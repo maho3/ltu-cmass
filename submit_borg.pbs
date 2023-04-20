@@ -1,0 +1,14 @@
+#PBS -N jupylab
+#PBS -q batch
+#PBS -j oe
+#PBS -o borg_job.log
+#PBS -l walltime=04:00:00
+#PBS -l select=1:ncpus=128:mem=2000gb
+
+module purge
+module restore myborg
+source ~/data/venv/borg/bin/activate
+
+cd ~/git/cmass-ili/
+
+python ./run_borglpt.py 3000 526

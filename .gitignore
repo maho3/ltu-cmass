@@ -132,3 +132,7 @@ dmypy.json
 data
 *.jpg
 images/
+allocation_stats*
+fft_wisdom
+timing_stats*
+
