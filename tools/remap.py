@@ -1,4 +1,5 @@
 # originally from http://mwhite.berkeley.edu/BoxRemap/
+# TODO: really slow! Someone needs to rewrite this to make it more efficient
 
 import sys
 from math import *
