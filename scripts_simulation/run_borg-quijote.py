@@ -24,11 +24,11 @@ print(args)
 
 
 cind = args.cind
-L = 1000
-N = 512
+L = 3000
+N = 384
 zi = 127
 zf = 0.
-supersampling=1
+supersampling=2
 
 ai = 1/(1+zi)
 af = 1/(1+zf)
@@ -36,7 +36,7 @@ af = 1/(1+zf)
 transfer = 'EH' # 'CLASS' # 
 
 
-# define fucnctions
+# define fucntions
 def get_params(index):
     if index=="fid":
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
@@ -132,7 +132,7 @@ def run_density(cpar):
 content = get_params(cind)
 print(content)
 
-datadir = f'/home/mattho/git/cmass-ili/data/borg-quijote/latin_hypercube_HR-{N}/{cind}'
+datadir = f'/home/mattho/git/cmass-ili/data/borg-quijote/latin_hypercube_HR-L{L}-N{N}/{cind}'
 os.makedirs(datadir, exist_ok=True)
 print('I will save to:', datadir)
 
