@@ -80,7 +80,7 @@
 #                 return False
 #         return True
 
-    
+
 # def UnitCubeTest(P):
 #     """Return +1, 0, or -1 if the unit cube is above, below, or intersecting the plane."""
 #     above = 0
@@ -225,7 +225,7 @@
 #         x2 = fmod(p[1], 1) + (p[1] < 0)
 #         x3 = fmod(p[2], 1) + (p[2] < 0)
 #         return vec3(x1, x2, x3)
-    
+
 #     def TransformVelocity(self, vx, vy, vz):
 #         v = vec3(vx,vy,vz)
 #         return (dot(v, self.n1), dot(v, self.n2), dot(v, self.n3))
@@ -240,6 +240,7 @@ import sys
 import numpy as np
 
 verbose = False
+
 
 class vec3(np.ndarray):
     """A simple 3D vector class, using NumPy for fast array operations."""
@@ -277,11 +278,14 @@ class vec3(np.ndarray):
 def dot(u, v):
     return np.dot(u, v)
 
+
 def square(v):
     return np.dot(v, v)
 
+
 def length(v):
     return np.sqrt(square(v))
+
 
 def triple_scalar_product(u, v, w):
     return dot(u, np.cross(v, w))
@@ -319,8 +323,9 @@ def UnitCubeTest(P):
     """Return +1, 0, or -1 if the unit cube is above, below, or intersecting the plane."""
     above = 0
     below = 0
-    unit_cube = np.array([(0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)])
-    for (a,b,c) in unit_cube:
+    unit_cube = np.array([(0, 0, 0), (0, 0, 1), (0, 1, 0),
+                         (0, 1, 1), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)])
+    for (a, b, c) in unit_cube:
         s = P.test(a, b, c)
         if s > 0:
             above = 1
@@ -332,20 +337,22 @@ def UnitCubeTest(P):
 class Cuboid:
     """Cuboid remapping class."""
 
-    def __init__(self, u1=(1,0,0), u2=(0,1,0), u3=(0,0,1)):
+    def __init__(self, u1=(1, 0, 0), u2=(0, 1, 0), u3=(0, 0, 1)):
         """Initialize by passing a 3x3 invertible integer matrix."""
         u1 = vec3(u1)
         u2 = vec3(u2)
         u3 = vec3(u3)
 
         if triple_scalar_product(u1, u2, u3) != 1:
-            print("!! Invalid lattice vectors: u1 = %s, u2 = %s, u3 = %s" % (u1, u2, u3), file=sys.stderr)
-            self.e1 = vec3(1,0,0)
-            self.e2 = vec3(0,1,0)
-            self.e3 = vec3(0,0,1)
+            print("!! Invalid lattice vectors: u1 = %s, u2 = %s, u3 = %s" %
+                  (u1, u2, u3), file=sys.stderr)
+            self.e1 = vec3(1, 0, 0)
+            self.e2 = vec3(0, 1, 0)
+            self.e3 = vec3(0, 0, 1)
         else:
             alpha = -dot(u1, u2) / square(u1)
-            gamma = -(alpha * dot(u1, u3) + dot(u2, u3)) / (alpha * dot(u1, u2) + square(u2))
+            gamma = -(alpha * dot(u1, u3) + dot(u2, u3)) / \
+                (alpha * dot(u1, u2) + square(u2))
             beta = -(dot(u1, u3) + gamma * dot(u1, u2)) / square(u1)
             self.e1 = u1
             self.e2 = u2 + alpha * u1
@@ -364,7 +371,7 @@ class Cuboid:
         self.n3 = self.e3 / self.L3
         self.cells = []
 
-        v0 = vec3(0,0,0)
+        v0 = vec3(0, 0, 0)
         self.v = np.array([v0,
                            v0 + self.e3,
                            v0 + self.e2,
@@ -415,12 +422,12 @@ class Cuboid:
 
                     if skipcell or len(c.faces) == 0:
                         if verbose:
-                            print("Skipping cell at (%d,%d,%d)" % (ix,iy,iz))
+                            print("Skipping cell at (%d,%d,%d)" % (ix, iy, iz))
                         continue
                     else:
                         self.cells.append(c)
                         if verbose:
-                            print("Adding cell at (%d,%d,%d)" % (ix,iy,iz))
+                            print("Adding cell at (%d,%d,%d)" % (ix, iy, iz))
 
         # For the identity remapping, use exactly one cell
         if len(self.cells) == 0:
@@ -431,7 +438,7 @@ class Cuboid:
             print("%d non-empty cells" % len(self.cells))
             for c in self.cells:
                 print("Cell at (%d,%d,%d) has %d non-trivial planes" % (c.ix,
-                    c.iy, c.iz, len(c.faces)))
+                                                                        c.iy, c.iz, len(c.faces)))
 
     def Transform(self, x, y, z):
         for c in self.cells:
@@ -441,7 +448,8 @@ class Cuboid:
                 z += c.iz
                 p = vec3(x, y, z)
                 return (dot(p, self.n1), dot(p, self.n2), dot(p, self.n3))
-        raise RuntimeError("(%g, %g, %g) not contained in any cell" % (x,y,z))
+        raise RuntimeError(
+            "(%g, %g, %g) not contained in any cell" % (x, y, z))
 
     def InverseTransform(self, r1, r2, r3):
         p = r1 * self.n1 + r2 * self.n2 + r3 * self.n3
