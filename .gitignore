@@ -135,4 +135,4 @@ images/
 allocation_stats*
 fft_wisdom
 timing_stats*
-
+.DS_Store
