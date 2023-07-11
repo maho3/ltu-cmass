@@ -1,28 +1,25 @@
 import numpy as np
-from sklearn.neighbors import KNeighborsRegressor
+from scipy.spatial import cKDTree
 import argparse
 import logging
+import jax
 from os.path import join as pjoin
 from cuboid_remap import Cuboid
 
-from tools.freecode import load_quijote_halos, TruncatedPowerLaw, sample_3d
+from tools.freecode import TruncatedPowerLaw, sample_3d
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)
 
 
-def load_hhalos(snapdir):
-    # load quijote halos and compute histogram
-    pos_h, mass, _, _ = load_quijote_halos(snapdir)
-    posm = np.concatenate([pos_h, np.log10(mass)[:, None]], axis=1)
-    h, edges = np.histogramdd(
-        posm,
-        (128, 128, 128, 10),
-        range=[(0, 1e3)]*3+[(12.8, 15.8)]
-    )
-    return h, edges
+def load_bias_params(bias_path, lhid):
+    # load the bias parameters for using the 1 Gpc Quijote sims
+    popt = np.load(pjoin(bias_path, f'{lhid}.npy'))
+    medges = np.load(pjoin(bias_path, 'medges.npy'))
+    return popt, medges
 
 
+@timing_decorator
 def load_borg(source_dir):
     rho = np.load(pjoin(source_dir, 'rho.npy'))
     ppos = np.load(pjoin(source_dir, 'ppos.npy'))
@@ -44,7 +41,6 @@ def pad(ppos, pvel, Lbox, Lpad):
         # recursively pad the cube
         if index >= 3:
             return []
-
         padded = []
         for i, dir in [(1, 1), (3, -1)]:
             mask = idig[:, index] == i
@@ -64,24 +60,60 @@ def pad(ppos, pvel, Lbox, Lpad):
     padvel = np.concatenate(padvel)
 
     logging.info(
-        f'len(pad)/len(original): {len(padpos)} / {len(ppos)}'
-        f'= {len(padpos)/len(ppos):.3f}')
+        f'len(pad)/len(original): {len(padpos)}/{len(ppos)}'
+        f' = {len(padpos)/len(ppos):.3f}')
     return padpos, padvel
 
 
 @timing_decorator
-def fit_bias_params(load_dir):
-    # fit the bias parameters for using the 1 Gpc Quijote sims
-    logging.info('Loading 1 Gpc sims...')
-    rho1g = np.load(pjoin(load_dir, 'df_m_128_z=0.npy'))
-    hhalos1g, edges = load_hhalos(load_dir)
-
-    logging.info('Fitting power law...')
+def sample_counts(rho, popt):
+    # sample the halo counts from the bias model
     law = TruncatedPowerLaw()
-    popt = np.zeros((10, 4))
+    return np.stack([law._get_mean_ngal(rho, *popt[i]) for i in range(10)],
+                    axis=-1)
+    # return np.stack([law.sample(rho, popt[i]) for i in range(10)], axis=-1)
+
+
+@timing_decorator
+def sample_positions(hsamp):
+    # sample the positions from the halo counts
+    xtrues = []
     for i in range(10):
-        popt[i] = law.fit(rho1g.flatten(), hhalos1g[..., i].flatten())
-    return popt, edges[-1]
+        xtrue, _, _ = sample_3d(
+            hsamp[..., i],
+            np.sum(hsamp[..., i]).astype(int),
+            3000, 0, np.zeros(3))
+        xtrues.append(xtrue.T)
+    return xtrues
+
+
+@timing_decorator
+def sample_velocities(xtrues, ppos, pvel):
+    # sample the velocities from the particles
+    tree = cKDTree(ppos, compact_nodes=False, balanced_tree=False)
+    k = 5
+    vtrues = []
+    for i in range(10):
+        _, nns = tree.query(xtrues[i], k)
+        vnns = pvel[nns.reshape(-1)].reshape(-1, k, 3)
+        vtrues.append(np.mean(vnns, axis=1))
+    return vtrues
+
+    # knn = KNeighborsRegressor(
+    #     n_neighbors=5, leaf_size=1000,
+    #     algorithm='ball_tree', weights='distance', n_jobs=-1)
+    # knn.fit(ppos, pvel)
+    # vtrues = [knn.predict(x) for x in xtrues]
+
+
+@timing_decorator
+def sample_masses(Nsamp, medges):
+    # sample the masses from the mass bins
+    mtrues = []
+    for i in range(len(medges)-1):
+        im = np.random.uniform(*medges[i:i+2], size=Nsamp[i])
+        mtrues.append(im)
+    return mtrues
 
 
 def remap(ppos, pvel):
@@ -90,12 +122,11 @@ def remap(ppos, pvel):
     u1, u2, u3 = (1, 1, 0), (0, 0, 1), (1, 0, 0)
 
     c = Cuboid(u1, u2, u3)
-    ppos = c.Transform(ppos/Lbox)*Lbox
-    pvel = c.TransformVelocity(pvel)
+    ppos = jax.vmap(c.Transform)(ppos/Lbox)*Lbox
+    pvel = jax.vmap(c.TransformVelocity)(pvel)
     return ppos, pvel
 
 
-@timing_decorator
 def main():
     # Load global configuration
     glbcfg = get_global_config()
@@ -107,10 +138,9 @@ def main():
     args = parser.parse_args()
 
     logging.info(f'Running with lhid={args.lhid}...')
-
-    load_dir = pjoin(glbcfg['wdir'],
-                     f'quijote/density_field/latin_hypercube/{args.lhid}')
-    popt, medges = fit_bias_params(load_dir)
+    logging.info('Loading bias parameters...')
+    bias_path = pjoin(glbcfg['wdir'], 'quijote/bias_fit/LH_n=128')
+    popt, medges = load_bias_params(bias_path, args.lhid)
 
     logging.info('Loading 3 Gpc sims...')
     source_dir = pjoin(
@@ -119,33 +149,19 @@ def main():
     rho, ppos, pvel = load_borg(source_dir)
 
     logging.info('Padding...')
-    ppos, pvel = pad(ppos, pvel, Lbox=3000, Lpad=100)
-
-    logging.info('Building KDE tree...')
-    knn = KNeighborsRegressor(n_neighbors=5, weights='distance')
-    knn.fit(ppos, pvel)  # todo: account for periodic boundary conditions
+    ppos, pvel = pad(ppos, pvel, Lbox=3000, Lpad=10)
 
     logging.info('Sampling power law...')
-    law = TruncatedPowerLaw()
-    hsamp = np.stack([law.sample(rho, popt[i]) for i in range(10)], axis=-1)
+    hsamp = sample_counts(rho, popt)
 
-    logging.info('Sampling halos in Poisson field...')
-    xtrues = []
-    for i in range(10):
-        xtrue, _, _ = sample_3d(
-            hsamp[..., i],
-            np.sum(hsamp[..., i]).astype(int),
-            3000, 0, np.zeros(3))
-        xtrues.append(xtrue.T)
+    logging.info('Sampling halo positions as a Poisson field...')
+    xtrues = sample_positions(hsamp)
 
     logging.info('Calculating velocities...')
-    vtrues = [knn.predict(x) for x in xtrues]
+    vtrues = sample_velocities(xtrues, ppos, pvel)
 
     logging.info('Sampling masses...')
-    mtrues = []
-    for i in range(len(medges)-1):
-        im = np.random.uniform(*medges[i:i+2], size=len(xtrues[i]))
-        mtrues.append(im)
+    mtrues = sample_masses(hsamp.sum(axis=(0, 1, 2)).astype(int), medges)
 
     logging.info('Combine...')
     xtrues = np.concatenate(xtrues, axis=0)

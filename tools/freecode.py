@@ -156,17 +156,18 @@ class TruncatedPowerLaw:
         loss = np.mean(ngal_mean - count_field * np.log(ngal_mean))
         return loss
 
-    def fit(self, delta, count_field):
+    def fit(self, delta, count_field, verbose=False):
         initial_guess = np.array([1.1, 1.1, 1.1, 0.51])
         bounds = [(0, None)] * 4  # Bounds for positive values
         result = minimize(
             self._loss, initial_guess, args=(delta, count_field),
             method='Nelder-Mead',
             bounds=bounds,
-            options={'disp': True}
+            options={'disp': verbose}
         )
         popt = result.x
-        print(f"Power law bias fit params: {popt}")
+        if verbose:
+            print(f"Power law bias fit params: {popt}")
         return popt
 
     def predict(self, delta, popt):

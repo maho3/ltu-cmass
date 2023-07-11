@@ -6,15 +6,17 @@ Most functions are from or inspired by: https://github.com/changhoonhahn/simbig/
 import os
 import numpy as np
 import pymangle
-
+from astropy.stats import scott_bin_width
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 # mask functions
+
 
 def BOSS_angular(ra, dec):
     ''' Given RA and Dec, check whether the galaxies are within the angular
     mask of BOSS
     '''
-    f_poly = os.path.join('data', 'mask_DR12v5_CMASSLOWZ_North.ply')
+    f_poly = os.path.join('data', 'obs', 'mask_DR12v5_CMASS_North.ply')
     mask = pymangle.Mangle(f_poly)
 
     w = mask.weight(ra, dec)
@@ -22,7 +24,7 @@ def BOSS_angular(ra, dec):
     return inpoly
 
 
-def BOSS_veto(ra, dec):
+def BOSS_veto(ra, dec, verbose=False):
     ''' given RA and Dec, find the objects that fall within one of the veto 
     masks of BOSS. At the moment it checks through the veto masks one by one.  
     '''
@@ -37,8 +39,9 @@ def BOSS_veto(ra, dec):
 
     veto_dir = 'data'
     for fveto in fvetos:
-        print(fveto)
-        veto = pymangle.Mangle(os.path.join(veto_dir, fveto))
+        if verbose:
+            print(fveto)
+        veto = pymangle.Mangle(os.path.join(veto_dir, 'obs', fveto))
         w_veto = veto.weight(ra, dec)
         in_veto = in_veto | (w_veto > 0.)
     return in_veto
@@ -73,15 +76,57 @@ def BOSS_radial(z, sample='lowz-south', seed=0):
     ngal_z, _ = np.histogram(np.array(z), bins=zedges)
 
     # fraction to downsample
-    fdown_z = tot_gal/ngal_z.astype(float)
+    # fdown_z = tot_gal/ngal_z.astype(float)
 
     # impose redshift limit
     zlim = (z > zmin) & (z < zmax)
 
-    i_z = np.digitize(z, zedges)
-    downsample = (np.random.rand(len(z)) < fdown_z[i_z])
+    # i_z = np.digitize(z, zedges)
+    # downsample = (np.random.rand(len(z)) < fdown_z[i_z])
 
     return zlim  # & downsample
+
+
+def BOSS_area():
+    f_poly = os.path.join('data', 'obs/mask_DR12v5_CMASSLOWZ_North.ply')
+    boss_poly = pymangle.Mangle(f_poly)
+    area = np.sum(boss_poly.areas * boss_poly.weights)  # deg^2
+    return area
+
+
+def get_nofz(z, fsky, cosmo=None):
+    ''' calculate nbar(z) given redshift values and f_sky (sky coverage
+    fraction)
+    Parameters
+    ----------
+    z : array like
+        array of redshift values 
+    fsky : float 
+        sky coverage fraction  
+    cosmo : cosmology object 
+        cosmology to calculate comoving volume of redshift bins 
+    Returns
+    -------
+    number density at input redshifts: nbar(z) 
+    Notes
+    -----
+    * based on nbdoykit implementation 
+    '''
+    # calculate nbar(z) for each galaxy
+    _, edges = scott_bin_width(z, return_bins=True)
+
+    dig = np.searchsorted(edges, z, "right")
+    N = np.bincount(dig, minlength=len(edges)+1)[1:-1]
+
+    R_hi = cosmo.comoving_distance(edges[1:])  # Mpc/h
+    R_lo = cosmo.comoving_distance(edges[:-1])  # Mpc/h
+
+    dV = (4./3.) * np.pi * (R_hi**3 - R_lo**3) * fsky
+
+    nofz = InterpolatedUnivariateSpline(
+        0.5*(edges[1:] + edges[:-1]), N/dV, ext='const')
+
+    return nofz
 
 
 # hod functions
