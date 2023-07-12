@@ -19,6 +19,7 @@ def load_halos(source_dir):
     pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
     vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
     mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
+    print(pos.max(axis=0), pos.min(axis=0))
     return pos, vel, mass
 
 
@@ -27,6 +28,16 @@ def populate_hod(
         pos, vel, mass,
         theta, cosmo, redshift, mdef,
         seed=0):
+    # sample theta based on priors set by Reid+(2014)
+    if seed != 0:
+        np.random.seed(seed)
+        hod_lower_bound = np.array([12.0, 0.1, 13.0, 13.0, 0.])
+        hod_upper_bound = np.array([14.0, 0.6, 15.0, 15.0, 1.5])
+        keys = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
+        theta = np.random.uniform(hod_lower_bound, hod_upper_bound, size=(5))
+        theta = dict(zip(keys, theta))
+        print(theta)
+
     # create a structured array to hold the halo catalog
     dtype = [('Position', (np.float32, 3)),
              ('Velocity', (np.float32, 3)),

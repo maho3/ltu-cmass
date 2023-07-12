@@ -1,8 +1,8 @@
 #PBS -N cmassFM
 #PBS -q batch
 #PBS -l walltime=4:00:00
-#PBS -l nodes=1:has1gpu:ppn=40,mem=128gb
-#PBS -t 1-20
+#PBS -l nodes=1:ppn=16,mem=32gb
+#PBS -t 51-100
 #PBS -j oe
 #PBS -o ./data/logs/_temp.o
 
@@ -13,11 +13,17 @@ cd /home/mattho/git/cmass-ili/
 echo activating environment...
 module load cuda
 source /data80/mattho/anaconda3/bin/activate
-conda activate jax
+conda activate nbodykit-env
 
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-python ./simulation/rho_to_halo.py --lhid ${PBS_ARRAYID}
+# for i in {0..20}
+# do
+#     python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i
+# done
+python ./simulation/apply_hod.py --lhid 3 --seed ${PBS_ARRAYID}
+python ./gals_to_summaries/apply_survey.py --lhid 3 --seed ${PBS_ARRAYID}
+python ./gals_to_summaries/calc_Pk_nbkit.py --lhid 3 --seed ${PBS_ARRAYID}
 
 echo done

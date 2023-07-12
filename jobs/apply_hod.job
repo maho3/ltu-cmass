@@ -1,0 +1,27 @@
+#PBS -N cmassFM
+#PBS -q batch
+#PBS -l walltime=8:00:00
+#PBS -l nodes=1:ppn=16,mem=32gb
+#PBS -t 1999
+#PBS -j oe
+#PBS -o ./data/logs/_temp.o
+
+echo cd-ing...
+
+cd /home/mattho/git/cmass-ili/
+
+echo activating environment...
+source /data80/mattho/anaconda3/bin/activate
+conda activate nbodykit-env
+
+echo running script...
+echo "arrayind is ${PBS_ARRAYID}"
+
+for i in {0..20}
+do
+    python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i
+    python ./gals_to_summaries/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i
+    python ./gals_to_summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i
+done
+
+echo done

@@ -2,9 +2,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 import argparse
 import logging
-import jax
 from os.path import join as pjoin
-from cuboid_remap import Cuboid
 
 from tools.freecode import TruncatedPowerLaw, sample_3d
 from tools.utils import get_global_config, get_logger, timing_decorator
@@ -116,17 +114,6 @@ def sample_masses(Nsamp, medges):
     return mtrues
 
 
-def remap(ppos, pvel):
-    # remap the particles to the cuboid
-    Lbox = 3000
-    u1, u2, u3 = (1, 1, 0), (0, 0, 1), (1, 0, 0)
-
-    c = Cuboid(u1, u2, u3)
-    ppos = jax.vmap(c.Transform)(ppos/Lbox)*Lbox
-    pvel = jax.vmap(c.TransformVelocity)(pvel)
-    return ppos, pvel
-
-
 def main():
     # Load global configuration
     glbcfg = get_global_config()
@@ -172,13 +159,6 @@ def main():
     np.save(pjoin(source_dir, 'halo_pos.npy'), xtrues)
     np.save(pjoin(source_dir, 'halo_vel.npy'), vtrues)
     np.save(pjoin(source_dir, 'halo_mass.npy'), mtrues)
-
-    logging.info('Remapping to cuboid...')
-    xtrues, vtrues = remap(xtrues, vtrues)
-
-    logging.info('Saving cuboid...')
-    np.save(pjoin(source_dir, 'halo_cuboid_pos.npy'), xtrues)
-    np.save(pjoin(source_dir, 'halo_cuboid_vel.npy'), vtrues)
 
     logging.info('Done!')
 

@@ -9,7 +9,8 @@ import pandas as pd
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_area, get_nofz
+from tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_area, \
+    get_nofz
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 # logger = get_logger(__name__)
@@ -47,7 +48,7 @@ def load_randoms():
     mask = (~BOSS_veto(randoms['RA'], randoms['DEC'], verbose=True))
     randoms = randoms[mask]
 
-    return randoms
+    return randoms.values
 
 
 @timing_decorator
@@ -62,7 +63,10 @@ def sky_to_xyz(rdz, cosmo):
 
 
 @timing_decorator
-def compute_Pk(grdz, rrdz, cosmo):
+def compute_Pk(grdz, rrdz, cosmo, weights=None):
+    if weights is None:
+        weights = np.ones(len(grdz))
+
     P0 = 1e4
     Ngrid = 360
     dk = 0.005
@@ -80,7 +84,7 @@ def compute_Pk(grdz, rrdz, cosmo):
     _gals = nblab.ArrayCatalog({
         'Position': gpos,
         'NZ': nbar_g,
-        'WEIGHT': np.ones(len(gpos)),  # w_g,
+        'WEIGHT': weights,  # w_g,
         'WEIGHT_FKP': 1./(1. + nbar_g * P0)
     })
 
@@ -124,7 +128,7 @@ def main():
     cosmo = cosmology.Planck15
 
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms.values, cosmo)
+    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo)
 
     # save results
     outpath = pjoin(source_dir, 'Pk')

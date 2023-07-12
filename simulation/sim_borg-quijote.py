@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import logging
 import borg
-from ..tools.utils import get_global_config, get_logger, timing_decorator
+from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)
 os.environ["PYBORG_QUIET"] = "yes"
@@ -16,7 +16,7 @@ os.environ["PYBORG_QUIET"] = "yes"
 def load_params(index):
     if index == "fid":
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
-    with open('latin_hypercube_params.txt', 'r') as f:
+    with open('latin_hypercube_params_bonus.txt', 'r') as f:
         content = f.readlines()[index+1]
     content = [np.float64(x) for x in content.split()]
     return content
@@ -163,13 +163,13 @@ def main():
     cpar = build_cosmology(content)
 
     # Set up output directory
-    outdir = pjoin(glbcfg['datadir'],
+    outdir = pjoin(glbcfg['wdir'], 'borg-quijote',
                    f'latin_hypercube_HR-L{L}-N{N}', f'{args.lhid}')
     logging.info(f'I will save to: {outdir}.')
 
     # Get ICs
     if args.matchIC:
-        path_to_ic = pjoin(glbcfg['datadir'],
+        path_to_ic = pjoin(glbcfg['wdir'],
                            'borg-quijote/ICs/wn_{args.lhid}.dat')
         ic = load_ICs(path_to_ic, N)
     else:
