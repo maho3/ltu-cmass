@@ -1,17 +1,15 @@
 import numpy as np
-from scipy.spatial import cKDTree
 import argparse
 import logging
 import jax
 from os.path import join as pjoin
 from cuboid_remap import Cuboid
-
-from tools.freecode import TruncatedPowerLaw, sample_3d
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)
 
 
+@timing_decorator
 def remap(ppos, pvel):
     # remap the particles to the cuboid
     Lbox = 3000

@@ -1,17 +1,12 @@
 
 
 # Quijote
-
-from matplotlib.patches import Rectangle
 import astropy.units as apu
 from astropy.coordinates import SkyCoord
 import scipy.stats
-import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import numpy as np
 import os
-import sys
-from struct import unpack
 
 
 class FoF_catalog:

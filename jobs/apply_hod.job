@@ -20,8 +20,8 @@ echo "arrayind is ${PBS_ARRAYID}"
 for i in {0..20}
 do
     python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i
-    python ./gals_to_summaries/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i
-    python ./gals_to_summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i
+    python ./simulation/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i
+    python ./summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i
 done
 
 echo done

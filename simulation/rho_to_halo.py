@@ -4,7 +4,7 @@ import argparse
 import logging
 from os.path import join as pjoin
 
-from tools.freecode import TruncatedPowerLaw, sample_3d
+from tools.shared_code import TruncatedPowerLaw, sample_3d
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)

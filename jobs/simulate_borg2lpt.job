@@ -17,6 +17,6 @@ source /home/mattho/data/venv/borg/bin/activate
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-python ./simulation/sim_borg-quijote.py --lhid ${PBS_ARRAYID}
+python ./simulation/simulate_borg2lpt.py --lhid ${PBS_ARRAYID}
 
 echo done

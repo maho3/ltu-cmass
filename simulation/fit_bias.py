@@ -5,7 +5,7 @@ from os.path import join as pjoin
 import multiprocessing as mp
 from functools import partial
 
-from tools.freecode import load_quijote_halos, TruncatedPowerLaw
+from tools.shared_code import load_quijote_halos, TruncatedPowerLaw
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)
