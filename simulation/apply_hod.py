@@ -1,3 +1,20 @@
+"""
+Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
+
+Requires:
+    - nbodykit
+
+Input:
+    - pos: halo positions
+    - vel: halo velocities
+    - mass: halo masses
+    - seed: random seed for sampling HOD parameters
+
+Output:
+    - pos: galaxy positions
+    - vel: galaxy velocities
+"""
+
 import numpy as np
 import argparse
 import logging

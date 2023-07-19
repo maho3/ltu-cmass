@@ -1,3 +1,16 @@
+"""
+Applies BOSS survey mask to a lightcone-shaped volume of galaxies.
+
+Requires:
+    - nbodykit
+    - pymangle
+    - astropy
+
+Input:
+    - pos: (N, 3) array of galaxy positions
+    - vel: (N, 3) array of galaxy velocities
+"""
+
 import os
 import numpy as np
 import argparse

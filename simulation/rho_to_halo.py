@@ -1,3 +1,24 @@
+"""
+Sample halos from the density field using a bias model. Assumes
+a continuous Poissonian distribution of halos by interpolating
+between the grid points of the density field
+
+Requires:
+    - scipy
+
+Input:
+    - rho: density field
+    - ppos: particle positions
+    - pvel: particle velocities
+    - popt: bias parameters
+    - medges: mass bin edges
+
+Output:
+    - xtrues: halo positions
+    - vtrues: halo velocities
+    - mtrues: halo masses
+"""
+
 import numpy as np
 from scipy.spatial import cKDTree
 import argparse

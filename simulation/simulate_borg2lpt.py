@@ -1,3 +1,19 @@
+"""
+Simulate density field using Borg2LPT.
+
+Requires:
+    - borg
+
+Input:
+    - index: index of the cosmological parameters in the
+        latin_hypercube_params_bonus.txt file
+
+Output:
+    - rho: density field
+    - ppos: particle positions
+    - pvel: particle velocities
+"""
+
 
 import os
 from os.path import join as pjoin
