@@ -1,0 +1,22 @@
+#PBS -N simjaxlpt
+#PBS -q batch
+#PBS -l walltime=4:00:00
+#PBS -l nodes=1:ppn=128,mem=256gb
+#PBS -t 1999
+#PBS -j oe
+#PBS -o ./data/logs/_temp.o
+
+echo cd-ing...
+
+cd /home/mattho/git/cmass-ili/
+
+echo activating environment...
+module restore myborg
+source /home/mattho/data/venv/borg/bin/activate
+
+echo running script...
+echo "arrayind is ${PBS_ARRAYID}"
+
+python ./simulation/simulate_jax2lpt.py --lhid ${PBS_ARRAYID}
+
+echo done
