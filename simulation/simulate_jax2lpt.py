@@ -5,7 +5,7 @@ from os.path import join as pjoin
 
 import borg
 import numpy as np
-from jax_lpt.hades import HadesJaxLpt
+import jax_lpt
 
 from tools.utils import get_global_config, get_logger, timing_decorator
 
@@ -30,29 +30,6 @@ def build_cosmology(pars):
     return cpar
 
 
-def transfer_EH(chain, box, ai):
-    chain.addModel(borg.forward.models.Primordial(box, ai))
-    chain.addModel(borg.forward.models.EisensteinHu(box))
-
-
-def transfer_CLASS(chain, box, cpar, ai):
-    # not currently used
-    sigma8_true = np.copy(cpar.sigma8)
-    cpar.sigma8 = 0
-    cpar.A_s = 2.3e-9  # will be modified to correspond to correct sigma
-    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade=10, k_max=50, extra={"YHe": "0.24"})
-    cosmo.computeSigma8()  # will compute sigma for the provided A_s
-    cos = cosmo.getCosmology()
-    # Update A_s
-    cpar.A_s = (sigma8_true / cos["sigma_8"]) ** 2 * cpar.A_s
-    # Add primordial fluctuations
-    chain.addModel(borg.forward.model_lib.M_PRIMORDIAL_AS(box))
-    # Add CLASS transfer function
-    transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(box, opts={"a_transfer": ai, "use_class_sign": False})
-    transfer_class.setModelParams({"extra_class_arguments": {"YHe": "0.24", "z_max_pk": "200"}})
-    chain.addModel(transfer_class)
-
-
 @timing_decorator
 def gen_ICs(N):
     """Generate ICs in Fourier space."""
@@ -71,54 +48,31 @@ def load_ICs(path_to_ic, N):
     return modes
 
 
-# NOTE: There is currently no supersampling option for JAX-LPT
 @timing_decorator
-def run_density(
-    ic,
-    L,
-    N,
-    ai,
-    af,
-    cpar,
-    transfer="EH",
-):
+def run_density(ic, L, N, ai, af, cpar, transfer="EH"):
     # Initialize the simulation box
-    box = borg.forward.BoxModel()
-    box.L = (L, L, L)
-    box.N = (N, N, N)
+    box = jax_lpt.simgrid.Box(L, N)
 
-    # Initialize the chain
-    chain = borg.forward.ChainForwardModel(box)
-    chain.addModel(borg.forward.models.HermiticEnforcer(box))
+    # Initial density at initial scale-factor
+    rho_init = jax_lpt.utils.generate_initial_density(L, N, cpar, ai, ic, transfer)
 
-    # Add transfer function
-    if transfer == "CLASS":
-        transfer_CLASS(chain, box, cpar, ai)
-    elif transfer == "EH":
-        transfer_EH(chain, box, ai)
-
-    # JAX-LPT model (2lpt)
-    lpt = HadesJaxLpt(box, ai, af, lpt_order=2)
-    chain.addModel(lpt)
-    chain.setCosmoParams(cpar)
+    # JAX-2LPT model
+    lpt = jax_lpt.lpt.Jax2LptSolver(box, cpar, ai, af, with_velocities=True)
 
     print("Running forward...")
-    chain.forwardModel_v2(ic)
+    rho = lpt.run(rho_init)
+    pos = lpt.get_positions()
+    vel = lpt.get_velocities()
 
-    print("Storing...")
-    rho = np.empty(chain.getOutputBoxModel().N)
-    chain.getDensityFinal(rho)
-
-    # TODO: Also extract particle positions and velocities
-
-    return rho
+    return rho, pos, vel
 
 
-# TODO: extend it to saving of positions and velocities once implemented
 @timing_decorator
-def save(savedir, rho):
+def save(savedir, rho, pos, vel):
     os.makedirs(savedir, exist_ok=True)
     np.save(pjoin(savedir, "rho.npy"), rho)
+    np.save(pjoin(savedir, "pos.npy"), pos)
+    np.save(pjoin(savedir, "vel.npy"), vel)
     logging.info(f"Saved to {savedir}.")
 
 
@@ -143,11 +97,9 @@ def main():
     N = 384  # number of grid points
     zi = 127  # initial redshift
     zf = 0.0  # final redshift
-    # supersampling = 2  # NOTE: WARNING: supersampling is not implemented for JAX-LPT, this parameter is not considered
-    transfer = "EH"  # Transfer function 'CLASS' or 'EH'
-
     ai = 1 / (1 + zi)
     af = 1 / (1 + zf)
+    transfer = "EH"  # transfer function 'CLASS' or 'EH'
 
     # Set up cosmo
     content = load_params(args.lhid)
@@ -166,12 +118,10 @@ def main():
         ic = gen_ICs(N)
 
     # Run
-    # TODO: extend it to positions and velocities
-    rho = run_density(ic, L, N, ai, af, cpar, transfer=transfer)
+    rho, pos, vel = run_density(ic, L, N, ai, af, cpar, transfer)
 
     # Save
-    # TODO: Use it with the extended version including positions and velocities
-    save(outdir, rho)
+    save(outdir, rho, pos, vel)
 
 
 if __name__ == "__main__":
