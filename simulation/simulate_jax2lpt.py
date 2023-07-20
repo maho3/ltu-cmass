@@ -5,7 +5,7 @@ from os.path import join as pjoin
 
 import borg
 import numpy as np
-import jax_lpt
+from jax_lpt import lpt, simgrid, utils
 
 from tools.utils import get_global_config, get_logger, timing_decorator
 
@@ -51,18 +51,18 @@ def load_ICs(path_to_ic, N):
 @timing_decorator
 def run_density(ic, L, N, ai, af, cpar, transfer="EH"):
     # Initialize the simulation box
-    box = jax_lpt.simgrid.Box(L, N)
+    box = simgrid.Box(L, N)
 
     # Initial density at initial scale-factor
-    rho_init = jax_lpt.utils.generate_initial_density(L, N, cpar, ai, ic, transfer)
+    rho_init = utils.generate_initial_density(L, N, cpar, ai, ic, transfer)
 
     # JAX-2LPT model
-    lpt = jax_lpt.lpt.Jax2LptSolver(box, cpar, ai, af, with_velocities=True)
+    fwd = lpt.Jax2LptSolver(box, cpar, ai, af, with_velocities=True)
 
     print("Running forward...")
-    rho = lpt.run(rho_init)
-    pos = lpt.get_positions()
-    vel = lpt.get_velocities()
+    rho = fwd.run(rho_init)
+    pos = fwd.get_positions()
+    vel = fwd.get_velocities()
 
     return rho, pos, vel
 
