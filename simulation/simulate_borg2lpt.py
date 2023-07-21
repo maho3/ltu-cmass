@@ -163,8 +163,8 @@ def main():
     args = parser.parse_args()
 
     # Set manually
-    L = 3000  # Mpc/h
-    N = 384  # number of grid points
+    L = 1000  # Mpc/h
+    N = 128  # number of grid points
     zi = 127  # initial redshift
     zf = 0.  # final redshift
     supersampling = 2
@@ -186,7 +186,7 @@ def main():
     # Get ICs
     if args.matchIC:
         path_to_ic = pjoin(glbcfg['wdir'],
-                           'borg-quijote/ICs/wn_{args.lhid}.dat')
+                           f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
         ic = load_ICs(path_to_ic, N)
     else:
         ic = gen_ICs(N)

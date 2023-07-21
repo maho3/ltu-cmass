@@ -14,6 +14,8 @@ Output:
     - vtrues: (N, 3) array of point set velocities in cuboid
 """
 
+import os
+os.environ['OPENBLAS_NUM_THREADS']='16'
 
 import numpy as np
 import argparse

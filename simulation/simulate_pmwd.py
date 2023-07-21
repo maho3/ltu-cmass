@@ -1,3 +1,5 @@
+import os 
+os.environ['OPENBLAS_NUM_THREADS']='16'
 
 from tools.utils import get_global_config, get_logger, timing_decorator
 from pmwd.spec_util import powspec
@@ -14,9 +16,7 @@ from pmwd import (
 import logging
 import numpy as np
 import argparse
-import os
 from os.path import join as pjoin
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'
 
 
 # define fucntions
@@ -31,14 +31,7 @@ def load_params(index):
 
 
 @timing_decorator
-def gen_ICs(N):
-    """Generate ICs in Fourier space."""
-    ic = np.fft.rfftn(np.random.randn(N, N, N))/N**(1.5)
-    return ic
-
-
-@timing_decorator
-def load_ICs(path_to_ic, N):
+def load_white_noise(path_to_ic, N):
     """Loading in Fourier space."""
     logging.info(f"Loading ICs from {path_to_ic}...")
     num_modes_last_d = N // 2 + 1
@@ -60,7 +53,6 @@ def run_density(
     ptcl, obsvbl = lpt(ic, cosmo, conf)
     ptcl, obsvbl = nbody(ptcl, obsvbl, cosmo, conf)
     rho = scatter(ptcl, conf)
-    ptcl, obsvbl = nbody(ptcl, obsvbl, cosmo, conf)
     pos = ptcl.disp
     vel = ptcl.vel
     return rho, pos, vel
@@ -87,7 +79,7 @@ def main():
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--matchIC', action='store_true')
     args = parser.parse_args()
-
+    
     content = load_params(args.lhid)
     logging.info(f'Cosmology parameters: {content}')
 
@@ -99,32 +91,25 @@ def main():
     ptcl_grid_shape = (N,)*3
     conf = Configuration(ptcl_spacing, ptcl_grid_shape,
                          mesh_shape=supersampling)
-    if args.seed:
-        seed = args.seed
-    else:
-        seed = 0
     cosmo = Cosmology.from_sigma8(
         conf, content[4], n_s=content[3], Omega_m=content[0],
         Omega_b=content[1], h=content[2])
+    
     if args.matchIC:
         path_to_ic = pjoin(glbcfg['wdir'],
-                           f'borg-quijote/ICs/wn_{args.lhid}.dat')
-        ic = load_ICs(path_to_ic, N)
+                           f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
+        modes = load_white_noise(path_to_ic, N)
     else:
         modes = white_noise(seed, conf)
-        cosmo = boltzmann(cosmo, conf)
-        ic = linear_modes(modes, cosmo, conf)
+    cosmo = boltzmann(cosmo, conf)
+    ic = linear_modes(modes, cosmo, conf)
 
-    outdir = pjoin(glbcfg['wdir'], 'pmwd-quijote',
-                   f'latin_hypercube_HR-L{L}-N{N}', f'{args.lhid}')
     # Run
-    rho, pos, vel = run_density(
-        ic,
-        conf,
-        cosmo
-    )
+    rho, pos, vel = run_density(ic, conf, cosmo)
 
     # Save
+    outdir = pjoin(glbcfg['wdir'], 'pmwd-quijote',
+                   f'latin_hypercube_HR-L{L}-N{N}', f'{args.lhid}')
     save(outdir, rho, pos, vel)
 
 
