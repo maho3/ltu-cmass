@@ -1,3 +1,20 @@
+"""
+Fits a TruncatedPowerLaw bias model to the density field vs. halo counts in
+the Quijote simulations.
+
+Requires:
+    - scipy
+    - astropy
+
+Input:
+    - posh: (N, 3) array of halo positions
+    - mass: (N,) array of halo masses
+    - rho: (N, N, N) array of density field
+
+Output:
+    - popt: (10, 3) array of bias parameters
+"""
+
 import numpy as np
 import argparse
 import logging

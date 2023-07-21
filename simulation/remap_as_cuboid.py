@@ -1,3 +1,22 @@
+"""
+Remaps a cubic box to a cuboid, designed to fit the survey geometry.
+
+Requires:
+    - jax
+    - https://github.com/maho3/cuboid_remap_jax
+
+Input:
+    - xtrues: (N, 3) array of point set positions in cube
+    - vtrues: (N, 3) array of point set velocities in cube
+
+Output:
+    - xtrues: (N, 3) array of point set positions in cuboid
+    - vtrues: (N, 3) array of point set velocities in cuboid
+"""
+
+import os
+os.environ['OPENBLAS_NUM_THREADS']='16'
+
 import numpy as np
 import argparse
 import logging

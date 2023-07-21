@@ -1,6 +1,6 @@
 """
 Functions for implementing BOSS-cmass forward models.
-Most functions are from or inspired by: https://github.com/changhoonhahn/simbig/blob/main/src/simbig/forwardmodel.py
+Many functions are from or inspired by: https://github.com/changhoonhahn/simbig/blob/main/src/simbig/forwardmodel.py
 """
 # imports
 import os
