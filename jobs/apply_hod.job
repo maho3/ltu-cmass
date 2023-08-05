@@ -2,7 +2,7 @@
 #PBS -q batch
 #PBS -l walltime=8:00:00
 #PBS -l nodes=1:ppn=16,mem=32gb
-#PBS -t 1999
+#PBS -t 0,2,3
 #PBS -j oe
 #PBS -o ./data/logs/_temp.o
 
@@ -17,11 +17,11 @@ conda activate nbodykit-env
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-for i in {0..20}
+for i in {0..10}
 do
-    python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i
-    python ./simulation/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i
-    python ./summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i
+    python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
+    python ./simulation/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
+    python ./summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
 done
 
 echo done

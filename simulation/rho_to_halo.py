@@ -20,7 +20,9 @@ Output:
 """
 
 import numpy as np
+import tqdm
 from scipy.spatial import cKDTree
+from sklearn.neighbors import KNeighborsRegressor
 import argparse
 import logging
 from os.path import join as pjoin
@@ -108,21 +110,12 @@ def sample_positions(hsamp):
 
 @timing_decorator
 def sample_velocities(xtrues, ppos, pvel):
-    # sample the velocities from the particles
-    tree = cKDTree(ppos, compact_nodes=False, balanced_tree=False)
-    k = 5
-    vtrues = []
-    for i in range(10):
-        _, nns = tree.query(xtrues[i], k)
-        vnns = pvel[nns.reshape(-1)].reshape(-1, k, 3)
-        vtrues.append(np.mean(vnns, axis=1))
+    knn = KNeighborsRegressor(
+        n_neighbors=5, leaf_size=1000,
+        algorithm='ball_tree', weights='distance', n_jobs=-1)
+    knn.fit(ppos, pvel)
+    vtrues = [knn.predict(x) for x in tqdm.tqdm(xtrues)]
     return vtrues
-
-    # knn = KNeighborsRegressor(
-    #     n_neighbors=5, leaf_size=1000,
-    #     algorithm='ball_tree', weights='distance', n_jobs=-1)
-    # knn.fit(ppos, pvel)
-    # vtrues = [knn.predict(x) for x in xtrues]
 
 
 @timing_decorator
@@ -143,6 +136,7 @@ def main():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)
+    parser.add_argument('--simtype', type=str, default='borg-quijote')
     args = parser.parse_args()
 
     logging.info(f'Running with lhid={args.lhid}...')
@@ -152,7 +146,7 @@ def main():
 
     logging.info('Loading 3 Gpc sims...')
     source_dir = pjoin(
-        glbcfg['wdir'], 'borg-quijote/latin_hypercube_HR-L3000-N384',
+        glbcfg['wdir'], f'{args.simtype}/latin_hypercube_HR-L3000-N384',
         f'{args.lhid}')
     rho, ppos, pvel = load_borg(source_dir)
 
@@ -169,7 +163,7 @@ def main():
     vtrues = sample_velocities(xtrues, ppos, pvel)
 
     logging.info('Sampling masses...')
-    mtrues = sample_masses(hsamp.sum(axis=(0, 1, 2)).astype(int), medges)
+    mtrues = sample_masses([len(x) for x in xtrues], medges)
 
     logging.info('Combine...')
     xtrues = np.concatenate(xtrues, axis=0)

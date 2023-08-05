@@ -85,12 +85,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--simtype', type=str, default='borg-quijote')
     args = parser.parse_args()
 
     logging.info(f'Running with lhid={args.lhid}, seed={args.seed}...')
     logging.info('Loading halos...')
     source_dir = pjoin(
-        glbcfg['wdir'], 'borg-quijote/latin_hypercube_HR-L3000-N384',
+        glbcfg['wdir'], f'{args.simtype}/latin_hypercube_HR-L3000-N384',
         f'{args.lhid}')
     pos, vel, mass = load_halos(source_dir)
 

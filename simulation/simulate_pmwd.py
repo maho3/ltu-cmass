@@ -1,5 +1,5 @@
-import os 
-os.environ['OPENBLAS_NUM_THREADS']='16'
+import os  # noqa
+os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa
 
 from tools.utils import get_global_config, get_logger, timing_decorator
 from pmwd.spec_util import powspec
@@ -36,9 +36,9 @@ def load_white_noise(path_to_ic, N):
     logging.info(f"Loading ICs from {path_to_ic}...")
     num_modes_last_d = N // 2 + 1
     with open(path_to_ic, 'rb') as f:
-        num_read = np.fromfile(f, np.uint32, 1)[0]
-        modes = np.fromfile(f, np.complex128, num_read).reshape(
-            (N, N, num_modes_last_d))
+        # num_read = np.fromfile(f, np.uint32, 1)[0]
+        modes = np.fromfile(f, np.complex128, -1)
+        modes = modes.reshape((N, N, num_modes_last_d))
     return modes
 
 
@@ -79,14 +79,14 @@ def main():
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--matchIC', action='store_true')
     args = parser.parse_args()
-    
+
     content = load_params(args.lhid)
     logging.info(f'Cosmology parameters: {content}')
 
     # Set manually
     L = 3000  # Mpc/h
     N = 384  # number of grid points
-    supersampling = 2
+    supersampling = 1
     ptcl_spacing = L / N
     ptcl_grid_shape = (N,)*3
     conf = Configuration(ptcl_spacing, ptcl_grid_shape,
@@ -94,18 +94,21 @@ def main():
     cosmo = Cosmology.from_sigma8(
         conf, content[4], n_s=content[3], Omega_m=content[0],
         Omega_b=content[1], h=content[2])
-    
+
     if args.matchIC:
         path_to_ic = pjoin(glbcfg['wdir'],
-                           f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
+                           f'wn/N{N}/wn_{args.lhid}.dat')
+        # path_to_ic = pjoin(glbcfg['wdir'],
+        #                    f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
         modes = load_white_noise(path_to_ic, N)
     else:
-        modes = white_noise(seed, conf)
+        modes = white_noise(args.seed, conf)
     cosmo = boltzmann(cosmo, conf)
     ic = linear_modes(modes, cosmo, conf)
 
     # Run
     rho, pos, vel = run_density(ic, conf, cosmo)
+    rho -= 1  # make it zero mean
 
     # Save
     outdir = pjoin(glbcfg['wdir'], 'pmwd-quijote',

@@ -1,6 +1,8 @@
+import os  # noqa
+os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa
+
 import argparse
 import logging
-import os
 from os.path import join as pjoin
 
 import borg
@@ -9,7 +11,7 @@ from jax_lpt import lpt, simgrid, utils
 
 from tools.utils import get_global_config, get_logger, timing_decorator
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 os.environ["PYBORG_QUIET"] = "yes"
 
 
@@ -43,8 +45,9 @@ def load_ICs(path_to_ic, N):
     logging.info(f"Loading ICs from {path_to_ic}...")
     num_modes_last_d = N // 2 + 1
     with open(path_to_ic, "rb") as f:
-        num_read = np.fromfile(f, np.uint32, 1)[0]
-        modes = np.fromfile(f, np.complex128, num_read).reshape((N, N, num_modes_last_d))
+        # num_read = np.fromfile(f, np.uint32, 1)[0]
+        modes = np.fromfile(f, np.complex128,
+                            -1).reshape((N, N, num_modes_last_d))
     return modes
 
 
@@ -64,15 +67,15 @@ def run_density(ic, L, N, ai, af, cpar, transfer="EH"):
     pos = fwd.get_positions()
     vel = fwd.get_velocities()
 
-    return rho, pos, vel
+    return rho, pos.T, vel.T
 
 
 @timing_decorator
 def save(savedir, rho, pos, vel):
     os.makedirs(savedir, exist_ok=True)
     np.save(pjoin(savedir, "rho.npy"), rho)
-    np.save(pjoin(savedir, "pos.npy"), pos)
-    np.save(pjoin(savedir, "vel.npy"), vel)
+    np.save(pjoin(savedir, "ppos.npy"), pos)
+    np.save(pjoin(savedir, "pvel.npy"), vel)
     logging.info(f"Saved to {savedir}.")
 
 
@@ -107,12 +110,16 @@ def main():
     cpar = build_cosmology(content)
 
     # Set up output directory
-    outdir = pjoin(glbcfg["wdir"], "borg-quijote", f"latin_hypercube_HR-L{L}-N{N}", f"{args.lhid}")
+    outdir = pjoin(glbcfg["wdir"], "jaxlpt-quijote",
+                   f"latin_hypercube_HR-L{L}-N{N}", f"{args.lhid}")
     logging.info(f"I will save to: {outdir}.")
 
     # Get ICs
     if args.matchIC:
-        path_to_ic = pjoin(glbcfg["wdir"], "borg-quijote/ICs/wn_{args.lhid}.dat")
+        path_to_ic = pjoin(glbcfg['wdir'],
+                           f'wn/N{N}/wn_{args.lhid}.dat')
+        # path_to_ic = pjoin(glbcfg['wdir'],
+        #                    f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
         ic = load_ICs(path_to_ic, N)
     else:
         ic = gen_ICs(N)

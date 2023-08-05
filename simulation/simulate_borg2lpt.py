@@ -84,9 +84,9 @@ def load_ICs(path_to_ic, N):
     logging.info(f"Loading ICs from {path_to_ic}...")
     num_modes_last_d = N // 2 + 1
     with open(path_to_ic, 'rb') as f:
-        num_read = np.fromfile(f, np.uint32, 1)[0]
-        modes = np.fromfile(f, np.complex128, num_read).reshape(
-            (N, N, num_modes_last_d))
+        # num_read = np.fromfile(f, np.uint32, 1)[0]
+        modes = np.fromfile(f, np.complex128, -1)
+        modes = modes.reshape((N, N, num_modes_last_d))
     return modes
 
 
@@ -163,11 +163,11 @@ def main():
     args = parser.parse_args()
 
     # Set manually
-    L = 1000  # Mpc/h
-    N = 128  # number of grid points
+    L = 3000  # Mpc/h
+    N = 384  # number of grid points
     zi = 127  # initial redshift
     zf = 0.  # final redshift
-    supersampling = 2
+    supersampling = 1
     transfer = 'EH'  # Transfer function 'CLASS' or 'EH'
 
     ai = 1/(1+zi)
@@ -186,7 +186,9 @@ def main():
     # Get ICs
     if args.matchIC:
         path_to_ic = pjoin(glbcfg['wdir'],
-                           f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
+                           f'wn/N{N}/wn_{args.lhid}.dat')
+        # path_to_ic = pjoin(glbcfg['wdir'],
+        #                    f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
         ic = load_ICs(path_to_ic, N)
     else:
         ic = gen_ICs(N)
