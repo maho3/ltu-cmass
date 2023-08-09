@@ -19,8 +19,8 @@ echo "arrayind is ${PBS_ARRAYID}"
 
 for i in {0..10}
 do
-    python ./simulation/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
-    python ./simulation/apply_survey.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
+    python ./biasing/apply_hod.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
+    python ./survey/apply_survey_cut.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
     python ./summaries/calc_Pk_nbkit.py --lhid ${PBS_ARRAYID} --seed $i --simtype pmwd-quijote
 done
 

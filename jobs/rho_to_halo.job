@@ -17,6 +17,6 @@ conda activate jax
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-python ./simulation/rho_to_halo.py --lhid ${PBS_ARRAYID} --simtype pmwd-quijote
+python ./biasing/rho_to_halo.py --lhid ${PBS_ARRAYID} --simtype pmwd-quijote
 
 echo done
