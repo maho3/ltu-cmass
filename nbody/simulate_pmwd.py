@@ -2,8 +2,6 @@ import os  # noqa
 os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa
 
 from tools.utils import get_global_config, get_logger, timing_decorator
-from pmwd.spec_util import powspec
-from pmwd.vis_util import simshow
 from pmwd import (
     Configuration,
     Cosmology,
@@ -21,10 +19,10 @@ from os.path import join as pjoin
 
 # define fucntions
 @timing_decorator
-def load_params(index):
+def load_params(index, cosmofile):
     if index == "fid":
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
-    with open('latin_hypercube_params_bonus.txt', 'r') as f:
+    with open(cosmofile, 'r') as f:
         content = f.readlines()[index+1]
     content = [np.float64(x) for x in content.split()]
     return content
@@ -53,7 +51,7 @@ def run_density(
     ptcl, obsvbl = lpt(ic, cosmo, conf)
     ptcl, obsvbl = nbody(ptcl, obsvbl, cosmo, conf)
     rho = scatter(ptcl, conf)
-    pos = ptcl.disp
+    pos = np.array(ptcl.pos())
     vel = ptcl.vel
     return rho, pos, vel
 
@@ -80,7 +78,7 @@ def main():
     parser.add_argument('--matchIC', action='store_true')
     args = parser.parse_args()
 
-    content = load_params(args.lhid)
+    content = load_params(args.lhid, glbcfg['cosmofile'])
     logging.info(f'Cosmology parameters: {content}')
 
     # Set manually
@@ -90,9 +88,10 @@ def main():
     ptcl_spacing = L / N
     ptcl_grid_shape = (N,)*3
     conf = Configuration(ptcl_spacing, ptcl_grid_shape,
+                         a_start=1/64., a_nbody_num=16,
                          mesh_shape=supersampling)
     cosmo = Cosmology.from_sigma8(
-        conf, content[4], n_s=content[3], Omega_m=content[0],
+        conf, sigma8=content[4], n_s=content[3], Omega_m=content[0],
         Omega_b=content[1], h=content[2])
 
     if args.matchIC:
@@ -109,6 +108,8 @@ def main():
     # Run
     rho, pos, vel = run_density(ic, conf, cosmo)
     rho -= 1  # make it zero mean
+    vel *= 100 * cosmo.h  # km/s
+    vel *= 2  # Approx rescaling... TODO: Figure out why!
 
     # Save
     outdir = pjoin(glbcfg['wdir'], 'pmwd-quijote',

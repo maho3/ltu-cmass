@@ -16,6 +16,8 @@ Output:
 
 
 import os
+os.environ["PYBORG_QUIET"] = "yes"  # noqa
+
 from os.path import join as pjoin
 import argparse
 import numpy as np
@@ -24,15 +26,14 @@ import borg
 from tools.utils import get_global_config, get_logger, timing_decorator
 
 logger = logging.getLogger(__name__)
-os.environ["PYBORG_QUIET"] = "yes"
 
 
 # define fucntions
 @timing_decorator
-def load_params(index):
+def load_params(index, cosmofile):
     if index == "fid":
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
-    with open('latin_hypercube_params_bonus.txt', 'r') as f:
+    with open(cosmofile, 'r') as f:
         content = f.readlines()[index+1]
     content = [np.float64(x) for x in content.split()]
     return content
@@ -42,6 +43,7 @@ def build_cosmology(pars):
     cpar = borg.cosmo.CosmologicalParameters()
     cpar.default()
     cpar.omega_m, cpar.omega_b, cpar.h, cpar.n_s, cpar.sigma8 = pars
+    cpar.omega_q = 1.0 - cpar.omega_m
     return cpar
 
 
@@ -174,7 +176,7 @@ def main():
     af = 1/(1+zf)
 
     # Set up cosmo
-    content = load_params(args.lhid)
+    content = load_params(args.lhid, glbcfg['cosmofile'])
     logging.info(f'Cosmology parameters: {content}')
     cpar = build_cosmology(content)
 
