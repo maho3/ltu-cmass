@@ -1,4 +1,4 @@
-# cmass-ili
+# cmass_ili
 A repository for storing code for the LtU Express Go Big pipeline. The scripts in this repository are designed to simulate and analyze mocks of the CMASS NGC galaxy sample from the BOSS survey.
 
 ## Organization
