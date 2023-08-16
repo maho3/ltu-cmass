@@ -1,7 +1,6 @@
 import os  # noqa
 os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa
 
-from tools.utils import get_global_config, get_logger, timing_decorator
 from pmwd import (
     Configuration,
     Cosmology,
@@ -15,6 +14,12 @@ import logging
 import numpy as np
 import argparse
 from os.path import join as pjoin
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
+
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='pmwd')
 
 
 # define fucntions
@@ -47,7 +52,6 @@ def run_density(
     cosmo,
 ):
     # initialize box and chain
-    cosmo = boltzmann(cosmo, conf)
     ptcl, obsvbl = lpt(ic, cosmo, conf)
     ptcl, obsvbl = nbody(ptcl, obsvbl, cosmo, conf)
     rho = scatter(ptcl, conf)
@@ -67,10 +71,6 @@ def save(savedir, rho, pos, vel):
 
 @timing_decorator
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)

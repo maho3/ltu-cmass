@@ -15,7 +15,7 @@ Output:
 """
 
 import os
-os.environ['OPENBLAS_NUM_THREADS']='16'
+os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa
 
 import numpy as np
 import argparse
@@ -23,9 +23,12 @@ import logging
 import jax
 from os.path import join as pjoin
 from cuboid_remap import Cuboid
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-logger = logging.getLogger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='remap_as_cuboid')
 
 
 @timing_decorator
@@ -41,10 +44,6 @@ def remap(ppos, pvel):
 
 
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)

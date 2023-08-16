@@ -22,10 +22,13 @@ from os.path import join as pjoin
 import multiprocessing as mp
 from functools import partial
 
-from tools.shared_code import load_quijote_halos, TruncatedPowerLaw
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.shared_code import load_quijote_halos, TruncatedPowerLaw
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-logger = logging.getLogger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='fit_halo_bias')
 
 
 @timing_decorator
@@ -60,10 +63,6 @@ def fit_bias_params(rho, hcounts):
 
 
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)

@@ -5,14 +5,15 @@ os.environ["PYBORG_QUIET"] = "yes"  # noqa
 import argparse
 import logging
 from os.path import join as pjoin
-
 import borg
 import numpy as np
 from jax_lpt import lpt, simgrid, utils
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-from tools.utils import get_global_config, get_logger, timing_decorator
 
-# logger = logging.getLogger(__name__)
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='jax2lpt')
 
 
 @timing_decorator
@@ -82,10 +83,6 @@ def save(savedir, rho, pos, vel):
 
 @timing_decorator
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg["logdir"])
-
     # Reduce verbosity
     console = borg.console()
     console.setVerboseLevel(1)

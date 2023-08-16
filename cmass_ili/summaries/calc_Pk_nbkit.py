@@ -30,9 +30,12 @@ from nbodykit import cosmology
 
 from tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_area, \
     get_nofz
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-# logger = get_logger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='calc_Pk_nbkit')
 
 
 @timing_decorator
@@ -129,9 +132,7 @@ def compute_Pk(grdz, rrdz, cosmo, weights=None):
 
 
 def main():
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
+    # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)
     parser.add_argument('--seed', type=int, default=0)

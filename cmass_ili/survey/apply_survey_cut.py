@@ -21,10 +21,13 @@ from scipy.spatial.transform import Rotation as R
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-# logger = get_logger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='apply_survey_cut')
 
 
 @timing_decorator
@@ -83,9 +86,7 @@ def reweight(rdz):
 
 
 def main():
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
+    # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)
     parser.add_argument('--seed', type=int, default=0)

@@ -2,22 +2,32 @@ import sys
 import logging
 import yaml
 import datetime
+import os
 from os.path import join as pjoin
 
 
-def get_logger(logdir, level=logging.INFO):
-    date = datetime.datetime.now().strftime("%Y%m%d_%H%M%S-%f")
-    date = date[:-4]  # remove last 4 digits of microseconds
-    path_to_log = pjoin(logdir, f'log{date}.log')
+def setup_logger(logdir, name='log', level=logging.INFO):
+    # define a naming prefix
+    date = datetime.datetime.now().strftime("%Y%m%d")
+    prefix = f'{name}_{date}'
 
+    # find all logs with the same prefix
+    logs = os.listdir(logdir)
+    logs = [l for l in logs if l.startswith(prefix)]
+
+    # find the next available number
+    path_to_log = pjoin(logdir, f'{name}_{date}_{len(logs):04}.log')
+
+    # setup the logger
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s-%(name)s-%(levelname)s %(message)s",
+        format="%(asctime)s-%(levelname)s %(message)s",
         handlers=[
             logging.FileHandler(path_to_log),
             logging.StreamHandler(sys.stdout)
         ]
     )
+    logging.info(f"Logging to {path_to_log}")
 
 
 def get_global_config():

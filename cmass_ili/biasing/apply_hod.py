@@ -24,11 +24,13 @@ from os.path import join as pjoin
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
 from nbodykit import cosmology
+from ..tools.BOSS_FM import thetahod_literature
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-from tools.BOSS_FM import thetahod_literature
-from tools.utils import get_global_config, get_logger, timing_decorator
 
-# logger = get_logger(__name__)
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='apply_hod')
 
 
 @timing_decorator

@@ -27,10 +27,13 @@ import argparse
 import logging
 from os.path import join as pjoin
 
-from tools.shared_code import TruncatedPowerLaw, sample_3d
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.shared_code import TruncatedPowerLaw, sample_3d
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-logger = logging.getLogger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='rho_to_halo')
 
 
 def load_bias_params(bias_path, lhid):
@@ -129,10 +132,6 @@ def sample_masses(Nsamp, medges):
 
 
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)

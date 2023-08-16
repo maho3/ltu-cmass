@@ -23,9 +23,12 @@ import argparse
 import numpy as np
 import logging
 import borg
-from tools.utils import get_global_config, get_logger, timing_decorator
+from ..tools.utils import get_global_config, setup_logger, timing_decorator
 
-logger = logging.getLogger(__name__)
+
+# Load global configuration and setup logger
+glbcfg = get_global_config()
+setup_logger(glbcfg['logdir'], name='borg2lpt')
 
 
 # define fucntions
@@ -123,11 +126,9 @@ def run_density(
     chain.setCosmoParams(cpar)
 
     # forward model
-
-    print('Running forward...')
+    logging.info('Running forward...')
     chain.forwardModel_v2(ic)
 
-    print('Storing...')
     Npart = lpt.getNumberOfParticles()
     rho = np.empty(chain.getOutputBoxModel().N)
     pos = np.empty(shape=(Npart, 3))
@@ -150,10 +151,6 @@ def save(savedir, rho, pos, vel):
 
 @timing_decorator
 def main():
-    # Load global configuration
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Reduce verbosity
     console = borg.console()
     console.setVerboseLevel(1)
@@ -205,6 +202,7 @@ def main():
     )
 
     # Save
+    logging.info('Saving...')
     save(outdir, rho, pos, vel)
 
 
