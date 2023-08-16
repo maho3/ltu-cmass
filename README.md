@@ -30,25 +30,25 @@ Below, we list the functionality of each script in the repository as well as its
 
 A full forward pass of the model might look like this:
 ```bash
-cd cmass-ili
+cd cmass_ili
 
 # simulate density field, particle positions and velocities with jax_lpt
-python ./nbody/simulate_jax2lpt.py --lhid 0
+python -m cmass_ili.nbody.jax2lpt --lhid 0
 
 # sample halo positions, velocities, and masses from the density field
-python ./biasing/rho_to_halo.py --lhid 0 --simtype jaxlpt-quijote
+python -m cmass_ili.biasing.rho_to_halo --lhid 0 --simtype jax2lpt
 
 # reshape the halo catalog to a cuboid matching our survey volume
-python ./survey/remap_as_cuboid.py --lhid 0 --simtype jaxlpt-quijote
+python -m cmass_ili.survey.remap_as_cuboid --lhid 0 --simtype jax2lpt
 
 # apply HOD to sample galaxies
-python ./biasing/apply_hod.py --lhid 0 --seed 42 --simtype jaxlpt-quijote
+python -m cmass_ili.biasing.apply_hod --lhid 0 --seed 42 --simtype jax2lpt
 
 # apply survey mask to the galaxy catalog
-python ./survey/apply_survey_cut.py --lhid 0 --seed 42 --simtype jaxlpt-quijote
+python -m cmass_ili.survey.apply_survey_cut --lhid 0 --seed 42 --simtype jax2lpt
 
 # calculate power spectrum of the galaxy catalog
-python ./summaries/calc_Pk_nbkit.py --lhid 0 --seed 42 --simtype jaxlpt-quijote
+python -m cmass_ili.summaries.calc_Pk_nbkit --lhid 0 --seed 42 --simtype jax2lpt
 ```
 
 This should save all intermediates and outputs to `./data/`.
