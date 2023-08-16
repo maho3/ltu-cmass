@@ -18,6 +18,6 @@ conda activate jax
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-python -m cmass_ili.survey.remap_as_cuboid --lhid ${PBS_ARRAYID} --simtype jaxlpt-quijote
+python -m cmass.survey.remap_as_cuboid --lhid ${PBS_ARRAYID} --simtype jaxlpt-quijote
 
 echo done

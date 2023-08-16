@@ -1,4 +1,4 @@
-# cmass_ili
+# ltu-cmass
 A repository for storing code for the LtU Express Go Big pipeline. The scripts in this repository are designed to simulate and analyze mocks of the CMASS NGC galaxy sample from the BOSS survey.
 
 ## Organization
@@ -6,22 +6,22 @@ A repository for storing code for the LtU Express Go Big pipeline. The scripts i
 
 Below, we list the functionality of each script in the repository as well as its major dependencies:
 
-### nbody
-  - `nbody/simulate_borg2lpt.py` - Simulate a cubic volume using Borg2LPT. Requires: `borg`.
-  - `nbody/simulate_jax2lpt.py` - Simulate a cubic volume using Jax2LPT. Requires: `borg` and `jax_lpt`.
-  - `nbody/simulate_pmwd.py` - Simulate a cubic volume using PM-WD. Requires: [`pmwd`](https://github.com/eelregit/pmwd/tree/master).
+### cmass/nbody
+  - `borg2lpt.py` - Simulate a cubic volume using Borg2LPT. Requires: `borg`.
+  - `jax2lpt.py` - Simulate a cubic volume using Jax2LPT. Requires: `borg` and `jax_lpt`.
+  - `pmwd.py` - Simulate a cubic volume using PM-WD. Requires: [`pmwd`](https://github.com/eelregit/pmwd/tree/master).
 
-### survey
-- `survey/remap_as_cuboid.py` - Remap a periodic volume to a cuboid. Requires: [`cuboid_remap_jax`](https://github.com/maho3/cuboid_remap_jax).
-- `survey/apply_survey_cut.py` - Applies BOSS survey mask to a lightcone-shaped volume of galaxies. Requires: `nbodykit`, `pymangle`, and `astropy`.
+### cmass/survey
+- `remap_as_cuboid.py` - Remap a periodic volume to a cuboid. Requires: [`cuboid_remap_jax`](https://github.com/maho3/cuboid_remap_jax).
+- `apply_survey_cut.py` - Applies BOSS survey mask to a lightcone-shaped volume of galaxies. Requires: `nbodykit`, `pymangle`, and `astropy`.
 
-### biasing
-- `biasing/fit_bias.py` - Fit a halo biasing model to map density fields to halo counts. Requires: `astropy` and `scipy`.
-- `biasing/rho_to_halo.py` - Sample halos from the density field using a pre-fit bias model. Requires: `scipy`.
-- `biasing/apply_hod.py` - Sample an HOD realization from the halo catalog using the Zheng+(2007) model. Requires: `nbodykit`.
+### cmass/biasing
+- `fit_bias.py` - Fit a halo biasing model to map density fields to halo counts. Requires: `astropy` and `scipy`.
+- `rho_to_halo.py` - Sample halos from the density field using a pre-fit bias model. Requires: `scipy`.
+- `apply_hod.py` - Sample an HOD realization from the halo catalog using the Zheng+(2007) model. Requires: `nbodykit`.
 
-### summaries
-- `summaries/calc_Pk_nbkit.py` - Measure the power spectrum of a galaxy catalog. Requires: `nbodykit`.
+### cmass/summaries
+- `calc_Pk_nbkit.py` - Measure the power spectrum of a galaxy catalog. Requires: `nbodykit`.
 
 ### Notebooks
 - `preprocess.ipynb` -  Executes various preprocessing tasks prepare for mass simulation. Designed to be run once at the start of code development.
@@ -30,25 +30,25 @@ Below, we list the functionality of each script in the repository as well as its
 
 A full forward pass of the model might look like this:
 ```bash
-cd cmass_ili
+cd ltu-cmass
 
 # simulate density field, particle positions and velocities with jax_lpt
-python -m cmass_ili.nbody.jax2lpt --lhid 0
+python -m cmass.nbody.jax2lpt --lhid 0
 
 # sample halo positions, velocities, and masses from the density field
-python -m cmass_ili.biasing.rho_to_halo --lhid 0 --simtype jax2lpt
+python -m cmass.biasing.rho_to_halo --lhid 0 --simtype jax2lpt
 
 # reshape the halo catalog to a cuboid matching our survey volume
-python -m cmass_ili.survey.remap_as_cuboid --lhid 0 --simtype jax2lpt
+python -m cmass.survey.remap_as_cuboid --lhid 0 --simtype jax2lpt
 
 # apply HOD to sample galaxies
-python -m cmass_ili.biasing.apply_hod --lhid 0 --seed 42 --simtype jax2lpt
+python -m cmass.biasing.apply_hod --lhid 0 --seed 42 --simtype jax2lpt
 
 # apply survey mask to the galaxy catalog
-python -m cmass_ili.survey.apply_survey_cut --lhid 0 --seed 42 --simtype jax2lpt
+python -m cmass.survey.apply_survey_cut --lhid 0 --seed 42 --simtype jax2lpt
 
 # calculate power spectrum of the galaxy catalog
-python -m cmass_ili.summaries.calc_Pk_nbkit --lhid 0 --seed 42 --simtype jax2lpt
+python -m cmass.summaries.calc_Pk_nbkit --lhid 0 --seed 42 --simtype jax2lpt
 ```
 
 This should save all intermediates and outputs to `./data/`.
