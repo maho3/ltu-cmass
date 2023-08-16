@@ -112,8 +112,8 @@ def main():
     vel *= 2  # Approx rescaling... TODO: Figure out why!
 
     # Save
-    outdir = pjoin(glbcfg['wdir'], 'pmwd-quijote',
-                   f'latin_hypercube_HR-L{L}-N{N}', f'{args.lhid}')
+    outdir = pjoin(glbcfg['wdir'], 'pmwd',
+                   f'L{L}-N{N}', f'{args.lhid}')
     save(outdir, rho, pos, vel)
 
 

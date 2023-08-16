@@ -178,8 +178,8 @@ def main():
     cpar = build_cosmology(content)
 
     # Set up output directory
-    outdir = pjoin(glbcfg['wdir'], 'borg-quijote',
-                   f'latin_hypercube_HR-L{L}-N{N}', f'{args.lhid}')
+    outdir = pjoin(glbcfg['wdir'], 'borg2lpt',
+                   f'L{L}-N{N}', f'{args.lhid}')
     logging.info(f'I will save to: {outdir}.')
 
     # Get ICs
@@ -187,7 +187,7 @@ def main():
         path_to_ic = pjoin(glbcfg['wdir'],
                            f'wn/N{N}/wn_{args.lhid}.dat')
         # path_to_ic = pjoin(glbcfg['wdir'],
-        #                    f'borg-quijote/ICs/wn-N{N}/wn_{args.lhid}.dat')
+        #                    f'borg2lpt/ICs/wn-N{N}/wn_{args.lhid}.dat')
         ic = load_ICs(path_to_ic, N)
     else:
         ic = gen_ICs(N)

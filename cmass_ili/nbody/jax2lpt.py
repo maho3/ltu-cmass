@@ -108,8 +108,8 @@ def main():
     cpar = build_cosmology(content)
 
     # Set up output directory
-    outdir = pjoin(glbcfg["wdir"], "jaxlpt-quijote",
-                   f"latin_hypercube_HR-L{L}-N{N}", f"{args.lhid}")
+    outdir = pjoin(glbcfg["wdir"], "jax2lpt",
+                   f'L{L}-N{N}', f"{args.lhid}")
     logging.info(f"I will save to: {outdir}.")
 
     # Get ICs

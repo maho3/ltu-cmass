@@ -47,14 +47,14 @@ def main():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--simtype', type=str, default='borg-quijote')
+    parser.add_argument('--simtype', type=str, default='borg2lpt')
     args = parser.parse_args()
 
     logging.info(f'Running with lhid={args.lhid}...')
 
     logging.info('Loading halo cube...')
     source_dir = pjoin(
-        glbcfg['wdir'], f'{args.simtype}/latin_hypercube_HR-L3000-N384',
+        glbcfg['wdir'], f'{args.simtype}/L3000-N384',
         f'{args.lhid}')
 
     xtrues = np.load(pjoin(source_dir, 'halo_pos.npy'))
