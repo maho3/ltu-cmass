@@ -108,8 +108,7 @@ def main():
     # Run
     rho, pos, vel = run_density(ic, conf, cosmo)
     rho -= 1  # make it zero mean
-    vel *= 100 * cosmo.h  # km/s
-    vel *= 2  # Approx rescaling... TODO: Figure out why!
+    vel *= 100  # km/s
 
     # Save
     outdir = pjoin(glbcfg['wdir'], 'pmwd',
