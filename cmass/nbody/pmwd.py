@@ -14,8 +14,9 @@ import logging
 import numpy as np
 import argparse
 from os.path import join as pjoin
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
-from .tools import load_params, gen_white_noise, load_white_noise, save_nbody
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
+from .tools import gen_white_noise, load_white_noise, save_nbody
 
 
 # Load global configuration and setup logger

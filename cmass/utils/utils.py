@@ -4,6 +4,7 @@ import yaml
 import datetime
 import os
 from os.path import join as pjoin
+import numpy as np
 import json
 
 
@@ -64,3 +65,13 @@ def timing_decorator(func, *args, **kwargs):
             f"Time elapsed: {int(dt//60)}m{int(dt%60)}s.")
         return out
     return wrapper
+
+
+@timing_decorator
+def load_params(index, cosmofile):
+    if index == "fid":
+        return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
+    with open(cosmofile, 'r') as f:
+        content = f.readlines()[index+1]
+    content = [np.float64(x) for x in content.split()]
+    return content

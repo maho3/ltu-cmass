@@ -4,9 +4,11 @@ Simulate density field using Borg2LPT.
 Requires:
     - borg
 
-Input:
+Params:
     - index: index of the cosmological parameters in the
         latin_hypercube_params_bonus.txt file
+    - order: LPT order (1 or 2)
+    - matchIC: whether to match ICs to file
 
 Output:
     - rho: density field
@@ -23,9 +25,10 @@ import argparse
 import numpy as np
 import logging
 import borg
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
-from .tools import load_params, gen_white_noise, load_white_noise, save_nbody
-from .borg_tools import build_cosmology, transfer_EH, transfer_CLASS
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
+from .tools import gen_white_noise, load_white_noise, save_nbody
+from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
 # Load global configuration and setup logger
@@ -129,7 +132,7 @@ def run_density(ic, L, N, supersampling, ai, af, cpar, order, transfer='EH'):
 def main():
     # Build run config
     cfg = build_config()
-    logging.info(f'Running with cosmology: {cfg.cosmo}')
+    logging.info(f'Running with config: {cfg.cosmo}')
 
     # Setup
     cpar = build_cosmology(*cfg.cosmo)

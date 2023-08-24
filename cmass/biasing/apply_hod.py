@@ -24,8 +24,8 @@ from os.path import join as pjoin
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
 from nbodykit import cosmology
-from ..tools.BOSS_FM import thetahod_literature
-from ..tools.utils import get_global_config, setup_logger, timing_decorator
+from .tools import thetahod_literature
+from ..utils import get_global_config, setup_logger, timing_decorator
 
 
 # Load global configuration and setup logger
@@ -80,9 +80,6 @@ def populate_hod(
 
 
 def main():
-    glbcfg = get_global_config()
-    get_logger(glbcfg['logdir'])
-
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--lhid', type=int, required=True)

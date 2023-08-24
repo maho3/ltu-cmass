@@ -8,9 +8,10 @@ from os.path import join as pjoin
 import borg
 import numpy as np
 from jax_lpt import lpt, simgrid, utils
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
-from .tools import load_params, gen_white_noise, load_white_noise, save_nbody
-from .borg_tools import build_cosmology
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
+from .tools import gen_white_noise, load_white_noise, save_nbody
+from .tools_borg import build_cosmology
 
 
 # Reduce verbosity

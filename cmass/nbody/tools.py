@@ -6,16 +6,6 @@ from ..utils import timing_decorator
 
 
 @timing_decorator
-def load_params(index, cosmofile):
-    if index == "fid":
-        return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
-    with open(cosmofile, 'r') as f:
-        content = f.readlines()[index+1]
-    content = [np.float64(x) for x in content.split()]
-    return content
-
-
-@timing_decorator
 def gen_white_noise(N):
     """Generate ICs in Fourier space."""
     ic = np.fft.rfftn(np.random.randn(N, N, N)) / N ** (1.5)

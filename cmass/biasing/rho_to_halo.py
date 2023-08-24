@@ -5,6 +5,9 @@ between the grid points of the density field
 
 Requires:
     - scipy
+    - sklearn
+    - jax
+    - pmwd
 
 Input:
     - rho: density field
@@ -14,26 +17,49 @@ Input:
     - medges: mass bin edges
 
 Output:
-    - xtrues: halo positions
-    - vtrues: halo velocities
-    - mtrues: halo masses
+    - hpos: halo positions
+    - hvel: halo velocities
+    - hmass: halo masses
 """
 
 import numpy as np
-import tqdm
-from scipy.spatial import cKDTree
-from sklearn.neighbors import KNeighborsRegressor
 import argparse
 import logging
 from os.path import join as pjoin
 
-from ..tools.shared_code import TruncatedPowerLaw, sample_3d
-from ..tools.utils import get_global_config, setup_logger, timing_decorator
+from .tools import (load_nbody, pad_3d, TruncatedPowerLaw,
+                    sample_3d)
+from .tools import (sample_velocities_density, sample_velocities_kNN,
+                    sample_velocities_CIC)
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
 glbcfg = get_global_config()
 setup_logger(glbcfg['logdir'], name='rho_to_halo')
+
+
+def build_config():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--lhid', type=int, required=True)  # which cosmology to use
+    parser.add_argument(
+        '--simtype', type=str, default='borg2lpt')  # which nbody sim to use
+    parser.add_argument(
+        '--veltype', type=str, default='density')  # method to infer velocities
+    args = parser.parse_args()
+
+    L = 3000           # length of box in Mpc/h
+    N = 384            # number of grid points on one side
+
+    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
+
+    return attrdict(
+        L=L, N=N, cosmo=cosmo,
+        lhid=args.lhid, simtype=args.simtype, veltype=args.veltype
+    )
 
 
 def load_bias_params(bias_path, lhid):
@@ -44,135 +70,83 @@ def load_bias_params(bias_path, lhid):
 
 
 @timing_decorator
-def load_borg(source_dir):
-    rho = np.load(pjoin(source_dir, 'rho.npy'))
-    ppos = np.load(pjoin(source_dir, 'ppos.npy'))
-    pvel = np.load(pjoin(source_dir, 'pvel.npy'))
-    return rho, ppos, pvel
-
-
-@timing_decorator
-def pad(ppos, pvel, Lbox, Lpad):
-    # pad the 3d particle cube with periodic boundary conditions
-
-    def offset(*inds):
-        # calculate the offset vector for a given region
-        out = np.zeros(3)
-        out[list(inds)] = Lbox
-        return out
-
-    def recursive_padding(ipos, idig, ivel, index=0):
-        # recursively pad the cube
-        if index >= 3:
-            return []
-        padded = []
-        for i, dir in [(1, 1), (3, -1)]:
-            mask = idig[:, index] == i
-            ippad, ivpad = ipos[mask] + dir*offset(index), ivel[mask]
-            padded += [(ippad, ivpad)]
-            padded += recursive_padding(ippad, idig[mask], ivpad, index+1)
-            padded += recursive_padding(ippad, idig[mask], ivpad, index+2)
-        return padded
-
-    regions = np.digitize(ppos, bins=[0, Lpad, Lbox - Lpad, Lbox])
-    padlist = [(ppos, pvel)]
-    padlist += recursive_padding(ppos, regions, pvel, index=0)
-    padlist += recursive_padding(ppos, regions, pvel, index=1)
-    padlist += recursive_padding(ppos, regions, pvel, index=2)
-    padpos, padvel = zip(*padlist)
-    padpos = np.concatenate(padpos)
-    padvel = np.concatenate(padvel)
-
-    logging.info(
-        f'len(pad)/len(original): {len(padpos)}/{len(ppos)}'
-        f' = {len(padpos)/len(ppos):.3f}')
-    return padpos, padvel
-
-
-@timing_decorator
 def sample_counts(rho, popt):
     # sample the halo counts from the bias model
     law = TruncatedPowerLaw()
     return np.stack([law._get_mean_ngal(rho, *popt[i]) for i in range(10)],
                     axis=-1)
-    # return np.stack([law.sample(rho, popt[i]) for i in range(10)], axis=-1)
 
 
 @timing_decorator
 def sample_positions(hsamp):
-    # sample the positions from the halo counts
-    xtrues = []
+    # sample the halo positions from the halo count field
+    hpos = []
     for i in range(10):
         xtrue, _, _ = sample_3d(
             hsamp[..., i],
             np.sum(hsamp[..., i]).astype(int),
             3000, 0, np.zeros(3))
-        xtrues.append(xtrue.T)
-    return xtrues
-
-
-@timing_decorator
-def sample_velocities(xtrues, ppos, pvel):
-    knn = KNeighborsRegressor(
-        n_neighbors=5, leaf_size=1000,
-        algorithm='ball_tree', weights='distance', n_jobs=-1)
-    knn.fit(ppos, pvel)
-    vtrues = [knn.predict(x) for x in tqdm.tqdm(xtrues)]
-    return vtrues
+        hpos.append(xtrue.T)
+    return hpos
 
 
 @timing_decorator
 def sample_masses(Nsamp, medges):
     # sample the masses from the mass bins
-    mtrues = []
+    hmass = []
     for i in range(len(medges)-1):
         im = np.random.uniform(*medges[i:i+2], size=Nsamp[i])
-        mtrues.append(im)
-    return mtrues
+        hmass.append(im)
+    return hmass
 
 
 def main():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--simtype', type=str, default='borg2lpt')
-    args = parser.parse_args()
+    # Build run config
+    cfg = build_config()
+    logging.info(f'Running with config: {cfg.cosmo}')
 
-    logging.info(f'Running with lhid={args.lhid}...')
-    logging.info('Loading bias parameters...')
     bias_path = pjoin(glbcfg['wdir'], 'quijote/bias_fit/LH_n=128')
-    popt, medges = load_bias_params(bias_path, args.lhid)
+    popt, medges = load_bias_params(bias_path, cfg.lhid)
 
     logging.info('Loading 3 Gpc sims...')
     source_dir = pjoin(
-        glbcfg['wdir'], f'{args.simtype}/L3000-N384',
-        f'{args.lhid}')
-    rho, ppos, pvel = load_borg(source_dir)
-
-    logging.info('Padding...')
-    ppos, pvel = pad(ppos, pvel, Lbox=3000, Lpad=10)
+        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}', f'{cfg.lhid}')
+    rho, ppos, pvel = load_nbody(source_dir)
 
     logging.info('Sampling power law...')
-    hsamp = sample_counts(rho, popt)
+    hcount = sample_counts(rho, popt)
 
     logging.info('Sampling halo positions as a Poisson field...')
-    xtrues = sample_positions(hsamp)
+    hpos = sample_positions(hcount)
 
     logging.info('Calculating velocities...')
-    vtrues = sample_velocities(xtrues, ppos, pvel)
+    if cfg.veltype == 'density':
+        # estimate halo velocities from matter density field
+        hvel = sample_velocities_density(
+            hpos, rho, cfg.L, cfg.cosmo[0], 2*cfg.L/cfg.N)
+    elif cfg.veltype == 'CIC':
+        # estimate halo velocities from CIC-interpolated particle velocities
+        hvel = sample_velocities_CIC(hpos, ppos, pvel, cfg.L, cfg.N, cfg.N//16)
+    elif cfg.veltype == 'kNN':
+        # estimate halo velocities from kNN-interpolated particle velocities
+        ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
+        hvel = sample_velocities_kNN(hpos, ppos, pvel)
+    else:
+        raise NotImplementedError(
+            f'Velocity type {cfg.veltype} not implemented.')
 
     logging.info('Sampling masses...')
-    mtrues = sample_masses([len(x) for x in xtrues], medges)
+    hmass = sample_masses([len(x) for x in hpos], medges)
 
     logging.info('Combine...')
-    xtrues = np.concatenate(xtrues, axis=0)
-    vtrues = np.concatenate(vtrues, axis=0)
-    mtrues = np.concatenate(mtrues, axis=0)
+    hpos = np.concatenate(hpos, axis=0)
+    hvel = np.concatenate(hvel, axis=0)
+    hmass = np.concatenate(hmass, axis=0)
 
     logging.info('Saving cube...')
-    np.save(pjoin(source_dir, 'halo_pos.npy'), xtrues)
-    np.save(pjoin(source_dir, 'halo_vel.npy'), vtrues)
-    np.save(pjoin(source_dir, 'halo_mass.npy'), mtrues)
+    np.save(pjoin(source_dir, 'halo_pos.npy'), hpos)
+    np.save(pjoin(source_dir, 'halo_vel.npy'), hvel)
+    np.save(pjoin(source_dir, 'halo_mass.npy'), hmass)
 
     logging.info('Done!')
 
