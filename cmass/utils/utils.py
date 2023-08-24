@@ -4,6 +4,23 @@ import yaml
 import datetime
 import os
 from os.path import join as pjoin
+import json
+
+
+class attrdict(dict):
+    """Simple dict wrapper, allowing attribute access and saving to yaml."""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+    def save(self, path):
+        with open(path, 'w') as f:
+            json.dump(self, f, indent=4)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'r') as f:
+            return cls(json.load(f))
 
 
 def setup_logger(logdir, name='log', level=logging.INFO):
