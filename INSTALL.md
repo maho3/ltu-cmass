@@ -28,18 +28,18 @@ conda activate cmass-env
 ```
 
 ### Installing nbodykit
-Installing nbodykit is quite tricky. First, it requires that you have a working MPI installation and a C compiler installed. This is usually not so simple on a Mac machine. On a Linux computing cluster, you likely can load these with:
+Installing nbodykit is quite tricky. First, it requires that you have a working MPI compiler and a C compiler installed which are compatible with cython and mpi4py. This is usually not so simple on a Mac machine. On the Linux cluster at Infinity@IAP, for example, you load these with:
 ```bash
-module load openmpi gcc
+module load gcc/13.2.0 openmpi/4.1.2-intel
 ```
 Next, clone the nbodykit repository:
 ```bash
 git clone https://github.com/bccp/nbodykit/tree/master
 cd nbodykit
 ```
-Then, install the dependencies. Note, numpy, cython, and mpi4py must be installed first because they are used to build other packages.
+Then, install the dependencies. Note, numpy, cython, and mpi4py must be installed first because they are used to build other packages. We use the `--no-cache-dir` flag to force recompiling of cython and mpi4py, which must be built for your specific compilers.
 ```bash
-pip install numpy==1.24.4 cython==0.29.33 mpi4py
+pip install --no-cache-dir  numpy==1.24.4 cython==0.29.33 mpi4py
 pip install -r requirements.txt
 pip install -r requirements-extras.txt
 ```
@@ -52,11 +52,9 @@ cd .. # return to the parent directory
 ### Installing BORG
 Install the public version of borg with:
 ```bash
-pip install aquila-borg
+pip install --no-cache-dir aquila-borg
 ```
-The build process for this package takes a while (>30 minutes). It may be faster when run on a compute node with many CPUs.
-
-Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
+The build process for this package takes a while (>30 minutes). It may go faster when run on a compute node with many CPUs. Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
 
 ### Installing other dependencies and ltu-cmass
 The remaining dependencies can be installed with:
@@ -70,7 +68,7 @@ pip install -e .
 ```
 
 ### Configure the working directory
-Lastly, configure the json in `global.cfg` to point to the working directory where you want to store the data and the text file of cosmological parameters you want to index from. We recommend setting the working directory to a folder in the scratch space of your computing cluster, as the data can take up many GB.
+Lastly, configure the json in `global.cfg` to point to the working directory where you want to store the data and the text file of cosmological parameters you want to index from. We recommend setting the working directory to somewhere in the scratch space of your computing cluster, as the data can take up many GB.
 
 ### Download some working data
 Several steps of the forward model depend on external data that has been gathered and shared on the [LtU OSN storage](https://github.com/maho3/ltu-ili/blob/main/DATA.md). When getting started, we recommended you to download a copy of a pre-compiled and run working directory from the `cmass-ili` folder of the OSN repository. This will ensure your working directory is setup properly and has the prerequisite data.
@@ -92,13 +90,13 @@ python -m cmass.biasing.rho_to_halo --lhid 0 --simtype borg2lpt
 python -m cmass.survey.remap_cuboid --lhid 0 --simtype borg2lpt
 
 # apply HOD to sample galaxies
-python -m cmass.biasing.apply_hod --lhid 0 --seed 42 --simtype borg2lpt
+python -m cmass.biasing.apply_hod --lhid 0 --seed 1 --simtype borg2lpt
 
 # apply survey mask to the galaxy catalog
-python -m cmass.survey.ngc_selection --lhid 0 --seed 42 --simtype borg2lpt
+python -m cmass.survey.ngc_selection --lhid 0 --seed 1 --simtype borg2lpt
 
 # calculate power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk_nbkit --lhid 0 --seed 42 --simtype borg2lpt
+python -m cmass.summaries.Pk_nbkit --lhid 0 --seed 1 --simtype borg2lpt
 ```
 
-This should save all intermediates and outputs to the working directory specified in `global.cfg`, which is by default `./data/`.
+This should save all intermediates and outputs to the working directory specified in `global.cfg`, which is `ltu-cmass/data` by default.
