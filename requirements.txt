@@ -1,0 +1,9 @@
+numpy
+scipy
+scikit-learn
+jax
+pandas
+astropy
+pymangle
+git+https://github.com/eelregit/pmwd.git
+git+https://github.com/maho3/cuboid_remap_jax.git
