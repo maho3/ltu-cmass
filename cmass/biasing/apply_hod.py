@@ -23,9 +23,10 @@ from os.path import join as pjoin
 
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
-from nbodykit import cosmology
-from .tools import thetahod_literature
-from ..utils import get_global_config, setup_logger, timing_decorator
+from nbodykit.cosmology import Cosmology
+from .tools.hod import thetahod_literature
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
@@ -33,20 +34,29 @@ glbcfg = get_global_config()
 setup_logger(glbcfg['logdir'], name='apply_hod')
 
 
-@timing_decorator
-def load_halos(source_dir):
-    pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
-    mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
-    print(pos.max(axis=0), pos.min(axis=0))
-    return pos, vel, mass
+def build_config():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lhid', type=int, required=True)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--simtype', type=str, default='borg2lpt')
+    args = parser.parse_args()
+
+    L = 3000           # length of box in Mpc/h
+    N = 384            # number of grid points on one side
+
+    theta = get_hod_params(args.seed)  # HOD parameters
+    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
+
+    return attrdict(
+        L=L, N=N,
+        lhid=args.lhid, seed=args.seed, simtype=args.simtype,
+        theta=theta, cosmo=cosmo
+    )
 
 
-@timing_decorator
-def populate_hod(
-        pos, vel, mass,
-        theta, cosmo, redshift, mdef,
-        seed=0):
+def get_hod_params(seed=0):
+    theta = thetahod_literature('reid2014_cmass')
     # sample theta based on priors set by Reid+(2014)
     if seed != 0:
         np.random.seed(seed)
@@ -55,7 +65,23 @@ def populate_hod(
         keys = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
         theta = np.random.uniform(hod_lower_bound, hod_upper_bound, size=(5))
         theta = dict(zip(keys, theta))
-        print(theta)
+    return theta
+
+
+@timing_decorator
+def load_cuboid(source_dir):
+    pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
+    vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
+    mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
+    print(pos.shape, vel.shape, mass.shape)
+    return pos, vel, mass
+
+
+@timing_decorator
+def populate_hod(
+        pos, vel, mass,
+        theta, cosmo, redshift, mdef, L,
+        seed=0):
 
     # create a structured array to hold the halo catalog
     dtype = [('Position', (np.float32, 3)),
@@ -67,11 +93,15 @@ def populate_hod(
     halos['Mass'] = 10**mass
 
     source = nblab.ArrayCatalog(halos)
-    source.attrs['BoxSize'] = [4242.64068712, 3000.,
-                               2121.32034356]  # calculated from remap_Lbox
+    source.attrs['BoxSize'] = L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
+
+    cosmology = Cosmology(h=cosmo[2], Omega0_cdm=cosmo[0], Omega0_b=cosmo[1],
+                          n_s=cosmo[3])
+    cosmology = cosmology.match(sigma8=cosmo[4])
+
     halos = nblab.HaloCatalog(
         source,
-        cosmo=cosmo,
+        cosmo=cosmology,
         redshift=redshift,
         mdef=mdef,
     )
@@ -80,35 +110,29 @@ def populate_hod(
 
 
 def main():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--simtype', type=str, default='borg2lpt')
-    args = parser.parse_args()
+    cfg = build_config()
+    logging.info(f'Running with config: {cfg}')
 
-    logging.info(f'Running with lhid={args.lhid}, seed={args.seed}...')
     logging.info('Loading halos...')
     source_dir = pjoin(
-        glbcfg['wdir'], f'{args.simtype}/L3000-N384',
-        f'{args.lhid}')
-    pos, vel, mass = load_halos(source_dir)
+        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
+        f'{cfg.lhid}')
+    pos, vel, mass = load_cuboid(source_dir)
 
     logging.info('Populating HOD...')
-    theta = thetahod_literature('reid2014_cmass')
     hod = populate_hod(
         pos, vel, mass,
-        theta, cosmology.Planck15, 0, 'vir',
-        seed=args.seed
+        cfg.theta, cfg.cosmo, 0, 'vir', cfg.L,
+        seed=cfg.seed
     )
 
     pos, vel = np.array(hod['Position']), np.array(hod['Velocity'])
 
     savepath = pjoin(source_dir, 'hod')
     os.makedirs(savepath, exist_ok=True)
-    logging.info(f'Saving to {savepath}/hod{args.seed}...')
-    np.save(pjoin(savepath, f'hod{args.seed}_pos.npy'), pos)
-    np.save(pjoin(savepath, f'hod{args.seed}_vel.npy'), vel)
+    logging.info(f'Saving to {savepath}/hod{cfg.seed}...')
+    np.save(pjoin(savepath, f'hod{cfg.seed}_pos.npy'), pos)
+    np.save(pjoin(savepath, f'hod{cfg.seed}_vel.npy'), vel)
 
     logging.info('Done!')
 

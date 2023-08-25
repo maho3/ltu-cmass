@@ -22,15 +22,14 @@ import numpy as np
 import argparse
 import logging
 from os.path import join as pjoin
-from astropy.io import fits
-import pandas as pd
 
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_area, \
-    get_nofz
-from ..tools.utils import get_global_config, setup_logger, timing_decorator
+from .tools import (get_nofz, sky_to_xyz, load_galaxies_obs,
+                    load_randoms_precomputed)
+from ..survey.tools import BOSS_area
+from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
 
 
 # Load global configuration and setup logger
@@ -38,50 +37,21 @@ glbcfg = get_global_config()
 setup_logger(glbcfg['logdir'], name='calc_Pk_nbkit')
 
 
-@timing_decorator
-def load_galaxies_obs(source_dir, seed):
-    rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
-    return rdz
+def build_config():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lhid', type=int, required=True)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--simtype', type=str, default='borg-quijote')
+    args = parser.parse_args()
 
+    L = 3000           # length of box in Mpc/h
+    N = 384            # number of grid points on one side
 
-@timing_decorator
-def load_randoms():
-    fname = 'data/obs/random0_DR12v5_CMASS_North.fits'
-    fields = ['RA', 'DEC', 'Z']
-    with fits.open(fname) as hdul:
-        randoms = np.array([hdul[1].data[x] for x in fields]).T
-        randoms = pd.DataFrame(randoms, columns=fields)
-
-    n_z = np.load(pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
-                  allow_pickle=True).item()
-    be, hobs = n_z['be'], n_z['h']
-    cutoffs = np.cumsum(hobs) / np.sum(hobs)
-    w = np.diff(be[:2])[0]
-
-    prng = np.random.uniform(size=len(randoms))
-    randoms['Z'] = be[:-1][cutoffs.searchsorted(prng)]
-    randoms['Z'] += w * np.random.uniform(size=len(randoms))
-
-    # further selection functions
-    mask = BOSS_angular(randoms['RA'], randoms['DEC'])
-    randoms = randoms[mask]
-    mask = BOSS_redshift(randoms['Z'])
-    randoms = randoms[mask]
-    mask = (~BOSS_veto(randoms['RA'], randoms['DEC'], verbose=True))
-    randoms = randoms[mask]
-
-    return randoms.values
-
-
-@timing_decorator
-def load_randoms_precomputed():
-    savepath = pjoin(
-        'data', 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
-    return np.load(savepath)
-
-
-def sky_to_xyz(rdz, cosmo):
-    return nblab.transform.SkyToCartesian(*rdz.T, cosmo)
+    return attrdict(
+        L=L, N=N,
+        lhid=args.lhid, seed=args.seed, simtype=args.simtype
+    )
 
 
 @timing_decorator
@@ -106,7 +76,7 @@ def compute_Pk(grdz, rrdz, cosmo, weights=None):
     _gals = nblab.ArrayCatalog({
         'Position': gpos,
         'NZ': nbar_g,
-        'WEIGHT': weights,  # w_g,
+        'WEIGHT': weights,
         'WEIGHT_FKP': 1./(1. + nbar_g * P0)
     })
 
@@ -132,21 +102,17 @@ def compute_Pk(grdz, rrdz, cosmo, weights=None):
 
 
 def main():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--simtype', type=str, default='borg-quijote')
-    args = parser.parse_args()
+    cfg = build_config()
+    logging.info(f'Running with config: {cfg}')
 
     source_dir = pjoin(
-        glbcfg['wdir'], f'{args.simtype}/latin_hypercube_HR-L3000-N384',
-        f'{args.lhid}')
-    rdz = load_galaxies_obs(source_dir, args.seed)
-    # randoms = load_randoms()
+        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
+        f'{cfg.lhid}')
+    rdz = load_galaxies_obs(source_dir, cfg.seed)
+
     randoms = load_randoms_precomputed()
 
-    cosmo = cosmology.Planck15
+    cosmo = cosmology.Planck15  # fixed because we don't know true cosmology
 
     # compute P(k)
     k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo)
@@ -154,7 +120,7 @@ def main():
     # save results
     outpath = pjoin(source_dir, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    outpath = pjoin(outpath, f'Pk{args.seed}.npz')
+    outpath = pjoin(outpath, f'Pk{cfg.seed}.npz')
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)

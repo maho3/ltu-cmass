@@ -27,10 +27,9 @@ import argparse
 import logging
 from os.path import join as pjoin
 
-from .tools import (load_nbody, pad_3d, TruncatedPowerLaw,
-                    sample_3d)
-from .tools import (sample_velocities_density, sample_velocities_kNN,
-                    sample_velocities_CIC)
+from .tools.halos import (pad_3d, TruncatedPowerLaw, sample_3d)
+from .tools.halos import (sample_velocities_density, sample_velocities_kNN,
+                          sample_velocities_CIC)
 from ..utils import (attrdict, get_global_config, setup_logger,
                      timing_decorator, load_params)
 
@@ -60,6 +59,14 @@ def build_config():
         L=L, N=N, cosmo=cosmo,
         lhid=args.lhid, simtype=args.simtype, veltype=args.veltype
     )
+
+
+@timing_decorator
+def load_nbody(source_dir):
+    rho = np.load(pjoin(source_dir, 'rho.npy'))
+    ppos = np.load(pjoin(source_dir, 'ppos.npy'))
+    pvel = np.load(pjoin(source_dir, 'pvel.npy'))
+    return rho, ppos, pvel
 
 
 def load_bias_params(bias_path, lhid):
@@ -103,7 +110,7 @@ def sample_masses(Nsamp, medges):
 def main():
     # Build run config
     cfg = build_config()
-    logging.info(f'Running with config: {cfg.cosmo}')
+    logging.info(f'Running with config: {cfg}')
 
     bias_path = pjoin(glbcfg['wdir'], 'quijote/bias_fit/LH_n=128')
     popt, medges = load_bias_params(bias_path, cfg.lhid)
@@ -138,10 +145,14 @@ def main():
     logging.info('Sampling masses...')
     hmass = sample_masses([len(x) for x in hpos], medges)
 
+    for i in range(10):
+        print(hpos[i].shape, hvel[i].shape, hmass[i].shape)
+
     logging.info('Combine...')
     hpos = np.concatenate(hpos, axis=0)
     hvel = np.concatenate(hvel, axis=0)
     hmass = np.concatenate(hmass, axis=0)
+    print(hpos.shape, hvel.shape, hmass.shape)
 
     logging.info('Saving cube...')
     np.save(pjoin(source_dir, 'halo_pos.npy'), hpos)

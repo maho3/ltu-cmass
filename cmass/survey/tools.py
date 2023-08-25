@@ -4,10 +4,13 @@ Many functions are from or inspired by: https://github.com/changhoonhahn/simbig/
 """
 # imports
 import os
+from os.path import join as pjoin
 import numpy as np
 import pymangle
-from astropy.stats import scott_bin_width
-from scipy.interpolate import InterpolatedUnivariateSpline
+from astropy.io import fits
+import pandas as pd
+
+from ..utils import timing_decorator
 
 # mask functions
 
@@ -94,36 +97,30 @@ def BOSS_area():
     return area
 
 
-def get_nofz(z, fsky, cosmo=None):
-    ''' calculate nbar(z) given redshift values and f_sky (sky coverage
-    fraction)
-    Parameters
-    ----------
-    z : array like
-        array of redshift values 
-    fsky : float 
-        sky coverage fraction  
-    cosmo : cosmology object 
-        cosmology to calculate comoving volume of redshift bins 
-    Returns
-    -------
-    number density at input redshifts: nbar(z) 
-    Notes
-    -----
-    * based on nbdoykit implementation 
-    '''
-    # calculate nbar(z) for each galaxy
-    _, edges = scott_bin_width(z, return_bins=True)
+@timing_decorator
+def gen_randoms():
+    fname = 'data/obs/random0_DR12v5_CMASS_North.fits'
+    fields = ['RA', 'DEC', 'Z']
+    with fits.open(fname) as hdul:
+        randoms = np.array([hdul[1].data[x] for x in fields]).T
+        randoms = pd.DataFrame(randoms, columns=fields)
 
-    dig = np.searchsorted(edges, z, "right")
-    N = np.bincount(dig, minlength=len(edges)+1)[1:-1]
+    n_z = np.load(pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+                  allow_pickle=True).item()
+    be, hobs = n_z['be'], n_z['h']
+    cutoffs = np.cumsum(hobs) / np.sum(hobs)
+    w = np.diff(be[:2])[0]
 
-    R_hi = cosmo.comoving_distance(edges[1:])  # Mpc/h
-    R_lo = cosmo.comoving_distance(edges[:-1])  # Mpc/h
+    prng = np.random.uniform(size=len(randoms))
+    randoms['Z'] = be[:-1][cutoffs.searchsorted(prng)]
+    randoms['Z'] += w * np.random.uniform(size=len(randoms))
 
-    dV = (4./3.) * np.pi * (R_hi**3 - R_lo**3) * fsky
+    # further selection functions
+    mask = BOSS_angular(randoms['RA'], randoms['DEC'])
+    randoms = randoms[mask]
+    mask = BOSS_redshift(randoms['Z'])
+    randoms = randoms[mask]
+    mask = (~BOSS_veto(randoms['RA'], randoms['DEC'], verbose=True))
+    randoms = randoms[mask]
 
-    nofz = InterpolatedUnivariateSpline(
-        0.5*(edges[1:] + edges[:-1]), N/dV, ext='const')
-
-    return nofz
+    return randoms.values

@@ -21,13 +21,30 @@ from scipy.spatial.transform import Rotation as R
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from ..tools.BOSS_FM import BOSS_angular, BOSS_veto, BOSS_redshift
-from ..tools.utils import get_global_config, setup_logger, timing_decorator
+from .tools import BOSS_angular, BOSS_veto, BOSS_redshift
+from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
 
 
 # Load global configuration and setup logger
 glbcfg = get_global_config()
 setup_logger(glbcfg['logdir'], name='apply_survey_cut')
+
+
+def build_config():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lhid', type=int, required=True)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--simtype', type=str, default='borg2lpt')
+    args = parser.parse_args()
+
+    L = 3000           # length of box in Mpc/h
+    N = 384            # number of grid points on one side
+
+    return attrdict(
+        L=L, N=N,
+        lhid=args.lhid, seed=args.seed, simtype=args.simtype
+    )
 
 
 @timing_decorator
@@ -86,19 +103,14 @@ def reweight(rdz):
 
 
 def main():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--simtype', type=str, default='borg2lpt')
-    args = parser.parse_args()
+    cfg = build_config()
 
     source_dir = pjoin(
-        glbcfg['wdir'], f'{args.simtype}/L3000-N384',
-        f'{args.lhid}')
+        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
+        f'{cfg.lhid}')
 
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_dir, args.seed)
+    pos, vel = load_galaxies_sim(source_dir, cfg.seed)
 
     # Rotate to align with CMASS
     pos, vel = rotate(pos, vel)
@@ -114,7 +126,7 @@ def main():
 
     # Save
     os.makedirs(pjoin(source_dir, 'obs'), exist_ok=True)
-    np.save(pjoin(source_dir, 'obs', f'rdz{args.seed}.npy'), rdz)
+    np.save(pjoin(source_dir, 'obs', f'rdz{cfg.seed}.npy'), rdz)
 
 
 if __name__ == "__main__":

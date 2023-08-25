@@ -40,6 +40,7 @@ def setup_logger(logdir, name='log', level=logging.INFO):
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s-%(levelname)s %(message)s",
+        datefmt='%H:%M:%S',
         handlers=[
             logging.FileHandler(path_to_log),
             logging.StreamHandler(sys.stdout)

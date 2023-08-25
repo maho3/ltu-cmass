@@ -22,13 +22,25 @@ from os.path import join as pjoin
 import multiprocessing as mp
 from functools import partial
 
-from ..tools.shared_code import load_quijote_halos, TruncatedPowerLaw
-from ..tools.utils import get_global_config, setup_logger, timing_decorator
+from .tools.quijote import load_quijote_halos, TruncatedPowerLaw
+from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
 
 
 # Load global configuration and setup logger
 glbcfg = get_global_config()
 setup_logger(glbcfg['logdir'], name='fit_halo_bias')
+
+
+def build_config():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--lhid', type=int, required=True)  # which cosmology to use
+    args = parser.parse_args()
+
+    return attrdict(
+        lhid=args.lhid
+    )
 
 
 @timing_decorator
@@ -63,19 +75,16 @@ def fit_bias_params(rho, hcounts):
 
 
 def main():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    args = parser.parse_args()
+    cfg = build_config()
 
-    logging.info(f'Running with lhid={args.lhid}...')
+    logging.info(f'Running with lhid={cfg.lhid}...')
     halo_path = pjoin(
         glbcfg['wdir'],
-        f'quijote/source/Halos/latin_hypercube/{args.lhid}')
+        f'quijote/source/Halos/latin_hypercube/{cfg.lhid}')
     hcounts, edges = load_hhalos(halo_path)
     rho_path = pjoin(
         glbcfg['wdir'],
-        f'quijote/source/density_field/latin_hypercube/{args.lhid}',
+        f'quijote/source/density_field/latin_hypercube/{cfg.lhid}',
         'df_m_128_z=0.npy')
     rho = np.load(rho_path)
 
@@ -84,7 +93,7 @@ def main():
     logging.info('Saving...')
     save_path = pjoin(
         glbcfg['wdir'],
-        f'quijote/bias_fit/LH_n=128/{args.lhid}.npy'
+        f'quijote/bias_fit/LH_n=128/{cfg.lhid}.npy'
     )
     np.save(save_path, popt)
 
