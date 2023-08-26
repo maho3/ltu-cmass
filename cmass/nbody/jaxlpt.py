@@ -5,13 +5,13 @@ os.environ["PYBORG_QUIET"] = "yes"  # noqa
 import argparse
 import logging
 from os.path import join as pjoin
-import borg
+import aquila_borg as borg
 import numpy as np
-from jax_lpt import lpt, simgrid, utils
+from jax_lpt import lpt, simgrid
 from ..utils import (attrdict, get_global_config, setup_logger,
                      timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody
-from .tools_borg import build_cosmology
+from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
 # Reduce verbosity
@@ -71,12 +71,33 @@ def get_ICs(N, lhid, matchIC, quijote):
 
 
 @timing_decorator
+def generate_initial_density(L, N, cpar, ai, ic, transfer):
+    box = borg.forward.BoxModel()
+    box.L = (L, L, L)
+    box.N = (N, N, N)
+
+    chain = borg.forward.ChainForwardModel(box)
+    chain.addModel(borg.forward.models.HermiticEnforcer(box))
+
+    if transfer == 'CLASS':
+        transfer_CLASS(chain, box, cpar, ai)
+    elif transfer == 'EH':
+        transfer_EH(chain, box, ai)
+
+    chain.setCosmoParams(cpar)
+    chain.forwardModel_v2(ic)
+    rho = np.empty(chain.getOutputBoxModel().N)
+    chain.getDensityFinal(rho)
+    return rho
+
+
+@timing_decorator
 def run_density(ic, L, N, ai, af, cpar, order, transfer="EH"):
     # Initialize the simulation box
     box = simgrid.Box(L, N)
 
     # Initial density at initial scale-factor
-    rho_init = utils.generate_initial_density(L, N, cpar, ai, ic, transfer)
+    rho_init = generate_initial_density(L, N, cpar, ai, ic, transfer)
 
     # JAX-2LPT model
     if order == 1:

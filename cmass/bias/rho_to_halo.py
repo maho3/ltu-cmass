@@ -145,14 +145,10 @@ def main():
     logging.info('Sampling masses...')
     hmass = sample_masses([len(x) for x in hpos], medges)
 
-    for i in range(10):
-        print(hpos[i].shape, hvel[i].shape, hmass[i].shape)
-
     logging.info('Combine...')
     hpos = np.concatenate(hpos, axis=0)
     hvel = np.concatenate(hvel, axis=0)
     hmass = np.concatenate(hmass, axis=0)
-    print(hpos.shape, hvel.shape, hmass.shape)
 
     logging.info('Saving cube...')
     np.save(pjoin(source_dir, 'halo_pos.npy'), hpos)

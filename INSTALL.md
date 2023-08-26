@@ -23,7 +23,7 @@ git clone git@github.com:maho3/ltu-cmass.git
 ```
 Next, we recommend installing things in a fresh Python environment, such as anaconda. We've tested the following configuration with Python 3.10.
 ```bash
-conda create -n cmass-env python=3.10
+conda create -n cmass-env python=3.9
 conda activate cmass-env
 ```
 
@@ -54,7 +54,7 @@ Install the public version of borg with:
 ```bash
 pip install --no-cache-dir aquila-borg
 ```
-The build process for this package takes a while (>30 minutes). It may go faster when run on a compute node with many CPUs. Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
+The build process for this package may take a while (~20 minutes). Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
 
 ### Installing other dependencies and ltu-cmass
 The remaining dependencies can be installed with:
@@ -62,7 +62,11 @@ The remaining dependencies can be installed with:
 cd ltu-cmass
 pip install -r requirements.txt
 ```
-Finally, install the package itself:
+If you have access to jax_lpt (contact Axel Lapel), you can also install that with:
+```bash
+pip install -r requirements-extras.txt
+```
+Finally, install the ltu-cmass package itself:
 ```bash
 pip install -e .
 ```

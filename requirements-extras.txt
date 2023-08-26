@@ -1,0 +1,5 @@
+# for jax_lpt install
+
+Pylians
+cmasher
+# git+https://mho11@bitbucket.org/aquila-consortium/jax_lpt.git

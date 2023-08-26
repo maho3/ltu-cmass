@@ -1,5 +1,5 @@
 import numpy as np
-import borg
+import aquila_borg as borg
 
 
 def build_cosmology(omega_m, omega_b, h, n_s, sigma8):

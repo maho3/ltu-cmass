@@ -27,3 +27,6 @@ Below, we list the functionality of each script in the repository as well as its
 - `preprocess.ipynb` -  Executes various preprocessing tasks prepare for mass simulation. Designed to be run once at the start of code development.
 - `validation.ipynb` - Validates outputs at intermediate stages in the forward pipeline.
 - `inference.ipynb` - Working notebook to perform implicit inference on power spectra from the CMASS forward model.
+
+## Getting Started
+See installation and usage instructions in [INSTALL.md](INSTALL.md).

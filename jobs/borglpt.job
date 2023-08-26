@@ -1,7 +1,7 @@
-#PBS -N rho_to_halo
+#PBS -N simborg
 #PBS -q batch
 #PBS -l walltime=4:00:00
-#PBS -l nodes=1:ppn=32,mem=64gb
+#PBS -l nodes=1:ppn=64,mem=128gb
 #PBS -t 0-3
 #PBS -j oe
 #PBS -o ./data/logs/_temp.o
@@ -18,7 +18,6 @@ conda activate cmass-env
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-python -m cmass.bias.rho_to_halo --lhid ${PBS_ARRAYID} --simtype borg2lpt --veltype density
-python -m cmass.survey.remap_cuboid --lhid ${PBS_ARRAYID} --simtype borg2lpt
+python -m cmass.nbody.borglpt --lhid ${PBS_ARRAYID} --matchIC --order 2
 
 echo done

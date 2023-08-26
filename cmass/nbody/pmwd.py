@@ -62,7 +62,7 @@ def configure_pmwd(L, N, N_steps, supersampling, ai, af, cosmo):
     ptcl_grid_shape = (N,)*3
     pmconf = Configuration(ptcl_spacing, ptcl_grid_shape,
                            a_start=ai, a_stop=af,
-                           a_nbody_num=N_steps,
+                           a_nbody_maxstep=(af-ai)/N_steps,
                            mesh_shape=supersampling)
     pmcosmo = Cosmology.from_sigma8(
         pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],

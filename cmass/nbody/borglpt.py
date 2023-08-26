@@ -24,7 +24,7 @@ from os.path import join as pjoin
 import argparse
 import numpy as np
 import logging
-import borg
+import aquila_borg as borg
 from ..utils import (attrdict, get_global_config, setup_logger,
                      timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody

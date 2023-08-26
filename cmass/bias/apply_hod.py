@@ -73,7 +73,6 @@ def load_cuboid(source_dir):
     pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
     vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
     mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
-    print(pos.shape, vel.shape, mass.shape)
     return pos, vel, mass
 
 

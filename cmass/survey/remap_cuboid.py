@@ -53,7 +53,7 @@ def build_config():
 @timing_decorator
 def remap(ppos, pvel, L, u1, u2, u3):
     # remap the particles to the cuboid
-    new_size = list(L*np.array(remap_Lbox(u1, u2, u3))
+    new_size = list(L*np.array(remap_Lbox(u1, u2, u3)))
     logging.info(f'Remapping from {[L]*3} to {new_size}.')
 
     c = Cuboid(u1, u2, u3)
