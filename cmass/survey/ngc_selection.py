@@ -19,10 +19,10 @@ from os.path import join as pjoin
 from scipy.spatial.transform import Rotation as R
 
 import nbodykit.lab as nblab
-from nbodykit import cosmology
 
 from .tools import BOSS_angular, BOSS_veto, BOSS_redshift
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
+from ..utils import (attrdict, get_global_config, setup_logger,
+                     timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
@@ -41,9 +41,12 @@ def build_config():
     L = 3000           # length of box in Mpc/h
     N = 384            # number of grid points on one side
 
+    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
+
     return attrdict(
         L=L, N=N,
-        lhid=args.lhid, seed=args.seed, simtype=args.simtype
+        lhid=args.lhid, seed=args.seed, simtype=args.simtype,
+        cosmo=cosmo
     )
 
 
@@ -66,7 +69,17 @@ def rotate(pos, vel):
 
 
 def xyz_to_sky(pos, vel, cosmo):
-    return nblab.transform.CartesianToSky(pos, cosmo)
+    cosmology = nblab.cosmology.Planck15.clone(
+        h=cosmo[2],
+        Omega0_b=cosmo[1],
+        Omega0_cdm=cosmo[0] - cosmo[1],
+        m_ncdm=None,
+        n_s=cosmo[3])
+
+    # We don't need to match sigma8, because sky transform is invariant.
+    # cosmology = cosmology.match(sigma8=cosmo[4])
+
+    return nblab.transform.CartesianToSky(pos, cosmology, velocity=vel).T
 
 
 @timing_decorator
@@ -116,7 +129,7 @@ def main():
     pos, vel = rotate(pos, vel)
 
     # Calculate sky coordinates
-    rdz = xyz_to_sky(pos, vel, cosmology.Planck15).T
+    rdz = xyz_to_sky(pos, vel, cfg.cosmo)
 
     # Apply mask
     rdz = apply_mask(rdz)

@@ -23,7 +23,6 @@ from os.path import join as pjoin
 
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
-from nbodykit.cosmology import Cosmology
 from .tools.hod import thetahod_literature
 from ..utils import (attrdict, get_global_config, setup_logger,
                      timing_decorator, load_params)
@@ -94,9 +93,15 @@ def populate_hod(
     source = nblab.ArrayCatalog(halos)
     source.attrs['BoxSize'] = L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
 
-    cosmology = Cosmology(h=cosmo[2], Omega0_cdm=cosmo[0], Omega0_b=cosmo[1],
-                          n_s=cosmo[3])
-    cosmology = cosmology.match(sigma8=cosmo[4])
+    cosmology = nblab.cosmology.Planck15.clone(
+        h=cosmo[2],
+        Omega0_b=cosmo[1],
+        Omega0_cdm=cosmo[0] - cosmo[1],
+        m_ncdm=None,
+        n_s=cosmo[3])
+
+    # We don't need to match sigma8, because HOD is invariant.
+    # cosmology = cosmology.match(sigma8=cosmo[4])
 
     halos = nblab.HaloCatalog(
         source,
