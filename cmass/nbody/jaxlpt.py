@@ -136,7 +136,8 @@ def main():
 
     # Save
     outdir = get_source_path(
-        glbcfg["wdir"], f"jax{cfg.order}lpt", cfg.L, cfg.N, check=False)
+        glbcfg["wdir"], f"jax{cfg.order}lpt",
+        cfg.L, cfg.N, cfg.lhid, check=False)
     os.makedirs(outdir, exist_ok=True)
     save_nbody(outdir, rho, pos, vel)
     cfg.save(pjoin(outdir, 'config.json'))

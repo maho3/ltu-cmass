@@ -123,7 +123,7 @@ def main():
     cfg = build_config()
 
     source_dir = get_source_path(
-        
+        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
 
     # Load galaxies
     pos, vel = load_galaxies_sim(source_dir, cfg.seed)

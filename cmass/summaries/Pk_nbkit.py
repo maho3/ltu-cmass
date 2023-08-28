@@ -111,7 +111,7 @@ def main():
     logging.info(f'Running with config: {cfg}')
 
     source_dir = get_source_path(
-        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N)
+        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
     rdz = load_galaxies_obs(source_dir, cfg.seed)
 
     randoms = load_randoms_precomputed()

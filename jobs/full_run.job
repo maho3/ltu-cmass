@@ -18,9 +18,9 @@ conda activate cmass-env
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-simtype=jax2lpt
+simtype=pmwd
 
-python -m cmass.nbody.jaxlpt --lhid ${PBS_ARRAYID} --matchIC --order 2
+python -m cmass.nbody.pmwd --lhid ${PBS_ARRAYID} --matchIC
 python -m cmass.bias.rho_to_halo --lhid ${PBS_ARRAYID} --simtype ${simtype} --veltype density
 python -m cmass.survey.remap_cuboid --lhid ${PBS_ARRAYID} --simtype ${simtype}
 

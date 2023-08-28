@@ -72,7 +72,8 @@ def main():
     logging.info(f'Running with config: {cfg}')
 
     logging.info('Loading halo cube...')
-    source_dir = get_source_path(glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N)
+    source_dir = get_source_path(
+        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
 
     hpos = np.load(pjoin(source_dir, 'halo_pos.npy'))
     hvel = np.load(pjoin(source_dir, 'halo_vel.npy'))

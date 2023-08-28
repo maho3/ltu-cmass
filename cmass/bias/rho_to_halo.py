@@ -101,14 +101,26 @@ def sample_positions(hsamp):
 @timing_decorator
 def sample_masses(Nsamp, medges):
     """Linearly interpolate between different mass bins and sample."""
-
-    # calculate the cdf from high-to-low mass
+    # calculate the cdf
     cdf = np.array([0., *np.cumsum(Nsamp)/np.sum(Nsamp)])
+
+    # cut out duplicates at edges (where Nsamp[i]=0)
+    l, r = 0, len(cdf)-1
+    while (l < len(cdf)) and (cdf[l+1] == cdf[l]):
+        l += 1
+    while (r > 0) and (cdf[r-1] == cdf[r]):
+        r -= 1
+    r += 1
+    cdf_interp = interp1d(cdf[l:r], medges[l:r], kind='quadratic')
+
+    # sample the cdf, linearly interpolating the mass distribution
     hmass = []
     for i in range(len(Nsamp)):
-        x = np.random.rand(Nsamp[i])
-        x = (cdf[i+1] - cdf[i])*x + cdf[i]
-        m = interp1d(cdf, medges, kind='quadratic')(x)
+        if Nsamp[i] == 0:
+            hmass.append([])
+            continue
+        x = (cdf[i+1] - cdf[i])*np.random.rand(Nsamp[i]) + cdf[i]
+        m = cdf_interp(x)
         hmass.append(m)
     return hmass
 
@@ -122,7 +134,8 @@ def main():
     popt, medges = load_bias_params(bias_path, cfg.lhid)
 
     logging.info('Loading 3 Gpc sims...')
-    source_dir = get_source_path(glbcfg['wdir'], cfg.simtype, cfg.L, cfg.N)
+    source_dir = get_source_path(
+        glbcfg['wdir'], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
     rho, ppos, pvel = load_nbody(source_dir)
 
     logging.info('Sampling power law...')

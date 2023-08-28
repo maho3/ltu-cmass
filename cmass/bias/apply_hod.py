@@ -123,7 +123,7 @@ def main():
 
     logging.info('Loading halos...')
     source_dir = get_source_path(
-        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N)
+        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
     pos, vel, mass = load_cuboid(source_dir)
 
     logging.info('Populating HOD...')

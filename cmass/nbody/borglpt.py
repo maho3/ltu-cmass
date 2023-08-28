@@ -149,7 +149,8 @@ def main():
 
     # Save
     outdir = get_source_path(
-        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N, check=False)
+        glbcfg["wdir"], f"borg{cfg.order}lpt",
+        cfg.L, cfg.N, cfg.lhid, check=False)
     save_nbody(outdir, rho, pos, vel)
     cfg.save(pjoin(outdir, 'config.json'))
 

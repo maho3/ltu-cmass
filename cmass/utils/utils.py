@@ -55,18 +55,23 @@ def get_global_config():
     return config
 
 
-def get_source_path(wdir, simtype, L, N, check=True):
-    source_dir = pjoin(wdir, simtype)
-    source_path = pjoin(source_dir, f'L{L}-N{N}')
+def get_source_path(wdir, simtype, L, N, lhid, check=True):
+    # get the path to the source directory, and check at each level
+    sim_dir = pjoin(wdir, simtype)
+    cfg_dir = pjoin(sim_dir, f'L{L}-N{N}')
+    lh_dir = pjoin(cfg_dir, str(lhid))
 
     if check:
-        # check if the source directory exists, if not list options
-        if not os.path.isdir(source_path):
+        if not os.path.isdir(sim_dir):
             raise ValueError(
-                f"Source directory {source_path} does not exist. "
-                "Did you run the prerequisites? "
-                f"Available options are: {os.listdir(source_dir)}")
-    return source_path
+                f"Simulation directory {sim_dir} does not exist.")
+        if not os.path.isdir(cfg_dir):
+            raise ValueError(
+                f"Configuration directory {cfg_dir} does not exist.")
+        if not os.path.isdir(lh_dir):
+            raise ValueError(
+                f"Latin hypercube directory {lh_dir} does not exist.")
+    return lh_dir
 
 
 def timing_decorator(func, *args, **kwargs):
