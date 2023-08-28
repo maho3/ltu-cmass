@@ -62,8 +62,8 @@ def timing_decorator(func, *args, **kwargs):
         out = func(*args, **kwargs)
         dt = (datetime.datetime.now() - t0).total_seconds()
         logging.info(
-            f"Done running {func.__name__}. "
-            f"Time elapsed: {int(dt//60)}m{int(dt%60)}s.")
+            f"Finished {func.__name__}... "
+            f"({int(dt//60)}m{int(dt%60)}s)")
         return out
     return wrapper
 

@@ -26,7 +26,7 @@ import numpy as np
 import argparse
 import logging
 from os.path import join as pjoin
-
+from scipy.interpolate import interp1d
 from .tools.halos import (pad_3d, TruncatedPowerLaw, sample_3d)
 from .tools.halos import (sample_velocities_density, sample_velocities_kNN,
                           sample_velocities_CIC)
@@ -99,11 +99,16 @@ def sample_positions(hsamp):
 
 @timing_decorator
 def sample_masses(Nsamp, medges):
-    # sample the masses from the mass bins
+    """Linearly interpolate between different mass bins and sample."""
+
+    # calculate the cdf from high-to-low mass
+    cdf = np.array([0., *np.cumsum(Nsamp)/np.sum(Nsamp)])
     hmass = []
-    for i in range(len(medges)-1):
-        im = np.random.uniform(*medges[i:i+2], size=Nsamp[i])
-        hmass.append(im)
+    for i in range(len(Nsamp)):
+        x = np.random.rand(Nsamp[i])
+        x = (cdf[i+1] - cdf[i])*x + cdf[i]
+        m = interp1d(cdf, medges, kind='quadratic')(x)
+        hmass.append(m)
     return hmass
 
 
@@ -130,7 +135,7 @@ def main():
     if cfg.veltype == 'density':
         # estimate halo velocities from matter density field
         hvel = sample_velocities_density(
-            hpos, rho, cfg.L, cfg.cosmo[0], 2*cfg.L/cfg.N)
+            hpos, rho, cfg.L, cfg.cosmo[0], cfg.L/cfg.N)
     elif cfg.veltype == 'CIC':
         # estimate halo velocities from CIC-interpolated particle velocities
         hvel = sample_velocities_CIC(hpos, ppos, pvel, cfg.L, cfg.N, cfg.N//16)
