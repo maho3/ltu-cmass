@@ -26,7 +26,8 @@ import numpy as np
 import argparse
 import logging
 from os.path import join as pjoin
-from scipy.interpolate import interp1d
+from scipy.integrate import quad
+from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 from .tools.halos import (pad_3d, TruncatedPowerLaw, sample_3d)
 from .tools.halos import (sample_velocities_density, sample_velocities_kNN,
                           sample_velocities_CIC)
@@ -99,28 +100,42 @@ def sample_positions(hsamp):
 
 
 @timing_decorator
-def sample_masses(Nsamp, medges):
-    """Linearly interpolate between different mass bins and sample."""
-    # calculate the cdf
-    cdf = np.array([0., *np.cumsum(Nsamp)/np.sum(Nsamp)])
+def sample_masses(Nsamp, medg, order=1):
+    """Interpolate the mass PDF and sample it continuously."""
+    mcen = (medg[1:] + medg[:-1])/2
 
-    # cut out duplicates at edges (where Nsamp[i]=0)
-    l, r = 0, len(cdf)-1
-    while (l < len(cdf)) and (cdf[l+1] == cdf[l]):
-        l += 1
-    while (r > 0) and (cdf[r-1] == cdf[r]):
-        r -= 1
-    r += 1
-    cdf_interp = interp1d(cdf[l:r], medges[l:r], kind='quadratic')
+    # don't interpolate unresolved bins at low/high mass
+    mask = np.array(Nsamp) > 0
+    l, r = mask.argmax(), mask.size - mask[::-1].argmax()+2
+    maskedg, maskcen, maskN = medg[l:r], mcen[l:r], Nsamp[l:r]
 
-    # sample the cdf, linearly interpolating the mass distribution
+    # interpolate the mass PDF
+    pdf = IUS(maskcen, np.log(maskN), k=order, ext=0)
+
+    # sample the CDF at high resolution
+    be = np.linspace(maskedg[0], maskedg[-1], 1000)
+    ipdf = [0] + [quad(lambda x: np.exp(pdf(x)), be[i], be[i+1])[0]
+                  for i in range(len(be)-1)]
+    cdf = np.cumsum(ipdf)
+    cdf /= cdf[-1]
+
+    # invert the CDF
+    invcdf = IUS(cdf, be, k=order, ext=3)
+
+    # calculate percentiles for each mass bin edge
+    perc = [0] + [quad(lambda x: np.exp(pdf(x)), medg[i], medg[i+1])[0]
+                  for i in range(len(medg)-1)]
+    perc = np.cumsum(perc)
+    perc /= perc[-1]
+
+    # sample the invcdf
     hmass = []
     for i in range(len(Nsamp)):
         if Nsamp[i] == 0:
             hmass.append([])
             continue
-        x = (cdf[i+1] - cdf[i])*np.random.rand(Nsamp[i]) + cdf[i]
-        m = cdf_interp(x)
+        u = np.random.uniform(low=perc[i], high=perc[i+1], size=Nsamp[i])
+        m = invcdf(u)
         hmass.append(m)
     return hmass
 
