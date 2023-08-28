@@ -84,7 +84,7 @@ After the packages are installed and your working directory is set up, a full fo
 cd ltu-cmass
 conda activate cmass-env
 
-# simulate density field, particle positions and velocities with jax_lpt
+# simulate density field, particle positions and velocities with borglpt
 python -m cmass.nbody.borglpt --lhid 0 --order 2
 
 # sample halo positions, velocities, and masses from the density field
@@ -94,7 +94,7 @@ python -m cmass.biasing.rho_to_halo --lhid 0 --simtype borg2lpt
 python -m cmass.survey.remap_cuboid --lhid 0 --simtype borg2lpt
 
 # apply HOD to sample galaxies
-python -m cmass.biasing.apply_hod --lhid 0 --seed 1 --simtype borg2lpt
+python -m cmass.bias.apply_hod --lhid 0 --seed 1 --simtype borg2lpt
 
 # apply survey mask to the galaxy catalog
 python -m cmass.survey.ngc_selection --lhid 0 --seed 1 --simtype borg2lpt
