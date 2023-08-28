@@ -21,8 +21,8 @@ from scipy.spatial.transform import Rotation as R
 import nbodykit.lab as nblab
 
 from .tools import BOSS_angular, BOSS_veto, BOSS_redshift
-from ..utils import (attrdict, get_global_config, setup_logger,
-                     timing_decorator, load_params)
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
@@ -120,9 +120,8 @@ def reweight(rdz):
 def main():
     cfg = build_config()
 
-    source_dir = pjoin(
-        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
-        f'{cfg.lhid}')
+    source_dir = get_source_path(
+        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N)
 
     # Load galaxies
     pos, vel = load_galaxies_sim(source_dir, cfg.seed)

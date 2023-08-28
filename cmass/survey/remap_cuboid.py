@@ -23,7 +23,8 @@ import logging
 import jax
 from os.path import join as pjoin
 from cuboid_remap import Cuboid, remap_Lbox
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator)
 
 
 # Load global configuration and setup logger
@@ -71,9 +72,8 @@ def main():
     logging.info(f'Running with config: {cfg}')
 
     logging.info('Loading halo cube...')
-    source_dir = pjoin(
-        glbcfg['wdir'], f'{cfg.simtype}/L3000-N384',
-        f'{cfg.lhid}')
+    source_dir = get_source_path(
+        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N)
 
     hpos = np.load(pjoin(source_dir, 'halo_pos.npy'))
     hvel = np.load(pjoin(source_dir, 'halo_vel.npy'))

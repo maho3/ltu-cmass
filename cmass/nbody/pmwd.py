@@ -14,8 +14,8 @@ import logging
 import numpy as np
 import argparse
 from os.path import join as pjoin
-from ..utils import (attrdict, get_global_config, setup_logger,
-                     timing_decorator, load_params)
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody
 
 
@@ -118,8 +118,8 @@ def main():
     rho, pos, vel = run_density(wn, pmconf, pmcosmo)
 
     # Save
-    outdir = pjoin(glbcfg['wdir'], 'pmwd',
-                   f'L{cfg.L}-N{cfg.N}', f'{cfg.lhid}')
+    outdir = get_source_path(
+        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N, check=False)
     save_nbody(outdir, rho, pos, vel)
     cfg.save(pjoin(outdir, 'config.json'))
 

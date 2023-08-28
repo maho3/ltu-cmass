@@ -29,7 +29,8 @@ from nbodykit import cosmology
 from .tools import (get_nofz, sky_to_xyz, load_galaxies_obs,
                     load_randoms_precomputed)
 from ..survey.tools import BOSS_area
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator)
 
 
 # Load global configuration and setup logger
@@ -107,9 +108,8 @@ def main():
     cfg = build_config()
     logging.info(f'Running with config: {cfg}')
 
-    source_dir = pjoin(
-        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
-        f'{cfg.lhid}')
+    source_dir = get_source_path(
+        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N)
     rdz = load_galaxies_obs(source_dir, cfg.seed)
 
     randoms = load_randoms_precomputed()

@@ -24,8 +24,8 @@ from os.path import join as pjoin
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
 from .tools.hod import thetahod_literature
-from ..utils import (attrdict, get_global_config, setup_logger,
-                     timing_decorator, load_params)
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
@@ -120,9 +120,8 @@ def main():
     logging.info(f'Running with config: {cfg}')
 
     logging.info('Loading halos...')
-    source_dir = pjoin(
-        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}',
-        f'{cfg.lhid}')
+    source_dir = get_source_path(
+        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N)
     pos, vel, mass = load_cuboid(source_dir)
 
     logging.info('Populating HOD...')

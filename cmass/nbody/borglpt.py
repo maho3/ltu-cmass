@@ -25,8 +25,8 @@ import argparse
 import numpy as np
 import logging
 import aquila_borg as borg
-from ..utils import (attrdict, get_global_config, setup_logger,
-                     timing_decorator, load_params)
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
@@ -148,8 +148,8 @@ def main():
         cfg.ai, cfg.af, cpar, cfg.order, cfg.transfer)
 
     # Save
-    outdir = pjoin(glbcfg["wdir"], f"borg{cfg.order}lpt",
-                   f'L{cfg.L}-N{cfg.N}', f"{cfg.lhid}")
+    outdir = get_source_path(
+        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N, check=False)
     save_nbody(outdir, rho, pos, vel)
     cfg.save(pjoin(outdir, 'config.json'))
 

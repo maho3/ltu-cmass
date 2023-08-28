@@ -55,6 +55,20 @@ def get_global_config():
     return config
 
 
+def get_source_path(wdir, simtype, L, N, check=True):
+    source_dir = pjoin(wdir, 'borg', simtype)
+    source_path = pjoin(source_dir, f'L{L}-N{N}')
+
+    if check:
+        # check if the source directory exists, if not list options
+        if not os.path.isdir(source_path):
+            raise ValueError(
+                f"Source directory {source_path} does not exist. "
+                "Did you run the prerequisites? "
+                f"Available options are: {os.listdir(source_dir)}")
+    return source_path
+
+
 def timing_decorator(func, *args, **kwargs):
     def wrapper(*args, **kwargs):
         logging.info(f"Running {func.__name__}...")

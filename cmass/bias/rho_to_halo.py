@@ -30,8 +30,8 @@ from scipy.interpolate import interp1d
 from .tools.halos import (pad_3d, TruncatedPowerLaw, sample_3d)
 from .tools.halos import (sample_velocities_density, sample_velocities_kNN,
                           sample_velocities_CIC)
-from ..utils import (attrdict, get_global_config, setup_logger,
-                     timing_decorator, load_params)
+from ..utils import (attrdict, get_global_config, get_source_path,
+                     setup_logger, timing_decorator, load_params)
 
 
 # Load global configuration and setup logger
@@ -122,8 +122,7 @@ def main():
     popt, medges = load_bias_params(bias_path, cfg.lhid)
 
     logging.info('Loading 3 Gpc sims...')
-    source_dir = pjoin(
-        glbcfg['wdir'], f'{cfg.simtype}/L{cfg.L}-N{cfg.N}', f'{cfg.lhid}')
+    source_dir = get_source_path(glbcfg['wdir'], cfg.simtype, cfg.L, cfg.N)
     rho, ppos, pvel = load_nbody(source_dir)
 
     logging.info('Sampling power law...')
