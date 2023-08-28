@@ -43,6 +43,10 @@ def build_config():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '-L', type=int, default=3000)  # side length of box in Mpc/h
+    parser.add_argument(
+        '-N', type=int, default=384)  # number of grid points on one side
+    parser.add_argument(
         '--lhid', type=int, required=True)  # which cosmology to use
     parser.add_argument(
         '--simtype', type=str, default='borg2lpt')  # which nbody sim to use
@@ -50,13 +54,10 @@ def build_config():
         '--veltype', type=str, default='density')  # method to infer velocities
     args = parser.parse_args()
 
-    L = 3000           # length of box in Mpc/h
-    N = 384            # number of grid points on one side
-
     cosmo = load_params(args.lhid, glbcfg['cosmofile'])
 
     return attrdict(
-        L=L, N=N, cosmo=cosmo,
+        L=args.L, N=args.N, cosmo=cosmo,
         lhid=args.lhid, simtype=args.simtype, veltype=args.veltype
     )
 

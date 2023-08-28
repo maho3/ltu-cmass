@@ -27,6 +27,10 @@ def build_config():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '-L', type=int, default=3000)  # side length of box in Mpc/h
+    parser.add_argument(
+        '-N', type=int, default=384)  # number of grid points on one side
+    parser.add_argument(
         '--lhid', type=int, required=True)  # which cosmology to use
     parser.add_argument(
         '--order', type=int, default=2)  # LPT order (1 or 2)
@@ -34,8 +38,6 @@ def build_config():
         '--matchIC', action='store_true')  # whether to match ICs to file
     args = parser.parse_args()
 
-    L = 3000           # length of box in Mpc/h
-    N = 384            # number of grid points on one side
     supersampling = 1  # supersampling factor
     transfer = 'EH'    # transfer function 'CLASS' or 'EH
     zi = 127           # initial redshift
@@ -45,13 +47,13 @@ def build_config():
 
     quijote = False  # whether to match ICs to Quijote (True) or custom (False)
     if quijote:
-        assert L == 1000  # enforce same size of quijote
+        assert args.L == 1000  # enforce same size of quijote
 
     # load cosmology
     cosmo = load_params(args.lhid, glbcfg['cosmofile'])
 
     return attrdict(
-        L=L, N=N, supersampling=supersampling, transfer=transfer,
+        L=args.L, N=args.N, supersampling=supersampling, transfer=transfer,
         lhid=args.lhid, order=args.order, matchIC=args.matchIC,
         zi=zi, zf=zf, ai=ai, af=af,
         quijote=quijote, cosmo=cosmo

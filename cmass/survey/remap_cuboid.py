@@ -34,17 +34,21 @@ setup_logger(glbcfg['logdir'], name='remap_as_cuboid')
 def build_config():
     # Get arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lhid', type=int, required=True)
-    parser.add_argument('--simtype', type=str, default='borg2lpt')
+    parser.add_argument(
+        '-L', type=int, default=3000)  # side length of box in Mpc/h
+    parser.add_argument(
+        '-N', type=int, default=384)  # number of grid points on one side
+    parser.add_argument(
+        '--lhid', type=int, required=True)  # which cosmology to use
+    parser.add_argument(
+        '--simtype', type=str, default='borg2lpt')  # which base simulation
     args = parser.parse_args()
 
-    L = 3000           # length of box in Mpc/h
-    N = 384            # number of grid points on one side
     # lattice vectors
     u1, u2, u3 = (1, 1, 0), (0, 0, 1), (1, 0, 0)
 
     return attrdict(
-        L=L, N=N,
+        L=args.L, N=args.N,
         u1=u1, u2=u2, u3=u3,
         lhid=args.lhid, simtype=args.simtype,
     )
