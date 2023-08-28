@@ -56,40 +56,6 @@ def BOSS_redshift(z):
     return np.array(mask)
 
 
-def BOSS_radial(z, sample='lowz-south', seed=0):
-    ''' Downsample the redshifts to match the BOSS radial selection function.
-    This assumes that the sample consists of the same type of galaxies (i.e. 
-    constant HOD), but selection effects randomly remove some of them 
-    Notes
-    -----
-    * nbar file from https://data.sdss.org/sas/bosswork/boss/lss/DR12v5/
-    '''
-    if sample == 'lowz-south':
-        f_nbar = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                              'dat', 'nbar_DR12v5_LOWZ_South_om0p31_Pfkp10000.dat')
-        zmin, zmax = 0.2, 0.37
-    else:
-        raise NotImplementedError
-
-    # zcen,zlow,zhigh,nbar,wfkp,shell_vol,total weighted gals
-    zcen, zlow, zhigh, nbar, wfkp, shell_vol, tot_gal = np.loadtxt(f_nbar,
-                                                                   skiprows=2, unpack=True)
-    zedges = np.concatenate([zlow, [zhigh[-1]]])
-
-    ngal_z, _ = np.histogram(np.array(z), bins=zedges)
-
-    # fraction to downsample
-    # fdown_z = tot_gal/ngal_z.astype(float)
-
-    # impose redshift limit
-    zlim = (z > zmin) & (z < zmax)
-
-    # i_z = np.digitize(z, zedges)
-    # downsample = (np.random.rand(len(z)) < fdown_z[i_z])
-
-    return zlim  # & downsample
-
-
 def BOSS_area():
     f_poly = os.path.join('data', 'obs/mask_DR12v5_CMASSLOWZ_North.ply')
     boss_poly = pymangle.Mangle(f_poly)

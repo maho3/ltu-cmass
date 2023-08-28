@@ -40,7 +40,7 @@ def build_config():
     N_steps = 16       # number of PM steps
     supersampling = 1  # supersampling factor
     zi = 127           # initial redshift
-    zf = 0.0           # final redshift
+    zf = 0.55          # final redshift (default=CMASS)
     ai = 1 / (1 + zi)  # initial scale factor
     af = 1 / (1 + zf)  # final scale factor
 
@@ -119,7 +119,7 @@ def main():
 
     # Save
     outdir = get_source_path(
-        glbcfg["wdir"], f"borg{cfg.order}lpt", cfg.L, cfg.N, check=False)
+        glbcfg["wdir"], "pmwd", cfg.L, cfg.N, check=False)
     save_nbody(outdir, rho, pos, vel)
     cfg.save(pjoin(outdir, 'config.json'))
 

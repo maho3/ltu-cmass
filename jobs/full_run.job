@@ -1,7 +1,7 @@
 #PBS -N cmassFM
 #PBS -q batch
 #PBS -l walltime=8:00:00
-#PBS -l nodes=1:ppn=32,mem=64gb
+#PBS -l nodes=1:ppn=40,mem=128gb
 #PBS -t 3
 #PBS -j oe
 #PBS -o ./data/logs/_temp.o
@@ -18,17 +18,17 @@ conda activate cmass-env
 echo running script...
 echo "arrayind is ${PBS_ARRAYID}"
 
-simtype=borg2lpt
+simtype=jax2lpt
 
-python -m cmass.nbody.borglpt --lhid ${PBS_ARRAYID} --matchIC --order 2
+python -m cmass.nbody.jaxlpt --lhid ${PBS_ARRAYID} --matchIC --order 2
 python -m cmass.bias.rho_to_halo --lhid ${PBS_ARRAYID} --simtype ${simtype} --veltype density
 python -m cmass.survey.remap_cuboid --lhid ${PBS_ARRAYID} --simtype ${simtype}
 
 for i in {0..5}
 do
-    python -m cmass.bias.apply_hod --lhid ${PBS_ARRAYID} --seed $i --simtype ${simtype}
-    python -m cmass.survey.ngc_selection --lhid ${PBS_ARRAYID} --seed $i --simtype ${simtype}
-    python -m cmass.summaries.Pk_nbkit --lhid ${PBS_ARRAYID} --seed $i --simtype ${simtype}
+    python -m cmass.bias.apply_hod --lhid ${PBS_ARRAYID} --seed ${i} --simtype ${simtype}
+    python -m cmass.survey.ngc_selection --lhid ${PBS_ARRAYID} --seed ${i} --simtype ${simtype}
+    python -m cmass.summaries.Pk_nbkit --lhid ${PBS_ARRAYID} --seed ${i} --simtype ${simtype}
 done
 
 echo done

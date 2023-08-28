@@ -56,7 +56,7 @@ def get_global_config():
 
 
 def get_source_path(wdir, simtype, L, N, check=True):
-    source_dir = pjoin(wdir, 'borg', simtype)
+    source_dir = pjoin(wdir, simtype)
     source_path = pjoin(source_dir, f'L{L}-N{N}')
 
     if check:

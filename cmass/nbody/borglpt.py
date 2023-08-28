@@ -54,7 +54,7 @@ def build_config():
     supersampling = 1  # supersampling factor
     transfer = 'EH'    # transfer function 'CLASS' or 'EH
     zi = 127           # initial redshift
-    zf = 0.0           # final redshift
+    zf = 0.55          # final redshift (default=CMASS)
     ai = 1 / (1 + zi)  # initial scale factor
     af = 1 / (1 + zf)  # final scale factor
 

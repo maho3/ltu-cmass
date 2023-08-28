@@ -40,6 +40,8 @@ def build_config():
     parser.add_argument(
         '--lhid', type=int, required=True)  # which cosmology to use
     parser.add_argument(
+        '--seed', type=int, required=True)  # HOD random seed
+    parser.add_argument(
         '--simtype', type=str, default='borg2lpt')  # which base simulation
     args = parser.parse_args()
 
@@ -121,7 +123,7 @@ def main():
     cfg = build_config()
 
     source_dir = get_source_path(
-        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N)
+        
 
     # Load galaxies
     pos, vel = load_galaxies_sim(source_dir, cfg.seed)
