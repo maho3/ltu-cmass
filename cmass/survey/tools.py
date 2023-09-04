@@ -7,8 +7,11 @@ import os
 from os.path import join as pjoin
 import numpy as np
 import pymangle
-from astropy.io import fits
 import pandas as pd
+from astropy.io import fits
+from astropy.coordinates import search_around_sky
+from astropy import units as u
+from astropy.coordinates import SkyCoord
 
 from ..utils import timing_decorator
 
@@ -54,6 +57,23 @@ def BOSS_redshift(z):
     zmin, zmax = 0.4, 0.7
     mask = (zmin < z) & (z < zmax)
     return np.array(mask)
+
+
+def BOSS_fiber(ra, dec, sep=0.01722, type='one'):
+    c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+    seplimit = seplimit*u.degree
+    idx1, idx2, _, _ = search_around_sky(c, c, seplimit)
+
+    if type == 'one':
+        iddrop = idx1[idx1 != idx2]
+    elif type == 'two':
+        iddrop = set(idx1[idx1 != idx2]).union(idx2[idx1 != idx2])
+    else:
+        raise ValueError(f'Fiber collision type {type} is not valid.')
+
+    mask = np.ones(len(ra), type=bool)
+    mask[iddrop] = False
+    return mask
 
 
 def BOSS_area():

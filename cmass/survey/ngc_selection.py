@@ -20,7 +20,7 @@ from scipy.spatial.transform import Rotation as R
 
 import nbodykit.lab as nblab
 
-from .tools import BOSS_angular, BOSS_veto, BOSS_redshift
+from .tools import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber
 from ..utils import (attrdict, get_global_config, get_source_path,
                      setup_logger, timing_decorator, load_params)
 
@@ -43,13 +43,16 @@ def build_config():
         '--seed', type=int, required=True)  # HOD random seed
     parser.add_argument(
         '--simtype', type=str, default='borg2lpt')  # which base simulation
+    parser.add_argument(
+        '--fibertype', type=str, default='None')  # fiber collision method
     args = parser.parse_args()
 
     cosmo = load_params(args.lhid, glbcfg['cosmofile'])
 
     return attrdict(
         L=args.L, N=args.N,
-        lhid=args.lhid, seed=args.seed, simtype=args.simtype,
+        lhid=args.lhid, seed=args.seed, 
+        simtype=args.simtype, fibertype=args.fibertype
         cosmo=cosmo
     )
 
@@ -87,7 +90,7 @@ def xyz_to_sky(pos, vel, cosmo):
 
 
 @timing_decorator
-def apply_mask(rdz):
+def apply_mask(rdz, fibertype='None'):
     logging.info('Applying redshift cut...')
     len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
@@ -100,6 +103,14 @@ def apply_mask(rdz):
     inveto = BOSS_veto(*rdz[:, :-1].T)
     mask = inpoly & (~inveto)
     rdz = rdz[mask]
+
+    if fibertype  != 'None':
+        logging.info('Applying fiber collisions...')
+        mask = BOSS_fiber(
+            *rdz[:, :-1].T,
+            sep=0.01722,  # ang. sep. for CMASS
+            type=fibertype)
+        rdz = rdz[mask]
 
     logging.info(f'Fraction of galaxies kept: {len(rdz) / len_rdz:.3f}')
     return rdz
@@ -135,7 +146,7 @@ def main():
     rdz = xyz_to_sky(pos, vel, cfg.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz)
+    rdz = apply_mask(rdz, cfg.fibertype)
 
     # Reweight
     rdz = reweight(rdz)
