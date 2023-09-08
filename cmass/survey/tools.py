@@ -59,19 +59,21 @@ def BOSS_redshift(z):
     return np.array(mask)
 
 
-def BOSS_fiber(ra, dec, sep=0.01722, type='one'):
-    c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
-    seplimit = seplimit*u.degree
+def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
+    c = SkyCoord(ra=ra, dec=dec, unit=u.degree)
+    seplimit = sep*u.degree
     idx1, idx2, _, _ = search_around_sky(c, c, seplimit)
 
-    if type == 'one':
+    if mode == 1:
         iddrop = idx1[idx1 != idx2]
-    elif type == 'two':
-        iddrop = set(idx1[idx1 != idx2]).union(idx2[idx1 != idx2])
+    elif mode == 2:
+        iddrop = np.array(
+            list(set(idx1[idx1 != idx2]).union(idx2[idx1 != idx2])),
+            dtype=int)
     else:
-        raise ValueError(f'Fiber collision type {type} is not valid.')
+        raise ValueError(f'Fiber collision type {mode} is not valid.')
 
-    mask = np.ones(len(ra), type=bool)
+    mask = np.ones(len(ra), dtype=bool)
     mask[iddrop] = False
     return mask
 

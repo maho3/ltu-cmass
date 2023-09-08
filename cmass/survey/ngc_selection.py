@@ -44,15 +44,15 @@ def build_config():
     parser.add_argument(
         '--simtype', type=str, default='borg2lpt')  # which base simulation
     parser.add_argument(
-        '--fibertype', type=str, default='None')  # fiber collision method
+        '--fibermode', type=int, default=0)  # fiber collision method
     args = parser.parse_args()
 
     cosmo = load_params(args.lhid, glbcfg['cosmofile'])
 
     return attrdict(
         L=args.L, N=args.N,
-        lhid=args.lhid, seed=args.seed, 
-        simtype=args.simtype, fibertype=args.fibertype
+        lhid=args.lhid, seed=args.seed,
+        simtype=args.simtype, fibermode=args.fibermode,
         cosmo=cosmo
     )
 
@@ -90,7 +90,7 @@ def xyz_to_sky(pos, vel, cosmo):
 
 
 @timing_decorator
-def apply_mask(rdz, fibertype='None'):
+def apply_mask(rdz, fibermode=0):
     logging.info('Applying redshift cut...')
     len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
@@ -104,12 +104,13 @@ def apply_mask(rdz, fibertype='None'):
     mask = inpoly & (~inveto)
     rdz = rdz[mask]
 
-    if fibertype  != 'None':
+    rdz = rdz.compute()  # dask array -> numpy array
+    if fibermode != 0:
         logging.info('Applying fiber collisions...')
         mask = BOSS_fiber(
             *rdz[:, :-1].T,
-            sep=0.01722,  # ang. sep. for CMASS
-            type=fibertype)
+            sep=0.01722,  # ang. sep. for CMASS in deg
+            mode=fibermode)
         rdz = rdz[mask]
 
     logging.info(f'Fraction of galaxies kept: {len(rdz) / len_rdz:.3f}')
@@ -146,7 +147,7 @@ def main():
     rdz = xyz_to_sky(pos, vel, cfg.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.fibertype)
+    rdz = apply_mask(rdz, cfg.fibermode)
 
     # Reweight
     rdz = reweight(rdz)

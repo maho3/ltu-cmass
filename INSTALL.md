@@ -34,7 +34,7 @@ module load gcc/13.2.0 openmpi/4.1.2-intel
 ```
 Next, clone the nbodykit repository:
 ```bash
-git clone https://github.com/bccp/nbodykit/tree/master
+git clone https://github.com/bccp/nbodykit.git
 cd nbodykit
 ```
 Then, install the dependencies. Note, numpy, cython, and mpi4py must be installed first because they are used to build other packages. We use the `--no-cache-dir` flag to force recompiling of cython and mpi4py, which must be built for your specific compilers.
