@@ -88,7 +88,7 @@ conda activate cmass-env
 python -m cmass.nbody.borglpt --lhid 0 --order 2
 
 # sample halo positions, velocities, and masses from the density field
-python -m cmass.biasing.rho_to_halo --lhid 0 --simtype borg2lpt
+python -m cmass.bias.rho_to_halo --lhid 0 --simtype borg2lpt
 
 # reshape the halo catalog to a cuboid matching our survey volume
 python -m cmass.survey.remap_cuboid --lhid 0 --simtype borg2lpt
