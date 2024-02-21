@@ -22,7 +22,8 @@ from os.path import join as pjoin
 import multiprocessing as mp
 from functools import partial
 
-from .tools.quijote import load_quijote_halos, TruncatedPowerLaw
+from .tools.quijote import load_quijote_halos
+from .tools.halos import TruncatedPowerLaw
 from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
 
 

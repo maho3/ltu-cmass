@@ -106,7 +106,7 @@ def sample_masses(Nsamp, medg, order=1):
 
     # don't interpolate unresolved bins at low/high mass
     mask = np.array(Nsamp) > 0
-    l, r = mask.argmax(), mask.size - mask[::-1].argmax()+2
+    l, r = mask.argmax(), mask.size - (mask[::-1].argmax())
     maskedg, maskcen, maskN = medg[l:r], mcen[l:r], Nsamp[l:r]
 
     # interpolate the mass PDF
