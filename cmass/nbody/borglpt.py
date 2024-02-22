@@ -47,8 +47,9 @@ def build_config():
         '--lhid', type=int, required=True)  # which cosmology to use
     parser.add_argument(
         '--order', type=int, default=2)  # LPT order (1 or 2)
+    # whether to match ICs to file (0 no, 1 yes, 2 quijote)
     parser.add_argument(
-        '--matchIC', action='store_true')  # whether to match ICs to file
+        '--matchIC', type=int, default=0)
     args = parser.parse_args()
 
     supersampling = 1  # supersampling factor
@@ -57,9 +58,11 @@ def build_config():
     zf = 0.55          # final redshift (default=CMASS)
     ai = 1 / (1 + zi)  # initial scale factor
     af = 1 / (1 + zf)  # final scale factor
+    matchIC = args.matchIC > 0  # whether to match ICs to file
+    quijote = args.matchIC == 2  # whether to match ICs to Quijote
 
-    quijote = False  # whether to match ICs to Quijote (True) or custom (False)
     if quijote:
+        logging.info('Matching ICs to Quijote')
         assert args.L == 1000  # enforce same size of quijote
 
     # load cosmology
@@ -67,7 +70,7 @@ def build_config():
 
     return attrdict(
         L=args.L, N=args.N, supersampling=supersampling, transfer=transfer,
-        lhid=args.lhid, order=args.order, matchIC=args.matchIC,
+        lhid=args.lhid, order=args.order, matchIC=matchIC,
         zi=zi, zf=zf, ai=ai, af=af,
         quijote=quijote, cosmo=cosmo
     )
@@ -78,7 +81,7 @@ def get_ICs(N, lhid, matchIC, quijote):
         path_to_ic = pjoin(glbcfg['wdir'], f'wn/N{N}/wn_{lhid}.dat')
         if quijote:
             path_to_ic = pjoin(glbcfg['wdir'],
-                               f'borg-quijote/ICs/wn-N{N}'
+                               f'quijote/wn/wn-N{N}',
                                f'wn_{lhid}.dat')
         return load_white_noise(path_to_ic, N, quijote=quijote)
     else:
