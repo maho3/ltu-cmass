@@ -4,11 +4,10 @@ import yaml
 import datetime
 import os
 from os.path import join as pjoin
-import numpy as np
 import json
 
 
-class attrdict(dict):
+class attrdict(dict):  # TODO: remove?
     """Simple dict wrapper, allowing attribute access and saving to yaml."""
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
@@ -22,31 +21,6 @@ class attrdict(dict):
     def load(cls, path):
         with open(path, 'r') as f:
             return cls(json.load(f))
-
-
-def setup_logger(logdir, name='log', level=logging.INFO):
-    # define a naming prefix
-    date = datetime.datetime.now().strftime("%Y%m%d")
-    prefix = f'{name}_{date}'
-
-    # find all logs with the same prefix
-    logs = os.listdir(logdir)
-    logs = [l for l in logs if l.startswith(prefix)]
-
-    # find the next available number
-    path_to_log = pjoin(logdir, f'{name}_{date}_{len(logs):04}.log')
-
-    # setup the logger
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s-%(levelname)s %(message)s",
-        datefmt='%H:%M:%S',
-        handlers=[
-            logging.FileHandler(path_to_log),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    logging.info(f"Logging to {path_to_log}")
 
 
 def get_global_config():
@@ -93,5 +67,5 @@ def load_params(index, cosmofile):
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
     with open(cosmofile, 'r') as f:
         content = f.readlines()[index+1]
-    content = [np.float64(x) for x in content.split()]
+    content = [float(x) for x in content.split()]
     return content

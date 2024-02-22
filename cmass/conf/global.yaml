@@ -1,0 +1,14 @@
+hydra:
+  run:
+    dir: ./data/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+  job_logging:
+    formatters:
+      simple:
+        format: "[%(asctime)s-%(levelname)s] %(message)s"
+        datefmt: "%H:%M:%S"
+
+meta:
+  wdir: "/home/mattho/git/ltu-cmass/data"
+  logdir: "${meta.wdir}/logs/"
+  cosmofile: "${meta.wdir}/quijote/latin_hypercube_params_bonus.txt"

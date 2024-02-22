@@ -1,0 +1,16 @@
+
+defaults:
+  - global
+  - _self_
+
+nbody:
+  L: 1000
+  N: 128
+  lhid: 4
+  matchIC: 2
+
+  supersampling: 2
+  N_steps: 16
+
+  zi: 127
+  zf: 0.0

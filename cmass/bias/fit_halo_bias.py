@@ -81,7 +81,7 @@ def main():
     logging.info(f'Running with lhid={cfg.lhid}...')
     halo_path = pjoin(
         glbcfg['wdir'],
-        f'quijote/source/Halos/latin_hypercube/{cfg.lhid}')
+        f'quijote/source/Halos/latin_hypercube_HR/{cfg.lhid}')
     hcounts, edges = load_hhalos(halo_path)
     rho_path = pjoin(
         glbcfg['wdir'],

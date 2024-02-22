@@ -120,7 +120,8 @@ class FoF_catalog:
 
 
 def load_quijote_halos(snapdir):
-    FoF = FoF_catalog(snapdir, 4, long_ids=False,
+    FoF = FoF_catalog(snapdir, snapnum=4,  # 4 for z=0
+                      long_ids=False,
                       swap=False, SFR=False, read_IDs=False)
 
     # get the properties of the halos

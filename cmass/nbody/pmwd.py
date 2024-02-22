@@ -10,65 +10,46 @@ from pmwd import (
     nbody,
     scatter,
 )
+import jax.numpy as jnp
 import logging
 import numpy as np
-import argparse
 from os.path import join as pjoin
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator, load_params)
+import hydra
+from omegaconf import DictConfig, OmegaConf, open_dict
+from ..utils import (get_global_config, get_source_path,
+                     timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody
 
 
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='pmwd')
+def parse_config(cfg):
+    with open_dict(cfg):
+        nbody = cfg.nbody
+        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
+        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
+        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
+        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
+        # load cosmology
+        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
 
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    # whether to match ICs to file (0 no, 1 yes, 2 quijote)
-    parser.add_argument(
-        '--matchIC', type=int, default=0)
-    args = parser.parse_args()
-
-    N_steps = 16       # number of PM steps
-    supersampling = 1  # supersampling factor
-    zi = 127           # initial redshift
-    zf = 0.55          # final redshift (default=CMASS)
-    ai = 1 / (1 + zi)  # initial scale factor
-    af = 1 / (1 + zf)  # final scale factor
-    matchIC = args.matchIC > 0  # whether to match ICs to file
-    quijote = args.matchIC == 2  # whether to match ICs to Quijote
-
-    if quijote:
+    if cfg.nbody.quijote:
         logging.info('Matching ICs to Quijote')
-        assert args.L == 1000  # enforce same size of quijote
+        assert cfg.nbody.L == 1000  # enforce same size of quijote
 
-    # load cosmology
-    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
-
-    return attrdict(
-        L=args.L, N=args.N, N_steps=N_steps, supersampling=supersampling,
-        lhid=args.lhid, matchIC=matchIC,
-        zi=zi, zf=zf, ai=ai, af=af,
-        quijote=quijote, cosmo=cosmo
-    )
+    return cfg
 
 
-def configure_pmwd(L, N, N_steps, supersampling, ai, af, cosmo):
-    ptcl_spacing = L/N
+def configure_pmwd(cfg):
+    # L, N, N_steps, supersampling, ai, af, cosmo):
+    nbody = cfg.nbody
+    cosmo = nbody.cosmo
+
+    N = nbody.N*nbody.supersampling
+    ptcl_spacing = nbody.L/N
     ptcl_grid_shape = (N,)*3
     pmconf = Configuration(ptcl_spacing, ptcl_grid_shape,
-                           a_start=ai, a_stop=af,
-                           a_nbody_maxstep=(af-ai)/N_steps,
-                           mesh_shape=supersampling)
+                           a_start=nbody.ai, a_stop=nbody.af,
+                           a_nbody_maxstep=(nbody.af-nbody.ai)/nbody.N_steps)
     pmcosmo = Cosmology.from_sigma8(
         pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
         Omega_b=cosmo[1], h=cosmo[2])
@@ -76,27 +57,34 @@ def configure_pmwd(L, N, N_steps, supersampling, ai, af, cosmo):
     return pmconf, pmcosmo
 
 
-def get_ICs(N, lhid, matchIC, quijote):
-    if matchIC:
-        path_to_ic = pjoin(glbcfg['wdir'], f'wn/N{N}/wn_{lhid}.dat')
-        if quijote:
-            path_to_ic = pjoin(glbcfg['wdir'],
-                               f'quijote/wn/wn-N{N}',
-                               f'wn_{lhid}.dat')
-        return load_white_noise(path_to_ic, N, quijote=quijote)
+def get_ICs(cfg):
+    nbody = cfg.nbody
+    N = nbody.N*nbody.supersampling
+    if nbody.matchIC:
+        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
+        if nbody.quijote:
+            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+        else:
+            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N)
 
 
 @timing_decorator
-def run_density(wn, pmconf, pmcosmo):
+def run_density(wn, pmconf, pmcosmo, supersampling):
     ic = linear_modes(wn, pmcosmo, pmconf)
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
     ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
 
-    rho = scatter(ptcl, pmconf)
     pos = np.array(ptcl.pos())
     vel = ptcl.vel
+
+    # Compute density
+    rho = scatter(ptcl, pmconf,
+                  mesh=jnp.zeros(3*(pmconf.mesh_shape[0]//supersampling,)),
+                  cell_size=pmconf.cell_size*supersampling)
+    rho /= supersampling**3  # undo supersampling
 
     rho -= 1  # make it zero mean
     vel *= 100  # km/s
@@ -104,28 +92,39 @@ def run_density(wn, pmconf, pmcosmo):
 
 
 @timing_decorator
-def main():
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+
     # Build run config
-    cfg = build_config()
-    logging.info(f'Running with config: {cfg}')
+    cfg = parse_config(cfg)
+    logging.info(f"Working directory: {os.getcwd()}")
+    logging.info(
+        "Logging directory: " +
+        hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup
-    pmconf, pmcosmo = configure_pmwd(
-        cfg.L, cfg.N, cfg.N_steps, cfg.supersampling,
-        cfg.ai, cfg.af, cfg.cosmo)
+    pmconf, pmcosmo = configure_pmwd(cfg)
 
     # Get ICs
-    wn = get_ICs(cfg.N, cfg.lhid, cfg.matchIC, cfg.quijote)
+    wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, pmconf, pmcosmo)
+    rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg.nbody.supersampling)
 
     # Save
     outdir = get_source_path(
-        glbcfg["wdir"], "pmwd", cfg.L, cfg.N, cfg.lhid, check=False)
+        cfg.meta.wdir, "pmwd", cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
+        check=False)
     save_nbody(outdir, rho, pos, vel)
-    cfg.save(pjoin(outdir, 'config.json'))
+
+    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+        OmegaConf.save(cfg, f)
+    # cfg.save(pjoin(outdir, 'config.json'))
 
 
 if __name__ == '__main__':
+
     main()
+
+    logging.info('Done')

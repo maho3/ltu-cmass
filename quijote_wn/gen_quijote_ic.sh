@@ -1,9 +1,12 @@
 
-N=128
-datadir=/home/mattho/git/ltu-cmass/data/quijote/wn
+#!/bin/bash
 
-for i in {0..2000}
-do
-    echo "Running ${i}"
-    ./NGenicWhiteNoise/ngenic_white_noise ${N} ${N} ${i} ${datadir}/wn-N${N}/wn_${i}.dat 64
-done
+N=$1
+lhid=$2
+datadir=/home/mattho/git/ltu-cmass/data/quijote/wn/N${N}
+
+# Make datadir if it doesn't exist
+mkdir -p $datadir
+
+echo "Running NGenicWhiteNoise for N=${N} and lhid=${lhid}"
+./NGenicWhiteNoise/ngenic_white_noise ${N} ${N} ${lhid} ${datadir}/wn_${lhid}.dat 64

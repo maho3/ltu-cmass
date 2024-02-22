@@ -23,7 +23,7 @@ git clone git@github.com:maho3/ltu-cmass.git
 ```
 Next, we recommend installing things in a fresh Python environment, such as anaconda. We've tested the following configuration with Python 3.10.
 ```bash
-conda create -n cmass-env python=3.9
+conda create -n cmass-env python=3.10
 conda activate cmass-env
 ```
 
