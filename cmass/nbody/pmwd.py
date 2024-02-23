@@ -1,3 +1,35 @@
+"""
+Simulate density field using pmwd.
+
+Requires:
+    - pmwd
+
+Params:
+    - nbody.suite: suite name
+
+    - nbody.L: box size (in Mpc/h)
+    - nbody.N: number of grid points per dimension in density field
+    - nbody.lhid: index of the cosmological parameters in the
+        latin_hypercube_params_bonus.txt file
+    - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
+
+    - nbody.supersampling: particle resolution factor relative to density field
+    - nbody.B: force grid resolution factor relative to density field
+    - nbody.N_steps: number of steps in the nbody simulation
+
+    - nbody.zi: initial redshift
+    - nbody.zf: final redshift
+
+    - nbody.save_particles: whether to save particle positions and velocities
+
+
+Output:
+    - rho: density field
+    - ppos: particle positions
+    - pvel: particle velocities
+"""
+
+
 import os  # noqa
 os.environ['OPENBLAS_NUM_THREADS'] = '8'  # noqa, must go before jax
 os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
@@ -88,7 +120,6 @@ def run_density(wn, pmconf, pmcosmo, cfg):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-
     # Build run config
     cfg = parse_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
@@ -115,7 +146,4 @@ def main(cfg: DictConfig) -> None:
 
 
 if __name__ == '__main__':
-
     main()
-
-    logging.info('Done')

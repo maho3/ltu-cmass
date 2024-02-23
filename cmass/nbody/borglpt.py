@@ -21,106 +21,83 @@ import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 
 from os.path import join as pjoin
-import argparse
 import numpy as np
 import logging
+import hydra
+from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator, load_params)
+from ..utils import get_source_path, timing_decorator, load_params
 from .tools import gen_white_noise, load_white_noise, save_nbody
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='borglpt')
+def parse_config(cfg):
+    with open_dict(cfg):
+        nbody = cfg.nbody
+        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
+        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
+        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
+        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
+        # load cosmology
+        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
 
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--order', type=int, default=2)  # LPT order (1 or 2)
-    # whether to match ICs to file (0 no, 1 yes, 2 quijote)
-    parser.add_argument(
-        '--matchIC', type=int, default=0)
-    args = parser.parse_args()
-
-    supersampling = 1  # supersampling factor
-    transfer = 'EH'    # transfer function 'CLASS' or 'EH
-    zi = 127           # initial redshift
-    zf = 0.55          # final redshift (default=CMASS)
-    ai = 1 / (1 + zi)  # initial scale factor
-    af = 1 / (1 + zf)  # final scale factor
-    matchIC = args.matchIC > 0  # whether to match ICs to file
-    quijote = args.matchIC == 2  # whether to match ICs to Quijote
-
-    if quijote:
+    if cfg.nbody.quijote:
         logging.info('Matching ICs to Quijote')
-        assert args.L == 1000  # enforce same size of quijote
+        assert cfg.nbody.L == 1000  # enforce same size of quijote
 
-    # load cosmology
-    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
-
-    return attrdict(
-        L=args.L, N=args.N, supersampling=supersampling, transfer=transfer,
-        lhid=args.lhid, order=args.order, matchIC=matchIC,
-        zi=zi, zf=zf, ai=ai, af=af,
-        quijote=quijote, cosmo=cosmo
-    )
+    return cfg
 
 
-def get_ICs(N, lhid, matchIC, quijote):
-    if matchIC:
-        path_to_ic = pjoin(glbcfg['wdir'], f'wn/N{N}/wn_{lhid}.dat')
-        if quijote:
-            path_to_ic = pjoin(glbcfg['wdir'],
-                               f'quijote/wn/wn-N{N}',
-                               f'wn_{lhid}.dat')
-        return load_white_noise(path_to_ic, N, quijote=quijote)
+def get_ICs(cfg):
+    nbody = cfg.nbody
+    N = nbody.N
+    if nbody.matchIC:
+        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
+        if nbody.quijote:
+            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+        else:
+            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N)
 
 
 @timing_decorator
-def run_density(ic, L, N, supersampling, ai, af, cpar, order, transfer='EH'):
+def run_density(wn, cpar, cfg):
+    nbody = cfg.nbody
+
     # initialize box and chain
     box = borg.forward.BoxModel()
-    box.L = (L, L, L)
-    box.N = (N, N, N)
+    box.L = 3*(nbody.L,)
+    box.N = 3*(nbody.N,)
 
     chain = borg.forward.ChainForwardModel(box)
     chain.addModel(borg.forward.models.HermiticEnforcer(box))
 
-    if transfer == 'CLASS':
-        transfer_CLASS(chain, box, cpar, ai)
-    elif transfer == 'EH':
-        transfer_EH(chain, box, ai)
+    if nbody.transfer == 'CLASS':
+        transfer_CLASS(chain, box, cpar, nbody.ai)
+    elif nbody.transfer == 'EH':
+        transfer_EH(chain, box, nbody.ai)
 
     # add lpt
-    if order == 1:
+    if nbody.order == 1:
         modelclass = borg.forward.models.BorgLpt
-    elif order == 2:
+    elif nbody.order == 2:
         modelclass = borg.forward.models.Borg2Lpt
     else:
-        raise NotImplementedError(f'Order {order} not implemented.')
+        raise NotImplementedError(f'Order {nbody.order} not implemented.')
     lpt = modelclass(
         box=box, box_out=box,
-        ai=ai, af=af,
-        supersampling=supersampling
+        ai=nbody.ai, af=nbody.af,
+        supersampling=nbody.supersampling
     )
     chain.addModel(lpt)
     chain.setCosmoParams(cpar)
 
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(ic)
+    chain.forwardModel_v2(wn)
 
     Npart = lpt.getNumberOfParticles()
     rho = np.empty(chain.getOutputBoxModel().N)
@@ -134,28 +111,31 @@ def run_density(ic, L, N, supersampling, ai, af, cpar, order, transfer='EH'):
 
 
 @timing_decorator
-def main():
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
     # Build run config
-    cfg = build_config()
-    logging.info(f'Running with config: {cfg.cosmo}')
+    cfg = parse_config(cfg)
+    logging.info(f"Working directory: {os.getcwd()}")
+    logging.info(
+        "Logging directory: " +
+        hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup
-    cpar = build_cosmology(*cfg.cosmo)
+    cpar = build_cosmology(*cfg.nbody.cosmo)
 
     # Get ICs
-    wn = get_ICs(cfg.N, cfg.lhid, cfg.matchIC, cfg.quijote)
+    wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(
-        wn, cfg.L, cfg.N, cfg.supersampling,
-        cfg.ai, cfg.af, cpar, cfg.order, cfg.transfer)
+    rho, pos, vel = run_density(wn, cpar, cfg)
 
     # Save
-    outdir = get_source_path(
-        glbcfg["wdir"], f"borg{cfg.order}lpt",
-        cfg.L, cfg.N, cfg.lhid, check=False)
-    save_nbody(outdir, rho, pos, vel)
-    cfg.save(pjoin(outdir, 'config.json'))
+    outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
+    save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
+
+    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+        OmegaConf.save(cfg, f)
 
 
 if __name__ == '__main__':
