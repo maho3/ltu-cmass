@@ -1,5 +1,6 @@
 import os  # noqa
 os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa, must go before jax
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 
 from pmwd import (
     Configuration,
@@ -16,8 +17,7 @@ import numpy as np
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import (get_global_config, get_source_path,
-                     timing_decorator, load_params)
+from ..utils import (get_source_path, timing_decorator, load_params)
 from .tools import gen_white_noise, load_white_noise, save_nbody
 
 
@@ -49,7 +49,8 @@ def configure_pmwd(cfg):
     ptcl_grid_shape = (N,)*3
     pmconf = Configuration(ptcl_spacing, ptcl_grid_shape,
                            a_start=nbody.ai, a_stop=nbody.af,
-                           a_nbody_maxstep=(nbody.af-nbody.ai)/nbody.N_steps)
+                           a_nbody_maxstep=(nbody.af-nbody.ai)/nbody.N_steps,
+                           mesh_shape=cfg.nbody.B)
     pmcosmo = Cosmology.from_sigma8(
         pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
         Omega_b=cosmo[1], h=cosmo[2])
@@ -72,19 +73,22 @@ def get_ICs(cfg):
 
 
 @timing_decorator
-def run_density(wn, pmconf, pmcosmo, supersampling):
+def run_density(wn, pmconf, pmcosmo, cfg):
     ic = linear_modes(wn, pmcosmo, pmconf)
+    del wn
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
+    del ic
     ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
 
     pos = np.array(ptcl.pos())
     vel = ptcl.vel
 
     # Compute density
+    scale = cfg.nbody.supersampling * cfg.nbody.B
     rho = scatter(ptcl, pmconf,
-                  mesh=jnp.zeros(3*(pmconf.mesh_shape[0]//supersampling,)),
-                  cell_size=pmconf.cell_size*supersampling)
-    rho /= supersampling**3  # undo supersampling
+                  mesh=jnp.zeros(3*(cfg.nbody.N,)),
+                  cell_size=pmconf.cell_size*scale)
+    rho /= scale**3  # undo supersampling
 
     rho -= 1  # make it zero mean
     vel *= 100  # km/s
@@ -110,17 +114,16 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg.nbody.supersampling)
+    rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
 
     # Save
     outdir = get_source_path(
         cfg.meta.wdir, "pmwd", cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
         check=False)
-    save_nbody(outdir, rho, pos, vel)
+    save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
 
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
-    # cfg.save(pjoin(outdir, 'config.json'))
 
 
 if __name__ == '__main__':

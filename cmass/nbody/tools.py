@@ -26,9 +26,10 @@ def load_white_noise(path_to_ic, N, quijote=False):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, pos, vel):
+def save_nbody(savedir, rho, pos, vel, save_particles=True):
     os.makedirs(savedir, exist_ok=True)
     np.save(pjoin(savedir, 'rho.npy'), rho)
-    np.save(pjoin(savedir, 'ppos.npy'), pos)
-    np.save(pjoin(savedir, 'pvel.npy'), vel)
+    if save_particles:
+        np.save(pjoin(savedir, 'ppos.npy'), pos)
+        np.save(pjoin(savedir, 'pvel.npy'), vel)
     logging.info(f'Saved to {savedir}.')
