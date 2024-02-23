@@ -1,0 +1,16 @@
+# for calibrating halo biasing models with quijote
+suite: calib_1gpch
+
+L: 1000           # Mpc/h
+N: 128            # meshgrid resolution
+lhid: 3
+matchIC: 2
+
+supersampling: 2  # particles resolution relative to meshgrid
+B: 1.5            # force grid resolution relative to particle grid
+N_steps: 64
+
+zi: 127
+zf: 0.0
+
+save_particles: false

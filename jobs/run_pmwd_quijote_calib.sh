@@ -3,8 +3,8 @@
 #PBS -j oe
 #PBS -o ${HOME}/data/.jupyter_log/${PBS_JOBNAME}.${PBS_JOBID}.log
 #PBS -l walltime=04:00:00
-#PBS -l nodes=1:ppn=128,mem=256gb
-#PBS -t 3-512
+#PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
+#PBS -t 0-512
 
 source /data80/mattho/anaconda3/bin/activate
 conda activate cmass

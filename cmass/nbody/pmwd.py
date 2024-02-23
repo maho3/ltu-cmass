@@ -1,16 +1,9 @@
 import os  # noqa
-os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa, must go before jax
+os.environ['OPENBLAS_NUM_THREADS'] = '8'  # noqa, must go before jax
 os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 
-from pmwd import (
-    Configuration,
-    Cosmology,
-    boltzmann,
-    linear_modes,
-    lpt,
-    nbody,
-    scatter,
-)
+from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
+                  lpt, nbody, scatter)
 import jax.numpy as jnp
 import logging
 import numpy as np
@@ -40,7 +33,6 @@ def parse_config(cfg):
 
 
 def configure_pmwd(cfg):
-    # L, N, N_steps, supersampling, ai, af, cosmo):
     nbody = cfg.nbody
     cosmo = nbody.cosmo
 
@@ -75,9 +67,7 @@ def get_ICs(cfg):
 @timing_decorator
 def run_density(wn, pmconf, pmcosmo, cfg):
     ic = linear_modes(wn, pmcosmo, pmconf)
-    del wn
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
-    del ic
     ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
 
     pos = np.array(ptcl.pos())
@@ -88,7 +78,7 @@ def run_density(wn, pmconf, pmcosmo, cfg):
     rho = scatter(ptcl, pmconf,
                   mesh=jnp.zeros(3*(cfg.nbody.N,)),
                   cell_size=pmconf.cell_size*scale)
-    rho /= scale**3  # undo supersampling
+    rho /= scale**3  # renormalize
 
     rho -= 1  # make it zero mean
     vel *= 100  # km/s
@@ -117,9 +107,7 @@ def main(cfg: DictConfig) -> None:
     rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
 
     # Save
-    outdir = get_source_path(
-        cfg.meta.wdir, "pmwd", cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
-        check=False)
+    outdir = get_source_path(cfg, "pmwd", check=False)
     save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
 
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
