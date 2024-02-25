@@ -3,6 +3,7 @@ from os.path import join as pjoin
 import logging
 import numpy as np
 from ..utils import timing_decorator
+from pmwd import Configuration, Particles, scatter
 
 
 @timing_decorator
@@ -26,10 +27,44 @@ def load_white_noise(path_to_ic, N, quijote=False):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, pos, vel, save_particles=True):
+def save_nbody(savedir, rho, fvel, pos, vel, save_particles=True):
     os.makedirs(savedir, exist_ok=True)
     np.save(pjoin(savedir, 'rho.npy'), rho)
+    np.save(pjoin(savedir, 'fvel.npy'), fvel)
     if save_particles:
         np.save(pjoin(savedir, 'ppos.npy'), pos)
         np.save(pjoin(savedir, 'pvel.npy'), vel)
     logging.info(f'Saved to {savedir}.')
+
+
+@timing_decorator
+def vfield_CIC(ppos, pvel, cfg, interp=True):
+    nbody = cfg.nbody
+    N = nbody.N * nbody.supersampling
+    ptcl_spacing = nbody.L / N
+    ptcl_grid_shape = (N,)*3
+    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape)
+    ptcl = Particles.from_pos(pmconf, ppos)
+
+    scale = N / nbody.Nvfield
+    mesh = np.zeros([nbody.Nvfield]*3)
+    rho = scatter(ptcl, pmconf, val=1,
+                  mesh=mesh, cell_size=pmconf.cell_size*scale)
+    mesh = np.zeros([nbody.Nvfield]*3+[3])
+    mom = scatter(ptcl, pmconf, val=pvel,
+                  mesh=mesh, cell_size=pmconf.cell_size*scale)
+
+    vel = mom / rho[..., None]
+
+    if interp and np.any(np.isnan(vel)):
+        # interpolate nan values using nearest neighbors
+        davg = 1
+        naninds = np.argwhere(np.all(np.isnan(vel), axis=-1))
+        paddedvel = np.pad(vel, ((davg,), (davg,), (davg,), (0,)), mode='wrap')
+        for i, j, k in naninds:
+            perim = np.array(
+                [paddedvel[i:i+2*davg+1, j:j+2*davg+1, k:k+2*davg+1]])
+            perim = perim[~np.isnan(perim).all(axis=-1)]
+            vel[i, j, k] = np.mean(perim, axis=0)
+
+    return vel

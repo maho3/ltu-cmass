@@ -29,7 +29,6 @@ Output:
     - pvel: particle velocities
 """
 
-
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 
@@ -40,7 +39,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody
+from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
@@ -143,9 +142,12 @@ def main(cfg: DictConfig) -> None:
     # Run
     rho, pos, vel = run_density(wn, cpar, cfg)
 
+    # Calculate velocity field
+    fvel = vfield_CIC(pos, vel, cfg)
+
     # Save
     outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
-    save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
+    save_nbody(outdir, rho, fvel, pos, vel, cfg.nbody.save_particles)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

@@ -42,8 +42,8 @@ import numpy as np
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import (get_source_path, timing_decorator, load_params)
-from .tools import gen_white_noise, load_white_noise, save_nbody
+from ..utils import get_source_path, timing_decorator, load_params
+from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
 
 
 def parse_config(cfg):
@@ -137,9 +137,12 @@ def main(cfg: DictConfig) -> None:
     # Run
     rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
 
+    # Calculate velocity field
+    fvel = vfield_CIC(pos, vel, cfg)
+
     # Save
     outdir = get_source_path(cfg, "pmwd", check=False)
-    save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
+    save_nbody(outdir, rho, fvel, pos, vel, cfg.nbody.save_particles)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
