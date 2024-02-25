@@ -12,15 +12,15 @@ Params:
     - nbody.lhid: index of the cosmological parameters in the
         latin_hypercube_params_bonus.txt file
     - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
+    - nbody.save_particles: whether to save particle positions and velocities
 
-    - nbody.supersampling: particle resolution factor relative to density field
-    - nbody.B: force grid resolution factor relative to density field
-    - nbody.N_steps: number of steps in the nbody simulation
 
     - nbody.zi: initial redshift
     - nbody.zf: final redshift
+    - nbody.supersampling: particle resolution factor relative to density field
 
-    - nbody.save_particles: whether to save particle positions and velocities
+    - nbody.B: force grid resolution factor relative to density field
+    - nbody.N_steps: number of steps in the nbody simulation
 
 
 Output:
@@ -140,9 +140,9 @@ def main(cfg: DictConfig) -> None:
     # Save
     outdir = get_source_path(cfg, "pmwd", check=False)
     save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
-
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
+    logging.info("Done!")
 
 
 if __name__ == '__main__':

@@ -2,4 +2,5 @@
 defaults:
   - global
   - nbody: quijote
+  - fit: quijote_N128_z0
   - _self_

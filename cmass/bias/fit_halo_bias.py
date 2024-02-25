@@ -16,90 +16,103 @@ Output:
 """
 
 import numpy as np
-import argparse
 import logging
 from os.path import join as pjoin
 import multiprocessing as mp
 from functools import partial
+import hydra
+from omegaconf import DictConfig, OmegaConf
+import tqdm
 
 from .tools.quijote import load_quijote_halos
-from .tools.halos import TruncatedPowerLaw
-from ..utils import attrdict, get_global_config, setup_logger, timing_decorator
-
-
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='fit_halo_bias')
-
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    args = parser.parse_args()
-
-    return attrdict(
-        lhid=args.lhid
-    )
+from .tools.halo_models import TruncatedPowerLaw
+from ..utils import get_source_path, timing_decorator
 
 
 @timing_decorator
-def load_hhalos(snapdir):
-    # load quijote halos and compute histogram
-    Lbox = 1000
-    xbins, mbins = 128, 10
+def load_halo_histogram(cfg):
+    # setup metadata
+    snapdir = pjoin(
+        cfg.meta.wdir,
+        cfg.fit.path_to_qhalos,
+        f'{cfg.nbody.lhid}')
 
+    L = cfg.nbody.L
+    N, Nm = cfg.nbody.N, cfg.fit.Nm
+    mmin, mmax = cfg.fit.logMmin, cfg.fit.logMmax
+
+    # load quijote halos and compute histogram
     pos_h, mass, _, _ = load_quijote_halos(snapdir)
     posm = np.concatenate([pos_h, np.log10(mass)[:, None]], axis=1)
     h, edges = np.histogramdd(
         posm,
-        (xbins,)*3+(mbins,),
-        range=[(0, Lbox)]*3+[(12.8, 15.8)]
+        (N,)*3+(Nm,),
+        range=[(0, L)]*3+[(mmin, mmax)]
     )
     return (h, edges)
 
 
-def fit_mass_bin(ind, rho, halos):
+@timing_decorator
+def load_rho(cfg):
+    N, z = cfg.nbody.N, cfg.nbody.zf
+    if cfg.fit.use_rho_quijote:
+        rho_path = pjoin(
+            cfg.meta.wdir,
+            cfg.fit.path_to_qrhos,
+            f'{cfg.lhid}',
+            f'df_m_{N}_z={z}.npy')
+    else:
+        source_path = get_source_path(cfg, cfg.fit.simtype)
+        source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
+
+        # check that the source rho is the same as the one we want
+        if source_cfg.nbody.zf != z:
+            raise ValueError(
+                f"Source redshift {source_cfg.nbody.zf} does not match "
+                f"target redshift {z}.")
+
+        rho_path = pjoin(source_path, 'rho.npy')
+    return np.load(rho_path)
+
+
+def fit_mass_bin(hcounts, rho):
     law = TruncatedPowerLaw()
-    return law.fit(rho.flatten(), halos[..., ind].flatten())
+    return law.fit(rho.flatten(), hcounts.flatten())
 
 
 @timing_decorator
-def fit_bias_params(rho, hcounts):
+def fit_bias_params(rho, hcounts, verbose=True, nproc=mp.cpu_count()):
     # fit the bias parameters for using the 1 Gpc Quijote sims
     logging.info('Fitting power law...')
-    helper = partial(fit_mass_bin, rho=rho, halos=hcounts)
-    with mp.Pool(10) as pool:
-        popt = np.stack(list(pool.map(helper, range(10))))
-    return popt
+    Nm = hcounts.shape[-1]
+    popt = []
+    helper = partial(fit_mass_bin, rho=rho)
+    with mp.Pool(nproc) as pool:
+        popt = list(tqdm.tqdm(
+            pool.imap(helper, [hcounts[..., i] for i in range(Nm)]),
+            total=Nm, desc='Fitting mass bins', disable=not verbose))
+    return np.stack(list(popt), axis=0)
 
 
-def main():
-    cfg = build_config()
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    logging.info(f'Running with lhid={cfg.lhid}...')
-    halo_path = pjoin(
-        glbcfg['wdir'],
-        f'quijote/source/Halos/latin_hypercube_HR/{cfg.lhid}')
-    hcounts, edges = load_hhalos(halo_path)
-    rho_path = pjoin(
-        glbcfg['wdir'],
-        f'quijote/source/density_field/latin_hypercube/{cfg.lhid}',
-        'df_m_128_z=0.npy')
-    rho = np.load(rho_path)
+    hcounts, edges = load_halo_histogram(cfg)
 
-    popt = fit_bias_params(rho, hcounts)
+    rho = load_rho(cfg)
+
+    popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.nproc)
 
     logging.info('Saving...')
     save_path = pjoin(
-        glbcfg['wdir'],
-        f'quijote/bias_fit/LH_n=128/{cfg.lhid}.npy'
-    )
-    np.save(save_path, popt)
-
+        get_source_path(cfg, cfg.fit.simtype),
+        'halo_bias.npy')
+    np.save(pjoin(save_path, 'halo_bias.npy'), popt)
+    np.save(pjoin(save_path, 'halo_medges.npy'), edges)
     logging.info('Done!')
 
 
 if __name__ == '__main__':
+    mp.set_start_method('spawn')
     main()

@@ -1,3 +1,17 @@
+"""
+Simulate density field using jax lpt.
+
+Requires:
+    - jax_lpt
+
+This script is outdated due to the deprecation of jax_lpt to
+alpaga (https://bitbucket.org/aquila-consortium/alpaga/src/main/).
+
+TODO: Update this script to use alpaga.
+TODO: Update this script to use hydra for configuration.
+"""
+
+
 import os  # noqa
 os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa, must go before jax
 os.environ["PYBORG_QUIET"] = "yes"  # noqa

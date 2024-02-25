@@ -1,0 +1,16 @@
+simtype: 'pmwd'
+
+# Relative path to the quijote simulation halos
+path_to_qhalos: 'quijote/source/Halos/latin_hypercube_HR'
+
+# whether to use the quijote density field, or the one from the calibration suite
+use_rho_quijote: false
+path_to_qrhos: 'quijote/source/density_field/latin_hypercube'
+
+# mass bins
+Nm: 10           # number of mass bins
+logMmin: 12.8    # minimum log10 mass
+logMmax: 15.8    # maximum log10 mass
+
+verbose: false    # whether to print progress
+nproc: 10         # number of processes to use

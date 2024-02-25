@@ -28,9 +28,11 @@ import logging
 from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
-from .tools.halos import (pad_3d, TruncatedPowerLaw, sample_3d)
-from .tools.halos import (sample_velocities_density, sample_velocities_kNN,
-                          sample_velocities_CIC)
+from .tools.halo_models import TruncatedPowerLaw
+from .tools.halo_sampling import (pad_3d, sample_3d,
+                                  sample_velocities_density,
+                                  sample_velocities_kNN,
+                                  sample_velocities_CIC)
 from ..utils import (attrdict, get_global_config, get_source_path,
                      setup_logger, timing_decorator, load_params)
 

@@ -1,14 +1,27 @@
 """
-Simulate density field using Borg2LPT.
+Simulate density field using BORG LPT models.
 
 Requires:
-    - borg
+    - pmwd
 
 Params:
-    - index: index of the cosmological parameters in the
+    - nbody.suite: suite name
+
+    - nbody.L: box size (in Mpc/h)
+    - nbody.N: number of grid points per dimension in density field
+    - nbody.lhid: index of the cosmological parameters in the
         latin_hypercube_params_bonus.txt file
-    - order: LPT order (1 or 2)
-    - matchIC: whether to match ICs to file
+    - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
+    - nbody.save_particles: whether to save particle positions and velocities
+
+
+    - nbody.zi: initial redshift
+    - nbody.zf: final redshift
+    - nbody.supersampling: particle resolution factor relative to density field
+
+    - nbody.transfer: transfer function 'CLASS' or 'EH'
+    - nbody.order: LPT order (1 or 2)
+
 
 Output:
     - rho: density field
@@ -133,9 +146,9 @@ def main(cfg: DictConfig) -> None:
     # Save
     outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
     save_nbody(outdir, rho, pos, vel, cfg.nbody.save_particles)
-
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
+    logging.info("Done!")
 
 
 if __name__ == '__main__':
