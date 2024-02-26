@@ -77,30 +77,5 @@ Lastly, configure the json in `global.cfg` to point to the working directory whe
 ### Download some working data
 Several steps of the forward model depend on external data that has been gathered and shared on the [LtU OSN storage](https://github.com/maho3/ltu-ili/blob/main/DATA.md). When getting started, we recommended you to download a copy of a pre-compiled and run working directory from the `cmass-ili` folder of the OSN repository. This will ensure your working directory is setup properly and has the prerequisite data.
 
-## Running the code
-
-After the packages are installed and your working directory is set up, a full forward pass of the model might look like this:
-```bash
-cd ltu-cmass
-conda activate cmass-env
-
-# simulate density field, particle positions and velocities with borglpt
-python -m cmass.nbody.borglpt --lhid 0 --order 2
-
-# sample halo positions, velocities, and masses from the density field
-python -m cmass.bias.rho_to_halo --lhid 0 --simtype borg2lpt
-
-# reshape the halo catalog to a cuboid matching our survey volume
-python -m cmass.survey.remap_cuboid --lhid 0 --simtype borg2lpt
-
-# apply HOD to sample galaxies
-python -m cmass.bias.apply_hod --lhid 0 --seed 1 --simtype borg2lpt
-
-# apply survey mask to the galaxy catalog
-python -m cmass.survey.ngc_selection --lhid 0 --seed 1 --simtype borg2lpt
-
-# calculate power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk_nbkit --lhid 0 --seed 1 --simtype borg2lpt
-```
-
-This should save all intermediates and outputs to the working directory specified in `global.cfg`, which is `ltu-cmass/data` by default.
+### Running the pipeline
+See [README.md](README.md) for instructions on running the pipeline.
