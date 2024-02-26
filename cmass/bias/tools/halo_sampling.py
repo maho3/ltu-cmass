@@ -14,6 +14,7 @@ import jax
 from functools import partial
 from pmwd import Configuration, Particles, scatter
 from ...utils import timing_decorator
+from ...nbody.tools import vfield_CIC
 
 
 # General
@@ -309,21 +310,17 @@ def sample_3d(phi: np.ndarray, Nt: int, L: float, frac_sig_x: float, origin: np.
 # velocity fields
 
 @timing_decorator
-def sample_velocities_CIC(hpos, ppos, pvel, L, N, Nmesh):
-    ptcl_spacing = L / N
-    ptcl_grid_shape = (N,)*3
-    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape)
-    ptcl = Particles.from_pos(pmconf, ppos)
+def sample_velocities_CIC(hpos, cfg, fvel=None, ppos=None, pvel=None):
+    nbody = cfg.nbody
 
-    mesh = np.zeros([Nmesh]*3)
-    rho = scatter(ptcl, pmconf, val=1, mesh=mesh)
-    mesh = np.zeros([Nmesh]*3+[3])
-    mom = scatter(ptcl, pmconf, val=pvel, mesh=mesh)
-
-    vel = mom / rho[..., None]
+    if fvel is None:
+        logging.info('Measuring CIC velocity field from particles...')
+        if ppos is None or pvel is None:
+            raise ValueError('No particles found for CIC interpolation.')
+        fvel = vfield_CIC(ppos, pvel, cfg, interp=False)
 
     # Interpolate to halo positions
-    hvel = [interp_field(vel, hpos[i], L, np.zeros(3), order=1).T
+    hvel = [interp_field(fvel, hpos[i], nbody.L, np.zeros(3), order=1).T
             for i in range(len(hpos))]
 
     for i in range(len(hvel)):

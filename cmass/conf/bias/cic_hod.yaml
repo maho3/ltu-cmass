@@ -1,0 +1,7 @@
+
+# halo biasing
+halo:
+  base_sim: "${sim}"
+  vel: "CIC"
+
+# galaxy biasing

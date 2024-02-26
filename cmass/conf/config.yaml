@@ -3,4 +3,7 @@ defaults:
   - global
   - nbody: quijote
   - fit: quijote_N128_z0
+  - bias: cic_hod
   - _self_
+
+sim: pmwd

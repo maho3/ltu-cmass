@@ -49,7 +49,7 @@ def load_halo_histogram(cfg):
         (N,)*3+(Nm,),
         range=[(0, L)]*3+[(mmin, mmax)]
     )
-    return (h, edges)
+    return h, edges[-1]
 
 
 @timing_decorator
@@ -62,7 +62,7 @@ def load_rho(cfg):
             f'{cfg.lhid}',
             f'df_m_{N}_z={z}.npy')
     else:
-        source_path = get_source_path(cfg, cfg.fit.simtype)
+        source_path = get_source_path(cfg, cfg.sim)
         source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
 
         # check that the source rho is the same as the one we want
@@ -98,18 +98,17 @@ def fit_bias_params(rho, hcounts, verbose=True, nproc=mp.cpu_count()):
 def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    hcounts, edges = load_halo_histogram(cfg)
+    hcounts, medges = load_halo_histogram(cfg)
+    print(medges)
 
     rho = load_rho(cfg)
 
     popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.nproc)
 
     logging.info('Saving...')
-    save_path = pjoin(
-        get_source_path(cfg, cfg.fit.simtype),
-        'halo_bias.npy')
-    np.save(pjoin(save_path, 'halo_bias.npy'), popt)
-    np.save(pjoin(save_path, 'halo_medges.npy'), edges)
+    source_path = get_source_path(cfg, cfg.sim)
+    np.save(pjoin(source_path, 'halo_bias.npy'), popt)
+    np.save(pjoin(source_path, 'halo_medges.npy'), medges)
     logging.info('Done!')
 
 

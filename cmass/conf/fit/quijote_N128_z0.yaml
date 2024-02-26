@@ -1,4 +1,3 @@
-simtype: 'pmwd'
 
 # Relative path to the quijote simulation halos
 path_to_qhalos: 'quijote/source/Halos/latin_hypercube_HR'
@@ -13,4 +12,4 @@ logMmin: 12.8    # minimum log10 mass
 logMmax: 15.8    # maximum log10 mass
 
 verbose: false    # whether to print progress
-nproc: 10         # number of processes to use
+nproc: 5         # number of processes to use

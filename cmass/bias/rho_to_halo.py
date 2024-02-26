@@ -22,9 +22,11 @@ Output:
     - hmass: halo masses
 """
 
+import os
 import numpy as np
-import argparse
 import logging
+import hydra
+from omegaconf import DictConfig, open_dict
 from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
@@ -33,50 +35,31 @@ from .tools.halo_sampling import (pad_3d, sample_3d,
                                   sample_velocities_density,
                                   sample_velocities_kNN,
                                   sample_velocities_CIC)
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator, load_params)
+from ..utils import get_source_path, timing_decorator, load_params
 
 
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='rho_to_halo')
-
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--simtype', type=str, default='borg2lpt')  # which nbody sim to use
-    parser.add_argument(
-        '--veltype', type=str, default='density')  # method to infer velocities
-    args = parser.parse_args()
-
-    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
-
-    return attrdict(
-        L=args.L, N=args.N, cosmo=cosmo,
-        lhid=args.lhid, simtype=args.simtype, veltype=args.veltype
-    )
+def parse_config(cfg):
+    with open_dict(cfg):
+        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
+    return cfg
 
 
 @timing_decorator
 def load_nbody(source_dir):
     rho = np.load(pjoin(source_dir, 'rho.npy'))
-    ppos = np.load(pjoin(source_dir, 'ppos.npy'))
-    pvel = np.load(pjoin(source_dir, 'pvel.npy'))
-    return rho, ppos, pvel
+    fvel, ppos, pvel = None, None, None
+    if os.path.exists(pjoin(source_dir, 'fvel.npy')):
+        fvel = np.load(pjoin(source_dir, 'fvel.npy'))
+    if os.path.exists(pjoin(source_dir, 'ppos.npy')):
+        ppos = np.load(pjoin(source_dir, 'ppos.npy'))
+        pvel = np.load(pjoin(source_dir, 'pvel.npy'))
+    return rho, fvel, ppos, pvel
 
 
-def load_bias_params(bias_path, lhid):
-    # load the bias parameters for using the 1 Gpc Quijote sims
-    popt = np.load(pjoin(bias_path, f'{lhid}.npy'))
-    medges = np.load(pjoin(bias_path, 'medges.npy'))
+def load_bias_params(bias_path):
+    # load the bias parameters for Truncated Power Law
+    popt = np.load(pjoin(bias_path, 'halo_bias.npy'))
+    medges = np.load(pjoin(bias_path, 'halo_medges.npy'))
     return popt, medges
 
 
@@ -84,19 +67,19 @@ def load_bias_params(bias_path, lhid):
 def sample_counts(rho, popt):
     # sample the halo counts from the bias model
     law = TruncatedPowerLaw()
-    return np.stack([law._get_mean_ngal(rho, *popt[i]) for i in range(10)],
+    return np.stack([law.sample(rho, popt[i]) for i in range(10)],
                     axis=-1)
 
 
 @timing_decorator
-def sample_positions(hsamp):
+def sample_positions(hsamp, cfg):
     # sample the halo positions from the halo count field
     hpos = []
     for i in range(10):
         xtrue, _, _ = sample_3d(
             hsamp[..., i],
             np.sum(hsamp[..., i]).astype(int),
-            3000, 0, np.zeros(3))
+            cfg.nbody.L, 0, np.zeros(3))
         hpos.append(xtrue.T)
     return hpos
 
@@ -142,40 +125,43 @@ def sample_masses(Nsamp, medg, order=1):
     return hmass
 
 
-def main():
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
     # Build run config
-    cfg = build_config()
+    cfg = parse_config(cfg)
     logging.info(f'Running with config: {cfg}')
 
-    bias_path = pjoin(glbcfg['wdir'], 'quijote/bias_fit/LH_n=128')
-    popt, medges = load_bias_params(bias_path, cfg.lhid)
+    source_path = get_source_path(cfg, cfg.sim)
 
-    logging.info('Loading 3 Gpc sims...')
-    source_dir = get_source_path(
-        glbcfg['wdir'], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
-    rho, ppos, pvel = load_nbody(source_dir)
+    logging.info('Loading bias parameters...')
+    popt, medges = load_bias_params(source_path)
+
+    logging.info('Loading sims...')
+    rho, fvel, ppos, pvel = load_nbody(source_path)
 
     logging.info('Sampling power law...')
     hcount = sample_counts(rho, popt)
 
     logging.info('Sampling halo positions as a Poisson field...')
-    hpos = sample_positions(hcount)
+    hpos = sample_positions(hcount, cfg)
 
     logging.info('Calculating velocities...')
-    if cfg.veltype == 'density':
+    if cfg.bias.halo.vel == 'density':
         # estimate halo velocities from matter density field
-        hvel = sample_velocities_density(
-            hpos, rho, cfg.L, cfg.cosmo[0], cfg.L/cfg.N)
-    elif cfg.veltype == 'CIC':
+        hvel = sample_velocities_density(hpos, rho, cfg)
+    elif cfg.bias.halo.vel == 'CIC':
         # estimate halo velocities from CIC-interpolated particle velocities
-        hvel = sample_velocities_CIC(hpos, ppos, pvel, cfg.L, cfg.N, cfg.N//16)
-    elif cfg.veltype == 'kNN':
+        hvel = sample_velocities_CIC(hpos, cfg, fvel)
+    elif cfg.bias.halo.vel == 'kNN':
         # estimate halo velocities from kNN-interpolated particle velocities
+        if (ppos is None) or (pvel is None):
+            raise ValueError('No particles found for kNN interpolation.')
         ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
         hvel = sample_velocities_kNN(hpos, ppos, pvel)
     else:
         raise NotImplementedError(
-            f'Velocity type {cfg.veltype} not implemented.')
+            f'Velocity type {cfg.bias.halo.vel} not implemented.')
 
     logging.info('Sampling masses...')
     hmass = sample_masses([len(x) for x in hpos], medges)
@@ -186,9 +172,9 @@ def main():
     hmass = np.concatenate(hmass, axis=0)
 
     logging.info('Saving cube...')
-    np.save(pjoin(source_dir, 'halo_pos.npy'), hpos)
-    np.save(pjoin(source_dir, 'halo_vel.npy'), hvel)
-    np.save(pjoin(source_dir, 'halo_mass.npy'), hmass)
+    np.save(pjoin(source_path, 'halo_pos.npy'), hpos)
+    np.save(pjoin(source_path, 'halo_vel.npy'), hvel)
+    np.save(pjoin(source_path, 'halo_mass.npy'), hmass)
 
     logging.info('Done!')
 
