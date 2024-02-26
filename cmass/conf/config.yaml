@@ -4,6 +4,7 @@ defaults:
   - nbody: quijote
   - fit: quijote_N128_z0
   - bias: cic_hod
+  - survey: cmass_ngc
   - _self_
 
 sim: pmwd

@@ -18,45 +18,20 @@ import os
 os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa, must be set before jax
 
 import numpy as np
-import argparse
 import logging
 import jax
 from os.path import join as pjoin
+import hydra
+from omegaconf import DictConfig, OmegaConf
 from cuboid_remap import Cuboid, remap_Lbox
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator)
-
-
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='remap_as_cuboid')
-
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--simtype', type=str, default='borg2lpt')  # which base simulation
-    args = parser.parse_args()
-
-    # lattice vectors
-    u1, u2, u3 = (1, 1, 0), (0, 0, 1), (1, 0, 0)
-
-    return attrdict(
-        L=args.L, N=args.N,
-        u1=u1, u2=u2, u3=u3,
-        lhid=args.lhid, simtype=args.simtype,
-    )
+from ..utils import get_source_path, timing_decorator
 
 
 @timing_decorator
-def remap(ppos, pvel, L, u1, u2, u3):
+def remap(ppos, pvel, cfg):
+    L = cfg.nbody.L
+    u1, u2, u3 = cfg.survey.u1, cfg.survey.u2, cfg.survey.u3
+
     # remap the particles to the cuboid
     new_size = list(L*np.array(remap_Lbox(u1, u2, u3)))
     logging.info(f'Remapping from {[L]*3} to {new_size}.')
@@ -67,23 +42,23 @@ def remap(ppos, pvel, L, u1, u2, u3):
     return ppos, pvel
 
 
-def main():
-    cfg = build_config()
-    logging.info(f'Running with config: {cfg}')
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     logging.info('Loading halo cube...')
-    source_dir = get_source_path(
-        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
+    source_path = get_source_path(cfg, cfg.sim)
 
-    hpos = np.load(pjoin(source_dir, 'halo_pos.npy'))
-    hvel = np.load(pjoin(source_dir, 'halo_vel.npy'))
+    hpos = np.load(pjoin(source_path, 'halo_pos.npy'))
+    hvel = np.load(pjoin(source_path, 'halo_vel.npy'))
 
     logging.info('Remapping to cuboid...')
-    hpos, hvel = remap(hpos, hvel, cfg.L, cfg.u1, cfg.u2, cfg.u3)
+    hpos, hvel = remap(hpos, hvel, cfg)
 
     logging.info('Saving cuboid...')
-    np.save(pjoin(source_dir, 'halo_cuboid_pos.npy'), hpos)
-    np.save(pjoin(source_dir, 'halo_cuboid_vel.npy'), hvel)
+    np.save(pjoin(source_path, 'halo_cuboid_pos.npy'), hpos)
+    np.save(pjoin(source_path, 'halo_cuboid_vel.npy'), hvel)
 
     logging.info('Done!')
 

@@ -13,48 +13,22 @@ Input:
 
 import os
 import numpy as np
-import argparse
 import logging
 from os.path import join as pjoin
 from scipy.spatial.transform import Rotation as R
-
 import nbodykit.lab as nblab
+import hydra
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 from .tools import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator, load_params)
+from ..utils import (get_source_path, timing_decorator, load_params)
 
 
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='apply_survey_cut')
-
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--seed', type=int, required=True)  # HOD random seed
-    parser.add_argument(
-        '--simtype', type=str, default='borg2lpt')  # which base simulation
-    parser.add_argument(
-        '--fibermode', type=int, default=0)  # fiber collision method
-    args = parser.parse_args()
-
-    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
-
-    return attrdict(
-        L=args.L, N=args.N,
-        lhid=args.lhid, seed=args.seed,
-        simtype=args.simtype, fibermode=args.fibermode,
-        cosmo=cosmo
-    )
+def parse_config(cfg):
+    with open_dict(cfg):
+        # Cosmology
+        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
+    return cfg
 
 
 @timing_decorator
@@ -131,32 +105,34 @@ def reweight(rdz):
     return rdz[mask]
 
 
-def main():
-    cfg = build_config()
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    cfg = parse_config(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    source_dir = get_source_path(
-        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
+    source_path = get_source_path(cfg, cfg.sim)
 
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_dir, cfg.seed)
+    pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
 
     # Rotate to align with CMASS
     pos, vel = rotate(pos, vel)
 
     # Calculate sky coordinates
-    rdz = xyz_to_sky(pos, vel, cfg.cosmo)
+    rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.fibermode)
+    rdz = apply_mask(rdz, cfg.survey.fibermode)
 
     # Reweight
     rdz = reweight(rdz)
 
     # Save
-    os.makedirs(pjoin(source_dir, 'obs'), exist_ok=True)
+    os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
 
     # ra, dec, redshift
-    np.save(pjoin(source_dir, 'obs', f'rdz{cfg.seed}.npy'), rdz)
+    np.save(pjoin(source_path, 'obs', f'rdz{cfg.bias.hod.seed}.npy'), rdz)
 
 
 if __name__ == "__main__":

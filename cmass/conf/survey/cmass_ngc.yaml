@@ -1,0 +1,8 @@
+
+# cuboid remap
+u1: [1,1,0]
+u2: [0,0,1]
+u3: [1,0,0]
+
+# Fiber collision method
+fibermode: 0  # 0: no collisions, 1: one removed, 2: both removed

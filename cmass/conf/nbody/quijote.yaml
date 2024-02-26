@@ -9,15 +9,15 @@ matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 save_particles: false  # whether to save particle data
 Nvfield: 128      # velocity field resolution
 
-zi: 127           # initial redshift
+zi: 99            # initial redshift
 zf: 0.0           # final redshift
-supersampling: 2  # particles resolution relative to meshgrid
+supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt-only
 transfer: 'EH'    # transfer function (EH or CLASS)
 order: 2          # order of the LPT expansion
 
 # pmwd-only
-B: 2            # force grid resolution relative to particle grid
-N_steps: 16       # number of PM integration steps
+B: 1.5            # force grid resolution relative to particle grid
+N_steps: 20       # number of PM integration steps
 

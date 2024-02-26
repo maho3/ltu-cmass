@@ -320,7 +320,7 @@ def sample_velocities_CIC(hpos, cfg, fvel=None, ppos=None, pvel=None):
         fvel = vfield_CIC(ppos, pvel, cfg, interp=False)
 
     # Interpolate to halo positions
-    hvel = [interp_field(fvel, hpos[i], nbody.L, np.zeros(3), order=1).T
+    hvel = [interp_field(fvel.T, hpos[i], nbody.L, np.zeros(3), order=1).T
             for i in range(len(hpos))]
 
     for i in range(len(hvel)):

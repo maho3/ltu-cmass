@@ -19,9 +19,10 @@ Output:
 
 import os
 import numpy as np
-import argparse
 import logging
 from os.path import join as pjoin
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 import nbodykit.lab as nblab
 from nbodykit import cosmology
@@ -29,34 +30,7 @@ from nbodykit import cosmology
 from .tools import (get_nofz, sky_to_xyz, load_galaxies_obs,
                     load_randoms_precomputed)
 from ..survey.tools import BOSS_area
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator)
-
-
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='calc_Pk_nbkit')
-
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--seed', type=int, required=True)  # HOD random seed
-    parser.add_argument(
-        '--simtype', type=str, default='borg2lpt')  # which base simulation
-    args = parser.parse_args()
-
-    return attrdict(
-        L=args.L, N=args.N,
-        lhid=args.lhid, seed=args.seed, simtype=args.simtype
-    )
+from ..utils import get_source_path, timing_decorator
 
 
 @timing_decorator
@@ -106,13 +80,14 @@ def compute_Pk(grdz, rrdz, cosmo, weights=None):
     return k_gal, p0k_gal, p2k_gal, p4k_gal
 
 
-def main():
-    cfg = build_config()
-    logging.info(f'Running with config: {cfg}')
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    source_dir = get_source_path(
-        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
-    rdz = load_galaxies_obs(source_dir, cfg.seed)
+    source_path = get_source_path(cfg, cfg.sim)
+
+    rdz = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
     randoms = load_randoms_precomputed()
 
@@ -122,9 +97,9 @@ def main():
     k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo)
 
     # save results
-    outpath = pjoin(source_dir, 'Pk')
+    outpath = pjoin(source_path, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    outpath = pjoin(outpath, f'Pk{cfg.seed}.npz')
+    outpath = pjoin(outpath, f'Pk{cfg.bias.hod.seed}.npz')
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)

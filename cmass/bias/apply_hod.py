@@ -20,42 +20,22 @@ import argparse
 import logging
 import os
 from os.path import join as pjoin
-
+import hydra
+from omegaconf import DictConfig, OmegaConf, open_dict
 import nbodykit.lab as nblab
 from nbodykit.hod import Zheng07Model
 from .tools.hod import thetahod_literature
-from ..utils import (attrdict, get_global_config, get_source_path,
-                     setup_logger, timing_decorator, load_params)
+from ..utils import get_source_path, timing_decorator, load_params
 
 
-# Load global configuration and setup logger
-glbcfg = get_global_config()
-setup_logger(glbcfg['logdir'], name='apply_hod')
+def parse_config(cfg):
+    with open_dict(cfg):
+        # HOD parameters
+        cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
-
-def build_config():
-    # Get arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-L', type=int, default=3000)  # side length of box in Mpc/h
-    parser.add_argument(
-        '-N', type=int, default=384)  # number of grid points on one side
-    parser.add_argument(
-        '--lhid', type=int, required=True)  # which cosmology to use
-    parser.add_argument(
-        '--seed', type=int, required=True)  # HOD random seed
-    parser.add_argument(
-        '--simtype', type=str, default='borg2lpt')  # which base simulation
-    args = parser.parse_args()
-
-    theta = get_hod_params(args.seed)  # HOD parameters
-    cosmo = load_params(args.lhid, glbcfg['cosmofile'])
-
-    return attrdict(
-        L=args.L, N=args.N,
-        lhid=args.lhid, seed=args.seed, simtype=args.simtype,
-        theta=theta, cosmo=cosmo
-    )
+        # Cosmology
+        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
+    return cfg
 
 
 def get_hod_params(seed=0):
@@ -117,31 +97,33 @@ def populate_hod(
     return hod
 
 
-def main():
-    cfg = build_config()
-    logging.info(f'Running with config: {cfg}')
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    cfg = parse_config(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     logging.info('Loading halos...')
-    source_dir = get_source_path(
-        glbcfg["wdir"], cfg.simtype, cfg.L, cfg.N, cfg.lhid)
-    pos, vel, mass = load_cuboid(source_dir)
+    source_path = get_source_path(cfg, cfg.sim)
+    pos, vel, mass = load_cuboid(source_path)
 
     logging.info('Populating HOD...')
     hod = populate_hod(
         pos, vel, mass,
-        cfg.theta, cfg.cosmo, 0, 'vir', cfg.L,
-        seed=cfg.seed
+        cfg.bias.hod.theta, cfg.nbody.cosmo, 0, 'vir', cfg.nbody.L,
+        seed=cfg.bias.hod.seed
     )
 
     pos, vel = np.array(hod['Position']), np.array(hod['Velocity'])
 
-    savepath = pjoin(source_dir, 'hod')
+    savepath = pjoin(source_path, 'hod')
     os.makedirs(savepath, exist_ok=True)
-    logging.info(f'Saving to {savepath}/hod{cfg.seed}...')
+
+    logging.info(f'Saving to {savepath}/hod{cfg.bias.hod.seed}...')
     # galaxy positions [Mpc/h]
-    np.save(pjoin(savepath, f'hod{cfg.seed}_pos.npy'), pos)
+    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_pos.npy'), pos)
     # galaxy velocities [km/s]
-    np.save(pjoin(savepath, f'hod{cfg.seed}_vel.npy'), vel)
+    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_vel.npy'), vel)
 
     logging.info('Done!')
 

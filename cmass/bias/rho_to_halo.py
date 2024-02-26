@@ -26,7 +26,7 @@ import os
 import numpy as np
 import logging
 import hydra
-from omegaconf import DictConfig, open_dict
+from omegaconf import DictConfig, OmegaConf, open_dict
 from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
@@ -134,7 +134,7 @@ def sample_masses(Nsamp, medg, order=1):
 def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_config(cfg)
-    logging.info(f'Running with config: {cfg}')
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(cfg, cfg.sim)
 

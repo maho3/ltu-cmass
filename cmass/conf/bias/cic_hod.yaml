@@ -5,3 +5,5 @@ halo:
   vel: "CIC"
 
 # galaxy biasing
+hod: 
+  seed: 0  # HOD seed
