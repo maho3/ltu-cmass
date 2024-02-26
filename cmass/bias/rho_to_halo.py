@@ -46,12 +46,16 @@ def parse_config(cfg):
 
 @timing_decorator
 def load_nbody(source_dir):
+    # density contrast
     rho = np.load(pjoin(source_dir, 'rho.npy'))
     fvel, ppos, pvel = None, None, None
     if os.path.exists(pjoin(source_dir, 'fvel.npy')):
+        # velocity field [km/s]
         fvel = np.load(pjoin(source_dir, 'fvel.npy'))
     if os.path.exists(pjoin(source_dir, 'ppos.npy')):
+        # particle positions [Mpc/h]
         ppos = np.load(pjoin(source_dir, 'ppos.npy'))
+        # particle velocities [km/s]
         pvel = np.load(pjoin(source_dir, 'pvel.npy'))
     return rho, fvel, ppos, pvel
 
@@ -172,9 +176,9 @@ def main(cfg: DictConfig) -> None:
     hmass = np.concatenate(hmass, axis=0)
 
     logging.info('Saving cube...')
-    np.save(pjoin(source_path, 'halo_pos.npy'), hpos)
-    np.save(pjoin(source_path, 'halo_vel.npy'), hvel)
-    np.save(pjoin(source_path, 'halo_mass.npy'), hmass)
+    np.save(pjoin(source_path, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
+    np.save(pjoin(source_path, 'halo_vel.npy'), hvel)  # halo velocities [km/s]
+    np.save(pjoin(source_path, 'halo_mass.npy'), hmass)  # halo masses [Msun/h]
 
     logging.info('Done!')
 

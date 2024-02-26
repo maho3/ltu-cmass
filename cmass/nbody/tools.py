@@ -29,11 +29,11 @@ def load_white_noise(path_to_ic, N, quijote=False):
 @timing_decorator
 def save_nbody(savedir, rho, fvel, pos, vel, save_particles=True):
     os.makedirs(savedir, exist_ok=True)
-    np.save(pjoin(savedir, 'rho.npy'), rho)
-    np.save(pjoin(savedir, 'fvel.npy'), fvel)
+    np.save(pjoin(savedir, 'rho.npy'), rho)  # density contrast
+    np.save(pjoin(savedir, 'fvel.npy'), fvel)  # velocity field [km/s]
     if save_particles:
-        np.save(pjoin(savedir, 'ppos.npy'), pos)
-        np.save(pjoin(savedir, 'pvel.npy'), vel)
+        np.save(pjoin(savedir, 'ppos.npy'), pos)  # particle positions [Mpc/h]
+        np.save(pjoin(savedir, 'pvel.npy'), vel)  # particle velocities [km/s]
     logging.info(f'Saved to {savedir}.')
 
 
@@ -55,6 +55,7 @@ def vfield_CIC(ppos, pvel, cfg, interp=True):
                   mesh=mesh, cell_size=pmconf.cell_size*scale)
 
     vel = mom / rho[..., None]
+    vel = np.array(vel)
 
     if interp and np.any(np.isnan(vel)):
         # interpolate nan values using nearest neighbors

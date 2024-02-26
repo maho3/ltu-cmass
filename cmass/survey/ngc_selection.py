@@ -154,6 +154,8 @@ def main():
 
     # Save
     os.makedirs(pjoin(source_dir, 'obs'), exist_ok=True)
+
+    # ra, dec, redshift
     np.save(pjoin(source_dir, 'obs', f'rdz{cfg.seed}.npy'), rdz)
 
 

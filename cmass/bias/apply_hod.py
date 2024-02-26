@@ -138,7 +138,9 @@ def main():
     savepath = pjoin(source_dir, 'hod')
     os.makedirs(savepath, exist_ok=True)
     logging.info(f'Saving to {savepath}/hod{cfg.seed}...')
+    # galaxy positions [Mpc/h]
     np.save(pjoin(savepath, f'hod{cfg.seed}_pos.npy'), pos)
+    # galaxy velocities [km/s]
     np.save(pjoin(savepath, f'hod{cfg.seed}_vel.npy'), vel)
 
     logging.info('Done!')
