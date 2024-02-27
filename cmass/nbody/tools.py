@@ -7,8 +7,10 @@ from pmwd import Configuration, Particles, scatter
 
 
 @timing_decorator
-def gen_white_noise(N):
+def gen_white_noise(N, seed=None):
     """Generate ICs in Fourier space."""
+    if seed is not None:
+        np.random.seed(seed)
     ic = np.fft.rfftn(np.random.randn(N, N, N)) / N ** (1.5)
     return ic
 
@@ -27,10 +29,12 @@ def load_white_noise(path_to_ic, N, quijote=False):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, fvel, pos, vel, save_particles=True):
+def save_nbody(savedir, rho, fvel, pos, vel,
+               save_particles=True, save_velocities=True):
     os.makedirs(savedir, exist_ok=True)
     np.save(pjoin(savedir, 'rho.npy'), rho)  # density contrast
-    np.save(pjoin(savedir, 'fvel.npy'), fvel)  # velocity field [km/s]
+    if save_velocities:
+        np.save(pjoin(savedir, 'fvel.npy'), fvel)  # velocity field [km/s]
     if save_particles:
         np.save(pjoin(savedir, 'ppos.npy'), pos)  # particle positions [Mpc/h]
         np.save(pjoin(savedir, 'pvel.npy'), vel)  # particle velocities [km/s]

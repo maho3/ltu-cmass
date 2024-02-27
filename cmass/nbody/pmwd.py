@@ -93,7 +93,7 @@ def get_ICs(cfg):
             path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
         return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
-        return gen_white_noise(N)
+        return gen_white_noise(N, seed=nbody.lhid)
 
 
 @timing_decorator
@@ -138,11 +138,16 @@ def main(cfg: DictConfig) -> None:
     rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
 
     # Calculate velocity field
-    fvel = vfield_CIC(pos, vel, cfg)
+    fvel = None
+    if cfg.nbody.save_velocities:
+        fvel = vfield_CIC(pos, vel, cfg)
+        # convert from comoving -> peculiar velocities
+        fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "pmwd", check=False)
-    save_nbody(outdir, rho, fvel, pos, vel, cfg.nbody.save_particles)
+    save_nbody(outdir, rho, fvel, pos, vel,
+               cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
