@@ -28,7 +28,7 @@ conda activate cmass-env
 ```
 
 ### Installing nbodykit
-Installing nbodykit is quite tricky. First, it requires that you have a working MPI compiler and a C compiler installed which are compatible with cython and mpi4py. This is usually not so simple on a Mac machine. On the Linux cluster at Infinity@IAP, for example, you load these with:
+Installing nbodykit is quite tricky. First, it requires that you have a working MPI compiler and a C compiler installed which are compatible with cython and mpi4py. This is usually not so simple on a Mac machine. If you are working on Flatiron/Rusty, see instrcutions below... On the Linux cluster at Infinity@IAP, for example, you load these with:
 ```bash
 module load gcc/13.2.0 openmpi/4.1.2-intel
 ```
@@ -47,6 +47,15 @@ Finally, install nbodykit itself:
 ```bash
 pip install -e .
 cd .. # return to the parent directory
+```
+### nbodykit on Rusty/Flatiron
+The correct versions of nbodykit and mpi4py are already installed on Rusty/Flatiron. You can load them as follows:
+```bash
+module load python
+module load openmpi
+module load python-mpi
+module load gcc/13.2.0
+python -m venv --system-site-packages $VENVDIR/venv-name  # make your virtual env, and it has nbodykit and mpi4py
 ```
 
 ### Installing BORG
