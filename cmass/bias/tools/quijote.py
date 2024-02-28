@@ -119,8 +119,9 @@ class FoF_catalog:
                     Final = True
 
 
-def load_quijote_halos(snapdir):
-    FoF = FoF_catalog(snapdir, snapnum=4,  # 4 for z=0
+def load_quijote_halos(snapdir, z=0):
+    snapdict = {0: 4, 0.5: 3, 1: 2, 2: 1, 3: 0}  # z -> snapid
+    FoF = FoF_catalog(snapdir, snapnum=int(snapdict[z]),
                       long_ids=False,
                       swap=False, SFR=False, read_IDs=False)
 

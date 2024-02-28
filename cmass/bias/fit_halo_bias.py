@@ -42,7 +42,7 @@ def load_halo_histogram(cfg):
     mmin, mmax = cfg.fit.logMmin, cfg.fit.logMmax
 
     # load quijote halos and compute histogram
-    pos_h, mass, _, _ = load_quijote_halos(snapdir)
+    pos_h, mass, _, _ = load_quijote_halos(snapdir, z=cfg.nbody.zf)
     posm = np.concatenate([pos_h, np.log10(mass)[:, None]], axis=1)
     h, edges = np.histogramdd(
         posm,
@@ -99,7 +99,6 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     hcounts, medges = load_halo_histogram(cfg)
-    print(medges)
 
     rho = load_rho(cfg)
 

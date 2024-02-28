@@ -2,7 +2,7 @@
 defaults:
   - global
   - nbody: 1gpch
-  - fit: quijote_N128_z0
+  - fit: quijote_HR
   - bias: cic_hod
   - survey: cmass_ngc
   - _self_

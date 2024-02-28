@@ -1,7 +1,7 @@
 
 # halo biasing
 halo:
-  base_sim: "${sim}"
+  base_suite: calib_1gpch_z0.5
   vel: "CIC"
 
 # galaxy biasing

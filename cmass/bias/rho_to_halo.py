@@ -22,10 +22,13 @@ Output:
     - hmass: halo masses
 """
 
-import os
+import os  # noqa
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
+
 import numpy as np
 import logging
 import hydra
+from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf, open_dict
 from os.path import join as pjoin
 from scipy.integrate import quad
@@ -80,9 +83,12 @@ def sample_positions(hsamp, cfg):
     # sample the halo positions from the halo count field
     hpos = []
     for i in range(10):
+        Nbin = np.sum(hsamp[..., i])
+        if Nbin == 0:
+            hpos.append([])
+            continue
         xtrue, _, _ = sample_3d(
-            hsamp[..., i],
-            np.sum(hsamp[..., i]).astype(int),
+            hsamp[..., i], Nbin,
             cfg.nbody.L, 0, np.zeros(3))
         hpos.append(xtrue.T)
     return hpos
@@ -137,9 +143,12 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(cfg, cfg.sim)
+    bcfg = deepcopy(cfg)
+    bcfg.nbody.suite = bcfg.bias.halo.base_suite
+    bias_path = get_source_path(bcfg, cfg.sim)
 
     logging.info('Loading bias parameters...')
-    popt, medges = load_bias_params(source_path)
+    popt, medges = load_bias_params(bias_path)
 
     logging.info('Loading sims...')
     rho, fvel, ppos, pvel = load_nbody(source_path)
@@ -171,9 +180,11 @@ def main(cfg: DictConfig) -> None:
     hmass = sample_masses([len(x) for x in hpos], medges)
 
     logging.info('Combine...')
-    hpos = np.concatenate(hpos, axis=0)
-    hvel = np.concatenate(hvel, axis=0)
-    hmass = np.concatenate(hmass, axis=0)
+
+    def combine(x):
+        x = [t for t in x if len(t) > 0]
+        return np.concatenate(x, axis=0)
+    hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
 
     logging.info('Saving cube...')
     np.save(pjoin(source_path, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
