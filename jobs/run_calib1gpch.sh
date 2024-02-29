@@ -2,11 +2,11 @@
 #PBS -q batch
 #PBS -j oe
 #PBS -o ${HOME}/data/jobout/${PBS_JOBNAME}.${PBS_JOBID}.log
-#PBS -l walltime=00:30:00
-#PBS -t 1401-2000
+#PBS -l walltime=01:00:00
+#PBS -t 1001-1500
+#PBS -l nodes=1:ppn=32,mem=64gb
 # for pmwd PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
 # for borg PBS -l nodes=1:ppn=32,mem=64gb
-#PBS -l nodes=1:ppn=8,mem=16gb
 
 source /data80/mattho/anaconda3/bin/activate
 cd /home/mattho/git/ltu-cmass
@@ -32,7 +32,23 @@ echo "~~~~~ Running lhid=${PBS_ARRAYID} ~~~~~"
 # python -m cmass.nbody.pmwd nbody=quijote nbody.lhid=${PBS_ARRAYID}
 # rm ./data/quijote/wn/N${N}/wn_${PBS_ARRAYID}.dat
 
-## BORG fit_halo_bias
+## fit_halo_bias
+sim=pmwd
+
 conda activate cmass
-python -m cmass.bias.fit_halo_bias sim=pmwd nbody=quijote nbody.lhid=${PBS_ARRAYID}
-python -m cmass.bias.rho_to_halo sim=pmwd nbody=quijote nbody.lhid=${PBS_ARRAYID}
+source_path=/home/mattho/git/ltu-cmass/data/calib_1gpch_z0.5/${sim}/L1000-N128/${PBS_ARRAYID}
+if [ -f ${source_path}/halo_bias.npy ]
+then 
+    echo "halo_bias.npy exists, skipping fit_halo_bias"
+else
+    python -m cmass.bias.fit_halo_bias sim=${sim} nbody=quijote nbody.lhid=${PBS_ARRAYID}
+fi
+
+if [ -f ${source_path}/halo_pos.npy ]
+then 
+    echo "halo_pos.npy exists, skipping rho_to_halo"
+else
+    python -m cmass.bias.rho_to_halo sim=${sim} nbody=quijote nbody.lhid=${PBS_ARRAYID}
+fi
+
+echo "~~~~~ Finished lhid=${PBS_ARRAYID} ~~~~~"

@@ -23,6 +23,9 @@ class TruncatedPowerLaw:
         return loss.mean()
 
     def fit(self, delta, count_field, verbose=False):
+        if np.sum(count_field) == 0:
+            return np.array([0, 0, 0, 1])
+
         initial_guess = np.array([1e-2, 1., 1e-3, 1]).astype(np.float64)
         delta = delta.astype(np.float64)
 
