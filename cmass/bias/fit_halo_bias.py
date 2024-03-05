@@ -19,7 +19,6 @@ import numpy as np
 import logging
 from os.path import join as pjoin
 import multiprocessing as mp
-from functools import partial
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
@@ -59,7 +58,7 @@ def load_rho(cfg):
         rho_path = pjoin(
             cfg.meta.wdir,
             cfg.fit.path_to_qrhos,
-            f'{cfg.lhid}',
+            f'{cfg.nbody.lhid}',
             f'df_m_{N}_z={z}.npy')
     else:
         source_path = get_source_path(cfg, cfg.sim)
@@ -96,6 +95,9 @@ def fit_bias_params(rho, hcounts, verbose=True, attempts=5):
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'fit'])
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     hcounts, medges = load_halo_histogram(cfg)

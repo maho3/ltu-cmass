@@ -138,6 +138,9 @@ def sample_masses(Nsamp, medg, order=1):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+
     # Build run config
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))

@@ -127,6 +127,9 @@ def run_density(wn, cpar, cfg):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+
     # Build run config
     cfg = parse_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")

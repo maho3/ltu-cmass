@@ -45,6 +45,9 @@ def remap(ppos, pvel, cfg):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'survey'])
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     logging.info('Loading halo cube...')
