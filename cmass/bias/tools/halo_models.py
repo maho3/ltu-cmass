@@ -1,4 +1,6 @@
 import os  # noqa
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 os.environ['JAX_ENABLE_X64'] = '1'  # noqa
 
 import numpy as np
@@ -61,7 +63,7 @@ class PowerLaw:
             else:
                 logging.warning(
                     f"Fit failed with status: {result.status}. "
-                    f"Retrying {i+1}/{attempts}.")     
+                    f"Retrying {i+1}/{attempts}.")
         params = self._post(params)
         if verbose:
             logging.info(f"Power law bias fit params: {params}")

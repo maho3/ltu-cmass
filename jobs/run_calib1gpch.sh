@@ -3,9 +3,10 @@
 #PBS -j oe
 #PBS -o ${HOME}/data/jobout/${PBS_JOBNAME}.${PBS_JOBID}.log
 #PBS -l walltime=01:00:00
-#PBS -t 5-499
-#PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
-# for rho_to_halo PBS -l nodes=1:ppn=32,mem=64gb
+#PBS -t 0-4
+#PBS -l nodes=1:ppn=32,mem=64gb
+# for fit_halo_bias PBS -l nodes=1:has1gpu:ppn=8,mem=32gb
+# for pmwd PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
 # for borg PBS -l nodes=1:ppn=32,mem=64gb
 
 source /data80/mattho/anaconda3/bin/activate
@@ -39,7 +40,8 @@ for i in 0 500 1000 1500
 do
     idx=$(($i + ${PBS_ARRAYID}))
     echo "~~~~~ Running lhid=${idx} ~~~~~"
-    python -m cmass.bias.fit_halo_bias sim=${sim} nbody=quijote nbody.lhid=${idx}
+    # python -m cmass.bias.fit_halo_bias sim=${sim} nbody=quijote nbody.lhid=${idx}
+    python -m cmass.bias.rho_to_halo sim=${sim} nbody=quijote nbody.lhid=${idx}
     echo "~~~~~ Finished lhid=${idx} ~~~~~"
 done
 

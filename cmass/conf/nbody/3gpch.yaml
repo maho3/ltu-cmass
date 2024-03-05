@@ -1,12 +1,12 @@
 # for running inference on 2 Gpc/h volumes
-suite: inf_2gpch
+suite: inf_3gpch
 
 # General parameters
-L: 2000           # Mpc/h
-N: 256            # meshgrid resolution
+L: 3000           # Mpc/h
+N: 384            # meshgrid resolution
 lhid: 3           # latin hypercube id
 matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
-Nvfield: 256      # velocity field resolution
+Nvfield: 384      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 

@@ -6,3 +6,8 @@ u3: [1,0,0]
 
 # Fiber collision method
 fibermode: 1  # 0: no collisions, 1: one removed, 2: both removed
+
+# # Additional ra, dec, z cuts
+# ra_range: [150, 220]
+# dec_range: [20, 60]
+# z_range: [0.4, 0.7]

@@ -74,7 +74,7 @@ def load_rho(cfg):
     return np.load(rho_path)
 
 
-def fit_mass_bin(hcounts, rho, verbose=False, attempts=5):
+def fit_mass_bin(rho, hcounts, verbose=False, attempts=5):
     law = TruncatedPowerLaw()
     return law.fit(rho.flatten(), hcounts.flatten(),
                    verbose=verbose, attempts=attempts)

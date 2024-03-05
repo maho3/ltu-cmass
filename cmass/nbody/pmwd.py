@@ -31,8 +31,9 @@ Output:
 
 
 import os  # noqa
-os.environ['OPENBLAS_NUM_THREADS'] = '8'  # noqa, must go before jax
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
 os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
+os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"  # noqa, must go before jax
 
 from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
                   lpt, nbody, scatter)
@@ -100,6 +101,7 @@ def get_ICs(cfg):
 def run_density(wn, pmconf, pmcosmo, cfg):
     ic = linear_modes(wn, pmcosmo, pmconf)
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
+
     ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
 
     pos = np.array(ptcl.pos())

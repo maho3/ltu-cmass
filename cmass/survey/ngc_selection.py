@@ -92,6 +92,24 @@ def apply_mask(rdz, fibermode=0):
 
 
 @timing_decorator
+def custom_cuts(rdz, cfg):
+    logging.info('Applying custom cuts...')
+    if 'ra_range' in cfg.survey:
+        ra_range = cfg.survey.ra_range
+        mask = (rdz[:, 0] > ra_range[0]) & (rdz[:, 0] < ra_range[1])
+        rdz = rdz[mask]
+    if 'dec_range' in cfg.survey:
+        dec_range = cfg.survey.dec_range
+        mask = (rdz[:, 1] > dec_range[0]) & (rdz[:, 1] < dec_range[1])
+        rdz = rdz[mask]
+    if 'z_range' in cfg.survey:
+        z_range = cfg.survey.z_range
+        mask = (rdz[:, 2] > z_range[0]) & (rdz[:, 2] < z_range[1])
+        rdz = rdz[mask]
+    return rdz
+
+
+@timing_decorator
 def reweight(rdz):
     n_z = np.load(
         pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
@@ -109,7 +127,8 @@ def reweight(rdz):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'survey'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
 
     # Build run config
     cfg = parse_config(cfg)
@@ -128,6 +147,9 @@ def main(cfg: DictConfig) -> None:
 
     # Apply mask
     rdz = apply_mask(rdz, cfg.survey.fibermode)
+
+    # Custom cuts
+    rdz = custom_cuts(rdz, cfg)
 
     # Reweight
     rdz = reweight(rdz)
