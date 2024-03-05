@@ -74,7 +74,7 @@ def load_bias_params(bias_path):
 def sample_counts(rho, popt):
     # sample the halo counts from the bias model
     law = TruncatedPowerLaw()
-    return np.stack([law.sample(rho, popt[i]) for i in range(10)],
+    return np.stack([law.predict(rho, popt[i]) for i in range(10)],
                     axis=-1)
 
 
@@ -83,7 +83,7 @@ def sample_positions(hsamp, cfg):
     # sample the halo positions from the halo count field
     hpos = []
     for i in range(10):
-        Nbin = np.sum(hsamp[..., i])
+        Nbin = np.random.poisson(np.sum(hsamp[..., i]))
         if Nbin == 0:
             hpos.append([])
             continue

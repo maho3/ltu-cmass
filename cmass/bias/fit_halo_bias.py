@@ -75,23 +75,23 @@ def load_rho(cfg):
     return np.load(rho_path)
 
 
-def fit_mass_bin(hcounts, rho):
+def fit_mass_bin(hcounts, rho, verbose=False, attempts=5):
     law = TruncatedPowerLaw()
-    return law.fit(rho.flatten(), hcounts.flatten())
+    return law.fit(rho.flatten(), hcounts.flatten(),
+                   verbose=verbose, attempts=attempts)
 
 
 @timing_decorator
-def fit_bias_params(rho, hcounts, verbose=True, nproc=mp.cpu_count()):
+def fit_bias_params(rho, hcounts, verbose=True, attempts=5):
     # fit the bias parameters for using the 1 Gpc Quijote sims
     logging.info('Fitting power law...')
     Nm = hcounts.shape[-1]
-    popt = []
-    helper = partial(fit_mass_bin, rho=rho)
-    with mp.Pool(nproc) as pool:
-        popt = list(tqdm.tqdm(
-            pool.imap(helper, [hcounts[..., i] for i in range(Nm)]),
-            total=Nm, desc='Fitting mass bins', disable=not verbose))
-    return np.stack(list(popt), axis=0)
+    params = []
+    for i in tqdm.trange(Nm, desc='Fitting mass bins', disable=not verbose):
+        pi, _ = fit_mass_bin(rho, hcounts[..., i],
+                             verbose=verbose, attempts=attempts)
+        params.append(pi)
+    return np.stack(params, axis=0)
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
@@ -102,7 +102,7 @@ def main(cfg: DictConfig) -> None:
 
     rho = load_rho(cfg)
 
-    popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.nproc)
+    popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.attempts)
 
     logging.info('Saving...')
     source_path = get_source_path(cfg, cfg.sim)

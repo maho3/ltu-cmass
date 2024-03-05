@@ -12,4 +12,4 @@ logMmin: 12.8    # minimum log10 mass
 logMmax: 15.8    # maximum log10 mass
 
 verbose: true    # whether to print progress
-nproc: 5         # number of processes to use
+attempts: 10      # number of tries to fit with jax.scipy.optimize

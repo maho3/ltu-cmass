@@ -1,50 +1,125 @@
+import os  # noqa
+os.environ['JAX_ENABLE_X64'] = '1'  # noqa
+
 import numpy as np
-from scipy.optimize import minimize
+import jax
+import jax.numpy as jnp
+from jax import grad, jit
+from jax.scipy.optimize import minimize
+import logging
 
 
-# Simon's galaxy biasing
-
-class TruncatedPowerLaw:
+class PowerLaw:
     @staticmethod
-    def _get_mean_ngal(rho, nmean, beta, epsilon_g, rho_g):
-        rho[rho <= -1] = -1 + 1e-6  # Avoid log(0)
-        d = 1 + rho
-        x = np.power(np.abs(d / rho_g), -epsilon_g)
-        ngal_mean = nmean * np.power(d, beta) * np.exp(-x)
-        return ngal_mean
+    @jax.jit
+    def _get_mean_ngal(rho, params):
+        lognmean, beta = params
+        logd = jnp.log(1 + rho)
+        logngal_mean = lognmean + beta * logd
+        return jnp.exp(logngal_mean)
+
+    def _loss(self, params, delta, count_field, scale=1):
+        ngal_mean = self._get_mean_ngal(delta, params)
+
+        loss = ngal_mean - count_field * jnp.log(ngal_mean)
+        return jnp.mean(loss)/scale
 
     @staticmethod
-    def _loss(params, delta, count_field):
-        nmean, beta, epsilon_g, rho_g = params
-        ngal_mean = TruncatedPowerLaw._get_mean_ngal(
-            delta, nmean, beta, epsilon_g, rho_g)
+    def _post(params):
+        return params
 
-        loss = ngal_mean - count_field * np.log(ngal_mean)
-        return loss.mean()
+    def get_initial_guess(self, count_field):
+        hmean = count_field.mean()
+        initial_guess = jnp.array([hmean, 10]).astype(jnp.float64)
+        initial_guess = jnp.log(initial_guess)
+        initial_guess += 1e-2 * np.random.randn(2)
+        return initial_guess
 
-    def fit(self, delta, count_field, verbose=False):
-        if np.sum(count_field) == 0:
-            return np.array([0, 0, 0, 1])
+    @staticmethod
+    def get_default():
+        return np.array([0, 1])
 
-        initial_guess = np.array([1e-2, 1., 1e-3, 1]).astype(np.float64)
-        delta = delta.astype(np.float64)
+    def fit(self, delta, count_field, verbose=False, attempts=5):
+        for i in range(attempts):
+            initial_guess = self.get_initial_guess(count_field)
+            if jnp.sum(count_field) == 0:
+                return self.get_default(), None
 
-        bounds = [(0, None)] * 4  # Bounds for positive values
-        result = minimize(
-            self._loss, initial_guess, args=(delta, count_field),
-            method='Nelder-Mead',
-            bounds=bounds,
-            options={'disp': verbose}
-        )
-        popt = result.x
+            delta = delta.astype(jnp.float64)
+            if i <= attempts//2:  # initial loss is not good sometimes
+                scale = 10**i
+            else:
+                scale = 10**(attempts//2 - i)
+
+            result = minimize(
+                self._loss, initial_guess, args=(delta, count_field, scale),
+                method='BFGS', tol=1e-4
+            )
+            params = result.x
+            if result.success:
+                break
+            else:
+                logging.warning(
+                    f"Fit failed with status: {result.status}. "
+                    f"Retrying {i+1}/{attempts}.")     
+        params = self._post(params)
         if verbose:
-            print(f"Power law bias fit params: {popt}")
-        return popt
+            logging.info(f"Power law bias fit params: {params}")
+        return params, result
 
-    def predict(self, delta, popt):
-        ngal_mean = TruncatedPowerLaw._get_mean_ngal(delta, *popt)
-        return ngal_mean
+    def predict(self, delta, params):
+        ngal_mean = self._get_mean_ngal(delta, params)
+        return np.array(ngal_mean)
 
-    def sample(self, delta, popt):
-        ngal_mean = self.predict(delta, popt)
+    def sample(self, delta, params):
+        ngal_mean = self.predict(delta, params)
         return np.random.poisson(ngal_mean)
+
+
+class TruncatedPowerLaw(PowerLaw):
+    @staticmethod
+    @jax.jit
+    def _get_mean_ngal(rho, params):
+        nmean, beta, epsilon_g, rho_g = jnp.exp(params)
+        d = 1 + rho
+        x = jnp.power(d / rho_g, -epsilon_g)
+        ngal_mean = nmean * jnp.power(d, beta) * jnp.exp(-x)
+        return ngal_mean + 1e-6
+
+    def get_initial_guess(self, count_field):
+        initial_guess = jnp.array([np.exp(-2), 1, 3, 3]).astype(jnp.float64)
+        initial_guess = jnp.log(initial_guess)
+        inital_guess = [-2, 0.01, 1.1, 1.1]
+        initial_guess = jnp.array(inital_guess).astype(jnp.float64)
+        initial_guess += 1e-6 * np.random.randn(4)
+        return initial_guess
+
+    @staticmethod
+    def get_default():
+        return np.array([-np.inf, 1, 1, 1])
+
+
+class LogTPL(TruncatedPowerLaw):
+    def get_initial_guess(self, count_field):
+        logF = count_field.mean()
+        initial_guess = jnp.array(
+            [jnp.log(logF), 1, 1e-3, 1e-3]).astype(jnp.float64)
+        initial_guess += 1e-2 * np.random.randn(4)
+        return initial_guess
+
+    @staticmethod
+    @jax.jit
+    def _get_mean_ngal(rho, params):
+        # rho = jnp.where(rho <= -1, -1 + 1e-6, rho)  # Avoid log(0)
+        logf, alpha, epsilon, Aexp = params
+        Am = jnp.log(1 + rho)
+        Ah = logf + alpha * Am + jnp.exp(-epsilon*(Am - Aexp))
+        return jnp.exp(Ah)+1e-6
+
+    @staticmethod
+    def _post(params):
+        return params
+
+    @staticmethod
+    def get_default():
+        return np.array([0, 1, 1e-3, 1e-3])
