@@ -25,20 +25,9 @@ python -m cmass.survey.ngc_selection
 python -m cmass.summaries.Pk_nbkit
 ```
 
-## Configuration
-The default configurations of each stage of `ltu-cmass` are stored in `cmass/conf`. We use [hydra](https://hydra.cc/docs/tutorials/basic/your_first_app/simple_cli/) as a configuration framework. Hydra allows us to define a configuration schema and then override it with command-line arguments. This makes it easy to run the same code with different configurations.
+## Getting Started
+See installation and usage instructions in [INSTALL.md](INSTALL.md).
 
-For example, if I want to run `cmass/nbody/pmwd.py` twice using different latin hypercube (LH) cosmologies, I would run:
-```bash
-python -m cmass.nbody.pmwd nbody.lhid=3
-python -m cmass.nbody.pmwd nbody.lhid=4
-```
-These will have the same configurations, except for the cosmology.
-
-We can then define different suites of simulations based on large-scale configurations. For example, to run a simulation at the standard 2 Gpc/h configuration, we would run:
-```bash
-python -m cmass.nbody.pmwd nbody=2gpch
-```
 
 ## Organization
 
@@ -64,6 +53,3 @@ Below, we list the functionality of each script in the repository as well as its
 ### Notebooks
 - `preprocess.ipynb` -  Executes various preprocessing tasks prepare for mass simulation. Designed to be run once at the start of code development.
 - `validation.ipynb` - Validates outputs at intermediate stages in the forward pipeline.
-
-## Getting Started
-See installation and usage instructions in [INSTALL.md](INSTALL.md).
