@@ -15,7 +15,7 @@ Output:
 """
 
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '16'  # noqa, must be set before jax
+os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 
 import numpy as np
 import logging

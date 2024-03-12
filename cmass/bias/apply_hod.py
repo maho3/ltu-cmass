@@ -34,7 +34,8 @@ def parse_config(cfg):
         cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
         # Cosmology
-        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
+        cfg.nbody.cosmo = load_params(
+            cfg.nbody.lhid, cfg.meta.cosmofile)
     return cfg
 
 
@@ -47,6 +48,7 @@ def get_hod_params(seed=0):
         hod_upper_bound = np.array([14.0, 0.6, 15.0, 15.0, 1.5])
         keys = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
         theta = np.random.uniform(hod_lower_bound, hod_upper_bound, size=(5))
+        theta = [float(x) for x in theta]
         theta = dict(zip(keys, theta))
     return theta
 

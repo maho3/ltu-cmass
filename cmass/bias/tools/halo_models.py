@@ -1,12 +1,7 @@
-import os  # noqa
-os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
-os.environ['JAX_ENABLE_X64'] = '1'  # noqa
 
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import grad, jit
 from jax.scipy.optimize import minimize
 import logging
 

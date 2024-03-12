@@ -15,10 +15,14 @@ Output:
     - popt: (10, 3) array of bias parameters
 """
 
+import os  # noqa
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
+os.environ['JAX_ENABLE_X64'] = '1'  # noqa
+
 import numpy as np
 import logging
 from os.path import join as pjoin
-import multiprocessing as mp
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
@@ -114,5 +118,4 @@ def main(cfg: DictConfig) -> None:
 
 
 if __name__ == '__main__':
-    mp.set_start_method('spawn')
     main()
