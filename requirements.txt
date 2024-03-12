@@ -2,7 +2,6 @@ numpy
 scipy
 scikit-learn
 jax
-jaxlib
 pandas
 astropy
 pymangle
