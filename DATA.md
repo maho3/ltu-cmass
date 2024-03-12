@@ -36,7 +36,12 @@ This will configure your local rclone to access the LtU OSN server. You can then
 ```bash
 rclone ls ltu:/learningtheuniverse/
 ```
-**Warning**: Some rclone commands will work differently than other things you are familiar with (such as `scp` or `rsync`). Be sure to check the documentation before using a new command.
+To copy a starter kit for the working directory in the ltu-cmass [INSTALL.md](INSTALL.md)
+```bash
+rclone copy ltu:/learningtheuniverse/ltu-cmass-starter /path/to/working/directory -P
+```
+
+**Warning**: Some rclone commands will work differently than other things you are familiar with (such as `scp` or `rsync`). Be sure to check the documentation before using a new command. Some commands (such as `move` or `moveto`) will delete files in the source directory, so **be careful!**
 
 ## Globus
 OSN has a globus endpoint named “osn s3 collection”, but I have had authentication issues with it and haven’t gotten it to work yet.

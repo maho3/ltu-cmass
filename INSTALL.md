@@ -113,16 +113,20 @@ meta:
 ```
 All data will be stored in this directory, and the pipeline will expect to find the data in this directory.
 
-To run the pipeline in the following step, you will need some calibration files which connect the dark matter density field to the halo counts, as used in [cmass.bias.rho_to_halo](./cmass/bias/rho_to_halo.py). These can be downloaded from the `/learningtheuniverse/gobig/calib_1gpch` directory on OSN ([See access instructions here](./DATA.md)). They are stored in the working directory as following:
+To run the pipeline in the following step, you will need some calibration files and observational masks. These can be downloaded from the `/learningtheuniverse/ltu-cmass-starter` directory on OSN ([See access instructions here](./DATA.md)). They should be stored in the working directory as following:
 ```yaml
 +-- /path/to/working/directory
-|   +-- calib_1gpch        # name of calibration suite
+|   +-- calib_1gpch_z0.5   # name of calibration suite
 |   |   +-- pmwd           # name of the gravity solver
 |   |   |   +-- L1000-N128 # comoving size and resolution of the simulation
 |   |   |   |   +-- 0      # number of the latin-hypercube ID
 |   |   |   |   |   +-- halo_bias.npy    # bias model parameters
 |   |   |   |   +-- 1
 |   |   |   |   +-- ...
+|   +-- obs                # CMASS observational masks and randoms
+|   |   +-- allsky_bright_star_mask_pix.ply
+|   |   +-- badfield_mask_postprocess_pixs8.ply
+|   |   +-- ...
 ```
 
 ## Running the pipeline
