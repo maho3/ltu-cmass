@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ./data/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${meta.wdir}/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
   job_logging:
     formatters:
@@ -11,4 +11,4 @@ hydra:
 meta:
   wdir: "/home/mattho/git/ltu-cmass/data"
   logdir: "${meta.wdir}/logs/"
-  cosmofile: "${meta.wdir}/quijote/latin_hypercube_params_bonus.txt"
+  cosmofile: "./params/latin_hypercube_params.txt"
