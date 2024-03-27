@@ -1,0 +1,4 @@
+--std=c++17
+-Ipymangle/pymangle
+-Ihealpix_lite
+-Icuboidremap/c++
