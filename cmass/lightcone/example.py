@@ -12,7 +12,9 @@ boss_dir = '/tigress/lthiele/boss_dr12'
 snap_times = [0.7, 0.65, 0.6, ]
 
 # make the mask (this is a bit expensive, so we do it outside the lightcone so it can be re-used)
+print('Starting mask loading...')
 m = lc.Mask(boss_dir=boss_dir)
+print('...finished mask loading')
 
 # run the constructor
 l = lc.Lightcone(
@@ -35,8 +37,8 @@ ra, dec, z = l.finalize()
 
 # check if mask is working correctly
 fig, ax = plt.subplots(figsize=(10, 10))
-choose = (z>0.5) * (z<0.52)
-ax.plot(ra[choose], dec[choose], linestyle='none', marker='o')
+choose = (z>0.5) * (z<0.6)
+ax.plot(ra[choose], dec[choose], linestyle='none', marker='o', markersize=0.1)
 ax.set_xlabel('RA [deg]')
 ax.set_ylabel('DEC [deg]')
 plt.show()
