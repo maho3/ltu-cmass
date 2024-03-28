@@ -110,7 +110,6 @@ struct Lightcone
     cmangle::MangleMask *veto_masks[Masks::Nveto]; // maybe unused
     gsl_histogram *boss_z_hist;
     std::vector<double> RA, DEC, Z;
-    std::vector<double> galpos;// TODO turn into numpy
 
     Lightcone (const char *boss_dir_, double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> snap_times_,
@@ -170,7 +169,7 @@ struct Lightcone
         if (verbose) std::printf("Done with snap index %d\n", snap_idx);
     }
 
-    void finalize ()
+    pyb::tuple finalize ()
     {
         // get an idea of the fiber collision rate in our sample,
         // so the subsequent downsampling is to the correct level.
@@ -188,6 +187,13 @@ struct Lightcone
         // now downsample to our final density
         if (verbose) std::printf("downsample\n");
         downsample(0.0);
+
+        // copy RA, DEC, Z into the numpy arrays to be used from python
+        pyb::array_t<double> RAnumpy = pyb::cast(RA),
+                             DECnumpy = pyb::cast(DEC),
+                             Znumpy = pyb::cast(Z);
+
+        return pyb::make_tuple(RAnumpy, DECnumpy, Znumpy);
     }
 
     void process_times ();
@@ -222,7 +228,6 @@ PYBIND11_MODULE(lc, m)
         )
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xgal"_a, "vgal"_a, "vhlo"_a)
         .def("finalize", &Lightcone::finalize)
-        .def_readonly("galpos", &Lightcone::galpos)
         ;
 }
 
