@@ -7,19 +7,33 @@ pymangle, and a minimal healpix into this repository).
 Basic usage example please see `example.py`.
 The heavy sections of the code are multi-threaded, control via `OMP_NUM_THREADS`.
 
-## Constructor
+For efficiency, I have factored out the mask into a separate class.
+This way, an instance of this class only needs to be constructed once at the beginning
+and can then be passed to the lightcone generator repeatedly.
+
+## mask constructor
 
 **Mandatory**
-* `boss_dir`: a directory containing the following files:
-    * all `.ply` files for the angular mask. If `veto=False`,
-      only `mask_DR12v5_CMASS_North.ply` is required.
-    * a text file named `nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat`,
-      where the placeholders are filled by the `zmin` and `zmax` arguments.
-      This file defines the desired redshift distribution.
-      It is assumed that the histogramming is in uniform redshift bins
-      between `zmin` and `zmax`.
-      Each line of the file should contain a single integer for the number
-      of galaxies in the corresponding bin.
+* `boss_dir`: a directory containing all `.ply` files for the angular mask.
+  If `veto=False`, only `mask_DR12v5_CMASS_North.ply` is required.
+
+**Optional**
+* `veto = True`: whether the veto masks are to be applied, I see no reason
+  why not to.
+
+
+## lightcone Constructor
+
+**Mandatory**
+* `boss_dir`: a directory containing a text file named
+  `nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat`,
+  where the placeholders are filled by the `zmin` and `zmax` arguments.
+  This file defines the desired redshift distribution.
+  It is assumed that the histogramming is in uniform redshift bins
+  between `zmin` and `zmax`.
+  Each line of the file should contain a single integer for the number
+  of galaxies in the corresponding bin.
+* `mask`: instance of the `Mask` class, constructed as described above
 * `Omega_m`
 * `zmin`, `zmax`: the redshift boundaries
 * `snap_times`: a monotonically *decreasing* list of scale factors
@@ -29,7 +43,6 @@ The heavy sections of the code are multi-threaded, control via `OMP_NUM_THREADS`
 * `BoxSize = 3e3`: Mpc/h
 * `remap_case = 0`: either 0 or 1
 * `correct = True`: whether extrapolation dependent on host halo velocity is performed
-* `veto = True`: whether the six veto masks are applied
 * `stitch_before_RSD = True`: I wasn't able to figure out whether real or redshift space
   galaxy positions are appropriate when deciding how to stitch the snapshots.
   It probably doesn't matter much but can be played with.
