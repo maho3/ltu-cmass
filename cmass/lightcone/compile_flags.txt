@@ -2,3 +2,4 @@
 -Ipymangle/pymangle
 -Ihealpix_lite
 -Icuboidremap/c++
+-I/Users/leander/micromamba/include/python3.10

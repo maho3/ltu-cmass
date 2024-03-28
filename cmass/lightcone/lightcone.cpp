@@ -18,6 +18,13 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_statistics_double.h>
 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
+#include <pybind11/numpy.h>
+using namespace pybind11::literals;
+namespace pyb = pybind11;
+
 #include "cuboid.h"
 
 namespace cmangle {
@@ -28,269 +35,202 @@ namespace cmangle {
 
 #include "healpix_base.h"
 
-// GEOMETRY
-// these are the possible remaps I found
-int remaps[][9] =
-                  { // 1.4142 1.0000 0.7071
-                    { 1, 1, 0,
-                      0, 0, 1,
-                      1, 0, 0, },
-                    // 1.7321 0.8165 0.7071
-                    { 1, 1, 1,
-                      1, 0, 0,
-                      0, 1, 0, },
-                    // 1.0000 1.0000 1.0000
-                    // trivial case, only for debugging
-                    { 1, 0, 0,
-                      0, 1, 0,
-                      0, 0, 1 },
-                  };
+#ifndef M_PIl
+#define M_PIl 3.14159265358979323846264338327950288419716939937510L
+#endif
 
-// get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
-// we only need a rotation around the y-axis I believe
-const double alpha = 97.0 * M_PI / 180.0; // rotation around y-axis
-const double beta = 6.0; // rotation around z-axis, in degrees
-
-// in units of L1, L2, L3
-const double origin[] = { 0.5, -0.058, 0.0 };
-
-// MASKS
-const char ang_mask_fname[] = "mask_DR12v5_CMASS_North.ply";
-
-const int Nveto = 6;
-// we order them by size so the cheap ones go first
-const char *veto_fnames[Nveto] =
-    {
-      "bright_object_mask_rykoff_pix.ply", 
-      "centerpost_mask_dr12.ply", 
-      "collision_priority_mask_dr12.ply",
-      "badfield_mask_postprocess_pixs8.ply", 
-      "allsky_bright_star_mask_pix.ply",
-      "badfield_mask_unphot_seeing_extinction_pixs8_dr12.ply",
-    };
-
-
-// NUMERICAL CHOICES
-
-// before initial downsampling, we increase the fiber collision rate by this
-// to make sure that after fiber collisions we still have enough galaxies in each redshift bin
-const double fibcoll_rate_correction = 0.05;
-
-// how many interpolation stencils we use to get from chi to z
-const int N_interp = 1024;
-
-// GLOBALS (TO BE MODIFIED)
-
-// these are the input variables, populated from command line
-const char *infile, *outfile, *boss_dir;
-double BoxSize, Omega_m, zmin, zmax;
-int remap_case, Nsnaps;
-bool correct, veto, stitch_before_RSD, verbose;
-unsigned augment;
-
-// describe the available snapshots and redshift stitching
-std::vector<double> snap_times, snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
-
-// utilities for converting between redshift and comoving distance
-gsl_spline *z_chi_interp; gsl_interp_accel *z_chi_interp_acc;
-
-// describe the remapping
-cuboid::Cuboid C;
-double Li[3]; // the sidelengths in decreasing order
-
-// describe the survey footprint
-cmangle::MangleMask *ang_mask;
-cmangle::MangleMask *veto_masks[Nveto]; // maybe unused
-
-// contains the measured redshift distribution used to downsample the theory catalog
-gsl_histogram *boss_z_hist;
-
-// these are our outputs
-std::vector<double> RA, DEC, Z;
-
-
-// DECLARATION OF ROUTINES IN MAIN
-void process_args (int argc, const char **argv);
-
-// downsamples to the boss_z_hist, up to plus_factor
-void downsample (double plus_factor);
-
-// modifies RA, DEC, Z
-// if only_measure=false,
-// returns the fiber collision rate
-template<bool only_measure>
-double fibcoll (void);
-
-// sets times, redshifts, redshift_bounds, chi_bounds
-void process_times (void);
-
-// initialize the interpolator getting us from comoving to redshift
-void interpolate_chi_z (void);
-
-// initialize the mangle masks
-void init_masks (void);
-
-// get the target redshift distribution
-void measure_boss_nz (void);
-
-void read_snapshot (int snap_idx,
-                    std::vector<float> &xgal_f,
-                    std::vector<float> &vgal_f,
-                    std::vector<float> &vhlo_f,
-                    size_t &Ngal);
-
-void remap_snapshot (size_t Ngal,
-                     const std::vector<float> &xgal_f,
-                     const std::vector<float> &vgal_f,
-                     const std::vector<float> &vhlo_f,
-                     std::vector<double> &xgal,
-                     std::vector<double> &vgal,
-                     std::vector<double> &vhlo);
-
-// this routine modifies RA, DEC, Z
-void choose_galaxies (int snap_idx, size_t Ngal,
-                      const std::vector<double> &xgal,
-                      const std::vector<double> &vgal,
-                      const std::vector<double> &vhlo);
-
-void write_to_disk (void);
-
-// DRIVER
-int main (int argc, const char **argv)
+namespace Geometry
 {
-    process_args(argc, argv);
+    int remaps[][9] =
+                      { // 1.4142 1.0000 0.7071
+                        { 1, 1, 0,
+                          0, 0, 1,
+                          1, 0, 0, },
+                        // 1.7321 0.8165 0.7071
+                        { 1, 1, 1,
+                          1, 0, 0,
+                          0, 1, 0, },
+                        // 1.0000 1.0000 1.0000
+                        // trivial case, only for debugging
+                        { 1, 0, 0,
+                          0, 1, 0,
+                          0, 0, 1 },
+                      };
 
-    if (verbose) std::printf("process_times\n");
-    process_times();
+    // get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
+    // we only need a rotation around the y-axis I believe
+    const double alpha = 97.0 * M_PI / 180.0; // rotation around y-axis
+    const double beta = 6.0; // rotation around z-axis, in degrees
 
-    z_chi_interp = gsl_spline_alloc(gsl_interp_cspline, N_interp);
-    z_chi_interp_acc = gsl_interp_accel_alloc();
-    if (verbose) std::printf("interpolate_chi_z\n");
-    interpolate_chi_z();
+    // in units of L1, L2, L3
+    const double origin[] = { 0.5, -0.058, 0.0 };
+}
 
-    // initialize the transformation
-    C = cuboid::Cuboid(remaps[remap_case]);
-    Li[0] = C.L1; Li[1] = C.L2; Li[2] = C.L3;
+namespace Masks
+{
+    const char ang_mask_fname[] = "mask_DR12v5_CMASS_North.ply";
 
-    // initialize survey footprint and veto masks (if requested)
-    ang_mask = cmangle::mangle_new();
-    if (veto) for (int ii=0; ii<Nveto; ++ii) veto_masks[ii] = cmangle::mangle_new();
-    if (verbose) std::printf("init_masks\n");
-    init_masks();
+    const int Nveto = 6;
+    // we order them by size so the cheap ones go first
+    const char *veto_fnames[Nveto] =
+        {
+          "bright_object_mask_rykoff_pix.ply", 
+          "centerpost_mask_dr12.ply", 
+          "collision_priority_mask_dr12.ply",
+          "badfield_mask_postprocess_pixs8.ply", 
+          "allsky_bright_star_mask_pix.ply",
+          "badfield_mask_unphot_seeing_extinction_pixs8_dr12.ply",
+        };
+}
 
-    // the target redshift distribution
-    if (verbose) std::printf("measure_boss_nz\n");
-    measure_boss_nz();
+namespace Numerics
+{
+    // before initial downsampling, we increase the fiber collision rate by this
+    // to make sure that after fiber collisions we still have enough galaxies in each redshift bin
+    const double fibcoll_rate_correction = 0.05;
 
-    #pragma omp parallel for
-    for (int ii=0; ii<Nsnaps; ++ii)
+    // how many interpolation stencils we use to get from chi to z
+    const int N_interp = 1024;
+}
+
+struct Lightcone
+{
+    const char *boss_dir;
+    const double BoxSize, Omega_m, zmin, zmax;
+    const int remap_case;
+    const bool correct, veto, stitch_before_RSD, verbose;
+    const unsigned augment;
+    const unsigned long seed;
+    const std::vector<double> snap_times;
+    size_t Nsnaps;
+    std::vector<double> snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
+    gsl_spline *z_chi_interp; std::vector<gsl_interp_accel *> z_chi_interp_acc;
+    const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
+    cmangle::MangleMask *ang_mask;
+    cmangle::MangleMask *veto_masks[Masks::Nveto]; // maybe unused
+    gsl_histogram *boss_z_hist;
+    std::vector<double> RA, DEC, Z;
+    std::vector<double> galpos;// TODO turn into numpy
+
+    Lightcone (const char *boss_dir_, double Omega_m_, double zmin_, double zmax_,
+               const std::vector<double> snap_times_,
+               double BoxSize_=3e3, int remap_case_=0, bool correct_=true, bool veto_=true,
+               bool stitch_before_RSD_=true, bool verbose_=false, unsigned augment_=0,
+               unsigned long seed_=137UL) :
+        boss_dir{boss_dir_}, Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
+        snap_times{snap_times_}, Nsnaps{snap_times_.size()},
+        BoxSize{BoxSize_}, remap_case{remap_case_}, correct{correct_}, veto{veto_},
+        stitch_before_RSD{stitch_before_RSD_}, verbose{verbose_}, augment{augment_},
+        seed{seed_},
+        C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
     {
-        size_t Ngal;
+        if (verbose) std::printf("process_times\n");
+        process_times();
 
-        // contains the 32bit data from disk
-        std::vector<float> xgal_f, vgal_f, vhlo_f;
-        if (verbose) std::printf("\tread_snapshot\n");
-        read_snapshot(ii, xgal_f, vgal_f, vhlo_f, Ngal);
+        z_chi_interp = gsl_spline_alloc(gsl_interp_cspline, Numerics::N_interp);
+        for (int ii=0; ii<omp_get_max_threads(); ++ii)
+            z_chi_interp_acc.push_back(gsl_interp_accel_alloc());
+        if (verbose) std::printf("interpolate_chi_z\n");
+        interpolate_chi_z();
 
-        // these will contain the outputs of the remapping
-        std::vector<double> xgal, vgal, vhlo;
+        // initialize survey footprint and veto masks (if requested)
+        ang_mask = cmangle::mangle_new();
+        if (veto) for (int ii=0; ii<Masks::Nveto; ++ii) veto_masks[ii] = cmangle::mangle_new();
+        if (verbose) std::printf("init_masks\n");
+        init_masks();
+
+        // the target redshift distribution
+        if (verbose) std::printf("measure_boss_nz\n");
+        measure_boss_nz();
+    }
+
+    ~Lightcone ()
+    {
+        gsl_spline_free(z_chi_interp);
+        for (auto x: z_chi_interp_acc) gsl_interp_accel_free(x);
+        gsl_histogram_free(boss_z_hist);
+        cmangle::mangle_free(ang_mask);
+        if (veto) for (int ii=0; ii<Masks::Nveto; ++ii) cmangle::mangle_free(veto_masks[ii]);
+    }
+
+    void add_snap (int snap_idx,
+                   std::vector<double> &xgal,
+                   std::vector<double> &vgal,
+                   std::vector<double> &vhlo)
+    {
+        size_t Ngal = xgal.size() / 3;
+        assert(3*Ngal==vgal.size() && 3*Ngal==vhlo.size());
+
         if (verbose) std::printf("\tremap_snapshot\n");
-        remap_snapshot(Ngal, xgal_f, vgal_f, vhlo_f, xgal, vgal, vhlo);
+        remap_snapshot(Ngal, xgal, vgal, vhlo);
 
-        // choose the galaxies within this redshift shell
-        // This routine also implements lightcone correction
-        // and RSD
         if (verbose) std::printf("\tchoose_galaxies\n");
-        choose_galaxies(ii, Ngal, xgal, vgal, vhlo);
+        choose_galaxies(snap_idx, Ngal, xgal, vgal, vhlo);
 
-        if (verbose) std::printf("Done with %d\n", ii);
+        if (verbose) std::printf("Done with snap index %d\n", snap_idx);
     }
-    
-    // get an idea of the fiber collision rate in our sample,
-    // so the subsequent downsampling is to the correct level.
-    // This is justified as all this stuff is not super expensive.
-    double fibcoll_rate = fibcoll</*only_measure=*/true>();
 
-    // first downsampling before fiber collisions are applied
-    if (verbose) std::printf("downsample\n");
-    downsample(fibcoll_rate+fibcoll_rate_correction);
-
-    // apply fiber collisions
-    if (verbose) std::printf("fibcoll\n");
-    fibcoll</*only_measure=*/false>(); 
-
-    // now downsample to our final density
-    if (verbose) std::printf("downsample\n");
-    downsample(0.0);
-
-    // output
-    if (verbose) std::printf("write_to_disk\n");
-    write_to_disk();
-
-    // clean up
-    gsl_spline_free(z_chi_interp); gsl_interp_accel_free(z_chi_interp_acc);
-    gsl_histogram_free(boss_z_hist);
-    cmangle::mangle_free(ang_mask);
-    if (veto) for (int ii=0; ii<Nveto; ++ii) cmangle::mangle_free(veto_masks[ii]);
-
-    return 0;
-}
-
-// ------ IMPLEMENTATION ------
-void process_args (int argc, const char **argv)
-    // TODO
-{
-    const char **c = argv + 1;
-
-    if (!*c) // can call without arguments to get usage information
+    void finalize ()
     {
-        std::printf("COMMAND LINE ARGUMENTS:\n"
-                    "\tinpath\n"
-                    "\tinident\n"
-                    "\toutident\n"
-                    "\tBoxSize\n"
-                    "\tOmega_m\n"
-                    "\tzmin\n"
-                    "\tzmax\n"
-                    "\tremap_case\n"
-                    "\tcorrect\n"
-                    "\taugment\n"
-                    "\tboss_dir\n"
-                    "\tveto\n"
-                    "\tstitch_before_RSD\n"
-                    "\tverbose\n"
-                    "\tbinary_output\n"
-                    "\tsnap_times[...]\n");
-        throw std::runtime_error("Invalid arguments");
+        // get an idea of the fiber collision rate in our sample,
+        // so the subsequent downsampling is to the correct level.
+        // This is justified as all this stuff is not super expensive.
+        double fibcoll_rate = fibcoll</*only_measure=*/true>();
+
+        // first downsampling before fiber collisions are applied
+        if (verbose) std::printf("downsample\n");
+        downsample(fibcoll_rate+Numerics::fibcoll_rate_correction);
+
+        // apply fiber collisions
+        if (verbose) std::printf("fibcoll\n");
+        fibcoll</*only_measure=*/false>(); 
+
+        // now downsample to our final density
+        if (verbose) std::printf("downsample\n");
+        downsample(0.0);
     }
 
-    inpath = *(c++);
-    inident = *(c++);
-    outident = *(c++);
-    BoxSize = std::atof(*(c++));
-    Omega_m = std::atof(*(c++));
-    zmin = std::atof(*(c++));
-    zmax = std::atof(*(c++));
-    remap_case = std::atoi(*(c++));
-    correct = std::atoi(*(c++));
-    augment = std::atoi(*(c++));
-    boss_dir = *(c++);
-    veto = std::atoi(*(c++)); // whether to apply veto, removes a bit less than 7% of galaxies
-    stitch_before_RSD = std::atoi(*(c++));
-    verbose = std::atoi(*(c++));
-    binary_output = std::atoi(*(c++));
+    void process_times ();
+    void interpolate_chi_z ();
+    void init_masks ();
+    void measure_boss_nz ();
+    void downsample (double);
+    template<bool> double fibcoll ();
+    void remap_snapshot (size_t,
+                         std::vector<double> &,
+                         std::vector<double> &,
+                         std::vector<double> &) const;
+    void choose_galaxies (int, size_t,
+                          const std::vector<double> &,
+                          const std::vector<double> &,
+                          const std::vector<double> &);
+};
 
-    while (*c) snap_times.push_back(std::atof(*(c++)));
-    Nsnaps = snap_times.size();
-
-    assert((c-argv)==argc);
+PYBIND11_MODULE(lc, m)
+{
+    pyb::class_<Lightcone> (m, "Lightcone")
+        .def(pyb::init<const char *, double, double, double,
+                       const std::vector<double>,
+                       double, int, bool, bool,
+                       bool, bool, unsigned,
+                       unsigned long>(),
+            "boss_dir"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
+            pyb::kw_only(),
+            "BoxSize"_a=3e3, "remap_case"_a=0, "correct"_a=true, "veto"_a=true,
+            "stitch_before_RSD"_a=true, "verbose"_a=false, "augment"_a=0,
+            "seed"_a=137UL
+        )
+        .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xgal"_a, "vgal"_a, "vhlo"_a)
+        .def("finalize", &Lightcone::finalize)
+        .def_readonly("galpos", &Lightcone::galpos)
+        ;
 }
 
-void measure_boss_nz (void)
+void Lightcone::measure_boss_nz (void)
     // TODO
 {
     char fname[512];
-    std::sprintf(fname, "%s/galaxy_DR12v5_CMASS_North.bin", boss_dir);
+    std::snprintf(fname, 512, "%s/galaxy_DR12v5_CMASS_North.bin", boss_dir);
     auto fp = std::fopen(fname, "rb");
     // binary file containing ra, dec, z in this order in double
     
@@ -299,7 +239,7 @@ void measure_boss_nz (void)
     auto nbytes = std::ftell(fp);
 
     auto Ngal = nbytes/sizeof(double)/3;
-    if (!(Ngal*3*sizeof(double)==nbytes)) throw std::runtime_error("read_boss_z faield");
+    if (!(Ngal*3*sizeof(double)==nbytes)) throw std::runtime_error("read_boss_z failed");
 
     // skip RA and DEC
     std::fseek(fp, 2*Ngal*sizeof(double), SEEK_SET);
@@ -311,7 +251,7 @@ void measure_boss_nz (void)
     // remove values outside our bounds
     std::vector<double> boss_z_cleaned;
     std::copy_if(boss_z.begin(), boss_z.end(), std::back_inserter(boss_z_cleaned),
-                 [](double this_z){ return this_z>zmin && this_z<zmax; });
+                 [&](double this_z){ return this_z>zmin && this_z<zmax; });
 
     // measure the standard deviation for Scott's rule
     double sd = gsl_stats_sd(boss_z_cleaned.data(), 1, boss_z_cleaned.size());
@@ -324,76 +264,17 @@ void measure_boss_nz (void)
     gsl_histogram_set_ranges_uniform(boss_z_hist, zmin, zmax);
 
     std::for_each(boss_z_cleaned.begin(), boss_z_cleaned.end(),
-                  [](double this_z){ gsl_histogram_increment(boss_z_hist, this_z); });
+                  [&](double this_z){ gsl_histogram_increment(boss_z_hist, this_z); });
 }
 
-void read_snapshot (int snap_idx,
-                    std::vector<float> &xgal_f,
-                    std::vector<float> &vgal_f,
-                    std::vector<float> &vhlo_f,
-                    size_t &Ngal)
-    // TODO
-{
-    char fname[512];
-    std::sprintf(fname, "%s/galaxies%s%s_%.4f.bin",
-                        inpath, (std::strlen(inident)) ? "_" : "", inident, snap_times[snap_idx]);
-
-    auto fp = std::fopen(fname, "rb");
-    if (!fp) throw std::runtime_error("galaxies file not available");
-
-    // figure out number of galaxies
-    std::fseek(fp, 0, SEEK_END);
-    auto nbytes = std::ftell(fp);
-
-    Ngal = nbytes/sizeof(float)/9;
-    if (!(9*Ngal*sizeof(float)==nbytes)) throw std::runtime_error("failed in read_snapshot");
-
-    // go back to beginning
-    std::fseek(fp, 0, SEEK_SET);
-
-    xgal_f.resize(3 * Ngal);
-    vgal_f.resize(3 * Ngal);
-    vhlo_f.resize(3 * Ngal);
-    std::fread(xgal_f.data(), sizeof(float), 3*Ngal, fp);
-    std::fread(vgal_f.data(), sizeof(float), 3*Ngal, fp);
-    std::fread(vhlo_f.data(), sizeof(float), 3*Ngal, fp);
-
-    // now we can close
-    std::fclose(fp);
-}
-
-void write_to_disk (void)
-    // TODO
-{
-    char fname[512];
-    std::sprintf(fname, "%s/lightcone%s%s_%s.%s",
-                        inpath, (std::strlen(inident)) ? "_" : "", inident, outident,
-                        (binary_output) ? "bin" : "txt");
-    auto fp = std::fopen(fname, "w");
-
-    if (binary_output)
-    {
-        auto Nobj = RA.size(); assert(Nobj==DEC.size()); assert(Nobj==Z.size());
-        std::fwrite(RA.data(), sizeof(double), Nobj, fp);
-        std::fwrite(DEC.data(), sizeof(double), Nobj, fp);
-        std::fwrite(Z.data(), sizeof(double), Nobj, fp);
-    }
-    else
-        for (size_t ii=0; ii<Z.size(); ++ii)
-            std::fprintf(fp, "%lu 0 0 %.10f %.10f %.8f 1.0000 0.0\n", ii, RA[ii], DEC[ii], 299792.458*Z[ii]);
-
-    std::fclose(fp);
-}
-
-
-double comoving_integrand (double z, void *p)
+static double comoving_integrand (double z, void *p)
 {
     static const double H0inv = 2.99792458e3; // Mpc/h
     double Omega_m = *(double *)p;
     return H0inv / std::sqrt( Omega_m*gsl_pow_3(1.0+z)+(1.0-Omega_m) );
 }
 
-void comoving (int N, double *z, double *chi)
+static void comoving (int N, double *z, double *chi, double Omega_m)
 // populate chi with chi(z) in Mpc/h
 {
     gsl_function F;
@@ -410,15 +291,15 @@ void comoving (int N, double *z, double *chi)
     gsl_integration_workspace_free(ws);
 }
 
-void process_times (void)
+void Lightcone::process_times (void)
 {
-    // get increasing redshifts
-    std::sort(snap_times.begin(), snap_times.end(), [](double a, double b){ return a>b; });
+    // make sure redshifts are increasing
+    for (int ii=0; ii<Nsnaps-1; ++ii) assert(snap_times[ii]>snap_times[ii+1]);
 
     for (int ii=0; ii<Nsnaps; ++ii) snap_redshifts.push_back(1.0/snap_times[ii] - 1.0);
 
     snap_chis.resize(Nsnaps);
-    comoving(Nsnaps, snap_redshifts.data(), snap_chis.data());
+    comoving(Nsnaps, snap_redshifts.data(), snap_chis.data(), Omega_m);
 
     // define the redshift boundaries
     // TODO we can maybe do something more sophisticated here
@@ -429,49 +310,51 @@ void process_times (void)
     
     // convert to comoving distances
     chi_bounds.resize(Nsnaps+1);
-    comoving(Nsnaps+1, redshift_bounds.data(), chi_bounds.data());
+    comoving(Nsnaps+1, redshift_bounds.data(), chi_bounds.data(), Omega_m);
 }
 
-void interpolate_chi_z (void)
+void Lightcone::interpolate_chi_z (void)
 {
     double z_interp_min = zmin-0.01, z_interp_max=zmax+0.01;
-    double *z_interp = (double *)std::malloc(N_interp * sizeof(double));
-    double *chi_interp = (double *)std::malloc(N_interp * sizeof(double));
-    for (int ii=0; ii<N_interp; ++ii)
-        z_interp[ii] = z_interp_min + (z_interp_max-z_interp_min)*(double)ii/(double)(N_interp-1);
-    comoving(N_interp, z_interp, chi_interp);
-    gsl_spline_init(z_chi_interp, chi_interp, z_interp, N_interp);
+    double *z_interp = (double *)std::malloc(Numerics::N_interp * sizeof(double));
+    double *chi_interp = (double *)std::malloc(Numerics::N_interp * sizeof(double));
+    for (int ii=0; ii<Numerics::N_interp; ++ii)
+        z_interp[ii] = z_interp_min + (z_interp_max-z_interp_min)
+                                      * (double)ii / (double)(Numerics::N_interp-1);
+    comoving(Numerics::N_interp, z_interp, chi_interp, Omega_m);
+    gsl_spline_init(z_chi_interp, chi_interp, z_interp, Numerics::N_interp);
     std::free(z_interp); std::free(chi_interp);
 }
 
-void init_masks (void)
+void Lightcone::init_masks (void)
 {
     char mask_fname[512];
-    std::sprintf(mask_fname, "%s/%s", boss_dir, ang_mask_fname);
+    std::snprintf(mask_fname, 512, "%s/%s", boss_dir, Masks::ang_mask_fname);
     cmangle::mangle_read(ang_mask, mask_fname);
     cmangle::set_pixel_map(ang_mask);
 
     if (veto)
         // this stuff is pretty expensive so do it in parallel
         #pragma omp parallel for
-        for (int ii=0; ii<Nveto; ++ii)
+        for (int ii=0; ii<Masks::Nveto; ++ii)
         {
             char veto_fname[512];
-            std::sprintf(veto_fname, "%s/%s", boss_dir, veto_fnames[ii]);
+            std::snprintf(veto_fname, 512, "%s/%s", boss_dir, Masks::veto_fnames[ii]);
             cmangle::mangle_read(veto_masks[ii], veto_fname);
             cmangle::set_pixel_map(veto_masks[ii]);
         }
 }
 
 template<typename T>
-inline double per_unit (T x)
+static inline double per_unit (T x, double BoxSize)
 {
     double x1 = (double)x / BoxSize;
     x1 = std::fmod(x1, 1.0);
     return (x1<0.0) ? x1+1.0 : x1;
 }
 
-inline void reflect (unsigned r, double *x, double *v, double *vh)
+static inline void reflect (unsigned r, double *x, double *v, double *vh,
+                            double BoxSize, bool correct)
 {
     for (unsigned ii=0; ii<3; ++ii)
         if (r & (1<<ii))
@@ -482,7 +365,7 @@ inline void reflect (unsigned r, double *x, double *v, double *vh)
         }
 }
 
-inline void transpose (unsigned t, double *x)
+static inline void transpose (unsigned t, double *x)
 {
     if      (t==0) return;
     else if (t==1) std::swap(x[0], x[1]);
@@ -498,147 +381,158 @@ inline void transpose (unsigned t, double *x)
     }
 }
 
-void remap_snapshot (size_t Ngal,
-                     const std::vector<float> &xgal_f,
-                     const std::vector<float> &vgal_f,
-                     const std::vector<float> &vhlo_f,
-                     std::vector<double> &xgal,
-                     std::vector<double> &vgal,
-                     std::vector<double> &vhlo)
+void Lightcone::remap_snapshot (size_t Ngal,
+                                std::vector<double> &xgal,
+                                std::vector<double> &vgal,
+                                std::vector<double> &vhlo) const
 {
-    xgal.resize(3 * Ngal); vgal.resize(3 * Ngal);
-    if (correct) vhlo.resize(3 * Ngal);
+    std::vector<double> tmp_xgal, tmp_vgal, tmp_vhlo;
+    tmp_xgal.resize(3*Ngal); tmp_vgal.resize(3*Ngal);
+    if (correct) tmp_vhlo.resize(3*Ngal);
 
     unsigned r = augment / 6; // labels the 8 reflection cases
     unsigned t = augment % 6; // labels the 6 transposition cases
 
+    #pragma omp parallel for schedule (dynamic, 1024)
     for (size_t ii=0; ii<Ngal; ++ii)
     {
         double x[3], v[3], vh[3];
         for (int kk=0; kk<3; ++kk)
         {
-            x[kk] = xgal_f[3*ii+kk];
-            v[kk] = vgal_f[3*ii+kk];
-            vh[kk] = vhlo_f[3*ii+kk];
+            x[kk] = xgal[3*ii+kk];
+            v[kk] = vgal[3*ii+kk];
+            vh[kk] = vhlo[3*ii+kk];
         }
 
-        reflect(r, x, v, vh);
+        reflect(r, x, v, vh, BoxSize, correct);
         transpose(t, x); transpose(t, v);
         if (correct) transpose(t, vh);
 
-        C.Transform(per_unit(x[0]), per_unit(x[1]), per_unit(x[2]),
-                    xgal[3*ii+0], xgal[3*ii+1], xgal[3*ii+2]);
-        for (int kk=0; kk<3; ++kk) xgal[3*ii+kk] *= BoxSize;
+        C.Transform(per_unit(x[0], BoxSize), per_unit(x[1], BoxSize), per_unit(x[2], BoxSize),
+                    tmp_xgal[3*ii+0], tmp_xgal[3*ii+1], tmp_xgal[3*ii+2]);
+        for (int kk=0; kk<3; ++kk) tmp_xgal[3*ii+kk] *= BoxSize;
 
         C.VelocityTransform(v[0], v[1], v[2],
-                            vgal[3*ii+0], vgal[3*ii+1], vgal[3*ii+2]);
+                            tmp_vgal[3*ii+0], tmp_vgal[3*ii+1], tmp_vgal[3*ii+2]);
 
         if (correct)
             C.VelocityTransform(vh[0], vh[1], vh[2],
-                                vhlo[3*ii+0], vhlo[3*ii+1], vhlo[3*ii+2]);
+                                tmp_vhlo[3*ii+0], tmp_vhlo[3*ii+1], tmp_vhlo[3*ii+2]);
     }
+
+    xgal = std::move(tmp_xgal);
+    vgal = std::move(tmp_vgal);
+    vhlo = std::move(tmp_vhlo);
 }
 
-void choose_galaxies (int snap_idx, size_t Ngal,
-                      const std::vector<double> &xgal,
-                      const std::vector<double> &vgal,
-                      const std::vector<double> &vhlo)
+void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
+                                 const std::vector<double> &xgal,
+                                 const std::vector<double> &vgal,
+                                 const std::vector<double> &vhlo)
 {
     // h km/s/Mpc
-    const double Hz = 100.0 * std::sqrt(Omega_m*gsl_pow_3(1.0+snap_redshifts[snap_idx])+(1.0-Omega_m));
+    const double Hz = 100.0
+                      * std::sqrt(Omega_m*gsl_pow_3(1.0+snap_redshifts[snap_idx])+(1.0-Omega_m));
+    const double rsd_factor = (1.0+snap_redshifts[snap_idx]) / Hz;
 
-    double rsd_factor = (1.0+snap_redshifts[snap_idx]) / Hz;
-
-    for (size_t jj=0; jj<Ngal; ++jj)
+    #pragma omp parallel
     {
+        // the accelerator is non-const upon evaluation
+        auto acc = z_chi_interp_acc[omp_get_thread_num()];
         double los[3];
-        for (int kk=0; kk<3; ++kk) los[kk] = xgal[3*jj+kk] - origin[kk]*BoxSize*Li[kk];
-        
-        double chi = std::hypot(los[0], los[1], los[2]);
 
-        if (correct)
+        #pragma omp for schedule (dynamic, 1024)
+        for (size_t jj=0; jj<Ngal; ++jj)
         {
-            double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
-                              / chi;
+            for (int kk=0; kk<3; ++kk) los[kk] = xgal[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
+            double chi = std::hypot(los[0], los[1], los[2]);
 
-            // map onto the lightcone -- we assume that this is a relatively small correction
-            //                           so we just do it to first order
-            double delta_z = (chi - snap_chis[snap_idx]) / (299792.458 + vhloproj) * Hz;
-
-            // correct the position accordingly
-            for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / Hz;
-
-            // only a small correction I assume (and it is borne out by experiment!)
-            chi = std::hypot(los[0], los[1], los[2]);
-        }
-
-        double chi_stitch; // the one used for stitching
-
-        if (stitch_before_RSD) chi_stitch = chi;
-
-        // the radial velocity
-        double vproj = (los[0]*vgal[3*jj+0]+los[1]*vgal[3*jj+1]+los[2]*vgal[3*jj+2])
-                       / chi;
-
-        // now add RSD (the order is important here, as RSD can be a pretty severe effect)
-        for (int kk=0; kk<3; ++kk) los[kk] += rsd_factor * vproj * los[kk] / chi;
-
-        // I'm lazy
-        chi = std::hypot(los[0], los[1], los[2]);
-
-        if (!stitch_before_RSD) chi_stitch = chi;
-
-        if (chi_stitch>chi_bounds[snap_idx] && chi_stitch<chi_bounds[snap_idx+1]
-            // prevent from falling out of the redshift interval we're mapping into
-            // (only relevent if stitching based on chi before RSD)
-            && (!stitch_before_RSD || (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps])))
-        // we are in the comoving shell that's coming from this snapshot
-        {
-            // rotate the line of sight into the NGC footprint and transpose the axes into
-            // canonical order
-            double x1, x2, x3;
-            x1 = std::cos(alpha) * los[2] - std::sin(alpha) * los[1];
-            x2 = los[0];
-            x3 = std::sin(alpha) * los[2] + std::cos(alpha) * los[1];
-
-            double z = gsl_spline_eval(z_chi_interp, chi, z_chi_interp_acc);
-            double theta = std::acos(x3/chi);
-            double phi = std::atan2(x2, x1);
-
-            double dec = 90.0-theta/M_PI*180.0;
-            double ra = phi/M_PI*180.0;
-            if (ra<0.0) ra += 360.0;
-            ra += beta;
-
-            // for the angular mask
-            cmangle::Point pt;
-            cmangle::point_set_from_radec(&pt, ra, dec);
-            int64_t poly_id; long double weight;
-            cmangle::mangle_polyid_and_weight_pix(ang_mask, &pt, &poly_id, &weight);
-            if (weight==0.0L) goto not_chosen;
-
-            if (veto)
-                for (int kk=0; kk<Nveto; ++kk)
-                {
-                    cmangle::mangle_polyid_and_weight_pix(veto_masks[kk], &pt, &poly_id, &weight);
-                    if (weight!=0.0L) goto not_chosen;
-                }
-
-            // this is executed in parallel, modifying global variables
-            #pragma omp critical (CHOOSE_APPEND)
+            if (correct)
             {
-                RA.push_back(ra);
-                DEC.push_back(dec);
-                Z.push_back(z);
-            }
-            continue;
+                double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
+                                  / chi;
 
-            not_chosen : /* do nothing */;
+                // map onto the lightcone -- we assume that this is a relatively small correction
+                //                           so we just do it to first order
+                double delta_z = (chi - snap_chis[snap_idx]) / (299792.458 + vhloproj) * Hz;
+
+                // correct the position accordingly
+                for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / Hz;
+
+                // only a small correction I assume (and it is borne out by experiment!)
+                chi = std::hypot(los[0], los[1], los[2]);
+            }
+
+            double chi_stitch; // the one used for stitching
+
+            if (stitch_before_RSD) chi_stitch = chi;
+
+            // the radial velocity
+            double vproj = (los[0]*vgal[3*jj+0]+los[1]*vgal[3*jj+1]+los[2]*vgal[3*jj+2])
+                           / chi;
+
+            // now add RSD (the order is important here, as RSD can be a pretty severe effect)
+            for (int kk=0; kk<3; ++kk) los[kk] += rsd_factor * vproj * los[kk] / chi;
+
+            // I'm lazy
+            chi = std::hypot(los[0], los[1], los[2]);
+
+            if (!stitch_before_RSD) chi_stitch = chi;
+
+            if (chi_stitch>chi_bounds[snap_idx] && chi_stitch<chi_bounds[snap_idx+1]
+                // prevent from falling out of the redshift interval we're mapping into
+                // (only relevent if stitching based on chi before RSD)
+                && (!stitch_before_RSD || (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps])))
+            // we are in the comoving shell that's coming from this snapshot
+            {
+                // rotate the line of sight into the NGC footprint and transpose the axes into
+                // canonical order
+                double x1, x2, x3;
+                x1 = std::cos(Geometry::alpha) * los[2] - std::sin(Geometry::alpha) * los[1];
+                x2 = los[0];
+                x3 = std::sin(Geometry::alpha) * los[2] + std::cos(Geometry::alpha) * los[1];
+
+                double z = gsl_spline_eval(z_chi_interp, chi, acc);
+                double theta = std::acos(x3/chi);
+                double phi = std::atan2(x2, x1);
+
+                double dec = 90.0-theta/M_PI*180.0;
+                double ra = phi/M_PI*180.0;
+                if (ra<0.0) ra += 360.0;
+                ra += Geometry::beta;
+
+                // for the angular mask
+                cmangle::Point pt;
+                cmangle::point_set_from_radec(&pt, ra, dec);
+                int64_t poly_id; long double weight;
+                cmangle::mangle_polyid_and_weight_pix(ang_mask,
+                                                      &pt, &poly_id, &weight);
+                if (weight==0.0L) goto not_chosen;
+
+                if (veto)
+                    for (int kk=0; kk<Masks::Nveto; ++kk)
+                    {
+                        cmangle::mangle_polyid_and_weight_pix(veto_masks[kk],
+                                                              &pt, &poly_id, &weight);
+                        if (weight!=0.0L) goto not_chosen;
+                    }
+
+                // this is executed in parallel, modifying global variables
+                #pragma omp critical (CHOOSE_APPEND)
+                {
+                    RA.push_back(ra);
+                    DEC.push_back(dec);
+                    Z.push_back(z);
+                }
+                continue;
+
+                not_chosen : /* do nothing */;
+            }
         }
     }
 }
 
-void downsample (double plus_factor)
+void Lightcone::downsample (double plus_factor)
 // downsamples to the boss_z_hist, up to plus_factor
 {
     const gsl_histogram *target_hist = boss_z_hist;
@@ -719,20 +613,20 @@ struct GalHelper
     };
 };
 
-inline long double hav (long double theta)
+static inline long double hav (long double theta)
 {
     auto x = std::sin(0.5*theta);
     return x * x;
 }
 
-inline long double haversine (const pointing &a1, const pointing &a2)
+static inline long double haversine (const pointing &a1, const pointing &a2)
 {
     long double t1=a1.theta, t2=a2.theta, p1=a1.phi, p2=a2.phi;
     return hav(t1-t2) + hav(p1-p2) * ( - hav(t1-t2) + hav(t1+t2) );
 }
 
 template<bool only_measure>
-double fibcoll ()
+double Lightcone::fibcoll ()
 {
     // both figures from Chang
     // we are dealing with pretty small angle differences so better do things in long double
