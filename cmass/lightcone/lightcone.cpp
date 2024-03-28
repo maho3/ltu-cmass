@@ -139,8 +139,8 @@ struct Lightcone
         init_masks();
 
         // the target redshift distribution
-        if (verbose) std::printf("measure_boss_nz\n");
-        measure_boss_nz();
+        if (verbose) std::printf("read_boss_nz\n");
+        read_boss_nz();
     }
 
     ~Lightcone ()
@@ -212,7 +212,7 @@ struct Lightcone
     void process_times ();
     void interpolate_chi_z ();
     void init_masks ();
-    void measure_boss_nz ();
+    void read_boss_nz ();
     void downsample (double);
     template<bool> double fibcoll ();
     void remap_snapshot (size_t,
@@ -244,45 +244,25 @@ PYBIND11_MODULE(lc, m)
         ;
 }
 
-void Lightcone::measure_boss_nz (void)
-    // TODO
+void Lightcone::read_boss_nz (void)
 {
+
+    std::vector<double> nz;
+
     char fname[512];
-    std::snprintf(fname, 512, "%s/galaxy_DR12v5_CMASS_North.bin", boss_dir);
-    auto fp = std::fopen(fname, "rb");
-    // binary file containing ra, dec, z in this order in double
-    
-    // figure out number of galaxies
-    std::fseek(fp, 0, SEEK_END);
-    auto nbytes = std::ftell(fp);
+    // text file, each line number of objects in a redshift bin
+    // we assume bins are equally spaced in redshift between zmin and zmax,
+    // number of bins is inferred from the file
+    std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat",
+                  boss_dir, zmin, zmax);
+    auto fp = std::fopen(fname, "r");
+    char line[64]; size_t this_nz;
+    while (std::fgets(line, 64, fp))
+        nz.push_back(std::atof(line));
 
-    auto Ngal = nbytes/sizeof(double)/3;
-    if (!(Ngal*3*sizeof(double)==nbytes)) throw std::runtime_error("read_boss_z failed");
-
-    // skip RA and DEC
-    std::fseek(fp, 2*Ngal*sizeof(double), SEEK_SET);
-    std::vector<double> boss_z;
-    boss_z.resize(Ngal);
-    std::fread(boss_z.data(), sizeof(double), Ngal, fp);
-    std::fclose(fp);
-
-    // remove values outside our bounds
-    std::vector<double> boss_z_cleaned;
-    std::copy_if(boss_z.begin(), boss_z.end(), std::back_inserter(boss_z_cleaned),
-                 [&](double this_z){ return this_z>zmin && this_z<zmax; });
-
-    // measure the standard deviation for Scott's rule
-    double sd = gsl_stats_sd(boss_z_cleaned.data(), 1, boss_z_cleaned.size());
-
-    // Scott's rule
-    double dz = 3.5 * sd / std::cbrt((double)boss_z_cleaned.size());
-    size_t Nbins = std::round((zmax-zmin)/dz);
-
-    boss_z_hist = gsl_histogram_alloc(Nbins);
+    boss_z_hist = gsl_histogram_alloc(nz.size());
     gsl_histogram_set_ranges_uniform(boss_z_hist, zmin, zmax);
-
-    std::for_each(boss_z_cleaned.begin(), boss_z_cleaned.end(),
-                  [&](double this_z){ gsl_histogram_increment(boss_z_hist, this_z); });
+    std::memcpy(boss_z_hist->bin, nz.data(), nz.size() * sizeof(double));
 }
 
 static double comoving_integrand (double z, void *p)
@@ -567,7 +547,7 @@ void Lightcone::downsample (double plus_factor)
                             * gsl_histogram_get(target_hist, ii) / gsl_histogram_get(sim_z_hist, ii);
 
         // give warning if something goes wrong
-        if (keep_fraction[ii] > 1.0 && plus_factor==0.0)
+        if (keep_fraction[ii] > 1.02 && plus_factor==0.0)
             std::fprintf(stderr, "[WARNING] at z=%.4f, do not have enough galaxies, keep_fraction=%.4f\n",
                                  0.5*(target_hist->range[ii]+target_hist->range[ii+1]),
                                  keep_fraction[ii]);
