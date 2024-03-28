@@ -66,25 +66,13 @@ namespace Geometry
     const double origin[] = { 0.5, -0.058, 0.0 };
 }
 
-namespace Masks
-{
-    const char ang_mask_fname[] = "mask_DR12v5_CMASS_North.ply";
-
-    const int Nveto = 6;
-    // we order them by size so the cheap ones go first
-    const char *veto_fnames[Nveto] =
-        {
-          "bright_object_mask_rykoff_pix.ply", 
-          "centerpost_mask_dr12.ply", 
-          "collision_priority_mask_dr12.ply",
-          "badfield_mask_postprocess_pixs8.ply", 
-          "allsky_bright_star_mask_pix.ply",
-          "badfield_mask_unphot_seeing_extinction_pixs8_dr12.ply",
-        };
-}
-
 namespace Numerics
 {
+    // both figures from Chang
+    // we are dealing with pretty small angle differences so better do things in long double
+    static const long double angscale = 0.01722L * M_PIl / 180.0L; // in rad
+    static const double collrate = 0.6;
+
     // before initial downsampling, we increase the fiber collision rate by this
     // to make sure that after fiber collisions we still have enough galaxies in each redshift bin
     const double fibcoll_rate_correction = 0.05;
@@ -93,12 +81,62 @@ namespace Numerics
     const int N_interp = 1024;
 }
 
+struct Mask
+{
+    static const int Nveto = 6;
+    // we order them by size so the cheap ones go first
+    // it is important that the mask comes first, because the veto masks are inverted
+    const char fnames[Nveto+1][128] = {
+          "mask_DR12v5_CMASS_North.ply",
+          "bright_object_mask_rykoff_pix.ply", 
+          "centerpost_mask_dr12.ply", 
+          "collision_priority_mask_dr12.ply",
+          "badfield_mask_postprocess_pixs8.ply", 
+          "allsky_bright_star_mask_pix.ply",
+          "badfield_mask_unphot_seeing_extinction_pixs8_dr12.ply",
+    };
+
+    std::vector<cmangle::MangleMask *> masks;
+
+    Mask (const char *boss_dir, bool veto=true)
+    {
+        for (int ii=0; ii<1+veto*Nveto; ++ii)
+            masks.push_back(cmangle::mangle_new());
+        
+        #pragma omp parallel for
+        for (int ii=0; ii<1+veto*Nveto; ++ii)
+        {
+            char fname[512];
+            std::snprintf(fname, 512, "%s/%s", boss_dir, fnames[ii]);
+            cmangle::mangle_read(masks[ii], fname);
+            cmangle::set_pixel_map(masks[ii]);
+        }
+    }
+    
+    ~Mask ()
+    {
+        for (auto m: masks) cmangle::mangle_free(m);
+    }
+
+    bool masked (const cmangle::Point &pt) const
+    {
+        int64_t poly_id; long double weight;
+        for (size_t ii=0; ii<masks.size(); ++ii)
+        {
+            cmangle::mangle_polyid_and_weight_pix(masks[ii], &pt, &poly_id, &weight);
+            if ( (weight==0.0L) == (ii==0) )
+                return true;
+        }
+        return false;
+    }
+};
+
 struct Lightcone
 {
     const char *boss_dir;
     const double BoxSize, Omega_m, zmin, zmax;
     const int remap_case;
-    const bool correct, veto, stitch_before_RSD, verbose;
+    const bool correct, stitch_before_RSD, verbose;
     const unsigned augment;
     const unsigned long seed;
     const std::vector<double> snap_times;
@@ -106,19 +144,18 @@ struct Lightcone
     std::vector<double> snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
     gsl_spline *z_chi_interp; std::vector<gsl_interp_accel *> z_chi_interp_acc;
     const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
-    cmangle::MangleMask *ang_mask;
-    cmangle::MangleMask *veto_masks[Masks::Nveto]; // maybe unused
     gsl_histogram *boss_z_hist;
     std::vector<double> RA, DEC, Z;
+    const Mask &mask;
 
-    Lightcone (const char *boss_dir_, double Omega_m_, double zmin_, double zmax_,
+    Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> snap_times_,
-               double BoxSize_=3e3, int remap_case_=0, bool correct_=true, bool veto_=true,
+               double BoxSize_=3e3, int remap_case_=0, bool correct_=true,
                bool stitch_before_RSD_=true, bool verbose_=false, unsigned augment_=0,
                unsigned long seed_=137UL) :
-        boss_dir{boss_dir_}, Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
+        boss_dir{boss_dir_}, mask{mask_}, Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
-        BoxSize{BoxSize_}, remap_case{remap_case_}, correct{correct_}, veto{veto_},
+        BoxSize{BoxSize_}, remap_case{remap_case_}, correct{correct_},
         stitch_before_RSD{stitch_before_RSD_}, verbose{verbose_}, augment{augment_},
         seed{seed_},
         C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
@@ -132,12 +169,6 @@ struct Lightcone
         if (verbose) std::printf("interpolate_chi_z\n");
         interpolate_chi_z();
 
-        // initialize survey footprint and veto masks (if requested)
-        ang_mask = cmangle::mangle_new();
-        if (veto) for (int ii=0; ii<Masks::Nveto; ++ii) veto_masks[ii] = cmangle::mangle_new();
-        if (verbose) std::printf("init_masks\n");
-        init_masks();
-
         // the target redshift distribution
         if (verbose) std::printf("read_boss_nz\n");
         read_boss_nz();
@@ -148,8 +179,6 @@ struct Lightcone
         gsl_spline_free(z_chi_interp);
         for (auto x: z_chi_interp_acc) gsl_interp_accel_free(x);
         gsl_histogram_free(boss_z_hist);
-        cmangle::mangle_free(ang_mask);
-        if (veto) for (int ii=0; ii<Masks::Nveto; ++ii) cmangle::mangle_free(veto_masks[ii]);
     }
 
     void add_snap (int snap_idx,
@@ -211,7 +240,6 @@ struct Lightcone
 
     void process_times ();
     void interpolate_chi_z ();
-    void init_masks ();
     void read_boss_nz ();
     void downsample (double);
     template<bool> double fibcoll ();
@@ -227,21 +255,23 @@ struct Lightcone
 
 PYBIND11_MODULE(lc, m)
 {
+    pyb::class_<Mask> (m, "Mask")
+        .def(pyb::init<const char *, bool>(), "boss_dir"_a, pyb::kw_only(), "veto"_a=true);
+
     pyb::class_<Lightcone> (m, "Lightcone")
-        .def(pyb::init<const char *, double, double, double,
+        .def(pyb::init<const char *, const Mask&, double, double, double,
                        const std::vector<double>,
-                       double, int, bool, bool,
+                       double, int, bool,
                        bool, bool, unsigned,
                        unsigned long>(),
-            "boss_dir"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
+            "boss_dir"_a, "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
             pyb::kw_only(),
-            "BoxSize"_a=3e3, "remap_case"_a=0, "correct"_a=true, "veto"_a=true,
+            "BoxSize"_a=3e3, "remap_case"_a=0, "correct"_a=true,
             "stitch_before_RSD"_a=true, "verbose"_a=false, "augment"_a=0,
             "seed"_a=137UL
         )
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xgal"_a, "vgal"_a, "vhlo"_a)
-        .def("finalize", &Lightcone::finalize)
-        ;
+        .def("finalize", &Lightcone::finalize);
 }
 
 void Lightcone::read_boss_nz (void)
@@ -322,25 +352,6 @@ void Lightcone::interpolate_chi_z (void)
     comoving(Numerics::N_interp, z_interp, chi_interp, Omega_m);
     gsl_spline_init(z_chi_interp, chi_interp, z_interp, Numerics::N_interp);
     std::free(z_interp); std::free(chi_interp);
-}
-
-void Lightcone::init_masks (void)
-{
-    char mask_fname[512];
-    std::snprintf(mask_fname, 512, "%s/%s", boss_dir, Masks::ang_mask_fname);
-    cmangle::mangle_read(ang_mask, mask_fname);
-    cmangle::set_pixel_map(ang_mask);
-
-    if (veto)
-        // this stuff is pretty expensive so do it in parallel
-        #pragma omp parallel for
-        for (int ii=0; ii<Masks::Nveto; ++ii)
-        {
-            char veto_fname[512];
-            std::snprintf(veto_fname, 512, "%s/%s", boss_dir, Masks::veto_fnames[ii]);
-            cmangle::mangle_read(veto_masks[ii], veto_fname);
-            cmangle::set_pixel_map(veto_masks[ii]);
-        }
 }
 
 template<typename T>
@@ -502,18 +513,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 // for the angular mask
                 cmangle::Point pt;
                 cmangle::point_set_from_radec(&pt, ra, dec);
-                int64_t poly_id; long double weight;
-                cmangle::mangle_polyid_and_weight_pix(ang_mask,
-                                                      &pt, &poly_id, &weight);
-                if (weight==0.0L) goto not_chosen;
-
-                if (veto)
-                    for (int kk=0; kk<Masks::Nveto; ++kk)
-                    {
-                        cmangle::mangle_polyid_and_weight_pix(veto_masks[kk],
-                                                              &pt, &poly_id, &weight);
-                        if (weight!=0.0L) goto not_chosen;
-                    }
+                if (mask.masked(pt)) goto not_chosen;
 
                 // this is executed in parallel, modifying global variables
                 #pragma omp critical (CHOOSE_APPEND)
@@ -626,11 +626,6 @@ static inline long double haversine (const pointing &a1, const pointing &a2)
 template<bool only_measure>
 double Lightcone::fibcoll ()
 {
-    // both figures from Chang
-    // we are dealing with pretty small angle differences so better do things in long double
-    static const long double angscale = 0.01722L * M_PIl / 180.0L; // in rad
-    static const double collrate = 0.6;
-
     // for sampling from overlapping regions according to collision rate
     // and assignment of random galaxy IDs
     std::vector<gsl_rng *> rngs;
@@ -707,7 +702,7 @@ double Lightcone::fibcoll ()
             const auto &g = all_vec[ii];
 
             // one can gain performance here by playing with "fact"
-            hp_base.query_disc_inclusive(g.ang, angscale, query_result, /*fact=*/4);
+            hp_base.query_disc_inclusive(g.ang, Numerics::angscale, query_result, /*fact=*/4);
             query_result.toVector(query_vector);
 
             for (auto hp_idx : query_vector)
@@ -719,7 +714,7 @@ double Lightcone::fibcoll ()
                 const auto this_range = this_range_ptr->second;
                 for (size_t ii=this_range.first; ii<this_range.second; ++ii)
                     if (g.id > all_vec[ii].id
-                        && haversine(g.ang, all_vec[ii].ang) < hav(angscale))
+                        && haversine(g.ang, all_vec[ii].ang) < hav(Numerics::angscale))
                     // use the fact that haversine is monotonic to avoid inverse operation
                     // by using the greater-than check, we ensure to remove only one member
                     // of each pair
@@ -730,7 +725,7 @@ double Lightcone::fibcoll ()
             // TODO it could also make sense to call the rng every time we have a collision
             //      in the above loop instead. Maybe not super important though.
             collided :
-            if (gsl_rng_uniform(rng)<collrate) continue;
+            if (gsl_rng_uniform(rng)<Numerics::collrate) continue;
 
             not_collided :
             ++Nkept;

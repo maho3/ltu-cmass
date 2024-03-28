@@ -25,7 +25,7 @@ int pixel_parse_scheme(char buff[_MANGLE_SMALL_BUFFSIZE],
                        int64* res, char* pixeltype);
 
 
-int64 get_pixel_simple(int64 pixelres, struct Point* pt);
+int64 get_pixel_simple(int64 pixelres, const struct Point* pt);
 
 
 

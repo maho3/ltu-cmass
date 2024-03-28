@@ -103,7 +103,7 @@ _get_pix_scheme_errout:
 }
 
 int64
-get_pixel_simple(int64 pixelres, struct Point* pt)
+get_pixel_simple(int64 pixelres, const struct Point* pt)
 {
     int64 pix=0;
 

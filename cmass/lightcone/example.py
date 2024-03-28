@@ -1,15 +1,22 @@
 import numpy as np
+from matplotlib import pyplot as plt
 import lc
 
 # how many galaxies we randomly generate per volume
 N = 3000000
 
+# where mask .ply files and redshift histogram are stored
+boss_dir = '/tigress/lthiele/boss_dr12'
+
 # scale factors, need to be monotonically decreasing
 snap_times = [0.7, 0.65, 0.6, ]
 
+# make the mask (this is a bit expensive, so we do it outside the lightcone so it can be re-used)
+m = lc.Mask(boss_dir=boss_dir)
+
 # run the constructor
 l = lc.Lightcone(
-    boss_dir='/tigress/lthiele/boss_dr12',
+    boss_dir=boss_dir, mask=m,
     Omega_m=0.3, zmin=0.40, zmax=0.65,
     snap_times=snap_times,
     verbose=True
@@ -24,3 +31,12 @@ for snap_idx, a in enumerate(snap_times) :
     l.add_snap(snap_idx, xgal, vgal, vhlo)
 
 ra, dec, z = l.finalize()
+
+
+# check if mask is working correctly
+fig, ax = plt.subplots(figsize=(10, 10))
+choose = (z>0.5) * (z<0.52)
+ax.plot(ra[choose], dec[choose], linestyle='none', marker='o')
+ax.set_xlabel('RA [deg]')
+ax.set_ylabel('DEC [deg]')
+plt.show()
