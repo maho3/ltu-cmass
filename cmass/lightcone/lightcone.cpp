@@ -66,8 +66,10 @@ namespace Geometry
     const double origin[] = { 0.5, -0.058, 0.0 };
 }
 
-namespace Numerics
+namespace Numbers
 {
+    static const double lightspeed = 299792.458; // km/s    
+
     // both figures from Chang
     // we are dealing with pretty small angle differences so better do things in long double
     static const long double angscale = 0.01722L * M_PIl / 180.0L; // in rad
@@ -75,10 +77,10 @@ namespace Numerics
 
     // before initial downsampling, we increase the fiber collision rate by this
     // to make sure that after fiber collisions we still have enough galaxies in each redshift bin
-    const double fibcoll_rate_correction = 0.05;
+    static const double fibcoll_rate_correction = 0.05;
 
     // how many interpolation stencils we use to get from chi to z
-    const int N_interp = 1024;
+    static const int N_interp = 1024;
 }
 
 struct Mask
@@ -149,7 +151,7 @@ struct Lightcone
     const Mask &mask;
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
-               const std::vector<double> snap_times_,
+               const std::vector<double> &snap_times_,
                double BoxSize_=3e3, int remap_case_=0, bool correct_=true,
                bool stitch_before_RSD_=true, bool verbose_=false, unsigned augment_=0,
                unsigned long seed_=137UL) :
@@ -163,7 +165,7 @@ struct Lightcone
         if (verbose) std::printf("process_times\n");
         process_times();
 
-        z_chi_interp = gsl_spline_alloc(gsl_interp_cspline, Numerics::N_interp);
+        z_chi_interp = gsl_spline_alloc(gsl_interp_cspline, Numbers::N_interp);
         for (int ii=0; ii<omp_get_max_threads(); ++ii)
             z_chi_interp_acc.push_back(gsl_interp_accel_alloc());
         if (verbose) std::printf("interpolate_chi_z\n");
@@ -220,7 +222,7 @@ struct Lightcone
 
         // first downsampling before fiber collisions are applied
         if (verbose) std::printf("downsample\n");
-        downsample(fibcoll_rate+Numerics::fibcoll_rate_correction);
+        downsample(fibcoll_rate+Numbers::fibcoll_rate_correction);
 
         // apply fiber collisions
         if (verbose) std::printf("fibcoll\n");
@@ -253,6 +255,38 @@ struct Lightcone
                           const std::vector<double> &);
 };
 
+#ifdef TEST
+int main (int argc, char **argv)
+{
+    double Omega_m = 0.3;
+    const char *boss_dir = argv[1];
+    double zmin = std::atof(argv[2]);
+    double zmax = std::atof(argv[3]);
+    std::vector<double> snap_times;
+    for (char **c=argv+4; *c; ++c) snap_times.push_back(std::atof(*c));
+
+    auto m = Mask(boss_dir);
+    auto l = Lightcone(boss_dir, m, Omega_m, zmin, zmax, snap_times);
+    
+    std::vector<double> xa, va, vha;
+    const size_t N = 128;
+    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+    gsl_rng_set(rng, 42);
+    for (size_t ii=0; ii<N*3UL; ++ii)
+    {
+        xa.push_back(gsl_rng_uniform(rng) * 3e3);
+        va.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
+        vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
+    }
+    pyb::array_t<double> x=pyb::cast(xa), v=pyb::cast(va), vh=pyb::cast(vha);
+    x.reshape({N, 3UL}); v.reshape({N, 3UL}); vh.reshape({N, 3UL});
+    l.add_snap(0, x, v, vh);
+
+    l.finalize();
+
+    return 0;
+}
+#else // TEST
 PYBIND11_MODULE(lc, m)
 {
     pyb::class_<Mask> (m, "Mask")
@@ -260,7 +294,7 @@ PYBIND11_MODULE(lc, m)
 
     pyb::class_<Lightcone> (m, "Lightcone")
         .def(pyb::init<const char *, const Mask&, double, double, double,
-                       const std::vector<double>,
+                       const std::vector<double>&,
                        double, int, bool,
                        bool, bool, unsigned,
                        unsigned long>(),
@@ -273,6 +307,7 @@ PYBIND11_MODULE(lc, m)
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xgal"_a, "vgal"_a, "vhlo"_a)
         .def("finalize", &Lightcone::finalize);
 }
+#endif // TEST
 
 void Lightcone::read_boss_nz (void)
 {
@@ -297,7 +332,7 @@ void Lightcone::read_boss_nz (void)
 
 static double comoving_integrand (double z, void *p)
 {
-    static const double H0inv = 2.99792458e3; // Mpc/h
+    static const double H0inv = 1e-2 * Numbers::lightspeed; // Mpc/h
     double Omega_m = *(double *)p;
     return H0inv / std::sqrt( Omega_m*gsl_pow_3(1.0+z)+(1.0-Omega_m) );
 }
@@ -344,13 +379,13 @@ void Lightcone::process_times (void)
 void Lightcone::interpolate_chi_z (void)
 {
     double z_interp_min = zmin-0.01, z_interp_max=zmax+0.01;
-    double *z_interp = (double *)std::malloc(Numerics::N_interp * sizeof(double));
-    double *chi_interp = (double *)std::malloc(Numerics::N_interp * sizeof(double));
-    for (int ii=0; ii<Numerics::N_interp; ++ii)
+    double *z_interp = (double *)std::malloc(Numbers::N_interp * sizeof(double));
+    double *chi_interp = (double *)std::malloc(Numbers::N_interp * sizeof(double));
+    for (int ii=0; ii<Numbers::N_interp; ++ii)
         z_interp[ii] = z_interp_min + (z_interp_max-z_interp_min)
-                                      * (double)ii / (double)(Numerics::N_interp-1);
-    comoving(Numerics::N_interp, z_interp, chi_interp, Omega_m);
-    gsl_spline_init(z_chi_interp, chi_interp, z_interp, Numerics::N_interp);
+                                      * (double)ii / (double)(Numbers::N_interp-1);
+    comoving(Numbers::N_interp, z_interp, chi_interp, Omega_m);
+    gsl_spline_init(z_chi_interp, chi_interp, z_interp, Numbers::N_interp);
     std::free(z_interp); std::free(chi_interp);
 }
 
@@ -410,7 +445,7 @@ void Lightcone::remap_snapshot (size_t Ngal,
         {
             x[kk] = xgal[3*ii+kk];
             v[kk] = vgal[3*ii+kk];
-            vh[kk] = vhlo[3*ii+kk];
+            if (correct) vh[kk] = vhlo[3*ii+kk];
         }
 
         reflect(r, x, v, vh, BoxSize, correct);
@@ -463,7 +498,8 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
 
                 // map onto the lightcone -- we assume that this is a relatively small correction
                 //                           so we just do it to first order
-                double delta_z = (chi - snap_chis[snap_idx]) / (299792.458 + vhloproj) * Hz;
+                double delta_z = (chi - snap_chis[snap_idx])
+                                 / (Numbers::lightspeed + vhloproj) * Hz;
 
                 // correct the position accordingly
                 for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / Hz;
@@ -702,7 +738,7 @@ double Lightcone::fibcoll ()
             const auto &g = all_vec[ii];
 
             // one can gain performance here by playing with "fact"
-            hp_base.query_disc_inclusive(g.ang, Numerics::angscale, query_result, /*fact=*/4);
+            hp_base.query_disc_inclusive(g.ang, Numbers::angscale, query_result, /*fact=*/4);
             query_result.toVector(query_vector);
 
             for (auto hp_idx : query_vector)
@@ -714,7 +750,7 @@ double Lightcone::fibcoll ()
                 const auto this_range = this_range_ptr->second;
                 for (size_t ii=this_range.first; ii<this_range.second; ++ii)
                     if (g.id > all_vec[ii].id
-                        && haversine(g.ang, all_vec[ii].ang) < hav(Numerics::angscale))
+                        && haversine(g.ang, all_vec[ii].ang) < hav(Numbers::angscale))
                     // use the fact that haversine is monotonic to avoid inverse operation
                     // by using the greater-than check, we ensure to remove only one member
                     // of each pair
@@ -725,7 +761,7 @@ double Lightcone::fibcoll ()
             // TODO it could also make sense to call the rng every time we have a collision
             //      in the above loop instead. Maybe not super important though.
             collided :
-            if (gsl_rng_uniform(rng)<Numerics::collrate) continue;
+            if (gsl_rng_uniform(rng)<Numbers::collrate) continue;
 
             not_collided :
             ++Nkept;
