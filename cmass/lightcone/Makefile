@@ -26,7 +26,7 @@ lc: $(lco) $(pymangle) $(healpixlite) $(cuboidremap)
 	$(CXX) -shared -o lc$(shell python3-config --extension-suffix) $(lco) $(pymangle) $(healpixlite) $(cuboidremap) $(LFLAGS) $(shell python3-config --ldflags)
 
 $(test): lightcone.cpp $(pymangle) $(healpixlite) $(cuboidremap)
-	$(CXX) -DTEST $(shell python3 -m pybind11 --includes) -I$(pymangle_src) -I$(healpixlite_src) -I$(cuboidremap_src) -DHAVE_INLINE $(CXXFLAGS) -o $@ lightcone.cpp -L. -lcmangle -lhealpixlite -lcuboidremap $(LFLAGS) $(shell python3-config --ldflags)
+	$(CXX) -DTEST $(shell python3 -m pybind11 --includes) -I$(pymangle_src) -I$(healpixlite_src) -I$(cuboidremap_src) -DHAVE_INLINE $(CXXFLAGS) -o $@ lightcone.cpp -L. -lcmangle -lhealpixlite -lcuboidremap $(shell python3-config --ldflags) -lpython3.10 $(LFLAGS)
 
 $(cuboidremap): $(patsubst $(cuboidremap_src)/%.cpp,$(cuboidremap_src)/%.o,$(wildcard $(cuboidremap_src)/*.cpp))
 	ar -r $@ $^

@@ -34,7 +34,6 @@ for snap_idx, a in enumerate(snap_times) :
 
 ra, dec, z = l.finalize()
 
-
 # check if mask is working correctly
 fig, ax = plt.subplots(figsize=(10, 10))
 choose = (z>0.5) * (z<0.6)

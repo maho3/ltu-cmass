@@ -265,8 +265,11 @@ int main (int argc, char **argv)
     std::vector<double> snap_times;
     for (char **c=argv+4; *c; ++c) snap_times.push_back(std::atof(*c));
 
+    std::printf("...Starting loading mask\n");
     auto m = Mask(boss_dir);
+    std::printf("...finished loading mask, constructing lightcone...\n");
     auto l = Lightcone(boss_dir, m, Omega_m, zmin, zmax, snap_times);
+    std::printf("...finished constructing lightcone, making galaxies...\n");
     
     std::vector<double> xa, va, vha;
     const size_t N = 128;
@@ -278,11 +281,16 @@ int main (int argc, char **argv)
         va.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
         vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
     }
+    gsl_rng_free(rng);
     pyb::array_t<double> x=pyb::cast(xa), v=pyb::cast(va), vh=pyb::cast(vha);
     x.reshape({N, 3UL}); v.reshape({N, 3UL}); vh.reshape({N, 3UL});
+    std::printf("...finished making galaxies, adding snapshot...\n");
+
     l.add_snap(0, x, v, vh);
+    std::printf("...finished adding snapshot, finalizing...\n");
 
     l.finalize();
+    std::printf("...done!\n");
 
     return 0;
 }
