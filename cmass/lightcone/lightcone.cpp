@@ -153,11 +153,24 @@ struct Lightcone
     }
 
     void add_snap (int snap_idx,
-                   std::vector<double> &xgal,
-                   std::vector<double> &vgal,
-                   std::vector<double> &vhlo)
+                   const pyb::array_t<double> &xgal_numpy,
+                   const pyb::array_t<double> &vgal_numpy,
+                   const pyb::array_t<double> &vhlo_numpy)
     {
-        size_t Ngal = xgal.size() / 3;
+        size_t Ngal = xgal_numpy.shape()[0];
+        assert(xgal_numpy.shape()[1]==3 && vgal_numpy.shape()[1]==3
+               && (!correct || vhlo_numpy.shape()[1]==3));
+        assert(xgal_numpy.size()==3*Ngal && vgal_numpy.size()==3*Ngal
+               && (!correct || vhlo_numpy.size()==3*Ngal));
+        std::vector<double> xgal, vgal, vhlo;
+        for (size_t ii=0; ii<Ngal; ++ii)
+            for (size_t jj=0; jj<3; ++jj)
+            {
+                xgal.push_back(xgal_numpy.at(ii, jj));
+                vgal.push_back(vgal_numpy.at(ii, jj));
+                if (correct) vhlo.push_back(vhlo_numpy.at(ii, jj));
+            }
+
         assert(3*Ngal==vgal.size() && 3*Ngal==vhlo.size());
 
         if (verbose) std::printf("\tremap_snapshot\n");
