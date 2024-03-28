@@ -233,6 +233,7 @@ struct Lightcone
         downsample(0.0);
 
         // copy RA, DEC, Z into the numpy arrays to be used from python
+        // TODO I think currently we do vector->list->array, figure out how to do it properly
         pyb::array_t<double> RAnumpy = pyb::cast(RA),
                              DECnumpy = pyb::cast(DEC),
                              Znumpy = pyb::cast(Z);
@@ -282,6 +283,7 @@ int main (int argc, char **argv)
         vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
     }
     gsl_rng_free(rng);
+    // TODO segfaults somewhere here
     pyb::array_t<double> x=pyb::cast(xa), v=pyb::cast(va), vh=pyb::cast(vha);
     x.reshape({N, 3UL}); v.reshape({N, 3UL}); vh.reshape({N, 3UL});
     std::printf("...finished making galaxies, adding snapshot...\n");
