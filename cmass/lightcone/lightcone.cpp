@@ -183,6 +183,18 @@ struct Lightcone
         gsl_histogram_free(boss_z_hist);
     }
 
+    void _add_snap (int snap_idx, size_t Ngal,
+                    std::vector<double> &xgal, std::vector<double> &vgal, std::vector<double> &vhlo)
+    {
+        if (verbose) std::printf("\tremap_snapshot\n");
+        remap_snapshot(Ngal, xgal, vgal, vhlo);
+
+        if (verbose) std::printf("\tchoose_galaxies\n");
+        choose_galaxies(snap_idx, Ngal, xgal, vgal, vhlo);
+
+        if (verbose) std::printf("Done with snap index %d\n", snap_idx);
+    }
+
     void add_snap (int snap_idx,
                    const pyb::array_t<double,
                                       pyb::array::c_style | pyb::array::forcecast> &xgal_numpy,
@@ -203,16 +215,10 @@ struct Lightcone
         std::memcpy(vgal.data(), vgal_numpy.data(), 3UL*Ngal*sizeof(double));
         if (correct) std::memcpy(vhlo.data(), vhlo_numpy.data(), 3UL*Ngal*sizeof(double));
 
-        if (verbose) std::printf("\tremap_snapshot\n");
-        remap_snapshot(Ngal, xgal, vgal, vhlo);
-
-        if (verbose) std::printf("\tchoose_galaxies\n");
-        choose_galaxies(snap_idx, Ngal, xgal, vgal, vhlo);
-
-        if (verbose) std::printf("Done with snap index %d\n", snap_idx);
+        _add_snap(snap_idx, Ngal, xgal, vgal, vhlo);
     }
 
-    pyb::tuple finalize ()
+    void _finalize ()
     {
         // get an idea of the fiber collision rate in our sample,
         // so the subsequent downsampling is to the correct level.
@@ -230,6 +236,11 @@ struct Lightcone
         // now downsample to our final density
         if (verbose) std::printf("downsample\n");
         downsample(0.0);
+    }
+
+    pyb::tuple finalize ()
+    {
+        _finalize();
 
         // copy RA, DEC, Z into the numpy arrays to be used from python
         pyb::array_t<double> RAnumpy = pyb::array(RA.size(), RA.data()),
@@ -281,16 +292,12 @@ int main (int argc, char **argv)
         vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
     }
     gsl_rng_free(rng);
-    pyb::array_t<double> x=pyb::array(xa.size(), xa.data()),
-                         v=pyb::array(va.size(), va.data()),
-                         vh=pyb::array(vha.size(), vha.data());
-    x.reshape({N, 3UL}); v.reshape({N, 3UL}); vh.reshape({N, 3UL});
     std::printf("...finished making galaxies, adding snapshot...\n");
 
-    l.add_snap(0, x, v, vh);
+    l._add_snap(0, N, xa, va, vha);
     std::printf("...finished adding snapshot, finalizing...\n");
 
-    auto res = l.finalize();
+    l._finalize();
     std::printf("...done!\n");
 
     return 0;
