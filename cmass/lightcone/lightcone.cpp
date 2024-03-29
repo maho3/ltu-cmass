@@ -184,25 +184,24 @@ struct Lightcone
     }
 
     void add_snap (int snap_idx,
-                   const pyb::array_t<double> &xgal_numpy,
-                   const pyb::array_t<double> &vgal_numpy,
-                   const pyb::array_t<double> &vhlo_numpy)
+                   const pyb::array_t<double,
+                                      pyb::array::c_style | pyb::array::forcecast> &xgal_numpy,
+                   const pyb::array_t<double,
+                                      pyb::array::c_style | pyb::array::forcecast> &vgal_numpy,
+                   const pyb::array_t<double,
+                                      pyb::array::c_style | pyb::array::forcecast> &vhlo_numpy)
     {
         size_t Ngal = xgal_numpy.shape()[0];
         assert(xgal_numpy.shape()[1]==3 && vgal_numpy.shape()[1]==3
                && (!correct || vhlo_numpy.shape()[1]==3));
         assert(xgal_numpy.size()==3*Ngal && vgal_numpy.size()==3*Ngal
                && (!correct || vhlo_numpy.size()==3*Ngal));
-        std::vector<double> xgal, vgal, vhlo;
-        for (size_t ii=0; ii<Ngal; ++ii)
-            for (size_t jj=0; jj<3; ++jj)
-            {
-                xgal.push_back(xgal_numpy.at(ii, jj));
-                vgal.push_back(vgal_numpy.at(ii, jj));
-                if (correct) vhlo.push_back(vhlo_numpy.at(ii, jj));
-            }
 
-        assert(3*Ngal==vgal.size() && 3*Ngal==vhlo.size());
+        // copy into vectors which we will modify
+        std::vector<double> xgal(3UL*Ngal), vgal(3UL*Ngal), vhlo((correct) ? 3UL*Ngal : 0);
+        std::memcpy(xgal.data(), xgal_numpy.data(), 3UL*Ngal*sizeof(double));
+        std::memcpy(vgal.data(), vgal_numpy.data(), 3UL*Ngal*sizeof(double));
+        if (correct) std::memcpy(vhlo.data(), vhlo_numpy.data(), 3UL*Ngal*sizeof(double));
 
         if (verbose) std::printf("\tremap_snapshot\n");
         remap_snapshot(Ngal, xgal, vgal, vhlo);
@@ -233,10 +232,9 @@ struct Lightcone
         downsample(0.0);
 
         // copy RA, DEC, Z into the numpy arrays to be used from python
-        // TODO I think currently we do vector->list->array, figure out how to do it properly
-        pyb::array_t<double> RAnumpy = pyb::cast(RA),
-                             DECnumpy = pyb::cast(DEC),
-                             Znumpy = pyb::cast(Z);
+        pyb::array_t<double> RAnumpy = pyb::array(RA.size(), RA.data()),
+                             DECnumpy = pyb::array(DEC.size(), DEC.data()),
+                             Znumpy = pyb::array(Z.size(), Z.data());
 
         return pyb::make_tuple(RAnumpy, DECnumpy, Znumpy);
     }
@@ -283,15 +281,16 @@ int main (int argc, char **argv)
         vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
     }
     gsl_rng_free(rng);
-    // TODO segfaults somewhere here
-    pyb::array_t<double> x=pyb::cast(xa), v=pyb::cast(va), vh=pyb::cast(vha);
+    pyb::array_t<double> x=pyb::array(xa.size(), xa.data()),
+                         v=pyb::array(va.size(), va.data()),
+                         vh=pyb::array(vha.size(), vha.data());
     x.reshape({N, 3UL}); v.reshape({N, 3UL}); vh.reshape({N, 3UL});
     std::printf("...finished making galaxies, adding snapshot...\n");
 
     l.add_snap(0, x, v, vh);
     std::printf("...finished adding snapshot, finalizing...\n");
 
-    l.finalize();
+    auto res = l.finalize();
     std::printf("...done!\n");
 
     return 0;
