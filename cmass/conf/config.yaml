@@ -7,4 +7,4 @@ defaults:
   - survey: cmass_ngc
   - _self_
 
-sim: pmwd
+sim: borgpm

@@ -1,17 +1,17 @@
-# for running inference on 1 Gpc/h volumes
-suite: inf_1gpch
+# for comparing Quijote density fields at z=0
+suite: quijote_z0
 
 # General parameters
 L: 1000           # Mpc/h
 N: 128            # meshgrid resolution
 lhid: 3           # latin hypercube id
-matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
+matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
 zi: 20            # initial redshift
-zf: 0.5           # final redshift
+zf: 0.0           # final redshift
 supersampling: 1  # particles resolution relative to meshgrid
 
 # borglpt-only

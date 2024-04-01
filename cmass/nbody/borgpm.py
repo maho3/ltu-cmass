@@ -72,7 +72,7 @@ def get_ICs(cfg):
             path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
         else:
             path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
-        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
+        return - load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N, seed=nbody.lhid)
 
@@ -92,47 +92,39 @@ def run_density(wn, cpar, cfg):
     cosmo.computeSigma8()
     cos = cosmo.getCosmology()
     cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
-    cpar.sigma8 = sigma8_true
 
     # initialize box and chain
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
     box.N = 3*(nbody.N,)
-
-    chain = borg.forward.ChainForwardModel(box)
-    chain.addModel(borg.forward.models.HermiticEnforcer(box))
-
-    if nbody.transfer == 'CLASS':
-        transfer_CLASS(chain, box, cpar, nbody.ai)
-    elif nbody.transfer == 'EH':
-        transfer_EH(chain, box, nbody.ai)
-
-    # add lpt
-    if nbody.order == 1:
-        modelclass = borg.forward.models.BorgLpt
-    elif nbody.order == 2:
-        modelclass = borg.forward.models.Borg2Lpt
-    else:
-        raise NotImplementedError(f'Order {nbody.order} not implemented.')
-    lpt = modelclass(
-        box=box, box_out=box,
-        ai=nbody.ai, af=nbody.af,
-        supersampling=nbody.supersampling
-    )
-    chain.addModel(lpt)
+    
+    chain =borg.forward.ChainForwardModel(box)
+    chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
+    chain @= borg.forward.model_lib.M_TRANSFER_CLASS(box, opts=dict(a_transfer=1.0))
+    pm = borg.forward.model_lib.M_PM_CIC(box, opts=dict(a_initial=1.0,a_final=nbody.af,
+                                              do_rsd=False,
+                                              supersampling=nbody.supersampling,
+                                              part_factor=1.01,
+                                              forcesampling=nbody.B,
+                                              pm_start_z=nbody.zi,
+                                              pm_nsteps=nbody.N_steps,
+                                              tcola=nbody.COLA))
+    chain @= pm
+    chain.setAdjointRequired(False)
+    
     chain.setCosmoParams(cpar)
 
     # forward model
     logging.info('Running forward...')
     chain.forwardModel_v2(wn)
 
-    Npart = lpt.getNumberOfParticles()
+    Npart = pm.getNumberOfParticles()
     rho = np.empty(chain.getOutputBoxModel().N)
     pos = np.empty(shape=(Npart, 3))
     vel = np.empty(shape=(Npart, 3))
     chain.getDensityFinal(rho)
-    lpt.getParticlePositions(pos)
-    lpt.getParticleVelocities(vel)
+    pm.getParticlePositions(pos)
+    pm.getParticleVelocities(vel)
 
     return rho, pos, vel
 
@@ -168,7 +160,7 @@ def main(cfg: DictConfig) -> None:
         fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
+    outdir = get_source_path(cfg, f"borgpm", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
