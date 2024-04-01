@@ -16,7 +16,6 @@
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_histogram.h>
 #include <gsl/gsl_rng.h>
-#include <gsl/gsl_statistics_double.h>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -81,6 +80,12 @@ namespace Numbers
 
     // how many interpolation stencils we use to get from chi to z
     static const int N_interp = 1024;
+
+    // gsl integration workspace size for chi(z) integration
+    static const size_t ws_size = 8192;
+
+    // maximum integration error in chi(z), Mpc/h
+    static const double chi_epsabs = 1e-3;
 }
 
 struct Mask
@@ -149,6 +154,7 @@ struct Lightcone
     gsl_histogram *boss_z_hist;
     std::vector<double> RA, DEC, Z;
     const Mask &mask;
+    std::vector<int> snap_indices_done;
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> &snap_times_,
@@ -186,6 +192,10 @@ struct Lightcone
     void _add_snap (int snap_idx, size_t Ngal,
                     std::vector<double> &xgal, std::vector<double> &vgal, std::vector<double> &vhlo)
     {
+        if (std::find(snap_indices_done.begin(), snap_indices_done.end(), snap_idx)
+            != snap_indices_done.end())
+            throw std::runtime_error("adding the same snapshot twice");
+
         if (verbose) std::printf("\tremap_snapshot\n");
         remap_snapshot(Ngal, xgal, vgal, vhlo);
 
@@ -193,6 +203,7 @@ struct Lightcone
         choose_galaxies(snap_idx, Ngal, xgal, vgal, vhlo);
 
         if (verbose) std::printf("Done with snap index %d\n", snap_idx);
+        snap_indices_done.push_back(snap_idx);
     }
 
     void add_snap (int snap_idx,
@@ -220,6 +231,9 @@ struct Lightcone
 
     void _finalize ()
     {
+        if (snap_indices_done.size() != Nsnaps)
+            throw std::runtime_error("not all snapshots have been added");
+
         // get an idea of the fiber collision rate in our sample,
         // so the subsequent downsampling is to the correct level.
         // This is justified as all this stuff is not super expensive.
@@ -346,26 +360,29 @@ void Lightcone::read_boss_nz (void)
     std::memcpy(boss_z_hist->bin, nz.data(), nz.size() * sizeof(double));
 }
 
+static inline double Ez (double z, double Omega_m)
+{
+    return std::sqrt( Omega_m*gsl_pow_3(1.0+z) + (1.0-Omega_m) );
+}
+
 static double comoving_integrand (double z, void *p)
 {
     static const double H0inv = 1e-2 * Numbers::lightspeed; // Mpc/h
     double Omega_m = *(double *)p;
-    return H0inv / std::sqrt( Omega_m*gsl_pow_3(1.0+z)+(1.0-Omega_m) );
+    return H0inv / Ez(z, Omega_m);
 }
 
 static void comoving (int N, double *z, double *chi, double Omega_m)
 // populate chi with chi(z) in Mpc/h
 {
-    gsl_function F;
-    F.function = comoving_integrand;
-    F.params = &Omega_m;
+    gsl_function F { .function=comoving_integrand, .params=&Omega_m };
 
-    static const size_t ws_size = 1024;
-    gsl_integration_workspace *ws = gsl_integration_workspace_alloc(ws_size);
+    gsl_integration_workspace *ws = gsl_integration_workspace_alloc(Numbers::ws_size);
 
     double err;
     for (int ii=0; ii<N; ++ii)
-        gsl_integration_qag(&F, 0.0, z[ii], 1e-2, 0.0, ws_size, 6, ws, chi+ii, &err);
+        gsl_integration_qag(&F, 0.0, z[ii], Numbers::chi_epsabs, 0.0,
+                            Numbers::ws_size, 6, ws, chi+ii, &err);
 
     gsl_integration_workspace_free(ws);
 }
@@ -491,8 +508,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                                  const std::vector<double> &vhlo)
 {
     // h km/s/Mpc
-    const double Hz = 100.0
-                      * std::sqrt(Omega_m*gsl_pow_3(1.0+snap_redshifts[snap_idx])+(1.0-Omega_m));
+    const double Hz = 100.0 * Ez(snap_redshifts[snap_idx], Omega_m);
     const double rsd_factor = (1.0+snap_redshifts[snap_idx]) / Hz;
 
     #pragma omp parallel
