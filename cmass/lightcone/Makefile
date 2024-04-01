@@ -1,7 +1,7 @@
 CC = gcc
 CXX = g++
 
-FLAGS = -Wall -Wextra -O3 -ggdb -fPIC
+FLAGS = -Wall -Wextra -Wno-reorder -Wno-sign-compare -O3 -ggdb -fPIC
 CFLAGS = --std=gnu99 $(FLAGS)
 CXXFLAGS = --std=c++17 -fopenmp $(FLAGS)
 

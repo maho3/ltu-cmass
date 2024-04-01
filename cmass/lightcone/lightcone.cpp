@@ -151,6 +151,7 @@ struct Mask
 struct Lightcone
 {
     const char *boss_dir;
+    const Mask &mask;
     const double BoxSize, Omega_m, zmin, zmax;
     const int remap_case;
     const bool correct, stitch_before_RSD, verbose;
@@ -163,7 +164,6 @@ struct Lightcone
     const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
     gsl_histogram *boss_z_hist;
     std::vector<double> RA, DEC, Z;
-    const Mask &mask;
     std::vector<int> snap_indices_done;
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
@@ -361,7 +361,7 @@ void Lightcone::read_boss_nz (void)
     std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat",
                   boss_dir, zmin, zmax);
     auto fp = std::fopen(fname, "r");
-    char line[64]; size_t this_nz;
+    char line[64];
     while (std::fgets(line, 64, fp))
         nz.push_back(std::atof(line));
 
@@ -370,16 +370,16 @@ void Lightcone::read_boss_nz (void)
     std::memcpy(boss_z_hist->bin, nz.data(), nz.size() * sizeof(double));
 }
 
-static inline double Ez (double z, double Omega_m)
+static inline double Hz (double z, double Omega_m)
 {
-    return std::sqrt( Omega_m*gsl_pow_3(1.0+z) + (1.0-Omega_m) );
+    // h km/s/Mpc
+    return 100.0 * std::sqrt( Omega_m*gsl_pow_3(1.0+z) + (1.0-Omega_m) );
 }
 
 static double comoving_integrand (double z, void *p)
 {
-    static const double H0inv = 1e-2 * Numbers::lightspeed; // Mpc/h
     double Omega_m = *(double *)p;
-    return H0inv / Ez(z, Omega_m);
+    return Numbers::lightspeed / Hz(z, Omega_m);
 }
 
 static void comoving (int N, double *z, double *chi, double Omega_m)
@@ -441,14 +441,14 @@ static inline double per_unit (T x, double BoxSize)
 }
 
 static inline void reflect (unsigned r, double *x, double *v, double *vh,
-                            double BoxSize, bool correct)
+                            double BoxSize)
 {
     for (unsigned ii=0; ii<3; ++ii)
         if (r & (1<<ii))
         {
             x[ii] = BoxSize - x[ii];
             v[ii] *= -1.0;
-            if (correct) vh[ii] *= -1.0;
+            if (vh) vh[ii] *= -1.0;
         }
 }
 
@@ -491,20 +491,23 @@ void Lightcone::remap_snapshot (size_t Ngal,
             if (correct) vh[kk] = vhlo[3*ii+kk];
         }
 
-        reflect(r, x, v, vh, BoxSize, correct);
-        transpose(t, x); transpose(t, v);
-        if (correct) transpose(t, vh);
+        reflect(r, x, v, (correct)? vh : nullptr, BoxSize);
 
+        transpose(t, x);
         C.Transform(per_unit(x[0], BoxSize), per_unit(x[1], BoxSize), per_unit(x[2], BoxSize),
                     tmp_xgal[3*ii+0], tmp_xgal[3*ii+1], tmp_xgal[3*ii+2]);
         for (int kk=0; kk<3; ++kk) tmp_xgal[3*ii+kk] *= BoxSize;
 
+        transpose(t, v);
         C.VelocityTransform(v[0], v[1], v[2],
                             tmp_vgal[3*ii+0], tmp_vgal[3*ii+1], tmp_vgal[3*ii+2]);
 
         if (correct)
+        {
+            transpose(t, vh);
             C.VelocityTransform(vh[0], vh[1], vh[2],
                                 tmp_vhlo[3*ii+0], tmp_vhlo[3*ii+1], tmp_vhlo[3*ii+2]);
+        }
     }
 
     xgal = std::move(tmp_xgal);
@@ -518,8 +521,10 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                                  const std::vector<double> &vhlo)
 {
     // h km/s/Mpc
-    const double Hz = 100.0 * Ez(snap_redshifts[snap_idx], Omega_m);
-    const double rsd_factor = (1.0+snap_redshifts[snap_idx]) / Hz;
+    const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
+
+    // (Mpc/h)/(km/s)
+    const double rsd_factor = (1.0+snap_redshifts[snap_idx]) / H_;
 
     int mangle_status = 1;
 
@@ -546,10 +551,10 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 // map onto the lightcone -- we assume that this is a relatively small correction
                 //                           so we just do it to first order
                 double delta_z = (chi - snap_chis[snap_idx])
-                                 / (Numbers::lightspeed + vhloproj) * Hz;
+                                 / (Numbers::lightspeed + vhloproj) * H_;
 
                 // correct the position accordingly
-                for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / Hz;
+                for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / H_;
 
                 // only a small correction I assume (and it is borne out by experiment!)
                 chi = std::hypot(los[0], los[1], los[2]);
@@ -598,7 +603,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 cmangle::point_set_from_radec(&pt, ra, dec);
                 bool m = mask.masked(pt, mangle_status_);
                 mangle_status *= mangle_status_;
-                if (!mangle_status_) continue;
+                if (!mangle_status_) [[unlikely]] continue;
                 if (m) goto not_chosen;
 
                 // this is executed in parallel, modifying global variables
@@ -628,11 +633,12 @@ void Lightcone::downsample (double plus_factor)
     for (auto z : Z)
         gsl_histogram_increment(sim_z_hist, z);
     double keep_fraction[target_hist->n];
-    for (int ii=0; ii<target_hist->n; ++ii)
+    for (size_t ii=0; ii<target_hist->n; ++ii)
     {
         // note the GSL bin counts are doubles already
         keep_fraction[ii] = (1.0+plus_factor)
-                            * gsl_histogram_get(target_hist, ii) / gsl_histogram_get(sim_z_hist, ii);
+                            * gsl_histogram_get(target_hist, ii)
+                            / gsl_histogram_get(sim_z_hist, ii);
 
         // give warning if something goes wrong
         if (keep_fraction[ii] > 1.02 && plus_factor==0.0)
@@ -802,7 +808,7 @@ double Lightcone::fibcoll ()
                 const auto this_range = this_range_ptr->second;
                 for (size_t ii=this_range.first; ii<this_range.second; ++ii)
                     if (g.id > all_vec[ii].id
-                        && haversine(g.ang, all_vec[ii].ang) < hav(Numbers::angscale))
+                        && haversine(g.ang, all_vec[ii].ang) < hav(Numbers::angscale)) [[unlikely]]
                     // use the fact that haversine is monotonic to avoid inverse operation
                     // by using the greater-than check, we ensure to remove only one member
                     // of each pair
