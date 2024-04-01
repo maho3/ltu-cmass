@@ -109,15 +109,24 @@ struct Mask
     {
         for (int ii=0; ii<1+veto*Nveto; ++ii)
             masks.push_back(cmangle::mangle_new());
+
+        // pymangle uses the great convention that status=0 means failure
+        int status = 1;
         
-        #pragma omp parallel for
+        #pragma omp parallel for reduction(*:status)
         for (int ii=0; ii<1+veto*Nveto; ++ii)
         {
+            int status_;
             char fname[512];
             std::snprintf(fname, 512, "%s/%s", boss_dir, fnames[ii]);
-            cmangle::mangle_read(masks[ii], fname);
-            cmangle::set_pixel_map(masks[ii]);
+            status_ = cmangle::mangle_read(masks[ii], fname);
+            status *= status_;
+            if (!status_) continue;
+            status_ = cmangle::set_pixel_map(masks[ii]);
+            status *= status_;
         }
+
+        if (!status) throw std::runtime_error("Mask loading failed");
     }
     
     ~Mask ()
@@ -125,12 +134,13 @@ struct Mask
         for (auto m: masks) cmangle::mangle_free(m);
     }
 
-    bool masked (const cmangle::Point &pt) const
+    bool masked (const cmangle::Point &pt, int &status) const
     {
+        status = 1;
         int64_t poly_id; long double weight;
         for (size_t ii=0; ii<masks.size(); ++ii)
         {
-            cmangle::mangle_polyid_and_weight_pix(masks[ii], &pt, &poly_id, &weight);
+            status *= cmangle::mangle_polyid_and_weight_pix(masks[ii], &pt, &poly_id, &weight);
             if ( (weight==0.0L) == (ii==0) )
                 return true;
         }
@@ -511,15 +521,20 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
     const double Hz = 100.0 * Ez(snap_redshifts[snap_idx], Omega_m);
     const double rsd_factor = (1.0+snap_redshifts[snap_idx]) / Hz;
 
-    #pragma omp parallel
+    int mangle_status = 1;
+
+    #pragma omp parallel reduction(*:mangle_status)
     {
         // the accelerator is non-const upon evaluation
         auto acc = z_chi_interp_acc[omp_get_thread_num()];
         double los[3];
+        int mangle_status_ = 1;
 
         #pragma omp for schedule (dynamic, 1024)
         for (size_t jj=0; jj<Ngal; ++jj)
         {
+            if (!mangle_status_) continue;
+
             for (int kk=0; kk<3; ++kk) los[kk] = xgal[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
             double chi = std::hypot(los[0], los[1], los[2]);
 
@@ -581,7 +596,10 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 // for the angular mask
                 cmangle::Point pt;
                 cmangle::point_set_from_radec(&pt, ra, dec);
-                if (mask.masked(pt)) goto not_chosen;
+                bool m = mask.masked(pt, mangle_status_);
+                mangle_status *= mangle_status_;
+                if (!mangle_status_) continue;
+                if (m) goto not_chosen;
 
                 // this is executed in parallel, modifying global variables
                 #pragma omp critical (CHOOSE_APPEND)
@@ -596,6 +614,8 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
             }
         }
     }
+
+    if (!mangle_status) throw std::runtime_error("mangle failed");
 }
 
 void Lightcone::downsample (double plus_factor)

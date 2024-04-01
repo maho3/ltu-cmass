@@ -23,7 +23,7 @@ $(lco): lightcone.cpp
 	$(CXX) -c $(shell python3 -m pybind11 --includes) -I$(pymangle_src) -I$(healpixlite_src) -I$(cuboidremap_src) -DHAVE_INLINE $(CXXFLAGS) -o $@ $<
 
 lc: $(lco) $(pymangle) $(healpixlite) $(cuboidremap)
-	$(CXX) -shared -o lc$(shell python3-config --extension-suffix) $(lco) $(pymangle) $(healpixlite) $(cuboidremap) $(LFLAGS) $(shell python3-config --ldflags)
+	$(CXX) -shared -o lc$(shell python3-config --extension-suffix) $(lco) $(pymangle) $(healpixlite) $(cuboidremap) $(LFLAGS) $(shell python3-config --ldflags) -Wl,-undefined,dynamic_lookup
 
 $(test): lightcone.cpp $(pymangle) $(healpixlite) $(cuboidremap)
 	$(CXX) -DTEST $(shell python3 -m pybind11 --includes) -I$(pymangle_src) -I$(healpixlite_src) -I$(cuboidremap_src) -DHAVE_INLINE $(CXXFLAGS) -o $@ lightcone.cpp -L. -lcmangle -lhealpixlite -lcuboidremap $(shell python3-config --ldflags) -lpython3.10 $(LFLAGS)
