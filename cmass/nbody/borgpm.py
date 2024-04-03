@@ -140,6 +140,8 @@ def run_density(wn, cpar, cfg):
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
+    vel *= 100  # km/s
+
     return rho, pos, vel
 
 
