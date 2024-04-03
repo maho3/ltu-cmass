@@ -10,4 +10,4 @@ basedir=/home/mattho/git/ltu-cmass/quijote_wn
 mkdir -p $datadir
 
 echo "Running NGenicWhiteNoise for N=${N} and lhid=${lhid}"
-${basedir}/NGenicWhiteNoise/ngenic_white_noise ${N} ${N} ${lhid} ${datadir}/wn_${lhid}.dat 64
+${basedir}/NGenicWhiteNoise/ngenic_white_noise ${N} 512 ${lhid} ${datadir}/wn_${lhid}.dat 64

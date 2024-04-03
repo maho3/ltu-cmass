@@ -109,9 +109,12 @@ def run_density(wn, pmconf, pmcosmo, cfg):
 
     # Compute density
     scale = cfg.nbody.supersampling * cfg.nbody.B
-    rho = scatter(ptcl, pmconf,
-                  mesh=jnp.zeros(3*(cfg.nbody.N,)),
-                  cell_size=pmconf.cell_size*scale)
+    rho = scatter(
+        ptcl, pmconf,
+        mesh=jnp.zeros(3*(cfg.nbody.N,)),
+        cell_size=pmconf.cell_size*scale,
+        offset=-0.5
+    )
     rho /= scale**3  # renormalize
 
     rho -= 1  # make it zero mean
