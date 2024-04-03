@@ -1,5 +1,5 @@
 """
-Simulate density field using BORG LPT models.
+Simulate density field using BORG PM models.
 
 Requires:
     - pmwd
@@ -42,7 +42,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
-from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
+from .tools_borg import build_cosmology
 
 
 def parse_config(cfg):
@@ -80,7 +80,7 @@ def get_ICs(cfg):
 @timing_decorator
 def run_density(wn, cpar, cfg):
     nbody = cfg.nbody
-    
+
     # Compute As
     sigma8_true = np.copy(cpar.sigma8)
     cpar.sigma8 = 0
@@ -98,28 +98,34 @@ def run_density(wn, cpar, cfg):
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
     box.N = 3*(nbody.N,)
-    
-    chain =borg.forward.ChainForwardModel(box)
+
+    chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
         chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-        chain @= borg.forward.model_lib.M_TRANSFER_CLASS(box, opts=dict(a_transfer=1.0))
+        chain @= borg.forward.model_lib.M_TRANSFER_CLASS(
+            box, opts=dict(a_transfer=1.0))
     elif nbody.transfer == 'EH':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL(box, opts=dict(a_final=1.0))
-        chain @= borg.forward.model_lib.M_TRANSFER_EHU(box, opts=dict(reverse_sign=True))
+        chain @= borg.forward.model_lib.M_PRIMORDIAL(
+            box, opts=dict(a_final=1.0))
+        chain @= borg.forward.model_lib.M_TRANSFER_EHU(
+            box, opts=dict(reverse_sign=True))
     else:
         raise NotImplementedError
-        
-    pm = borg.forward.model_lib.M_PM_CIC(box, opts=dict(a_initial=1.0,a_final=nbody.af,
-                                              do_rsd=False,
-                                              supersampling=nbody.supersampling,
-                                              part_factor=1.01,
-                                              forcesampling=nbody.B,
-                                              pm_start_z=nbody.zi,
-                                              pm_nsteps=nbody.N_steps,
-                                              tcola=nbody.COLA))
+
+    pm = borg.forward.model_lib.M_PM_CIC(
+        box,
+        opts=dict(a_initial=1.0, a_final=nbody.af,
+                  do_rsd=False,
+                  supersampling=nbody.supersampling,
+                  part_factor=1.01,
+                  forcesampling=nbody.B,
+                  pm_start_z=nbody.zi,
+                  pm_nsteps=nbody.N_steps,
+                  tcola=nbody.COLA)
+    )
     chain @= pm
     chain.setAdjointRequired(False)
-    
+
     chain.setCosmoParams(cpar)
 
     # forward model
@@ -168,7 +174,7 @@ def main(cfg: DictConfig) -> None:
         fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    outdir = get_source_path(cfg, f"borgpm", check=False)
+    outdir = get_source_path(cfg, "borgpm", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
