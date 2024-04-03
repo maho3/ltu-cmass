@@ -86,7 +86,7 @@ Currently, there is not a known convenient installation of `nbodykit` on Mac mac
 
 
 ### Installing BORG
-We use BORG solely to run the BORG-LPT gravity solver. If you don't want to use this feature, you can skip this section.
+We use BORG solely to run the BORG-LPT and BORG-PM gravity solvers. If you don't want to use these features, you can skip this section.
 
 Install the public version of borg with:
 ```bash

@@ -10,15 +10,20 @@ Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
-zi: 99            # initial redshift
+zi: 20            # initial redshift
 zf: 0.5           # final redshift
-supersampling: 3  # particles resolution relative to meshgrid
+supersampling: 1  # particles resolution relative to meshgrid
+
+# borglpt and borgpm-only
+transfer: 'CLASS' # transfer function (EH or CLASS)
 
 # borglpt-only
-transfer: 'EH'    # transfer function (EH or CLASS)
 order: 2          # order of the LPT expansion
 
-# pmwd-only
-B: 1.5            # force grid resolution relative to particle grid
+# pmwd and borgpm-only
+B: 2              # force grid resolution relative to particle grid
 N_steps: 20       # number of PM integration steps
+
+# borgpm-only
+COLA: true        # whether to use COLA
 
