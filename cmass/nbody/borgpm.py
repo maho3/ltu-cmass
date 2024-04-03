@@ -92,6 +92,7 @@ def run_density(wn, cpar, cfg):
     cosmo.computeSigma8()
     cos = cosmo.getCosmology()
     cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
+    cpar.sigma8 = sigma8_true
 
     # initialize box and chain
     box = borg.forward.BoxModel()
@@ -99,8 +100,15 @@ def run_density(wn, cpar, cfg):
     box.N = 3*(nbody.N,)
     
     chain =borg.forward.ChainForwardModel(box)
-    chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-    chain @= borg.forward.model_lib.M_TRANSFER_CLASS(box, opts=dict(a_transfer=1.0))
+    if nbody.transfer == 'CLASS':
+        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
+        chain @= borg.forward.model_lib.M_TRANSFER_CLASS(box, opts=dict(a_transfer=1.0))
+    elif nbody.transfer == 'EH':
+        chain @= borg.forward.model_lib.M_PRIMORDIAL(box, opts=dict(a_final=1.0))
+        chain @= borg.forward.model_lib.M_TRANSFER_EHU(box, opts=dict(reverse_sign=True))
+    else:
+        raise NotImplementedError
+        
     pm = borg.forward.model_lib.M_PM_CIC(box, opts=dict(a_initial=1.0,a_final=nbody.af,
                                               do_rsd=False,
                                               supersampling=nbody.supersampling,

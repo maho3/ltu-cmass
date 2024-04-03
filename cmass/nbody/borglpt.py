@@ -93,33 +93,35 @@ def run_density(wn, cpar, cfg):
     cos = cosmo.getCosmology()
     cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
     cpar.sigma8 = sigma8_true
-
+    
     # initialize box and chain
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
     box.N = 3*(nbody.N,)
 
     chain = borg.forward.ChainForwardModel(box)
-    chain.addModel(borg.forward.models.HermiticEnforcer(box))
-
     if nbody.transfer == 'CLASS':
-        transfer_CLASS(chain, box, cpar, nbody.ai)
+        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
+        chain @= borg.forward.model_lib.M_TRANSFER_CLASS(box, opts=dict(a_transfer=1.0))
     elif nbody.transfer == 'EH':
-        transfer_EH(chain, box, nbody.ai)
-
-    # add lpt
+        chain @= borg.forward.model_lib.M_PRIMORDIAL(box, opts=dict(a_final=1.0))
+        chain @= borg.forward.model_lib.M_TRANSFER_EHU(box, opts=dict(reverse_sign=True))
+    else:
+        raise NotImplementedError(f'Transfer {nbody.transfer} not implemented.')
+        
     if nbody.order == 1:
-        modelclass = borg.forward.models.BorgLpt
+        lpt = borg.forward.model_lib.M_LPT_CIC(box, opts=dict(a_initial=1.0))    
     elif nbody.order == 2:
-        modelclass = borg.forward.models.Borg2Lpt
+        lpt = borg.forward.model_lib.M_2LPT_CIC(box, opts=dict(a_initial=1.0,
+                                                              a_final=1.0,
+                                                              do_rsd=False,
+                                                              supersampling=1,
+                                                              lightcone=False,
+                                                              part_factor=1.01,))  
     else:
         raise NotImplementedError(f'Order {nbody.order} not implemented.')
-    lpt = modelclass(
-        box=box, box_out=box,
-        ai=nbody.ai, af=nbody.af,
-        supersampling=nbody.supersampling
-    )
-    chain.addModel(lpt)
+    chain @= lpt
+
     chain.setCosmoParams(cpar)
 
     # forward model
