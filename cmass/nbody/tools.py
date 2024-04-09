@@ -29,15 +29,20 @@ def load_white_noise(path_to_ic, N, quijote=False):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, fvel, pos, vel,
+def save_nbody(savedir, rho, fvel, pos, vel, snap_id=None,
                save_particles=True, save_velocities=True):
+    suf = f'_snap{snap_id:02}' if snap_id is not None else ''
+
     os.makedirs(savedir, exist_ok=True)
-    np.save(pjoin(savedir, 'rho.npy'), rho)  # density contrast
+    np.save(pjoin(savedir, f'rho{suf}.npy'), rho)  # density contrast
     if save_velocities:
-        np.save(pjoin(savedir, 'fvel.npy'), fvel)  # velocity field [km/s]
+        np.save(
+            pjoin(savedir, f'fvel{suf}.npy'), fvel)  # velocity field [km/s]
     if save_particles:
-        np.save(pjoin(savedir, 'ppos.npy'), pos)  # particle positions [Mpc/h]
-        np.save(pjoin(savedir, 'pvel.npy'), vel)  # particle velocities [km/s]
+        # particle positions [Mpc/h]
+        np.save(pjoin(savedir, f'ppos{suf}.npy'), pos)
+        # particle velocities [km/s]
+        np.save(pjoin(savedir, f'pvel{suf}.npy'), vel)
     logging.info(f'Saved to {savedir}.')
 
 

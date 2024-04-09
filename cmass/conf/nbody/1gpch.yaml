@@ -11,7 +11,10 @@ save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
 zi: 99            # initial redshift
-zf: 0.5           # final redshift
+zmax: 0.6         # max redshift of range
+zmin: 0.4         # min redshift of range
+nsnap: 9         # number of snapshots to save
+
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt-only
@@ -20,5 +23,6 @@ order: 2          # order of the LPT expansion
 
 # pmwd-only
 B: 1.5            # force grid resolution relative to particle grid
-N_steps: 20       # number of PM integration steps
+nstep_i: 10        # number of initial PM integration steps
+nstep_snap: 5     # number of PM integration steps between snapshots
 

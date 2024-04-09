@@ -36,7 +36,9 @@ os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"  # noqa, must go before jax
 
 from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
-                  lpt, nbody, scatter)
+                  lpt, scatter)
+# TODO: use these instead of different snapshots
+from pmwd import nbody_init, nbody_step
 import jax.numpy as jnp
 import logging
 import numpy as np
@@ -50,8 +52,17 @@ from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
 def parse_config(cfg):
     with open_dict(cfg):
         nbody = cfg.nbody
-        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
-        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
+
+        # set redshift snapshots evenly-spaced
+        if nbody.zmax == nbody.zmin:
+            if nbody.nsnap != 1:
+                logging.warning('Setting nsnap to 1')
+            nbody.nsnap = 1
+            nbody.zlist = [nbody.zmin]
+        else:
+            nbody.zlist = np.linspace(
+                nbody.zmin, nbody.zmax, nbody.nsnap+2)[1:-1].tolist()
+
         nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
@@ -72,15 +83,32 @@ def configure_pmwd(cfg):
     N = nbody.N*nbody.supersampling
     ptcl_spacing = nbody.L/N
     ptcl_grid_shape = (N,)*3
-    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape,
-                           a_start=nbody.ai, a_stop=nbody.af,
-                           a_nbody_maxstep=(nbody.af-nbody.ai)/nbody.N_steps,
-                           mesh_shape=cfg.nbody.B)
-    pmcosmo = Cosmology.from_sigma8(
-        pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
-        Omega_b=cosmo[1], h=cosmo[2])
-    pmcosmo = boltzmann(pmcosmo, pmconf)
-    return pmconf, pmcosmo
+
+    # make a separate configuration for each snapshot
+
+    pmconfs, pmcosmos = [], []
+    for i in range(nbody.nsnap):
+        if i == 0:
+            zi = nbody.zi
+            nstep = nbody.nstep_i
+        else:
+            zi = nbody.zlist[i-1]
+            nstep = nbody.nstep_snap
+        zf = nbody.zlist[i]
+        ai = 1 / (1 + zi)
+        af = 1 / (1 + zf)
+        conf = Configuration(ptcl_spacing, ptcl_grid_shape,
+                             a_start=ai, a_stop=af,
+                             a_nbody_maxstep=(af-ai)/nstep,
+                             mesh_shape=cfg.nbody.B)
+        pmcosmo = Cosmology.from_sigma8(
+            conf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
+            Omega_b=cosmo[1], h=cosmo[2])
+        pmcosmo = boltzmann(pmcosmo, conf)
+        pmconfs.append(conf)
+        pmcosmos.append(pmcosmo)
+
+    return pmconfs, pmcosmos
 
 
 def get_ICs(cfg):
@@ -98,25 +126,51 @@ def get_ICs(cfg):
 
 
 @timing_decorator
-def run_density(wn, pmconf, pmcosmo, cfg):
-    ic = linear_modes(wn, pmcosmo, pmconf)
-    ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
+def run_density(wn, pmconfs, pmcosmos, cfg):
+    nbody = cfg.nbody
 
-    ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
+    # run initial displacement
+    logging.info('Running initial displacement...')
+    ic = linear_modes(wn, pmcosmos[0], pmconfs[0])
+    ptcl, obsvbl = lpt(ic, pmcosmos[0], pmconfs[0])
 
-    pos = np.array(ptcl.pos())
-    vel = ptcl.vel
+    # run nbody simulation
+    rhos, fvels, poss, vels = [], [], [], []
+    for i in range(nbody.nsnap):
+        logging.info(f'Running snapshot {i+1}/{nbody.nsnap}...')
+        ptcl, obsvbl = pmnbody(ptcl, obsvbl, pmcosmos[0], pmconfs[i])
 
-    # Compute density
-    scale = cfg.nbody.supersampling * cfg.nbody.B
-    rho = scatter(ptcl, pmconf,
-                  mesh=jnp.zeros(3*(cfg.nbody.N,)),
-                  cell_size=pmconf.cell_size*scale)
-    rho /= scale**3  # renormalize
+        pos = np.array(ptcl.pos())
+        vel = ptcl.vel
 
-    rho -= 1  # make it zero mean
-    vel *= 100  # km/s
-    return rho, pos, vel
+        # Compute density
+        scale = cfg.nbody.supersampling * cfg.nbody.B
+        rho = scatter(ptcl, pmconfs[i],
+                      mesh=jnp.zeros(3*(cfg.nbody.N,)),
+                      cell_size=pmconfs[i].cell_size*scale)
+        rho /= scale**3  # renormalize
+
+        rho -= 1  # make it zero mean
+        vel *= 100  # km/s
+
+        # Calculate velocity field
+        fvel = None
+        if cfg.nbody.save_velocities:
+            fvel = vfield_CIC(pos, vel, cfg)
+            # convert from comoving -> peculiar velocities
+            fvel *= (1 + nbody.zlist[i])
+
+        # Save
+        rhos.append(rho)
+        fvels.append(fvel)
+        if cfg.nbody.save_particles:
+            poss.append(pos)
+            vels.append(vel)
+        else:  # save memory
+            poss.append(None)
+            vels.append(None)
+
+    return rhos, fvels, poss, vels
 
 
 @timing_decorator
@@ -134,25 +188,19 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup
-    pmconf, pmcosmo = configure_pmwd(cfg)
+    pmconfs, pmcosmos = configure_pmwd(cfg)
 
     # Get ICs
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
-
-    # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    rhos, fvels, poss, vels = run_density(wn, pmconfs, pmcosmos, cfg)
 
     # Save
     outdir = get_source_path(cfg, "pmwd", check=False)
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    for i in range(cfg.nbody.nsnap):
+        save_nbody(outdir, rhos[i], fvels[i], poss[i], vels[i], i,
+                   cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
