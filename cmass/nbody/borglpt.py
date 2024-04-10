@@ -86,9 +86,9 @@ def run_density(wn, cpar, cfg):
     cpar.sigma8 = 0
     cpar.A_s = 2.3e-9
     k_max, k_per_decade = 10, 100
-    extra = {}
-    extra['YHe'] = '0.24'
-    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra)
+    extra_class = {}
+    extra_class['YHe'] = '0.24'
+    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
     cosmo.computeSigma8()
     cos = cosmo.getCosmology()
     cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
@@ -102,8 +102,10 @@ def run_density(wn, cpar, cfg):
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
         chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-        chain @= borg.forward.model_lib.M_TRANSFER_CLASS(
+        transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
             box, opts=dict(a_transfer=1.0))
+        transfer_class.setModelParams({"extra_class_arguments":extra_class})
+        chain @= transfer_class
     elif nbody.transfer == 'EH':
         chain @= borg.forward.model_lib.M_PRIMORDIAL(
             box, opts=dict(a_final=1.0))
