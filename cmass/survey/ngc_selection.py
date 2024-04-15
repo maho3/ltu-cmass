@@ -64,18 +64,18 @@ def xyz_to_sky(pos, vel, cosmo):
 
 
 @timing_decorator
-def apply_mask(rdz, fibermode=0):
+def apply_mask(rdz, wdir, fibermode=0):
     logging.info('Applying redshift cut...')
     len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
 
     logging.info('Applying angular mask...')
-    inpoly = BOSS_angular(*rdz[:, :-1].T)
+    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[inpoly]
 
     logging.info('Applying veto mask...')
-    inveto = BOSS_veto(*rdz[:, :-1].T)
+    inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[~inveto]
 
     rdz = rdz.compute()  # dask array -> numpy array
@@ -146,7 +146,7 @@ def main(cfg: DictConfig) -> None:
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.survey.fibermode)
+    rdz = apply_mask(rdz, cfg.meta.wdir, cfg.survey.fibermode)
 
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)

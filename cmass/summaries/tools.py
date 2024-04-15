@@ -48,12 +48,5 @@ def load_galaxies_obs(source_dir, seed):
     return rdz
 
 
-@timing_decorator
-def load_randoms_precomputed():
-    savepath = pjoin(
-        'data', 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
-    return np.load(savepath)
-
-
 def sky_to_xyz(rdz, cosmo):
     return nblab.transform.SkyToCartesian(*rdz.T, cosmo)

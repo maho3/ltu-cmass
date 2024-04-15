@@ -27,10 +27,19 @@ from omegaconf import DictConfig, OmegaConf
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from .tools import (get_nofz, sky_to_xyz, load_galaxies_obs,
-                    load_randoms_precomputed)
-from ..survey.tools import BOSS_area
+from .tools import get_nofz, sky_to_xyz, load_galaxies_obs
+from ..survey.tools import BOSS_area, gen_randoms
 from ..utils import get_source_path, timing_decorator
+
+
+@timing_decorator
+def load_randoms(wdir):
+    path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
+    if os.path.exists(path):
+        return np.load(path)
+    randoms = gen_randoms()
+    np.save(path, randoms)
+    return randoms
 
 
 @timing_decorator
@@ -89,7 +98,7 @@ def main(cfg: DictConfig) -> None:
 
     rdz = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
-    randoms = load_randoms_precomputed()
+    randoms = load_randoms(cfg.meta.wdir)
 
     cosmo = cosmology.Planck15  # fixed because we don't know true cosmology
 
