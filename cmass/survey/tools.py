@@ -26,8 +26,9 @@ def BOSS_angular(ra, dec):
     mask = pymangle.Mangle(f_poly)
 
     w = mask.weight(ra, dec)
-    inpoly = (w > 0.)
-    return inpoly
+    mask = (w > np.random.rand(len(ra)))  # conform to angular completeness
+    mask &= (w > 0.7)  # mask completeness < 0.7 (See arxiv:1509.06404)
+    return mask
 
 
 def BOSS_veto(ra, dec, verbose=False):

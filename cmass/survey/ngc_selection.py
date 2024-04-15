@@ -72,11 +72,11 @@ def apply_mask(rdz, fibermode=0):
 
     logging.info('Applying angular mask...')
     inpoly = BOSS_angular(*rdz[:, :-1].T)
+    rdz = rdz[inpoly]
 
     logging.info('Applying veto mask...')
     inveto = BOSS_veto(*rdz[:, :-1].T)
-    mask = inpoly & (~inveto)
-    rdz = rdz[mask]
+    rdz = rdz[~inveto]
 
     rdz = rdz.compute()  # dask array -> numpy array
     if fibermode != 0:
