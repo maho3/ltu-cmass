@@ -1,0 +1,88 @@
+sim_settings:
+  # number of simulations to train
+  nsims : 1024
+  nsubvol_per_ji : 4
+  nsubvol_fid : 512
+  num_cosmo_params : 5
+  subsel_criteria : 'random'
+  z_inference : '0.5'
+  # resolution of the simulations
+  ns_d : 128
+  # nbatches 
+  nb : 8
+  # nfilters
+  nf : 3
+  # convolution layers types:
+  # layers_types : ['res', 'res', 'res', 'res', 'res', 'res']
+  layers_types : ['res', 'res']
+  # layers_types : ['res', 'res']
+  # layers_types : ['res', 'res']
+  # conditioning of simulations:
+  # z_all : [0, 127]
+  # z_all : [0.5, 127, 'z_0.5_diff_sig_1', 'z_0.5_diff_sig_3']  
+  z_all : [0.5]    
+  # conditioning of the fastpm simulations:
+  # z_all_FP : [0, 99, 'M0_cond', 'M1_cond']
+  # z_all_FP : [0, 99, 'z_0_diff_sig_1', 'z_0_diff_sig_3']  
+  # z_all_FP : [0, 'z_0_diff_sig_1', 'z_0_diff_sig_3']    
+  z_all_FP : [0.5, 99, 'z_0.5_diff_sig_1']      
+  # z_all_FP : [0, 99]    
+  # condition on which simulation:
+  cond_sim : 'fastpm'
+  # cond_sim : 'quijote'  
+  # resolution of the halo catalog:
+  ns_h : 128
+  # nsims per batch when training
+  nsims_per_batch : 4608
+  # nbatches to use to train
+  nbatches_train : 1
+  # what type of smoothing to use for density:
+  # stype : 'uniform_cic'
+  stype : 'cic'  
+  # mass type of halos:
+  mass_type : 'rockstar_200c'
+  # mass_type : 'fof'  
+  # mass cut of halo catalog:
+  # lgMmincutstr : '5e13'
+  # lgMmin : 13.6989
+  lgMmincutstr : '1e13'
+  lgMmin : 13.0
+  lgMmax : 15.5
+  rescale_sub : -0.5
+  Nmax : 8
+  # subsel_highM1 : False
+  # nsubsel : 512
+  is_HR : True
+
+network_settings:
+  hidden_dim_MAF : 5
+  learning_rate : 0.001
+  K_M1 : 8
+  B_M1 : [-0.515,0.45]
+  nflows_M1_NSF : 5
+
+  K_Mdiff : 5
+  B_Mdiff : [[0,0.75], [0,0.55], [0,0.45], [0,0.3], [0,0.25], [0,0.25], [0,0.15], [0,0.03]]
+  nflows_Mdiff_NSF : 2
+
+  # base_dist_Ntot : 'normal'
+  base_dist_Ntot : 'pl_exp'  
+  base_dist_M1 : 'physical_hmf'
+  base_dist_Mdiff : 'gumbel'
+  ngauss_M1 : 5
+
+  changelr : True
+  nfeature_cnn : 5
+
+
+train_settings:
+  batch_size_DL : 1
+  all_gpu : True
+  nepochs_Ntot_only : 10000
+  nepochs_Ntot_M1_only : 5000
+  nepochs_all : 20000
+  start_with_bestfit : False
+  L2norm_Ntothist : False
+  L2norm_M1hist : False
+  nflows_train : 20
+  save_string : '_COND_FPM_Mmin1e13_nLHsims1024_nsubvolji4_nsubvolfid512_nsubselrand'
