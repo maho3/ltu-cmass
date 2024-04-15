@@ -1,7 +1,12 @@
 
 # halo biasing
 halo:
+  # where to find halo bias model
   base_suite: calib_1gpch_z0.5
+  L: 1000
+  N: 128
+
+  # how to interpolate halo velocities
   vel: "CIC"
 
 # galaxy biasing
