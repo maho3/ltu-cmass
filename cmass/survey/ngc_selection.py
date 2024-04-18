@@ -110,9 +110,9 @@ def custom_cuts(rdz, cfg):
 
 
 @timing_decorator
-def reweight(rdz):
+def reweight(rdz, wdir='./data'):
     n_z = np.load(
-        pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+        pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
@@ -152,7 +152,7 @@ def main(cfg: DictConfig) -> None:
     rdz = custom_cuts(rdz, cfg)
 
     # Reweight
-    rdz = reweight(rdz)
+    rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
     os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
