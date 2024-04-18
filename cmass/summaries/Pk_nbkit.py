@@ -43,7 +43,7 @@ def load_randoms(wdir):
 
 
 @timing_decorator
-def compute_Pk(grdz, rrdz, cosmo, weights=None):
+def compute_Pk(grdz, rrdz, cosmo, area, weights=None):
     if weights is None:
         weights = np.ones(len(grdz))
 
@@ -56,7 +56,7 @@ def compute_Pk(grdz, rrdz, cosmo, weights=None):
     gpos = sky_to_xyz(grdz, cosmo)
     rpos = sky_to_xyz(rrdz, cosmo)
 
-    fsky = BOSS_area() / (360.**2 / np.pi)
+    fsky = area / (360.**2 / np.pi)
     ng_of_z = get_nofz(grdz[:, -1], fsky, cosmo=cosmo)
     nbar_g = ng_of_z(grdz[:, -1])
     nbar_r = ng_of_z(rrdz[:, -1])
@@ -102,8 +102,10 @@ def main(cfg: DictConfig) -> None:
 
     cosmo = cosmology.Planck15  # fixed because we don't know true cosmology
 
+    area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
+
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo)
+    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo, area)
 
     # save results
     outpath = pjoin(source_path, 'Pk')
