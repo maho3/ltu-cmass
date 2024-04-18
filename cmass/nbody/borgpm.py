@@ -1,5 +1,6 @@
 """
 Simulate density field using BORG PM models.
+NOTE: This works with the private BORG version, available to Aquila members.
 
 Requires:
     - pmwd
@@ -104,7 +105,7 @@ def run_density(wn, cpar, cfg):
         chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
         transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
             box, opts=dict(a_transfer=1.0))
-        transfer_class.setModelParams({"extra_class_arguments":extra_class})
+        transfer_class.setModelParams({"extra_class_arguments": extra_class})
         chain @= transfer_class
     elif nbody.transfer == 'EH':
         chain @= borg.forward.model_lib.M_PRIMORDIAL(
