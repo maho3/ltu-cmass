@@ -105,7 +105,7 @@ def main(cfg: DictConfig) -> None:
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)
     
     # check if use filter
-    if cfg.filter.filter_name:
+    if hasattr(cfg, 'filter'):
         logging.info(f'Calculating Pk for filter: {cfg.filter.filter_name}')
         filtered_rdz = np.load(pjoin(source_path, 'obs/filtered',
                                      f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npy'))
