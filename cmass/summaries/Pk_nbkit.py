@@ -103,6 +103,22 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)
+    
+    # check if use filter
+    if cfg.filter.filter_name:
+        logging.info(f'Calculating Pk for filter: {cfg.filter.filter_name}')
+        filtered_rdz = np.load(pjoin(source_path, 'obs/filtered',
+                                     f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npy'))
+        rdz_weight = np.load(pjoin(source_path, 'obs/filtered',
+                                        f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}_weight.npy'))
+        
+        k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(filtered_rdz, randoms, cosmo, rdz_weight)
+        outpath = pjoin(source_path, 'Pk','filtered')
+        os.makedirs(outpath, exist_ok=True)
+        outpath = pjoin(outpath, f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz')
+        logging.info(f'Saving filtered P(k) to {outpath}...')
+        np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
+                 p2k_gal=p2k_gal, p4k_gal=p4k_gal)
 
 
 if __name__ == "__main__":
