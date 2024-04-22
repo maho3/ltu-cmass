@@ -92,6 +92,10 @@ def compute_Pk(grdz, rrdz, cosmo, area, weights=None):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'nbody', 'bias'])
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(cfg, cfg.sim)
