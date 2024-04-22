@@ -18,19 +18,20 @@ from ..utils import timing_decorator
 # mask functions
 
 
-def BOSS_angular(ra, dec):
+def BOSS_angular(ra, dec, wdir='./data'):
     ''' Given RA and Dec, check whether the galaxies are within the angular
     mask of BOSS
     '''
-    f_poly = os.path.join('data', 'obs', 'mask_DR12v5_CMASS_North.ply')
+    f_poly = os.path.join(wdir, 'obs', 'mask_DR12v5_CMASS_North.ply')
     mask = pymangle.Mangle(f_poly)
 
     w = mask.weight(ra, dec)
-    inpoly = (w > 0.)
-    return inpoly
+    mask = (w > np.random.rand(len(ra)))  # conform to angular completeness
+    mask &= (w > 0.7)  # mask completeness < 0.7 (See arxiv:1509.06404)
+    return mask
 
 
-def BOSS_veto(ra, dec, verbose=False):
+def BOSS_veto(ra, dec, verbose=False, wdir='./data'):
     ''' given RA and Dec, find the objects that fall within one of the veto 
     masks of BOSS. At the moment it checks through the veto masks one by one.  
     '''
@@ -43,11 +44,10 @@ def BOSS_veto(ra, dec, verbose=False):
         'centerpost_mask_dr12.ply',
         'collision_priority_mask_dr12.ply']
 
-    veto_dir = 'data'
     for fveto in fvetos:
         if verbose:
             print(fveto)
-        veto = pymangle.Mangle(os.path.join(veto_dir, 'obs', fveto))
+        veto = pymangle.Mangle(os.path.join(wdir, 'obs', fveto))
         w_veto = veto.weight(ra, dec)
         in_veto = in_veto | (w_veto > 0.)
     return in_veto
@@ -78,22 +78,22 @@ def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
     return mask
 
 
-def BOSS_area():
-    f_poly = os.path.join('data', 'obs/mask_DR12v5_CMASSLOWZ_North.ply')
+def BOSS_area(wdir='./data'):
+    f_poly = os.path.join(wdir, 'obs/mask_DR12v5_CMASSLOWZ_North.ply')
     boss_poly = pymangle.Mangle(f_poly)
     area = np.sum(boss_poly.areas * boss_poly.weights)  # deg^2
     return area
 
 
 @timing_decorator
-def gen_randoms():
-    fname = 'data/obs/random0_DR12v5_CMASS_North.fits'
+def gen_randoms(wdir='./data'):
+    fname = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North.fits')
     fields = ['RA', 'DEC', 'Z']
     with fits.open(fname) as hdul:
         randoms = np.array([hdul[1].data[x] for x in fields]).T
         randoms = pd.DataFrame(randoms, columns=fields)
 
-    n_z = np.load(pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+    n_z = np.load(pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
                   allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
     cutoffs = np.cumsum(hobs) / np.sum(hobs)
@@ -104,11 +104,11 @@ def gen_randoms():
     randoms['Z'] += w * np.random.uniform(size=len(randoms))
 
     # further selection functions
-    mask = BOSS_angular(randoms['RA'], randoms['DEC'])
+    mask = BOSS_angular(randoms['RA'], randoms['DEC'], wdir=wdir)
     randoms = randoms[mask]
     mask = BOSS_redshift(randoms['Z'])
     randoms = randoms[mask]
-    mask = (~BOSS_veto(randoms['RA'], randoms['DEC'], verbose=True))
+    mask = (~BOSS_veto(randoms['RA'], randoms['DEC'], verbose=True, wdir=wdir))
     randoms = randoms[mask]
 
     return randoms.values
