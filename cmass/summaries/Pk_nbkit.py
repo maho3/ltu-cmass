@@ -96,7 +96,11 @@ def main(cfg: DictConfig) -> None:
 
     source_path = get_source_path(cfg, cfg.sim)
 
-    rdz = load_galaxies_obs(source_path, cfg.bias.hod.seed)
+    # check if we are using a filter
+    if hasattr(cfg, 'filter'):
+        rdz, weights= load_galaxies_obs(source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
+    else:
+        rdz, weights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
     randoms = load_randoms(cfg.meta.wdir)
 
@@ -105,31 +109,16 @@ def main(cfg: DictConfig) -> None:
     area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
 
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo, area)
+    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo, area, weights=weights)
 
     # save results
     outpath = pjoin(source_path, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    outpath = pjoin(outpath, f'Pk{cfg.bias.hod.seed}.npz')
+    outname = f'Pk{cfg.bias.hod.seed}.npz' if not hasattr(cfg, 'filter') else f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
+    outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)
-    
-    # check if use filter
-    if hasattr(cfg, 'filter'):
-        logging.info(f'Calculating Pk for filter: {cfg.filter.filter_name}')
-        filtered_rdz = np.load(pjoin(source_path, 'obs/filtered',
-                                     f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npy'))
-        rdz_weight = np.load(pjoin(source_path, 'obs/filtered',
-                                        f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}_weight.npy'))
-        
-        k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(filtered_rdz, randoms, cosmo, rdz_weight)
-        outpath = pjoin(source_path, 'Pk','filtered')
-        os.makedirs(outpath, exist_ok=True)
-        outpath = pjoin(outpath, f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz')
-        logging.info(f'Saving filtered P(k) to {outpath}...')
-        np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
-                 p2k_gal=p2k_gal, p4k_gal=p4k_gal)
 
 
 if __name__ == "__main__":

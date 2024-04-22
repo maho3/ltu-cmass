@@ -43,9 +43,15 @@ def get_nofz(z, fsky, cosmo=None):
 
 
 @timing_decorator
-def load_galaxies_obs(source_dir, seed):
-    rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
-    return rdz
+def load_galaxies_obs(source_dir, seed, filter_name=None):
+    if filter_name is None:
+        rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
+        weight = np.ones(len(rdz))
+    else:
+        rdz = np.load(pjoin(source_dir, 'obs/filtered', f'rdz{seed}_{filter_name}.npy'))
+        weight = np.load(pjoin(source_dir, 'obs/filtered', f'rdz{seed}_{filter_name}_weight.npy'))
+    
+    return rdz,weight
 
 
 def sky_to_xyz(rdz, cosmo):
