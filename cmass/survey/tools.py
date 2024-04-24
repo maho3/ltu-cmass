@@ -23,17 +23,18 @@ from ..utils import timing_decorator
 # cosmo functions
 
 
-def xyz_to_sky(pos, vel, cparams):
+def xyz_to_sky(pos, vel, cosmo):
     """Converts cartesian coordinates to sky coordinates (ra, dec, z).
     Inspired by nbodykit.transform.CartesianToSky.
     """
-    cosmo = cosmology.FlatLambdaCDM(
-        H0=cparams[2]*100,
-        Om0=cparams[0],
-        Ob0=cparams[1],
-    )  # sigma8 and ns are not needed
+    if isinstance(cosmo, list):
+        cosmo = cosmology.FlatLambdaCDM(
+            H0=cosmo[2]*100,
+            Om0=cosmo[0],
+            Ob0=cosmo[1],
+        )  # sigma8 and ns are not needed
 
-    pos /= cparams[2]  # convert from Mpc/h to Mpc
+    pos /= cosmo.h  # convert from Mpc/h to Mpc
     pos *= u.Mpc  # label as Mpc
     vel *= u.km / u.s  # label as km/s
 
@@ -61,6 +62,25 @@ def xyz_to_sky(pos, vel, cparams):
     z += vpec / c.to(u.km/u.s)*(1+z)
 
     return np.array([ra, dec, z]).T
+
+
+def sky_to_xyz(rdz, cosmo):
+    """Converts sky coordinates (ra, dec, z) to cartesian coordinates."""
+    if isinstance(cosmo, list):
+        cosmo = cosmology.FlatLambdaCDM(
+            H0=cosmo[2]*100,
+            Om0=cosmo[0],
+            Ob0=cosmo[1],
+        )  # sigma8 and ns are not needed
+
+    ra, dec, z = rdz.T
+    pos = SkyCoord(ra=ra*u.deg, dec=dec*u.deg,
+                   distance=cosmo.comoving_distance(z))
+    pos = pos.cartesian.xyz.to(u.Mpc)
+    pos *= cosmo.h  # convert from Mpc to Mpc/h
+
+    return pos.value.T
+
 
 # mask functions
 

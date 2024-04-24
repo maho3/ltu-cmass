@@ -2,7 +2,6 @@ from os.path import join as pjoin
 import numpy as np
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
-import nbodykit.lab as nblab
 
 from ..utils import timing_decorator
 
@@ -46,7 +45,3 @@ def get_nofz(z, fsky, cosmo=None):
 def load_galaxies_obs(source_dir, seed):
     rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
     return rdz
-
-
-def sky_to_xyz(rdz, cosmo):
-    return nblab.transform.SkyToCartesian(*rdz.T, cosmo)

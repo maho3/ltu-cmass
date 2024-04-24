@@ -27,8 +27,8 @@ from omegaconf import DictConfig, OmegaConf
 import nbodykit.lab as nblab
 from nbodykit import cosmology
 
-from .tools import get_nofz, sky_to_xyz, load_galaxies_obs
-from ..survey.tools import BOSS_area, gen_randoms
+from .tools import get_nofz, load_galaxies_obs
+from ..survey.tools import BOSS_area, gen_randoms, sky_to_xyz
 from ..utils import get_source_path, timing_decorator
 
 
