@@ -8,12 +8,59 @@ from os.path import join as pjoin
 import numpy as np
 import pymangle
 import pandas as pd
+
 from astropy.io import fits
 from astropy.coordinates import search_around_sky
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+import astropy.cosmology as cosmology
+from astropy.constants import c
+from scipy.interpolate import interp1d
 
 from ..utils import timing_decorator
+
+
+# cosmo functions
+
+
+def xyz_to_sky(pos, vel, cparams):
+    """Converts cartesian coordinates to sky coordinates (ra, dec, z).
+    Inspired by nbodykit.transform.CartesianToSky.
+    """
+    cosmo = cosmology.FlatLambdaCDM(
+        H0=cparams[2]*100,
+        Om0=cparams[0],
+        Ob0=cparams[1],
+    )  # sigma8 and ns are not needed
+
+    pos /= cparams[2]  # convert from Mpc/h to Mpc
+    pos *= u.Mpc  # label as Mpc
+    vel *= u.km / u.s  # label as km/s
+
+    # get ra, dec
+    coord_cart = SkyCoord(
+        x=pos[:, 0], y=pos[:, 1], z=pos[:, 2],
+        representation_type='cartesian')
+    coord_sphe = coord_cart.represent_as('spherical')
+    ra = coord_sphe.lon.to(u.deg)
+    dec = coord_sphe.lat.to(u.deg)
+
+    # get redshift
+    R = np.linalg.norm(pos, axis=-1)
+
+    def z_from_comoving_distance(d):
+        zgrid = np.logspace(-8, 1.5, 2048)
+        zgrid = np.concatenate([[0.], zgrid])
+        dgrid = cosmo.comoving_distance(zgrid)
+        return interp1d(dgrid, zgrid)(d)
+
+    # Convert comoving distance to redshift
+    z = z_from_comoving_distance(R)
+
+    vpec = (pos*vel).sum(axis=-1) / R
+    z += vpec / c.to(u.km/u.s)*(1+z)
+
+    return np.array([ra, dec, z]).T
 
 # mask functions
 
