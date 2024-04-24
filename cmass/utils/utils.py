@@ -42,6 +42,8 @@ def timing_decorator(func, *args, **kwargs):
 
 @timing_decorator
 def load_params(index, cosmofile):
+    # load cosmology parameters
+    # [Omega_m, Omega_b, h, n_s, sigma8]
     if index == "fid":
         return [0.3175, 0.049, 0.6711, 0.9624, 0.834]
     with open(cosmofile, 'r') as f:

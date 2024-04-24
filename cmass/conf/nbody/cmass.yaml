@@ -1,0 +1,9 @@
+# for loading / running real CMASS NGC data
+suite: cmass_ngc
+
+# General parameters
+L: 0           # Mpc/h
+N: 0           # meshgrid resolution
+lhid: 0        # latin hypercube id
+
+# OTHER PARAMS IGNORED

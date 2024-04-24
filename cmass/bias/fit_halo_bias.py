@@ -44,8 +44,13 @@ def load_halo_histogram(cfg):
     N, Nm = cfg.nbody.N, cfg.fit.Nm
     mmin, mmax = cfg.fit.logMmin, cfg.fit.logMmax
 
-    # load quijote halos and compute histogram
+    # load quijote halos
     pos_h, mass, _, _ = load_quijote_halos(snapdir, z=cfg.nbody.zf)
+
+    # offset quijote halos by half a voxel (see issue #8)
+    pos_h = (pos_h + L/(2*N)) % L
+
+    # compute histogram
     posm = np.concatenate([pos_h, np.log10(mass)[:, None]], axis=1)
     h, edges = np.histogramdd(
         posm,

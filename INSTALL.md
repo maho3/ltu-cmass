@@ -81,12 +81,27 @@ module load gcc/13.2.0
 python -m venv --system-site-packages $VENVDIR/venv-name  # make your virtual env, and it has nbodykit and mpi4
 ```
 
+#### Narval@computecanada
+On Narval, you can install nbodykit and its dependencies as:
+```bash
+module load gcc
+module load openmpi
+git clone https://github.com/bccp/nbodykit.git
+cd nbodykit
+pip install --no-cache-dir  numpy==1.24.4 cython==0.29.33
+module load mpi4py
+module load gsl
+pip install -r requirements.txt
+pip install -r requirements-extras.txt
+pip install -e .
+```
+
 #### Other machines
 Currently, there is not a known convenient installation of `nbodykit` on Mac machines. If you manage to install `nbodykit` on a different machine, please let us know so we can add instructions here.
 
 
 ### Installing BORG
-We use BORG solely to run the BORG-LPT gravity solver. If you don't want to use this feature, you can skip this section.
+We use BORG solely to run the BORG-LPT and BORG-PM gravity solvers. If you don't want to use these features, you can skip this section.
 
 Install the public version of borg with:
 ```bash
@@ -103,6 +118,14 @@ pip install -r requirements.txt
 pip install -e .
 ```
 Now, the `cmass` package should be accessible in your Python environment. You can test this by running `python -c "import cmass"`.
+
+## Install forked `pmwd`
+As of 18/04/2024, there's a bug in the public implementation of pmwd which breaks the `linear_modes` function ([Issue #27](https://github.com/eelregit/pmwd/issues/27)). To address this, you can install [this fork of pmwd](https://github.com/maho3/pmwd) which has a small hotfix of the bug.
+```bash
+git clone git@github.com:maho3/pmwd.git
+pip install -e pmwd
+```
+If you want to use the GPU version of jax in pmwd, make sure you install the right version of jax and jaxlib [corresponding to your CUDA version](https://jax.readthedocs.io/en/latest/installation.html#pip-installation-nvidia-gpu-cuda-installed-via-pip-easier).
 
 
 ## Configure the Working Directory

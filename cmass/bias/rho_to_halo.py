@@ -148,6 +148,8 @@ def main(cfg: DictConfig) -> None:
     source_path = get_source_path(cfg, cfg.sim)
     bcfg = deepcopy(cfg)
     bcfg.nbody.suite = bcfg.bias.halo.base_suite
+    bcfg.nbody.L = bcfg.bias.halo.L
+    bcfg.nbody.N = bcfg.bias.halo.N
     bias_path = get_source_path(bcfg, cfg.sim)
 
     logging.info('Loading bias parameters...')

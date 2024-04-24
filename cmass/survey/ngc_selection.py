@@ -64,19 +64,19 @@ def xyz_to_sky(pos, vel, cosmo):
 
 
 @timing_decorator
-def apply_mask(rdz, fibermode=0):
+def apply_mask(rdz, wdir, fibermode=0):
     logging.info('Applying redshift cut...')
     len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
 
     logging.info('Applying angular mask...')
-    inpoly = BOSS_angular(*rdz[:, :-1].T)
+    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
+    rdz = rdz[inpoly]
 
     logging.info('Applying veto mask...')
-    inveto = BOSS_veto(*rdz[:, :-1].T)
-    mask = inpoly & (~inveto)
-    rdz = rdz[mask]
+    inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
+    rdz = rdz[~inveto]
 
     rdz = rdz.compute()  # dask array -> numpy array
     if fibermode != 0:
@@ -110,9 +110,9 @@ def custom_cuts(rdz, cfg):
 
 
 @timing_decorator
-def reweight(rdz):
+def reweight(rdz, wdir='./data'):
     n_z = np.load(
-        pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+        pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
@@ -146,13 +146,13 @@ def main(cfg: DictConfig) -> None:
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.survey.fibermode)
+    rdz = apply_mask(rdz, cfg.meta.wdir, cfg.survey.fibermode)
 
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)
 
     # Reweight
-    rdz = reweight(rdz)
+    rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
     os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
