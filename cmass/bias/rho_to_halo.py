@@ -158,11 +158,27 @@ def main(cfg: DictConfig) -> None:
     logging.info('Loading sims...')
     rho, fvel, ppos, pvel = load_nbody(source_path)
 
-    logging.info('Sampling power law...')
-    hcount = sample_counts(rho, popt)
+    if cfg.bias.halo.model == "CHARM":
+        logging.info('Using CHARM model...')
+        from charm import get_model_interface
+        run_config_name = cfg.bias.halo.confg_charm
+        charm_interface = get_model_interface(run_config_name)    
 
-    logging.info('Sampling halo positions as a Poisson field...')
-    hpos = sample_positions(hcount, cfg)
+        # test_LH_id = 0
+        # hpos, hmass = charm_interface.process_input_density(test_LH_id)
+
+        hpos, hmass = charm_interface.process_input_density(rho)
+
+    else:
+        logging.info('Sampling power law...')
+        hcount = sample_counts(rho, popt)
+
+        logging.info('Sampling halo positions as a Poisson field...')
+        hpos = sample_positions(hcount, cfg)
+
+        logging.info('Sampling masses...')
+        hmass = sample_masses([len(x) for x in hpos], medges)
+
 
     logging.info('Calculating velocities...')
     if cfg.bias.halo.vel == 'density':
@@ -181,8 +197,6 @@ def main(cfg: DictConfig) -> None:
         raise NotImplementedError(
             f'Velocity type {cfg.bias.halo.vel} not implemented.')
 
-    logging.info('Sampling masses...')
-    hmass = sample_masses([len(x) for x in hpos], medges)
 
     logging.info('Combine...')
 
