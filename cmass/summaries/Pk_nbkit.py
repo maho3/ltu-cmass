@@ -93,8 +93,6 @@ def compute_Pk(grdz, rrdz, cosmo, area, weights=None):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
@@ -103,6 +101,7 @@ def main(cfg: DictConfig) -> None:
     # check if we are using a filter
     use_filter = hasattr(cfg, 'filter')
     if use_filter:
+        logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
         rdz, weights = load_galaxies_obs(
             source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
     else:

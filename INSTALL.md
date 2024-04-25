@@ -221,8 +221,8 @@ Filtering and weighting (of galaxy positions) is not a default step in the pipel
 ```bash
 ...
 python -m cmass.survey.ngc_selection
-python -m cmass.filter.single_filter filter=random
-python -m cmass.summaries.Pk_nbkit filter=random
+python -m cmass.filter.single_filter +filter=random
+python -m cmass.summaries.Pk_nbkit +filter=random
 ```
 This would generate, e.g. ra/dec/z `rdz0_filter.npy` and weight `rdz0_filter_weight.npy` files within the `obs/filtered` subdirectory. They will then be automatically loaded into the summaries module, if the filter configuration is included.
 
