@@ -2,7 +2,8 @@
 Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
 
 Requires:
-    - nbodykit
+    - halotools
+    - astropy
 
 Input:
     - pos: halo positions

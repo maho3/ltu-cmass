@@ -2,7 +2,6 @@
 Applies BOSS survey mask to a lightcone-shaped volume of galaxies.
 
 Requires:
-    - nbodykit
     - pymangle
     - astropy
 

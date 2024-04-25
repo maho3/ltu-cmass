@@ -12,17 +12,17 @@ def get_nofz(z, fsky, cosmo=None):
     Parameters
     ----------
     z : array like
-        array of redshift values 
-    fsky : float 
-        sky coverage fraction  
-    cosmo : cosmology object 
-        cosmology to calculate comoving volume of redshift bins 
+        array of redshift values
+    fsky : float
+        sky coverage fraction
+    cosmo : cosmology object
+        cosmology to calculate comoving volume of redshift bins
     Returns
     -------
-    number density at input redshifts: nbar(z) 
+    number density at input redshifts: nbar(z)
     Notes
     -----
-    * based on nbdoykit implementation 
+    * based on nbodykit implementation
     '''
     # calculate nbar(z) for each galaxy
     _, edges = scott_bin_width(z, return_bins=True)
