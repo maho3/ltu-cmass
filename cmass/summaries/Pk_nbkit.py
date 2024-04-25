@@ -93,14 +93,19 @@ def compute_Pk(grdz, rrdz, cosmo, area, weights=None):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(cfg, cfg.sim)
 
-    rdz = load_galaxies_obs(source_path, cfg.bias.hod.seed)
+    # check if we are using a filter
+    use_filter = hasattr(cfg, 'filter')
+    if use_filter:
+        logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
+        rdz, weights = load_galaxies_obs(
+            source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
+    else:
+        rdz, weights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
     randoms = load_randoms(cfg.meta.wdir)
 
@@ -109,12 +114,17 @@ def main(cfg: DictConfig) -> None:
     area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
 
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo, area)
+    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(
+        rdz, randoms, cosmo, area, weights=weights)
 
     # save results
     outpath = pjoin(source_path, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    outpath = pjoin(outpath, f'Pk{cfg.bias.hod.seed}.npz')
+    if not use_filter:
+        outname = f'Pk{cfg.bias.hod.seed}.npz'
+    else:
+        outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
+    outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
              p2k_gal=p2k_gal, p4k_gal=p4k_gal)
