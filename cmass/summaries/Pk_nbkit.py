@@ -23,13 +23,12 @@ import logging
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
-
-import nbodykit.lab as nblab
-from nbodykit import cosmology
+import astropy
+from pypower import CatalogFFTPower
 
 from .tools import get_nofz, load_galaxies_obs
 from ..survey.tools import BOSS_area, gen_randoms, sky_to_xyz
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 
 
 @timing_decorator
@@ -43,50 +42,49 @@ def load_randoms(wdir):
 
 
 @timing_decorator
-def compute_Pk(grdz, rrdz, cosmo, area, weights=None):
-    if weights is None:
-        weights = np.ones(len(grdz))
+def compute_Pk(
+    grdz, rrdz, cosmo, survey_area,
+    gweights=None, rweights=None,
+    P0=1e5, Ngrid=256, dk=0.005,
+    kmin=0., kmax=2,
+):
+    if gweights is None:
+        gweights = np.ones(len(grdz))
+    if rweights is None:
+        rweights = np.ones(len(rrdz))
+    if isinstance(cosmo, list):
+        cosmo = cosmo_to_astropy(cosmo)
 
-    P0 = 1e4
-    Ngrid = 360
-    dk = 0.005
-    Nr = len(rrdz)
-    w_r = np.ones(Nr)
-
+    # convert ra, dec, z to cartesian coordinates
     gpos = sky_to_xyz(grdz, cosmo)
     rpos = sky_to_xyz(rrdz, cosmo)
 
-    fsky = area / (360.**2 / np.pi)
+    # calculate FKP weights
+    fsky = survey_area / (360.**2 / np.pi)
     ng_of_z = get_nofz(grdz[:, -1], fsky, cosmo=cosmo)
     nbar_g = ng_of_z(grdz[:, -1])
     nbar_r = ng_of_z(rrdz[:, -1])
+    gfkp = 1./(1. + nbar_g * P0)
+    rfkp = 1./(1. + nbar_r * P0)
 
-    _gals = nblab.ArrayCatalog({
-        'Position': gpos,
-        'NZ': nbar_g,
-        'WEIGHT': weights,
-        'WEIGHT_FKP': 1./(1. + nbar_g * P0)
-    })
+    # total weight = completeness weight * FKP weight
+    gweights *= gfkp
+    rweights *= rfkp
 
-    _rands = nblab.ArrayCatalog({
-        'Position': rpos,
-        'NZ': nbar_r,
-        'WEIGHT': w_r,
-        'WEIGHT_FKP': 1./(1. + nbar_r * P0)
-    })
+    # compute the power spectra multipoles
+    kedges = np.arange(0, 0.5, 0.005)
+    poles = CatalogFFTPower(
+        data_positions1=gpos, data_weights1=gweights,
+        randoms_positions1=rpos, randoms_weights1=rweights,
+        nmesh=Ngrid, resampler='tsc', interlacing=2,
+        ells=(0, 2, 4), edges=kedges,
+        position_type='pos', dtype='f4').poles
 
-    fkp = nblab.FKPCatalog(_gals, _rands)
-    mesh = fkp.to_mesh(Nmesh=Ngrid, nbar='NZ', fkp_weight='WEIGHT_FKP',
-                       comp_weight='WEIGHT', window='tsc')
-
-    # compute the multipoles
-    r = nblab.ConvolvedFFTPower(mesh, poles=[0, 2, 4], dk=dk, kmin=0.)
-
-    k_gal = r.poles['k']
-    p0k_gal = r.poles['power_0'].real - r.attrs['shotnoise']
-    p2k_gal = r.poles['power_2'].real
-    p4k_gal = r.poles['power_4'].real
-    return k_gal, p0k_gal, p2k_gal, p4k_gal
+    k = poles.k
+    p0k = poles(ell=0, complex=False, remove_shotnoise=True)
+    p2k = poles(ell=2, complex=False)
+    p4k = poles(ell=4, complex=False)
+    return k, p0k, p2k, p4k
 
 
 @timing_decorator
@@ -102,20 +100,23 @@ def main(cfg: DictConfig) -> None:
     use_filter = hasattr(cfg, 'filter')
     if use_filter:
         logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
-        rdz, weights = load_galaxies_obs(
+        grdz, gweights = load_galaxies_obs(
             source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
     else:
-        rdz, weights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
+        grdz, gweights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
-    randoms = load_randoms(cfg.meta.wdir)
+    rrdz = load_randoms(cfg.meta.wdir)
 
-    cosmo = cosmology.Planck15  # fixed because we don't know true cosmology
+    # fixed because we don't know true cosmo
+    cosmo = astropy.cosmology.Planck15
 
-    area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
+    survey_area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
 
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(
-        rdz, randoms, cosmo, area, weights=weights)
+    k, p0k, p2k, p4k = compute_Pk(
+        grdz, rrdz, cosmo, survey_area,
+        gweights=gweights
+    )
 
     # save results
     outpath = pjoin(source_path, 'Pk')
@@ -126,8 +127,8 @@ def main(cfg: DictConfig) -> None:
         outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
     outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
-    np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,
-             p2k_gal=p2k_gal, p4k_gal=p4k_gal)
+    np.savez(outpath, k_gal=k, p0k_gal=p0k,
+             p2k_gal=p2k, p4k_gal=p4k)
 
 
 if __name__ == "__main__":
