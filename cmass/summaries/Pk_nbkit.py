@@ -97,7 +97,8 @@ def main(cfg: DictConfig) -> None:
     source_path = get_source_path(cfg, cfg.sim)
 
     # check if we are using a filter
-    if hasattr(cfg, 'filter'):
+    use_filter = hasattr(cfg, 'filter')
+    if use_filter:
         rdz, weights = load_galaxies_obs(
             source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
     else:
@@ -116,7 +117,7 @@ def main(cfg: DictConfig) -> None:
     # save results
     outpath = pjoin(source_path, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    if not hasattr(cfg, 'filter'):
+    if not use_filter:
         outname = f'Pk{cfg.bias.hod.seed}.npz'
     else:
         outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'

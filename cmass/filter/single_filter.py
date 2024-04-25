@@ -40,7 +40,7 @@ def main(cfg: DictConfig) -> None:
 
     # Build run config
     cfg = parse_config(cfg)
-    # logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg.filter))
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg.filter))
 
     source_path = get_source_path(cfg, cfg.sim)
 
@@ -54,14 +54,10 @@ def main(cfg: DictConfig) -> None:
     filtered_rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-
     os.makedirs(pjoin(source_path, 'obs', 'filtered'), exist_ok=True)
-    np.save(pjoin(source_path, 'obs/filtered',
-                  f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npy'),
-            filtered_rdz)
-    np.save(pjoin(source_path, 'obs/filtered',
-                  f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}_weight.npy'),
-            weight)
+    prefix = f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}'
+    np.save(pjoin(source_path, 'obs/filtered', f'{prefix}.npy'), filtered_rdz)
+    np.save(pjoin(source_path, 'obs/filtered', f'{prefix}_weight.npy'), weight)
 
 
 if __name__ == "__main__":
