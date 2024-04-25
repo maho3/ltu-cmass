@@ -13,11 +13,10 @@ from astropy.io import fits
 from astropy.coordinates import search_around_sky
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-import astropy.cosmology as cosmology
 from astropy.constants import c
 from scipy.interpolate import interp1d
 
-from ..utils import timing_decorator
+from ..utils import timing_decorator, cosmo_to_astropy
 
 
 # cosmo functions
@@ -28,11 +27,7 @@ def xyz_to_sky(pos, vel, cosmo):
     Inspired by nbodykit.transform.CartesianToSky.
     """
     if isinstance(cosmo, list):
-        cosmo = cosmology.FlatLambdaCDM(
-            H0=cosmo[2]*100,
-            Om0=cosmo[0],
-            Ob0=cosmo[1],
-        )  # sigma8 and ns are not needed
+        cosmo = cosmo_to_astropy(cosmo)
 
     pos /= cosmo.h  # convert from Mpc/h to Mpc
     pos *= u.Mpc  # label as Mpc
@@ -67,16 +62,12 @@ def xyz_to_sky(pos, vel, cosmo):
 def sky_to_xyz(rdz, cosmo):
     """Converts sky coordinates (ra, dec, z) to cartesian coordinates."""
     if isinstance(cosmo, list):
-        cosmo = cosmology.FlatLambdaCDM(
-            H0=cosmo[2]*100,
-            Om0=cosmo[0],
-            Ob0=cosmo[1],
-        )  # sigma8 and ns are not needed
+        cosmo = cosmo_to_astropy(cosmo)
 
     ra, dec, z = rdz.T
     pos = SkyCoord(ra=ra*u.deg, dec=dec*u.deg,
                    distance=cosmo.comoving_distance(z))
-    pos = pos.cartesian.xyz.to(u.Mpc)
+    pos = pos.cartesian.xyz
     pos *= cosmo.h  # convert from Mpc to Mpc/h
 
     return pos.value.T
