@@ -5,7 +5,7 @@ defaults:
   - fit: quijote_HR
   - bias: cic_hod
   - survey: cmass_ngc
-  # - filter: random_filter
+  # - filter: random  # not default
   - _self_
 
 sim: pmwd
