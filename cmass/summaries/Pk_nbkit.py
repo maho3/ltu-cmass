@@ -98,7 +98,8 @@ def main(cfg: DictConfig) -> None:
 
     # check if we are using a filter
     if hasattr(cfg, 'filter'):
-        rdz, weights= load_galaxies_obs(source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
+        rdz, weights = load_galaxies_obs(
+            source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
     else:
         rdz, weights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
 
@@ -109,12 +110,16 @@ def main(cfg: DictConfig) -> None:
     area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
 
     # compute P(k)
-    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(rdz, randoms, cosmo, area, weights=weights)
+    k_gal, p0k_gal, p2k_gal, p4k_gal = compute_Pk(
+        rdz, randoms, cosmo, area, weights=weights)
 
     # save results
     outpath = pjoin(source_path, 'Pk')
     os.makedirs(outpath, exist_ok=True)
-    outname = f'Pk{cfg.bias.hod.seed}.npz' if not hasattr(cfg, 'filter') else f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
+    if not hasattr(cfg, 'filter'):
+        outname = f'Pk{cfg.bias.hod.seed}.npz'
+    else:
+        outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
     outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
     np.savez(outpath, k_gal=k_gal, p0k_gal=p0k_gal,

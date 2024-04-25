@@ -48,10 +48,12 @@ def load_galaxies_obs(source_dir, seed, filter_name=None):
         rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
         weight = np.ones(len(rdz))
     else:
-        rdz = np.load(pjoin(source_dir, 'obs/filtered', f'rdz{seed}_{filter_name}.npy'))
-        weight = np.load(pjoin(source_dir, 'obs/filtered', f'rdz{seed}_{filter_name}_weight.npy'))
-    
-    return rdz,weight
+        rdz = np.load(pjoin(source_dir, 'obs/filtered',
+                      f'rdz{seed}_{filter_name}.npy'))
+        weight = np.load(pjoin(source_dir, 'obs/filtered',
+                         f'rdz{seed}_{filter_name}_weight.npy'))
+
+    return rdz, weight
 
 
 def sky_to_xyz(rdz, cosmo):
