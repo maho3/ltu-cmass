@@ -1,7 +1,6 @@
 numpy
 scipy
 scikit-learn
-jax
 pandas
 astropy
 pymangle
@@ -9,3 +8,4 @@ tqdm
 hydra-core
 git+https://github.com/eelregit/pmwd.git
 git+https://github.com/maho3/cuboid_remap_jax.git
+pypower @ git+https://github.com/cosmodesi/pypower.git

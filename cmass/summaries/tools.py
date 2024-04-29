@@ -2,7 +2,6 @@ from os.path import join as pjoin
 import numpy as np
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
-import nbodykit.lab as nblab
 
 from ..utils import timing_decorator
 
@@ -13,17 +12,18 @@ def get_nofz(z, fsky, cosmo=None):
     Parameters
     ----------
     z : array like
-        array of redshift values 
-    fsky : float 
-        sky coverage fraction  
-    cosmo : cosmology object 
-        cosmology to calculate comoving volume of redshift bins 
+        array of redshift values
+    fsky : float
+        sky coverage fraction
+    cosmo : cosmology object
+        cosmology to calculate comoving volume of redshift bins
     Returns
     -------
-    number density at input redshifts: nbar(z) 
+    number density at input redshifts: nbar(z)
     Notes
     -----
-    * based on nbdoykit implementation 
+    * based on nbodykit implementation
+    * Deprecated with pypower implementation
     '''
     # calculate nbar(z) for each galaxy
     _, edges = scott_bin_width(z, return_bins=True)
@@ -54,7 +54,3 @@ def load_galaxies_obs(source_dir, seed, filter_name=None):
                          f'rdz{seed}_{filter_name}_weight.npy'))
 
     return rdz, weight
-
-
-def sky_to_xyz(rdz, cosmo):
-    return nblab.transform.SkyToCartesian(*rdz.T, cosmo)
