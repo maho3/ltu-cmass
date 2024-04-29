@@ -64,7 +64,6 @@ def apply_mask(rdz, wdir, fibermode=0):
     inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[~inveto]
 
-    rdz = rdz.compute()  # dask array -> numpy array
     if fibermode != 0:
         logging.info('Applying fiber collisions...')
         mask = BOSS_fiber(

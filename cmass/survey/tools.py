@@ -26,8 +26,7 @@ def xyz_to_sky(pos, vel, cosmo):
     """Converts cartesian coordinates to sky coordinates (ra, dec, z).
     Inspired by nbodykit.transform.CartesianToSky.
     """
-    if isinstance(cosmo, list):
-        cosmo = cosmo_to_astropy(cosmo)
+    cosmo = cosmo_to_astropy(cosmo)
 
     pos /= cosmo.h  # convert from Mpc/h to Mpc
     pos *= u.Mpc  # label as Mpc
@@ -61,8 +60,7 @@ def xyz_to_sky(pos, vel, cosmo):
 
 def sky_to_xyz(rdz, cosmo):
     """Converts sky coordinates (ra, dec, z) to cartesian coordinates."""
-    if isinstance(cosmo, list):
-        cosmo = cosmo_to_astropy(cosmo)
+    cosmo = cosmo_to_astropy(cosmo)
 
     ra, dec, z = rdz.T
     pos = SkyCoord(ra=ra*u.deg, dec=dec*u.deg,

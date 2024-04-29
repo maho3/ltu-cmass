@@ -25,7 +25,8 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import astropy.cosmology as cosmology
 from .tools.hod import (thetahod_literature,
                         build_halo_catalog, build_HOD_model)
-from ..utils import get_source_path, timing_decorator, load_params
+from ..utils import (get_source_path, timing_decorator, load_params,
+                     cosmo_to_astropy)
 
 
 def parse_config(cfg):
@@ -66,16 +67,11 @@ def populate_hod(
     pos, vel, mass,
     cosmo, cfg, seed=0, mdef='vir'
 ):
-    if isinstance(cosmo, list):
-        cosmo = cosmology.FlatLambdaCDM(
-            H0=cosmo[2]*100,
-            Om0=cosmo[0],
-            Ob0=cosmo[1],
-        )  # sigma8 and ns are not needed
+    cosmo = cosmo_to_astropy(cosmo)
 
     BoxSize = cfg.nbody.L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
     catalog = build_halo_catalog(
-        pos, vel, mass, cfg.nbody.zf, BoxSize, cosmo,
+        pos, vel, 10**mass, cfg.nbody.zf, BoxSize, cosmo,
         mdef=mdef
     )
 
@@ -116,7 +112,7 @@ def main(cfg: DictConfig) -> None:
 
     gpos = np.array([hod['x'], hod['y'], hod['z']]).T
     gvel = np.array([hod['vx'], hod['vy'], hod['vz']]).T
-    meta = {'galtype': hod['galtype'], 'hostid': hod['hostid']}
+    meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
 
     savepath = pjoin(source_path, 'hod')
     os.makedirs(savepath, exist_ok=True)

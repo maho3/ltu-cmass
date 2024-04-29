@@ -55,4 +55,10 @@ def load_params(index, cosmofile):
 def cosmo_to_astropy(params):
     # Converts a list of cosmological parameters into an astropy cosmology object.
     # Note, ignores s8 and n_s parameters, which are not used in astropy.
+
+    # check if params is a list
+    try:
+        params = list(params)
+    except TypeError:
+        return params
     return FlatLambdaCDM(H0=params[2]*100, Om0=params[0], Ob0=params[1])
