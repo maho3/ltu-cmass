@@ -137,6 +137,7 @@ def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
 
 
 def BOSS_area(wdir='./data'):
+    """Returns the area of the BOSS survey. Deprecated with addition of pypower."""
     f_poly = os.path.join(wdir, 'obs/mask_DR12v5_CMASSLOWZ_North.ply')
     boss_poly = pymangle.Mangle(f_poly)
     area = np.sum(boss_poly.areas * boss_poly.weights)  # deg^2

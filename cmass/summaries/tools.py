@@ -23,6 +23,7 @@ def get_nofz(z, fsky, cosmo=None):
     Notes
     -----
     * based on nbodykit implementation
+    * Deprecated with pypower implementation
     '''
     # calculate nbar(z) for each galaxy
     _, edges = scott_bin_width(z, return_bins=True)

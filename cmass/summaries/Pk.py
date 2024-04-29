@@ -26,8 +26,8 @@ from omegaconf import DictConfig, OmegaConf
 import astropy
 from pypower import CatalogFFTPower
 
-from .tools import get_nofz, load_galaxies_obs
-from ..survey.tools import BOSS_area, gen_randoms, sky_to_xyz
+from .tools import load_galaxies_obs
+from ..survey.tools import gen_randoms, sky_to_xyz
 from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 
 
@@ -43,7 +43,7 @@ def load_randoms(wdir):
 
 @timing_decorator
 def compute_Pk(
-    grdz, rrdz, cosmo, survey_area,
+    grdz, rrdz, cosmo,
     gweights=None, rweights=None,
     P0=1e5, Ngrid=256, dk=0.005,
     kmin=0., kmax=2,
@@ -59,17 +59,7 @@ def compute_Pk(
     gpos = sky_to_xyz(grdz, cosmo)
     rpos = sky_to_xyz(rrdz, cosmo)
 
-    # calculate FKP weights
-    fsky = survey_area / (360.**2 / np.pi)
-    ng_of_z = get_nofz(grdz[:, -1], fsky, cosmo=cosmo)
-    nbar_g = ng_of_z(grdz[:, -1])
-    nbar_r = ng_of_z(rrdz[:, -1])
-    gfkp = 1./(1. + nbar_g * P0)
-    rfkp = 1./(1. + nbar_r * P0)
-
-    # total weight = completeness weight * FKP weight
-    gweights *= gfkp
-    rweights *= rfkp
+    # note: FKP weights are automatically included in CatalogFFTPower
 
     # compute the power spectra multipoles
     kedges = np.arange(0, 0.5, 0.005)
@@ -110,11 +100,9 @@ def main(cfg: DictConfig) -> None:
     # fixed because we don't know true cosmo
     cosmo = astropy.cosmology.Planck15
 
-    survey_area = BOSS_area(cfg.meta.wdir)  # sky coverage area of BOSS survey
-
     # compute P(k)
     k, p0k, p2k, p4k = compute_Pk(
-        grdz, rrdz, cosmo, survey_area,
+        grdz, rrdz, cosmo,
         gweights=gweights
     )
 
