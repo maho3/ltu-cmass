@@ -109,7 +109,7 @@ python -m cmass.bias.apply_hod
 python -m cmass.survey.ngc_selection
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk_nbkit
+python -m cmass.summaries.Pk
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
@@ -159,7 +159,7 @@ Filtering and weighting (of galaxy positions) is not a default step in the pipel
 ...
 python -m cmass.survey.ngc_selection
 python -m cmass.filter.single_filter +filter=random
-python -m cmass.summaries.Pk_nbkit +filter=random
+python -m cmass.summaries.Pk +filter=random
 ```
 This would generate, e.g. ra/dec/z `rdz0_filter.npy` and weight `rdz0_filter_weight.npy` files within the `obs/filtered` subdirectory. They will then be automatically loaded into the summaries module, if the filter configuration is included.
 
