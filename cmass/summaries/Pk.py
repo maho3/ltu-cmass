@@ -26,32 +26,22 @@ from omegaconf import DictConfig, OmegaConf
 import astropy
 from pypower import CatalogFFTPower
 
-from .tools import load_galaxies_obs
-from ..survey.tools import gen_randoms, sky_to_xyz
+from .tools import load_galaxies_obs, load_randoms
+from ..survey.tools import sky_to_xyz
 from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
-
-
-@timing_decorator
-def load_randoms(wdir):
-    path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
-    if os.path.exists(path):
-        return np.load(path)
-    randoms = gen_randoms()
-    np.save(path, randoms)
-    return randoms
 
 
 @timing_decorator
 def compute_Pk(
     grdz, rrdz, cosmo,
     gweights=None, rweights=None,
-    P0=1e5, Ngrid=256, dk=0.005,
-    kmin=0., kmax=2,
+    Ngrid=256, kmin=0., kmax=2, dk=0.005,
 ):
     if gweights is None:
         gweights = np.ones(len(grdz))
     if rweights is None:
         rweights = np.ones(len(rrdz))
+
     if isinstance(cosmo, list):
         cosmo = cosmo_to_astropy(cosmo)
 
@@ -62,13 +52,15 @@ def compute_Pk(
     # note: FKP weights are automatically included in CatalogFFTPower
 
     # compute the power spectra multipoles
-    kedges = np.arange(0, 0.5, 0.005)
+    kedges = np.arange(kmin, kmax, dk)
     poles = CatalogFFTPower(
         data_positions1=gpos, data_weights1=gweights,
         randoms_positions1=rpos, randoms_weights1=rweights,
         nmesh=Ngrid, resampler='tsc', interlacing=2,
         ells=(0, 2, 4), edges=kedges,
-        position_type='pos', dtype='f4').poles
+        position_type='pos', dtype=np.float32,
+        wrap=False
+    ).poles
 
     k = poles.k
     p0k = poles(ell=0, complex=False, remove_shotnoise=True)

@@ -1,9 +1,11 @@
+import os
 from os.path import join as pjoin
 import numpy as np
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 from ..utils import timing_decorator
+from ..survey.tools import gen_randoms
 
 
 def get_nofz(z, fsky, cosmo=None):
@@ -54,3 +56,13 @@ def load_galaxies_obs(source_dir, seed, filter_name=None):
                          f'rdz{seed}_{filter_name}_weight.npy'))
 
     return rdz, weight
+
+
+@timing_decorator
+def load_randoms(wdir):
+    path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
+    if os.path.exists(path):
+        return np.load(path)
+    randoms = gen_randoms()
+    np.save(path, randoms)
+    return randoms
