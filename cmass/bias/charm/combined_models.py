@@ -354,12 +354,12 @@ class COMBINED_Model(nn.Module):
 
             if use_truth_M1:
                 mask_tensor_M1_samp = (mask_M1_truth)[jb, ...][None, ...].T
-                mask_tensor_M1_samp = mask_tensor_M1_samp.float().cuda()
+                mask_tensor_M1_samp = mask_tensor_M1_samp.float().to(device)
 
             else:
                 # mask_tensor_M1_samp = torch.Tensor(np.array([mask_samp_all[:, 0]]).T)
                 mask_tensor_M1_samp = torch.from_numpy(mask_samp_M1)
-                mask_tensor_M1_samp = mask_tensor_M1_samp.float().cuda()
+                mask_tensor_M1_samp = mask_tensor_M1_samp.float().to(device)
             mask_tensor_M1_samp_out.append(mask_tensor_M1_samp)
             # print(mask_tensor_M1_samp.shape, mask_samp_M1.shape, mask_samp_all.shape)
             if use_truth_Mdiff:
@@ -367,7 +367,7 @@ class COMBINED_Model(nn.Module):
             else:
                 # mask_tensor_Mdiff_samp = torch.Tensor(np.copy(mask_samp))
                 mask_tensor_Mdiff_samp = torch.from_numpy(mask_samp_M_diff)
-                mask_tensor_Mdiff_samp = mask_tensor_Mdiff_samp.float().cuda()
+                mask_tensor_Mdiff_samp = mask_tensor_Mdiff_samp.float().to(device)
             mask_tensor_Mdiff_samp_out.append(mask_tensor_Mdiff_samp)
 
             if use_truth_Nhalo:
@@ -375,7 +375,7 @@ class COMBINED_Model(nn.Module):
             else:
                 if train_multi:
                     Nhalo_conditional = torch.Tensor(np.array([Ntot_samp]).T)
-                    Nhalo_conditional = Nhalo_conditional.float().cuda()
+                    Nhalo_conditional = Nhalo_conditional.float().to(device)
                 else:
                     raise ValueError('Must use truth Nhalo if not training Ntot')
 
