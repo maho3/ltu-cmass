@@ -29,85 +29,12 @@ git clone git@github.com:maho3/ltu-cmass.git
 cd ltu-cmass
 ```
 
-## Install dependencies
-ltu-cmass has quite a few dependencies, several of which are rather difficult to install. A partial list is given in [`requirements.txt`](requirements.txt) with the addition of the following unlisted dependencies: 
-- nbodykit
-- aquila-borg
-
-Here we provide a step-by-step guide to installing the dependencies on a Linux system. For this configuration, everything can be installed into the same environment, though you may want to split up various components into different environments if you have trouble installing everything at once.
-
-
-### Activating a virtual environment
+## Activate a virtual environment
 First, we recommend installing things in a fresh Python environment, such as anaconda. We've tested the following configuration with Python 3.10.
 ```bash
 conda create -n cmass python=3.10
 conda activate cmass
 ```
-
-### Installing nbodykit
-We use the [`nbodykit`](https://github.com/bccp/nbodykit) package to apply survey masks and calculate some summary statistics. If you don't want to use these features, you can skip this section.
-
-Installing `nbodykit` is quite tricky. It requires that you have a working C compiler and MPI backend which are compatible with `cython` and `mpi4py`. Below are example instructions for installing `nbodykit` on Infinity and Rusty. 
-
-#### Infinity@IAP
-On the Infinity cluster at IAP, you can install nbodykit and its dependencies as:
-```bash
-# load the C-compiler and MPI modules
-module load gcc/13.2.0 openmpi/4.1.2-intel
-
-# clone nbodykit
-git clone https://github.com/bccp/nbodykit.git
-cd nbodykit
-
-# install nbodykit dependencies
-pip install --no-cache-dir  numpy==1.24.4 cython==0.29.33 mpi4py
-pip install -r requirements.txt
-pip install -r requirements-extras.txt
-
-# install nbodykit itself
-pip install -e .
-
-# return to the parent directory
-cd ..
-```
-
-#### Rusty@Flatiron
-On Flatiron/Rusty, the correct versions of nbodykit and mpi4py are already installed. You can load them as follows:
-```bash
-module load python
-module load openmpi
-module load python-mpi
-module load gcc/13.2.0
-python -m venv --system-site-packages $VENVDIR/venv-name  # make your virtual env, and it has nbodykit and mpi4
-```
-
-#### Narval@computecanada
-On Narval, you can install nbodykit and its dependencies as:
-```bash
-module load gcc
-module load openmpi
-git clone https://github.com/bccp/nbodykit.git
-cd nbodykit
-pip install --no-cache-dir  numpy==1.24.4 cython==0.29.33
-module load mpi4py
-module load gsl
-pip install -r requirements.txt
-pip install -r requirements-extras.txt
-pip install -e .
-```
-
-#### Other machines
-Currently, there is not a known convenient installation of `nbodykit` on Mac machines. If you manage to install `nbodykit` on a different machine, please let us know so we can add instructions here.
-
-
-### Installing BORG
-We use BORG solely to run the BORG-LPT and BORG-PM gravity solvers. If you don't want to use these features, you can skip this section.
-
-Install the public version of borg with:
-```bash
-pip install --no-cache-dir aquila-borg
-```
-The build process for this package may take a while (~20 minutes). Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
 
 
 ## Install `cmass`
@@ -122,11 +49,21 @@ Now, the `cmass` package should be accessible in your Python environment. You ca
 ## Install forked `pmwd`
 As of 18/04/2024, there's a bug in the public implementation of pmwd which breaks the `linear_modes` function ([Issue #27](https://github.com/eelregit/pmwd/issues/27)). To address this, you can install [this fork of pmwd](https://github.com/maho3/pmwd) which has a small hotfix of the bug.
 ```bash
+cd ..
 git clone git@github.com:maho3/pmwd.git
 pip install -e pmwd
 ```
 If you want to use the GPU version of jax in pmwd, make sure you install the right version of jax and jaxlib [corresponding to your CUDA version](https://jax.readthedocs.io/en/latest/installation.html#pip-installation-nvidia-gpu-cuda-installed-via-pip-easier).
 
+
+## Installing BORG [optional]
+We use BORG solely to run the BORG-LPT and BORG-PM gravity solvers. If you don't want to use these features, you can skip this section.
+
+Install the public version of borg with:
+```bash
+pip install --no-cache-dir aquila-borg
+```
+The build process for this package may take a while (~20 minutes). Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
 
 ## Configure the Working Directory
 ltu-cmass expects a certain working directory structure to know how to move data around. First, pick a directory on your machine where you want to store the data. On computing clusters, this is usually in the scratch space. Then, change the global configuration in [`ltu-cmass/cmass/conf/global.yaml`](./cmass/conf/global.yaml) to point to this directory, as follows:
@@ -172,7 +109,7 @@ python -m cmass.bias.apply_hod
 python -m cmass.survey.ngc_selection
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk_nbkit
+python -m cmass.summaries.Pk
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
@@ -215,6 +152,16 @@ We can then define different suites of simulations based on large-scale configur
 python -m cmass.nbody.pmwd nbody=2gpch
 ```
 You can see other default configurations in [`cmass/conf`](./cmass/conf).
+
+## Running filtering
+Filtering and weighting (of galaxy positions) is not a default step in the pipeline. To apply filtering, you would use the `cmass.filter` module, after the `ngc_selection` step but before summary measurement. For example,
+```bash
+...
+python -m cmass.survey.ngc_selection
+python -m cmass.filter.single_filter +filter=random
+python -m cmass.summaries.Pk +filter=random
+```
+This would generate, e.g. ra/dec/z `rdz0_filter.npy` and weight `rdz0_filter_weight.npy` files within the `obs/filtered` subdirectory. They will then be automatically loaded into the summaries module, if the filter configuration is included.
 
 ## Generating Quijote ICs and refitting halo bias models
 

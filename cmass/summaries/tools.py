@@ -1,10 +1,11 @@
+import os
 from os.path import join as pjoin
 import numpy as np
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
-import nbodykit.lab as nblab
 
 from ..utils import timing_decorator
+from ..survey.tools import gen_randoms
 
 
 def get_nofz(z, fsky, cosmo=None):
@@ -13,17 +14,18 @@ def get_nofz(z, fsky, cosmo=None):
     Parameters
     ----------
     z : array like
-        array of redshift values 
-    fsky : float 
-        sky coverage fraction  
-    cosmo : cosmology object 
-        cosmology to calculate comoving volume of redshift bins 
+        array of redshift values
+    fsky : float
+        sky coverage fraction
+    cosmo : cosmology object
+        cosmology to calculate comoving volume of redshift bins
     Returns
     -------
-    number density at input redshifts: nbar(z) 
+    number density at input redshifts: nbar(z)
     Notes
     -----
-    * based on nbdoykit implementation 
+    * based on nbodykit implementation
+    * Deprecated with pypower implementation
     '''
     # calculate nbar(z) for each galaxy
     _, edges = scott_bin_width(z, return_bins=True)
@@ -43,10 +45,24 @@ def get_nofz(z, fsky, cosmo=None):
 
 
 @timing_decorator
-def load_galaxies_obs(source_dir, seed):
-    rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
-    return rdz
+def load_galaxies_obs(source_dir, seed, filter_name=None):
+    if filter_name is None:
+        rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
+        weight = np.ones(len(rdz))
+    else:
+        rdz = np.load(pjoin(source_dir, 'obs/filtered',
+                      f'rdz{seed}_{filter_name}.npy'))
+        weight = np.load(pjoin(source_dir, 'obs/filtered',
+                         f'rdz{seed}_{filter_name}_weight.npy'))
+
+    return rdz, weight
 
 
-def sky_to_xyz(rdz, cosmo):
-    return nblab.transform.SkyToCartesian(*rdz.T, cosmo)
+@timing_decorator
+def load_randoms(wdir):
+    path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
+    if os.path.exists(path):
+        return np.load(path)
+    randoms = gen_randoms()
+    np.save(path, randoms)
+    return randoms

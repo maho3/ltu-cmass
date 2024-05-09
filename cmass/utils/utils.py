@@ -3,6 +3,7 @@ import logging
 import datetime
 import os
 from os.path import join as pjoin
+from astropy.cosmology import FlatLambdaCDM
 
 
 def get_source_path(cfg, simtype, check=True):
@@ -40,7 +41,6 @@ def timing_decorator(func, *args, **kwargs):
     return wrapper
 
 
-@timing_decorator
 def load_params(index, cosmofile):
     # load cosmology parameters
     # [Omega_m, Omega_b, h, n_s, sigma8]
@@ -50,3 +50,15 @@ def load_params(index, cosmofile):
         content = f.readlines()[index]
     content = [float(x) for x in content.split()]
     return content
+
+
+def cosmo_to_astropy(params):
+    # Converts a list of cosmological parameters into an astropy cosmology object.
+    # Note, ignores s8 and n_s parameters, which are not used in astropy.
+
+    # check if params is a list
+    try:
+        params = list(params)
+    except TypeError:
+        return params
+    return FlatLambdaCDM(H0=params[2]*100, Om0=params[0], Ob0=params[1])

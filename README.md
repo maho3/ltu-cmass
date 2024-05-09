@@ -22,7 +22,7 @@ python -m cmass.bias.apply_hod
 python -m cmass.survey.ngc_selection
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk_nbkit
+python -m cmass.summaries.Pk
 ```
 
 ## Getting Started
@@ -54,14 +54,14 @@ Below, we list the functionality of each script in the repository as well as its
 ### cmass.bias
 - `fit_halo_bias` - Fit a halo biasing model to map density fields to halo counts. Requires: `astropy` and `scipy`.
 - `rho_to_halo` - Sample halos from the density field using a pre-fit bias model. Requires: `scipy` and `jax`.
-- `apply_hod` - Sample an HOD realization from the halo catalog using the Zheng+(2007) model. Requires: `nbodykit`.
+- `apply_hod` - Sample an HOD realization from the halo catalog using the Zheng+(2007) model. Requires: `halotools`.
 
 ### cmass.survey
 - `remap_as_cuboid` - Remap a periodic volume to a cuboid. Requires: [`cuboid_remap_jax`](https://github.com/maho3/cuboid_remap_jax).
-- `ngc_selection` - Applies CMASS NGC survey mask to a lightcone-shaped volume of galaxies. Requires: `nbodykit`, `pymangle`, and `astropy`.
+- `ngc_selection` - Applies CMASS NGC survey mask to a lightcone-shaped volume of galaxies. Requires: `pymangle`, and `astropy`.
 
 ### cmass.summaries
-- `calc_Pk_nbkit` - Measure the power spectrum of a galaxy catalog. Requires: `nbodykit`.
+- `Pk` - Measure the power spectrum of a galaxy catalog. Requires: `pypower`.
 
 ### Notebooks
 - `preprocess.ipynb` -  Executes various preprocessing tasks prepare for mass simulation. Designed to be run once at the start of code development. [Deprecated]
