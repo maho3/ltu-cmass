@@ -7,9 +7,9 @@ import torch.optim as optim
 # os.chdir(root_dir)
 import sys, os
 # sys.path.append(root_dir)
-from combined_models import COMBINED_Model
-from all_models import *
-from utils_data_prep_cosmo import *
+from .combined_models import COMBINED_Model
+from .all_models import *
+from .utils_data_prep_cosmo import *
 from colossus.cosmology import cosmology
 params = {'flat': True, 'H0': 67.11, 'Om0': 0.3175, 'Ob0': 0.049, 'sigma8': 0.834, 'ns': 0.9624}
 cosmo = cosmology.setCosmology('myCosmo', **params)
@@ -38,7 +38,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 #                                   sample_velocities_density,
 #                                   sample_velocities_kNN,
 #                                   sample_velocities_CIC)
-from ..utils import get_source_path, timing_decorator, load_params
+from ...utils import get_source_path, timing_decorator, load_params
 
 
 def parse_config(cfg):

@@ -149,6 +149,55 @@ def run_density(wn, cpar, cfg):
 
 
 @timing_decorator
+def run_ICs(wn, cpar, cfg):
+    nbody = cfg.nbody
+
+    # Compute As
+    sigma8_true = np.copy(cpar.sigma8)
+    cpar.sigma8 = 0
+    cpar.A_s = 2.3e-9
+    k_max, k_per_decade = 10, 100
+    extra_class = {}
+    extra_class['YHe'] = '0.24'
+    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
+    cosmo.computeSigma8()
+    cos = cosmo.getCosmology()
+    cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
+    cpar.sigma8 = sigma8_true
+
+    # initialize box and chain
+    box = borg.forward.BoxModel()
+    box.L = 3*(nbody.L,)
+    box.N = 3*(nbody.N,)
+
+    af = 1/(1+50)  # z=50
+    chain = borg.forward.ChainForwardModel(box)
+    if nbody.transfer == 'CLASS':
+        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
+        transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
+            box, opts=dict(a_transfer=af, z_max=50))
+        transfer_class.setModelParams({"extra_class_arguments": extra_class})
+        chain @= transfer_class
+    elif nbody.transfer == 'EH':
+        chain @= borg.forward.model_lib.M_PRIMORDIAL(
+            box, opts=dict(a_final=af, z_max_pk=200))
+        chain @= borg.forward.model_lib.M_TRANSFER_EHU(
+            box, opts=dict(reverse_sign=True))
+    else:
+        raise NotImplementedError
+
+    chain.setCosmoParams(cpar)
+
+    # forward model
+    logging.info('Running forward...')
+    chain.forwardModel_v2(wn)
+
+    rhoic = np.empty(chain.getOutputBoxModel().N)
+    chain.getDensityFinal(rhoic)
+    return rhoic
+
+
+@timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
@@ -169,6 +218,8 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
+    if cfg.nbody.save_z50:
+        rho50 = run_ICs(wn, cpar, cfg)
     rho, pos, vel = run_density(wn, cpar, cfg)
 
     # Calculate velocity field
@@ -182,6 +233,8 @@ def main(cfg: DictConfig) -> None:
     outdir = get_source_path(cfg, "borgpm", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    if cfg.nbody.save_z50:
+        np.save(pjoin(outdir, 'rho_z50.npy'), rho50)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

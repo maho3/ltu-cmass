@@ -135,6 +135,11 @@ def sample_masses(Nsamp, medg, order=1):
     return hmass
 
 
+def load_IC(source_path):
+    filepath = pjoin(source_path, 'rho_z50.npy')
+    return np.load(filepath)
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -160,15 +165,16 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
-        from charm import get_model_interface
-        run_config_name = cfg.bias.halo.confg_charm
-        charm_interface = get_model_interface(run_config_name)    
+        from .charm.integrate_ltu_cmass import get_model_interface
+        run_config_name = cfg.bias.halo.config_charm
+        charm_interface = get_model_interface(run_config_name)
 
-        rho_IC, fvel_IC, ppos_IC, pvel_IC = load_IC(source_path)
+        rho_IC = load_IC(source_path)
         # test_LH_id = 0
         # hpos, hmass = charm_interface.process_input_density(test_LH_id)
 
-        hpos, hmass = charm_interface.process_input_density(rho, rho_IC)
+        hpos, hmass = charm_interface.process_input_density(
+            cfg.nbody.lhid, rho, rho_IC)
 
     else:
         logging.info('Sampling power law...')
@@ -179,7 +185,6 @@ def main(cfg: DictConfig) -> None:
 
         logging.info('Sampling masses...')
         hmass = sample_masses([len(x) for x in hpos], medges)
-
 
     logging.info('Calculating velocities...')
     if cfg.bias.halo.vel == 'density':
@@ -197,7 +202,6 @@ def main(cfg: DictConfig) -> None:
     else:
         raise NotImplementedError(
             f'Velocity type {cfg.bias.halo.vel} not implemented.')
-
 
     logging.info('Combine...')
 

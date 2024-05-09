@@ -1,6 +1,9 @@
 
 # halo biasing
 halo:
+  model: CHARM
+  run_config_name: temp
+
   # where to find halo bias model
   base_suite: calib_1gpch_z0.5
   L: 1000
