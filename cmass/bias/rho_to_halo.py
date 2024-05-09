@@ -164,10 +164,11 @@ def main(cfg: DictConfig) -> None:
         run_config_name = cfg.bias.halo.confg_charm
         charm_interface = get_model_interface(run_config_name)    
 
+        rho_IC, fvel_IC, ppos_IC, pvel_IC = load_IC(source_path)
         # test_LH_id = 0
         # hpos, hmass = charm_interface.process_input_density(test_LH_id)
 
-        hpos, hmass = charm_interface.process_input_density(rho)
+        hpos, hmass = charm_interface.process_input_density(rho, rho_IC)
 
     else:
         logging.info('Sampling power law...')
