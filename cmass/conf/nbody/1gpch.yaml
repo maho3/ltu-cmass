@@ -18,11 +18,13 @@ nsnap: 9         # number of snapshots to save
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt-only
-transfer: 'EH'    # transfer function (EH or CLASS)
 order: 2          # order of the LPT expansion
 
 # pmwd-only
 B: 1.5            # force grid resolution relative to particle grid
 nstep_i: 10        # number of initial PM integration steps
 nstep_snap: 5     # number of PM integration steps between snapshots
+
+# borgpm-only
+COLA: true        # whether to use COLA
 

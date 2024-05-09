@@ -2,7 +2,6 @@
 Applies BOSS survey mask to a lightcone-shaped volume of galaxies.
 
 Requires:
-    - nbodykit
     - pymangle
     - astropy
 
@@ -16,11 +15,12 @@ import numpy as np
 import logging
 from os.path import join as pjoin
 from scipy.spatial.transform import Rotation as R
-import nbodykit.lab as nblab
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from .tools import BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber
+
+from .tools import (xyz_to_sky, BOSS_angular, BOSS_veto,
+                    BOSS_redshift, BOSS_fiber)
 from ..utils import (get_source_path, timing_decorator, load_params)
 
 
@@ -49,36 +49,21 @@ def rotate(pos, vel):
     return pos, vel
 
 
-def xyz_to_sky(pos, vel, cosmo):
-    cosmology = nblab.cosmology.Planck15.clone(
-        h=cosmo[2],
-        Omega0_b=cosmo[1],
-        Omega0_cdm=cosmo[0] - cosmo[1],
-        m_ncdm=None,
-        n_s=cosmo[3])
-
-    # We don't need to match sigma8, because sky transform is invariant.
-    # cosmology = cosmology.match(sigma8=cosmo[4])
-
-    return nblab.transform.CartesianToSky(pos, cosmology, velocity=vel).T
-
-
 @timing_decorator
-def apply_mask(rdz, fibermode=0):
+def apply_mask(rdz, wdir, fibermode=0):
     logging.info('Applying redshift cut...')
     len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
 
     logging.info('Applying angular mask...')
-    inpoly = BOSS_angular(*rdz[:, :-1].T)
+    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
+    rdz = rdz[inpoly]
 
     logging.info('Applying veto mask...')
-    inveto = BOSS_veto(*rdz[:, :-1].T)
-    mask = inpoly & (~inveto)
-    rdz = rdz[mask]
+    inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
+    rdz = rdz[~inveto]
 
-    rdz = rdz.compute()  # dask array -> numpy array
     if fibermode != 0:
         logging.info('Applying fiber collisions...')
         mask = BOSS_fiber(
@@ -110,9 +95,9 @@ def custom_cuts(rdz, cfg):
 
 
 @timing_decorator
-def reweight(rdz):
+def reweight(rdz, wdir='./data'):
     n_z = np.load(
-        pjoin('data', 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+        pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
@@ -146,13 +131,13 @@ def main(cfg: DictConfig) -> None:
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.survey.fibermode)
+    rdz = apply_mask(rdz, cfg.meta.wdir, cfg.survey.fibermode)
 
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)
 
     # Reweight
-    rdz = reweight(rdz)
+    rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
     os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)

@@ -1,4 +1,13 @@
 
+import numpy as np
+
+from halotools.empirical_models import NFWProfile
+from halotools.sim_manager import UserSuppliedHaloCatalog
+from halotools.empirical_models import halo_mass_to_halo_radius
+from halotools.empirical_models import Zheng07Sats, Zheng07Cens, NFWPhaseSpace, TrivialPhaseSpace
+from halotools.empirical_models import HodModelFactory
+
+
 def thetahod_literature(paper):
     ''' best-fit HOD parameters from the literature.
 
@@ -53,3 +62,125 @@ def thetahod_literature(paper):
         raise NotImplementedError
 
     return p_hod
+
+
+def mass_to_concentration(mass, redshift, cosmo, mdef='vir'):
+    model = NFWProfile(
+        cosmology=cosmo,
+        conc_mass_model='dutton_maccio14',
+        mdef=mdef,
+        redshift=redshift
+    )
+    return model.conc_NFWmodel(prim_haloprop=mass)
+
+
+def build_halo_catalog(
+    pos, vel, mass, redshift, BoxSize, cosmo,
+    radius=None, conc=None, mdef='vir'
+):
+    '''Build a halo catalog from the given halo properties.
+
+    Args:
+        pos (array_like): Halo positions in Mpc/h. Shape (N, 3).
+        vel (array_like): Halo velocities in km/s. Shape (N, 3).
+        mass (array_like): Halo masses in Msun/h. Shape (N,).
+        redshift (float): The redshift of the halo catalog.
+        BoxSize (float): The size of the simulation box in Mpc/h.
+        cosmo (astropy.cosmology.Cosmology):
+            The cosmology used for the simulation.
+        radius (array_like, optional): Halo radius in Mpc/h. Defaults to None.
+        conc (array_like, optional): Halo concentration parameter.
+            Defaults to None.
+        mdef (str, optional): Halo mass definition. Defaults to 'vir'.
+
+    Returns:
+        catalog (UserSuppliedHaloCatalog): A halo catalog object
+            that can be used with Halotools.
+    '''
+    mkey = f'halo_m{mdef}'
+    rkey = f'halo_r{mdef}'
+
+    if radius is None:
+        radius = halo_mass_to_halo_radius(mass, cosmo, redshift, mdef)
+    if conc is None:
+        conc = mass_to_concentration(mass, redshift, cosmo, mdef)
+
+    # Specify arguments
+    kws = {
+        # halo properties
+        'halo_x': pos[:, 0],
+        'halo_y': pos[:, 1],
+        'halo_z': pos[:, 2],
+        'halo_vx': vel[:, 0],
+        'halo_vy': vel[:, 1],
+        'halo_vz': vel[:, 2],
+        mkey: mass,
+        rkey: radius,
+        'halo_nfw_conc': conc,
+        'halo_id': np.arange(len(mass)),
+        'halo_hostid': np.zeros(len(mass), dtype=int),
+        'halo_upid': np.zeros(len(mass)) - 1,
+        'halo_local_id': np.arange(len(mass), dtype='i8'),
+
+        # metadata
+        'cosmology': cosmo,
+        'redshift': redshift,
+        'particle_mass': 1,  # not used
+        'Lbox': BoxSize,
+        'mdef': mdef,
+    }
+
+    # convert to Halotools format
+    return UserSuppliedHaloCatalog(**kws)
+
+
+def build_HOD_model(
+    cosmology, redshift, hod_model='zheng07', mdef='vir', **hod_params
+):
+    '''Build a HOD model from the given HOD parameters.
+
+    Args:
+        cosmology (astropy.cosmology.Cosmology):
+            The cosmology used for the simulation.
+        redshift (float): The redshift of the halo catalog.
+        hod_model (str, optional): The HOD model to use.
+            Defaults to 'zheng07'.
+        mdef (str, optional): Halo mass definition. Defaults to 'vir'.
+        **kwargs: Additional arguments to pass to the HOD model.
+
+    Returns:
+        hod_model (HODMockFactory): A HOD model object
+            that can be used with Halotools.
+    '''
+    # determine mass column
+    mkey = 'halo_m' + mdef
+
+    # parse HOD parameters
+    t_ = thetahod_literature('manera2015_lowz_ngc')
+    t_.update(hod_params)
+    hod_params = t_
+
+    # occupation functions
+    if hod_model == 'zheng07':
+        cenocc = Zheng07Cens(prim_haloprop_key=mkey, **hod_params)
+        satocc = Zheng07Sats(
+            prim_haloprop_key=mkey,
+            cenocc_model=cenocc, **hod_params
+        )
+    else:
+        raise NotImplementedError
+    satocc._suppress_repeated_param_warning = True
+
+    # profile functions
+    hod_params.update(
+        {'cosmology': cosmology, 'redshift': redshift, 'mdef': mdef})
+    censprof = TrivialPhaseSpace(**hod_params)
+    satsprof = NFWPhaseSpace(**hod_params)
+
+    # make the model
+    model = {}
+    model['centrals_occupation'] = cenocc
+    model['centrals_profile'] = censprof
+    model['satellites_occupation'] = satocc
+    model['satellites_profile'] = satsprof
+    return HodModelFactory(**model)
