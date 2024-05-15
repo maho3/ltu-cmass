@@ -1,7 +1,7 @@
 
 # halo biasing
 halo:
-  model: CHARM
+  model: CHARM # power law # CHARM
   config_charm: config_v0.yaml
 
   # where to find halo bias model

@@ -1,5 +1,5 @@
 # for calibrating halo biasing models with quijote
-suite: calib_1gpch_z0.5
+suite: charm_1gpch_z0.5  # calib 
 
 # General parameters
 L: 1000           # Mpc/h
