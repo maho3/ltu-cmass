@@ -2,7 +2,7 @@
 # halo biasing
 halo:
   model: CHARM
-  run_config_name: temp
+  config_charm: config_v0.yaml
 
   # where to find halo bias model
   base_suite: calib_1gpch_z0.5

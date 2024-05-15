@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from .cnn_3d_stack import CNN3D_stackout
 # check if cuda is available:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

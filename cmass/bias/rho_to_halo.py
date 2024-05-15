@@ -170,11 +170,25 @@ def main(cfg: DictConfig) -> None:
         charm_interface = get_model_interface(run_config_name)
 
         rho_IC = load_IC(source_path)
-        # test_LH_id = 0
-        # hpos, hmass = charm_interface.process_input_density(test_LH_id)
 
         hpos, hmass = charm_interface.process_input_density(
-            cfg.nbody.lhid, rho, rho_IC)
+            rho,
+            rho_IC,
+            cosmology_array=np.array(cfg.nbody.cosmo))
+        
+        # halos are initially put on a grid, perturb their positions
+        voxL = cfg.nbody.L/cfg.nbody.N
+        hpos += np.random.uniform(
+            low=-voxL/2,
+            high=voxL/2,
+            size=hpos.shape
+        )  # TODO: Should this use `sample_3d`?
+
+        # ensure periodicity
+        hpos = hpos % cfg.nbody.L
+
+        # conform to mass-bin format of other bias models TODO: refactor?
+        hpos, hmass = [hpos], [hmass]
 
     else:
         logging.info('Sampling power law...')
@@ -198,7 +212,7 @@ def main(cfg: DictConfig) -> None:
         if (ppos is None) or (pvel is None):
             raise ValueError('No particles found for kNN interpolation.')
         ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
-        hvel = sample_velocities_kNN(hpos, ppos, pvel)
+        hvel = [sample_velocities_kNN([hpos[i]], ppos, pvel)[0] for i in range(len(hpos))]
     else:
         raise NotImplementedError(
             f'Velocity type {cfg.bias.halo.vel} not implemented.')

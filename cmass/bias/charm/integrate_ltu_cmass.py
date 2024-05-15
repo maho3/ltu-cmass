@@ -41,15 +41,11 @@ from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 #                                   sample_velocities_density,
 #                                   sample_velocities_kNN,
 #                                   sample_velocities_CIC)
-<<<<<<< HEAD
-from ...utils import get_source_path, timing_decorator, load_params
-=======
 # sys.path.append("../../../utils/")
 import pathlib
 curr_path = pathlib.Path(__file__).parent.resolve()
 print(curr_path)
 # from utils import get_source_path, timing_decorator, load_params
->>>>>>> charm
 
 
 def parse_config(cfg):
@@ -347,8 +343,8 @@ class get_model_interface:
 
         cosmo_val_test = np.tile(cosmology_array, (cond_tensor_nsh_test.shape[1] ,1))[None,:]
         
-        df_test_all_pad = torch.tensor(df_test_all_pad).to(dev)
-        df_test_all_unpad = torch.tensor(cond_tensor_nsh_test).to(dev)
+        df_test_all_pad = torch.tensor(df_test_all_pad, dtype=torch.float32).to(dev)
+        df_test_all_unpad = torch.tensor(cond_tensor_nsh_test, dtype=torch.float32).to(dev)
         cosmo_val_test = torch.tensor(cosmo_val_test, dtype=torch.float32).to(dev)
 
         train_Ntot, train_M1, train_Mdiff = 1, 1, 1
