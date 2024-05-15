@@ -10,7 +10,8 @@ Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
-zi: 99            # initial redshift
+zi: 20            # initial redshift
+zf: 0.4
 zmax: 0.6         # max redshift of range
 zmin: 0.4         # min redshift of range
 nsnap: 9         # number of snapshots to save

@@ -78,3 +78,41 @@ def vfield_CIC(ppos, pvel, cfg, interp=True):
             vel[i, j, k] = np.mean(perim, axis=0)
 
     return vel
+
+
+@timing_decorator
+def rho_and_v_CIC(
+    ppos, pvel,
+    N, L, Nvfield=None,
+    interp=True
+):
+    if Nvfield is None:
+        Nvfield = N
+    ptcl_spacing = L / N
+    ptcl_grid_shape = (N,)*3
+    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape)
+    ptcl = Particles.from_pos(pmconf, ppos)
+
+    scale = N / Nvfield
+    mesh = np.zeros([Nvfield]*3)
+    rho = scatter(ptcl, pmconf, val=1,
+                  mesh=mesh, cell_size=pmconf.cell_size*scale)
+    mesh = np.zeros([Nvfield]*3+[3])
+    mom = scatter(ptcl, pmconf, val=pvel,
+                  mesh=mesh, cell_size=pmconf.cell_size*scale)
+
+    vel = mom / rho[..., None]
+    vel = np.array(vel)
+
+    if interp and np.any(np.isnan(vel)):
+        # interpolate nan values using nearest neighbors
+        davg = 1
+        naninds = np.argwhere(np.all(np.isnan(vel), axis=-1))
+        paddedvel = np.pad(vel, ((davg,), (davg,), (davg,), (0,)), mode='wrap')
+        for i, j, k in naninds:
+            perim = np.array(
+                [paddedvel[i:i+2*davg+1, j:j+2*davg+1, k:k+2*davg+1]])
+            perim = perim[~np.isnan(perim).all(axis=-1)]
+            vel[i, j, k] = np.mean(perim, axis=0)
+
+    return rho, vel

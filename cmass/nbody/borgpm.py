@@ -42,7 +42,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
+from .tools import gen_white_noise, load_white_noise, save_nbody, rho_and_v_CIC
 from .tools_borg import build_cosmology
 
 
@@ -126,6 +126,38 @@ def run_density(wn, cpar, cfg):
                   pm_nsteps=nbody.N_steps,
                   tcola=nbody.COLA)
     )
+
+    class notifier:
+        def __init__(self, asave, da):
+            self.step_id = 0
+            self.asave = asave
+            self.da = da
+            self.snaps = np.zeros(len(self.asave))
+
+        def __call__(self, a, Np, ids, poss, vels):
+            if np.min(np.abs(a-self.asave)) > self.da:
+                # if not in save list, ignore
+                return
+            print(f"Step {a:.4f} / {self.step_id}")
+            self.step_id += 1
+
+            rho, fvel = rho_and_v_CIC(
+                pos, vel,
+                N=nbody.N * nbody.supersampling,
+                L=nbody.L,
+                Nvfield=nbody.N,
+                interp=True
+            )
+
+    zsave = np.array([0.7, 0.6, 0.5, 0.4])
+    asave = 1/(1+zsave)
+
+    da = (nbody.af-nbody.ai)/nbody.N_steps
+    pm.setStepNotifier(
+        notifier(asave=asave, da=da),
+        with_particles=True
+    )
+
     chain @= pm
     chain.setAdjointRequired(False)
 
@@ -136,16 +168,22 @@ def run_density(wn, cpar, cfg):
     chain.forwardModel_v2(wn)
 
     Npart = pm.getNumberOfParticles()
-    rho = np.empty(chain.getOutputBoxModel().N)
     pos = np.empty(shape=(Npart, 3))
     vel = np.empty(shape=(Npart, 3))
-    chain.getDensityFinal(rho)
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
     vel *= 100  # km/s
 
-    return rho, pos, vel
+    rho, fvel = rho_and_v_CIC(
+        pos, vel,
+        N=nbody.N * nbody.supersampling,
+        L=nbody.L,
+        Nvfield=nbody.N,
+        interp=True
+    )
+
+    return rho, fvel
 
 
 @timing_decorator
@@ -169,19 +207,20 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, cpar, cfg)
+    rho, fvel = run_density(wn, cpar, cfg)
 
-    # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    # # Calculate velocity field  # TODO: remove
+    # fvel = None
+    # if cfg.nbody.save_velocities:
+    #     fvel = vfield_CIC(pos, vel, cfg)
+    #     # convert from comoving -> peculiar velocities
+    #     fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "borgpm", check=False)
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    save_nbody(outdir, rho, fvel, pos=None, vel=None,
+               save_particles=cfg.nbody.save_particles,
+               save_velocities=cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
