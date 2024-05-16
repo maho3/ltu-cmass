@@ -128,33 +128,53 @@ def run_density(wn, cpar, cfg):
     )
 
     class notifier:
-        def __init__(self, asave, da):
+        def __init__(self, asave):
             self.step_id = 0
             self.asave = asave
-            self.da = da
-            self.snaps = np.zeros(len(self.asave))
+            self.rhos = {}
+            self.fvels = {}
+
+        def assign_snap(self):
+            # after learning the step intervals, assign where to save snaps
+            asteps = np.arange(self.a1, 1, self.da)
+            tosave = [
+                np.argmin(np.abs(asteps - a)) for a in self.asave
+            ]
+            tosave = np.unique(tosave)
+            self.tosave = tosave
 
         def __call__(self, a, Np, ids, poss, vels):
-            if np.min(np.abs(a-self.asave)) > self.da:
-                # if not in save list, ignore
-                return
-            print(f"Step {a:.4f} / {self.step_id}")
             self.step_id += 1
-
+            if self.step_id == 1:  # ignore initial step
+                return
+            elif self.step_id == 2:  # save the first step
+                self.a1 = a
+                return
+            elif self.step_id == 3:  # learn the step intervals
+                self.da = a - self.a1
+                self.assign_snap()
+            if self.step_id-2 not in self.tosave:  # ignore intermediate steps
+                return
+            logging.info(f"Saving snap a={a:.6f}, step {self.step_id}")
             rho, fvel = rho_and_v_CIC(
-                pos, vel,
+                poss, vels,
                 N=nbody.N * nbody.supersampling,
                 L=nbody.L,
                 Nvfield=nbody.N,
                 interp=True
             )
+            self.rhos[a] = rho
+            self.fvels[a] = fvel
 
-    zsave = np.array([0.7, 0.6, 0.5, 0.4])
-    asave = 1/(1+zsave)
+    if hasattr(nbody, 'zsave'):
+        zsave = np.array(nbody.zsave)
+        asave = 1/(1+zsave)
+    else:
+        asave = []
 
-    da = (nbody.af-nbody.ai)/nbody.N_steps
+    noti = notifier(asave=asave)
     pm.setStepNotifier(
-        notifier(asave=asave, da=da),
+        noti,
         with_particles=True
     )
 
@@ -173,6 +193,11 @@ def run_density(wn, cpar, cfg):
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
+    snapshots = {
+        'rhos': noti.rhos,
+        'fvels': noti.fvels
+    }
+
     vel *= 100  # km/s
 
     rho, fvel = rho_and_v_CIC(
@@ -183,7 +208,7 @@ def run_density(wn, cpar, cfg):
         interp=True
     )
 
-    return rho, fvel
+    return rho, fvel, snapshots
 
 
 @timing_decorator
@@ -207,7 +232,7 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, fvel = run_density(wn, cpar, cfg)
+    rho, fvel, snapshots = run_density(wn, cpar, cfg)
 
     # # Calculate velocity field  # TODO: remove
     # fvel = None
@@ -221,6 +246,7 @@ def main(cfg: DictConfig) -> None:
     save_nbody(outdir, rho, fvel, pos=None, vel=None,
                save_particles=cfg.nbody.save_particles,
                save_velocities=cfg.nbody.save_velocities)
+    np.savez(pjoin(outdir, 'snapshots.npz'), **snapshots)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

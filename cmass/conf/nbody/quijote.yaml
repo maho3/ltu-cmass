@@ -11,7 +11,8 @@ save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
 zi: 20            # initial redshift
-zf: 0.5           # final redshift
+zf: 0.4           # final redshift
+zsave: [0.6, 0.55, 0.5, 0.45, 0.4]  # snapshot redshifts to save
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt and borgpm-only
