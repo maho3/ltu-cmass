@@ -42,7 +42,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
-from .tools_borg import build_cosmology
+from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
 def parse_config(cfg):
@@ -81,19 +81,6 @@ def get_ICs(cfg):
 def run_density(wn, cpar, cfg):
     nbody = cfg.nbody
 
-    # Compute As
-    sigma8_true = np.copy(cpar.sigma8)
-    cpar.sigma8 = 0
-    cpar.A_s = 2.3e-9
-    k_max, k_per_decade = 10, 100
-    extra_class = {}
-    extra_class['YHe'] = '0.24'
-    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
-    cosmo.computeSigma8()
-    cos = cosmo.getCosmology()
-    cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
-    cpar.sigma8 = sigma8_true
-
     # initialize box and chain
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
@@ -101,34 +88,29 @@ def run_density(wn, cpar, cfg):
 
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-        transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
-            box, opts=dict(a_transfer=1.0))
-        transfer_class.setModelParams({"extra_class_arguments":extra_class})
-        chain @= transfer_class
+        chain = transfer_CLASS(chain, box, cpar)
     elif nbody.transfer == 'EH':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL(
-            box, opts=dict(a_final=1.0))
-        chain @= borg.forward.model_lib.M_TRANSFER_EHU(
-            box, opts=dict(reverse_sign=True))
+        chain = transfer_EH(chain, box)
     else:
         raise NotImplementedError(
-            f'Transfer {nbody.transfer} not implemented.')
+            f'Transfer function "{nbody.transfer}" not implemented.')
 
     if nbody.order == 1:
         lpt = borg.forward.model_lib.M_LPT_CIC(box, opts=dict(a_initial=1.0))
     elif nbody.order == 2:
         lpt = borg.forward.model_lib.M_2LPT_CIC(
             box,
-            opts=dict(a_initial=1.0,
-                      a_final=1.0,
-                      do_rsd=False,
-                      supersampling=1,
-                      lightcone=False,
-                      part_factor=1.01)
+            opts=dict(
+                a_initial=1.0,
+                a_final=1.0,
+                do_rsd=False,
+                supersampling=1,
+                lightcone=False,
+                part_factor=1.01
+            )
         )
     else:
-        raise NotImplementedError(f'Order {nbody.order} not implemented.')
+        raise NotImplementedError(f'Order "{nbody.order}" not implemented.')
     chain @= lpt
 
     chain.setCosmoParams(cpar)

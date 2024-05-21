@@ -82,19 +82,6 @@ def get_ICs(cfg):
 def run_density(wn, cpar, cfg):
     nbody = cfg.nbody
 
-    # Compute As
-    sigma8_true = np.copy(cpar.sigma8)
-    cpar.sigma8 = 0
-    cpar.A_s = 2.3e-9
-    k_max, k_per_decade = 10, 100
-    extra_class = {}
-    extra_class['YHe'] = '0.24'
-    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
-    cosmo.computeSigma8()
-    cos = cosmo.getCosmology()
-    cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
-    cpar.sigma8 = sigma8_true
-
     # initialize box and chain
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
@@ -102,29 +89,26 @@ def run_density(wn, cpar, cfg):
 
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-        transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
-            box, opts=dict(a_transfer=1.0))
-        transfer_class.setModelParams({"extra_class_arguments": extra_class})
-        chain @= transfer_class
+        chain = transfer_CLASS(chain, box, cpar)
     elif nbody.transfer == 'EH':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL(
-            box, opts=dict(a_final=1.0))
-        chain @= borg.forward.model_lib.M_TRANSFER_EHU(
-            box, opts=dict(reverse_sign=True))
+        chain = transfer_EH(chain, box)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(
+            f'Transfer function "{nbody.transfer}" not implemented.')
 
     pm = borg.forward.model_lib.M_PM_CIC(
         box,
-        opts=dict(a_initial=1.0, a_final=nbody.af,
-                  do_rsd=False,
-                  supersampling=nbody.supersampling,
-                  part_factor=1.01,
-                  forcesampling=nbody.B,
-                  pm_start_z=nbody.zi,
-                  pm_nsteps=nbody.N_steps,
-                  tcola=nbody.COLA)
+        opts=dict(
+            a_initial=1.0,
+            a_final=nbody.af,
+            do_rsd=False,
+            supersampling=nbody.supersampling,
+            part_factor=1.01,
+            forcesampling=nbody.B,
+            pm_start_z=nbody.zi,
+            pm_nsteps=nbody.N_steps,
+            tcola=nbody.COLA
+        )
     )
     chain @= pm
     chain.setAdjointRequired(False)
