@@ -175,7 +175,7 @@ def main(cfg: DictConfig) -> None:
             rho,
             rho_IC,
             cosmology_array=np.array(cfg.nbody.cosmo))
-        
+
         # halos are initially put on a grid, perturb their positions
         voxL = cfg.nbody.L/cfg.nbody.N
         hpos += np.random.uniform(
@@ -212,7 +212,8 @@ def main(cfg: DictConfig) -> None:
         if (ppos is None) or (pvel is None):
             raise ValueError('No particles found for kNN interpolation.')
         ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
-        hvel = [sample_velocities_kNN([hpos[i]], ppos, pvel)[0] for i in range(len(hpos))]
+        hvel = [sample_velocities_kNN([hpos[i]], ppos, pvel)[0]
+                for i in range(len(hpos))]
     else:
         raise NotImplementedError(
             f'Velocity type {cfg.bias.halo.vel} not implemented.')

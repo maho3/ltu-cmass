@@ -175,7 +175,7 @@ def run_ICs(wn, cpar, cfg):
     if nbody.transfer == 'CLASS':
         chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
         transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
-            box, opts=dict(a_transfer=af, z_max=50))
+            box, opts=dict(a_transfer=af, z_max_pk=200))
         transfer_class.setModelParams({"extra_class_arguments": extra_class})
         chain @= transfer_class
     elif nbody.transfer == 'EH':
