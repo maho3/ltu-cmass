@@ -43,7 +43,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
-from .tools_borg import build_cosmology
+from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
 def parse_config(cfg):
