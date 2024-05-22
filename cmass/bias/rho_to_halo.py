@@ -182,7 +182,8 @@ def main(cfg: DictConfig) -> None:
         hpos, hmass = charm_interface.process_input_density(
             rho,
             rho_IC,
-            cosmology_array=np.array(cfg.nbody.cosmo)
+            cosmology_array=np.array(cfg.nbody.cosmo),
+            BoxSize=cfg.nbody.L,
         )
 
         # halos are initially put on a grid, perturb their positions

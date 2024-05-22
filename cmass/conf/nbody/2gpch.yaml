@@ -14,6 +14,10 @@ zi: 20            # initial redshift
 zf: 0.5           # final redshift
 supersampling: 2  # particles resolution relative to meshgrid
 
+
+# whether to save z=99 ICs (for CHARM bias model)
+save_z50: True
+
 # borglpt and borgpm-only
 transfer: 'CLASS' # transfer function (EH or CLASS)
 
