@@ -38,7 +38,9 @@ from .tools.halo_sampling import (pad_3d, sample_3d,
                                   sample_velocities_density,
                                   sample_velocities_kNN,
                                   sample_velocities_CIC)
-from ..utils import get_source_path, timing_decorator, load_params
+from ..utils import (get_source_path, timing_decorator,
+                     load_params, cosmo_to_colossus)
+import colossus.cosmology.cosmology as csm
 
 
 def parse_config(cfg):
@@ -135,9 +137,15 @@ def sample_masses(Nsamp, medg, order=1):
     return hmass
 
 
-def load_IC(source_path):
+def load_IC(source_path, cpars):
     filepath = pjoin(source_path, 'rho_z50.npy')
-    return np.load(filepath)
+    rhoic = np.load(filepath)
+
+    # correct for growth factor
+    cosmo = cosmo_to_colossus(cpars)
+    corr = cosmo.growthFactorUnnormalized(z=99)
+    corr /= cosmo.growthFactorUnnormalized(z=50)
+    return rhoic*corr
 
 
 @timing_decorator
@@ -169,12 +177,13 @@ def main(cfg: DictConfig) -> None:
         run_config_name = cfg.bias.halo.config_charm
         charm_interface = get_model_interface(run_config_name)
 
-        rho_IC = load_IC(source_path)
+        rho_IC = load_IC(source_path, cfg.nbody.cosmo)
 
         hpos, hmass = charm_interface.process_input_density(
             rho,
             rho_IC,
-            cosmology_array=np.array(cfg.nbody.cosmo))
+            cosmology_array=np.array(cfg.nbody.cosmo)
+        )
 
         # halos are initially put on a grid, perturb their positions
         voxL = cfg.nbody.L/cfg.nbody.N
