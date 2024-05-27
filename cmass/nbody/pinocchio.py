@@ -1,9 +1,11 @@
 import os
 from os.path import join as pjoin
+import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
+from .tools import gen_white_noise, load_white_noise
 
 def parse_config(cfg):
     with open_dict(cfg):
@@ -23,10 +25,47 @@ def parse_config(cfg):
     return cfg
 
 
+def get_ICs(cfg, outdir):
+    
+    nbody = cfg.nbody
+    N = nbody.N
+    
+    # Load the ics in Fourier space
+    if nbody.matchIC:
+        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
+        if nbody.quijote:
+            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+        else:
+            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+        ic = load_white_noise(path_to_ic, N, quijote=nbody.quijote)
+    else:
+        ic = gen_white_noise(N, seed=nbody.lhid)
+        
+    # Convert to real space
+    ic = - np.fft.irfftn(ic, norm="ortho").astype(np.float32)
+
+    # Make header
+    header = np.array([0, N, N, N, nbody.lhid, 0], dtype=np.int32)
+    
+    # Write the white noise field to a binary file
+    filename = pjoin(outdir, "WhiteNoise")
+    with open(filename, 'wb') as file:
+        header.tofile(file)
+        # ic.tofile(file)
+        planesize = N * N * np.dtype(np.float32).itemsize
+        for plane in ic:
+            file.write(np.array([planesize], dtype=np.int32).tobytes())
+            plane.tofile(file)
+            file.write(np.array([planesize], dtype=np.int32).tobytes())
+    
+    return
+
+
 def generate_param_file(cfg, outdir):
     
     random_seed=486604
     
+    # Convert args to variables needed
     filename = pjoin(outdir, "parameter_file")
     output_list= pjoin(outdir, "outputs")
     run_flag = f"pinocchio-L{int(cfg.nbody.L)}-N{cfg.nbody.N}-{cfg.nbody.lhid}"
@@ -37,6 +76,7 @@ def generate_param_file(cfg, outdir):
     de_w0 = -1.0
     de_wa = 0.0
     
+    # Choose output mass function
     mass_functions = [
         "Press_Schechter_1974",
         "Sheth_Tormen_2001",
@@ -55,8 +95,21 @@ def generate_param_file(cfg, outdir):
     else:
         AMF = len(mass_functions) - 1
         logging.info(f'Choosing analytic mass function {mass_functions[AMF]}')
+        
+    # Make outputs file
+    content = (
+        "# This file contains the list of output redshifts, in chronological\n"
+        "# (i.e. descending) order. The last value is the final redshift of the\n"
+        "# run. The past-light cone is NOT generated using these outputs but\n"
+        "# is computed with continuous time sampling.\n\n"
+    )
+    content += "\n".join(map(str, sorted(cfg.nbody.output_redshifts, reverse=True))) + "\n"
+    with open(output_list, 'w') as file:
+        file.write(content)
     
-    content = f"""# This is an example parameter file for the Pinocchio 4.0 code
+    # Make paramater file
+    
+    content = f"""# This is a parameter file for the Pinocchio 4.0 code
 
 # run properties
 RunFlag                {run_flag}      % name of the run
@@ -96,7 +149,7 @@ MinHaloMass            10           % smallest halo that is given in output
 AnalyticMassFunction   {AMF}            % form of analytic mass function given in the .mf.out files
 
 # output options:
-% WriteSnapshot                     % writes a Gadget2 snapshot as an output
+WriteSnapshot                     % writes a Gadget2 snapshot as an output
 % DoNotWriteCatalogs                % skips the writing of full catalogs (including PLC)
 % DoNotWriteHistories               % skips the writing of merger histories
 
@@ -122,6 +175,16 @@ PLCAperture            30           % cone aperture for the past light cone
     return
 
 
+def run_pinoccio(cfg, outdir):
+    
+    cwd = os.getcwd()
+    os.chdir(outdir)
+    os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
+    os.chdir(cwd)
+    
+    return
+
+
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
@@ -138,30 +201,16 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     
     outdir = get_source_path(cfg, f"pinocchio", check=False)
+    
+    # Convert ICs to correct format
+    get_ICs(cfg, outdir)
+    
+    # Generate parameter file
     generate_param_file(cfg, outdir)
     
-#     # Setup
-#     cpar = build_cosmology(*cfg.nbody.cosmo)
-
-#     # Get ICs
-#     wn = get_ICs(cfg)
-
-#     # Run
-#     rho, pos, vel = run_density(wn, cpar, cfg)
-
-#     # Calculate velocity field
-#     fvel = None
-#     if cfg.nbody.save_velocities:
-#         fvel = vfield_CIC(pos, vel, cfg)
-#         # convert from comoving -> peculiar velocities
-#         fvel *= (1 + cfg.nbody.zf)
-
-#     # Save
-#     outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
-#     save_nbody(outdir, rho, fvel, pos, vel,
-#                cfg.nbody.save_particles, cfg.nbody.save_velocities)
-#     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-#         OmegaConf.save(cfg, f)
+    # Run
+    run_pinoccio(cfg, outdir)
+ 
     logging.info("Done!")
 
 
@@ -169,5 +218,11 @@ if __name__ == '__main__':
     main()
     
     
-# python -m cmass.nbody.pinocchio nbody=quijote_z0
+"""
+python -m cmass.nbody.pinocchio nbody=quijote_z0
+
+TO DO:
+- Check ICs are used correctly
+- Load halos and save to correct format
+"""
 

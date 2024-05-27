@@ -29,3 +29,5 @@ COLA: true        # whether to use COLA
 
 # pinocchio only
 mass_function: Watson_2013  # which output HMF to use
+output_redshifts: [2.0, 1.0, 0.5, 0.0]
+pinocchio_exec: /home/bartlett/ili/Pinocchio/src/pinocchio.x
