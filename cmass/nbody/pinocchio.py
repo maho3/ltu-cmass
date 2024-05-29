@@ -4,8 +4,10 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
+import MAS_library as MASL
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, get_camb_pk, get_class_pk, get_syren_pk
+from .tools import (gen_white_noise, load_white_noise, save_nbody, 
+                    vfield_CIC, get_camb_pk, get_class_pk, get_syren_pk)
 
 def parse_config(cfg):
     with open_dict(cfg):
@@ -86,7 +88,7 @@ def generate_pk_file(cfg, outdir):
 
 def generate_param_file(cfg, outdir):
     
-    random_seed=486604
+    random_seed = cfg.nbody.lhid
     
     # Convert args to variables needed
     filename = pjoin(outdir, "parameter_file")
@@ -126,7 +128,8 @@ def generate_param_file(cfg, outdir):
         "# run. The past-light cone is NOT generated using these outputs but\n"
         "# is computed with continuous time sampling.\n\n"
     )
-    content += "\n".join(map(str, sorted(cfg.nbody.output_redshifts, reverse=True))) + "\n"
+    output_redshifts = [cfg.nbody.zf]
+    content += "\n".join(map(str, sorted(output_redshifts, reverse=True))) + "\n"
     with open(output_list, 'w') as file:
         file.write(content)
         
@@ -203,14 +206,107 @@ PLCAperture            30           % cone aperture for the past light cone
     return
 
 
-def run_pinoccio(cfg, outdir):
+@timing_decorator
+def run_density(cfg, outdir):
     
+    # Run pinoccio
     cwd = os.getcwd()
     os.chdir(outdir)
     os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
     os.chdir(cwd)
     
-    return
+    # Load the data
+    filename = pjoin(outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
+    data = {}
+    
+    with open(filename, 'rb') as f:
+
+        # Function to read a block
+        def read_block(expected_name, dtype, count):
+            initial_block_size = np.fromfile(f, dtype=np.int32, count=1)[0]
+            block_name = np.fromfile(f, dtype='S4', count=1)[0].decode().strip()
+            block_size_with_name = np.fromfile(f, dtype=np.int32, count=1)[0]
+            if block_name != expected_name:
+                raise ValueError(f"Expected block name '{expected_name}', but got '{block_name}'")
+            data_block = np.fromfile(f, dtype=dtype, count=count)
+            trailing_block_size = np.fromfile(f, dtype=np.int32, count=1)[0]
+            return data_block
+
+        # Read the HEADER block
+        header_dtype = np.dtype([
+            ('dummy', np.int64),
+            ('NPart', np.uint32, 6),
+            ('Mass', np.float64, 6),
+            ('Time', np.float64),
+            ('RedShift', np.float64),
+            ('flag_sfr', np.int32),
+            ('flag_feedback', np.int32),
+            ('NPartTotal', np.uint32, 6),
+            ('flag_cooling', np.int32),
+            ('num_files', np.int32),
+            ('BoxSize', np.float64),
+            ('Omega0', np.float64),
+            ('OmegaLambda', np.float64),
+            ('HubbleParam', np.float64),
+            ('flag_stellarage', np.int32),
+            ('flag_metals', np.int32),
+            ('npartTotalHighWord', np.uint32, 6),
+            ('flag_entropy_instead_u', np.int32),
+            ('flag_metalcooling', np.int32),
+            ('flag_stellarevolution', np.int32),
+            ('fill', np.int8, 52)
+        ])
+        header_block = read_block('HEAD', header_dtype, 1)[0]
+        data['header'] = {name: header_block[name] for name in header_dtype.names}
+
+        # Number of particles
+        num_particles = header_block['NPart'][1]
+
+        # Read INFO block
+        info_dtype = np.dtype([('name', 'S4'), ('type', 'S8'), ('ndim', np.int32), ('active', np.int32, 6)])
+        read_block('INFO', info_dtype, 4)
+
+        # Read empty FMAX block
+        fmax_dtype = np.dtype([('dummy', np.int64), ('fmax', np.float32)])
+        read_block('FMAX', fmax_dtype, 2)
+
+        # Read empty RMAX block
+        rmax_dtype = np.dtype([('dummy', np.int64), ('rmax', np.int64)])
+        read_block('RMAX', rmax_dtype, 2)
+
+        # Read ID block
+        id_dtype = np.dtype([
+            ('dummy', np.int64),
+            ('ids', np.uint32, num_particles)
+        ])
+        ids = read_block('ID', id_dtype, 1)
+        data['ids'] = ids['ids'][0]
+
+        # Read POS block
+        pos_dtype = np.dtype([
+            ('dummy', np.int64),
+            ('pos', np.float32, num_particles * 3)
+        ])
+        positions = read_block('POS', pos_dtype, 1)
+        data['positions'] = positions['pos'].reshape(-1, 3)
+
+        # Read VEL block
+        vel_dtype = np.dtype([
+            ('dummy', np.int64),
+            ('vel', np.float32, num_particles * 3)
+        ])
+        positions = read_block('VEL', vel_dtype, 1)
+        data['velocities'] = positions['vel'].reshape(-1, 3)
+        
+    # CIC density field
+    rho = np.zeros((cfg.nbody.N,cfg.nbody.N,cfg.nbody.N), dtype=np.float32)
+    MASL.MA(data['positions'].astype(np.float32), rho, cfg.nbody.L, "CIC", verbose=True)
+
+    # Align axes
+    data['positions'][:,[0,1,2]] = data['positions'][:,[2,1,0]]
+    data['velocities'][:,[0,1,2]] = data['velocities'][:,[2,1,0]]
+    
+    return rho, data['positions'], data['velocities']
 
 
 
@@ -232,7 +328,6 @@ def main(cfg: DictConfig) -> None:
     
     # Setup power spectrum file if needed
     generate_pk_file(cfg, outdir)
-    # quit()
     
     # Convert ICs to correct format
     get_ICs(cfg, outdir)
@@ -241,20 +336,23 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(cfg, outdir)
     
     # Run
-    run_pinoccio(cfg, outdir)
+    rho, pos, vel = run_density(cfg, outdir)
+    
+    # Calculate velocity field
+    fvel = None
+    if cfg.nbody.save_velocities:
+        fvel = vfield_CIC(pos, vel, cfg)
+        # convert from comoving -> peculiar velocities
+        fvel *= (1 + cfg.nbody.zf)
+        
+    # Save
+    save_nbody(outdir, rho, fvel, pos, vel,
+               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+        OmegaConf.save(cfg, f)
  
     logging.info("Done!")
 
 
 if __name__ == '__main__':
     main()
-    
-    
-"""
-python -m cmass.nbody.pinocchio nbody=quijote_z0
-
-TO DO:
-- Check ICs are used correctly
-- Load halos and save to correct format
-"""
-
