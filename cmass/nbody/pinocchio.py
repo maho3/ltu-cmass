@@ -42,7 +42,7 @@ def get_ICs(cfg, outdir):
         ic = gen_white_noise(N, seed=nbody.lhid)
         
     # Convert to real space
-    ic = - np.fft.irfftn(ic, norm="ortho").astype(np.float32)
+    ic = np.fft.irfftn(ic, norm="ortho").astype(np.float32)
 
     # Make header
     header = np.array([0, N, N, N, nbody.lhid, 0], dtype=np.int32)
