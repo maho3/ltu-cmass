@@ -5,7 +5,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise
+from .tools import gen_white_noise, load_white_noise, get_camb_pk, get_class_pk
 
 def parse_config(cfg):
     with open_dict(cfg):
@@ -61,6 +61,27 @@ def get_ICs(cfg, outdir):
     return
 
 
+def generate_pk_file(cfg, outdir):
+    
+    if cfg.nbody.transfer == 'EH':
+        return
+    
+    kmin = 2 * np.pi / cfg.nbody.L
+    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / cfg.nbody.L  # Larger than Nyquist
+    k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
+    
+    if cfg.nbody.transfer == 'CAMB':
+        pk = get_camb_pk(k, *cfg.nbody.cosmo)
+    elif cfg.nbody.transfer == 'CLASS':
+        pk = get_class_pk(k, *cfg.nbody.cosmo)
+    else:
+        raise NotImplementedError(f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
+    
+    np.savetxt(pjoin(outdir, "input_power_spectrum.txt"), np.transpose(np.array([k, pk])))
+    
+    return
+
+
 def generate_param_file(cfg, outdir):
     
     random_seed=486604
@@ -106,6 +127,11 @@ def generate_param_file(cfg, outdir):
     content += "\n".join(map(str, sorted(cfg.nbody.output_redshifts, reverse=True))) + "\n"
     with open(output_list, 'w') as file:
         file.write(content)
+        
+    if cfg.nbody.transfer == 'EH':
+        pk_file = "no"
+    else:
+        pk_file = "input_power_spectrum.txt"
     
     # Make paramater file
     
@@ -129,7 +155,7 @@ PrimordialIndex        {n_s}         % n_s
 DEw0                   {de_w0}         % w0 of parametric dark energy equation of state
 DEwa                   {de_wa}          % wa of parametric dark energy equation of state
 TabulatedEoSfile       no           % equation of state of dark energy tabulated in a file
-FileWithInputSpectrum  no           % P(k) tabulated in a file
+FileWithInputSpectrum  {pk_file}           % P(k) tabulated in a file
                                     % "no" means that the fit of Eisenstein & Hu is used
 
 # from N-GenIC
@@ -201,6 +227,10 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     
     outdir = get_source_path(cfg, f"pinocchio", check=False)
+    
+    # Setup power spectrum file if needed
+    generate_pk_file(cfg, outdir)
+    # quit()
     
     # Convert ICs to correct format
     get_ICs(cfg, outdir)
