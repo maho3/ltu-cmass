@@ -14,7 +14,7 @@ zi: 20            # initial redshift
 zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
 
-# borglpt and borgpm-only
+# borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH or CLASS)
 
 # borglpt-only
@@ -26,3 +26,7 @@ N_steps: 32       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA
+
+# pinocchio only
+mass_function: Watson_2013  # which output HMF to use
+pinocchio_exec: /home/bartlett/ili/Pinocchio/src/pinocchio.x
