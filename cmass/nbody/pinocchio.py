@@ -5,7 +5,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, get_camb_pk, get_class_pk
+from .tools import gen_white_noise, load_white_noise, get_camb_pk, get_class_pk, get_syren_pk
 
 def parse_config(cfg):
     with open_dict(cfg):
@@ -74,6 +74,8 @@ def generate_pk_file(cfg, outdir):
         pk = get_camb_pk(k, *cfg.nbody.cosmo)
     elif cfg.nbody.transfer == 'CLASS':
         pk = get_class_pk(k, *cfg.nbody.cosmo)
+    elif cfg.nbody.transfer == 'SYREN':
+        pk = get_syren_pk(k, *cfg.nbody.cosmo)
     else:
         raise NotImplementedError(f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
     

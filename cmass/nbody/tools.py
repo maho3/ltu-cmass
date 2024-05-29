@@ -6,6 +6,7 @@ from ..utils import timing_decorator
 from pmwd import Configuration, Particles, scatter
 import camb
 from classy import Class, CosmoComputationError
+import symbolic_pofk.linear
 
 @timing_decorator
 def gen_white_noise(N, seed=None):
@@ -160,3 +161,8 @@ def get_class_pk(k, omega_m, omega_b, h, n_s, sigma8):
     cosmo.empty()
     
     return plin_class
+
+
+def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):    
+    return symbolic_pofk.linear.plin_emulated(k, sigma8, omega_m, omega_b, h, n_s,
+        emulator='fiducial', extrapolate=True)
