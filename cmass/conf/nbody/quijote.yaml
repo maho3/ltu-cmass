@@ -24,7 +24,7 @@ transfer: 'CLASS' # transfer function (EH or CLASS)
 order: 2          # order of the LPT expansion
 
 # pmwd and borgpm-only
-B: 2              # force grid resolution relative to particle grid
+B: 6              # force grid resolution relative to particle grid
 N_steps: 32       # number of PM integration steps
 
 # borgpm-only
