@@ -301,12 +301,25 @@ def run_density(cfg, outdir):
     # CIC density field
     rho = np.zeros((cfg.nbody.N,cfg.nbody.N,cfg.nbody.N), dtype=np.float32)
     MASL.MA(data['positions'].astype(np.float32), rho, cfg.nbody.L, "CIC", verbose=True)
+    rho = np.transpose(rho, (2,1,0))
 
     # Align axes
     data['positions'][:,[0,1,2]] = data['positions'][:,[2,1,0]]
     data['velocities'][:,[0,1,2]] = data['velocities'][:,[2,1,0]]
     
-    return rho, data['positions'], data['velocities']
+    # Load halo data
+    #    0) group ID
+    #    1) group mass (Msun/h)
+    # 2- 4) initial position (Mpc/h)
+    # 5- 7) final position (Mpc/h)
+    # 8-10) velocity (km/s)
+    #   11) number of particles
+    filename = pjoin(outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
+    hmass = np.log10(np.loadtxt(filename,unpack=False,usecols=(1,)))
+    hpos = np.loadtxt(filename,unpack=False,usecols=(7,6,5))
+    hvel = np.loadtxt(filename,unpack=False,usecols=(10,9,8))
+    
+    return rho, data['positions'], data['velocities'], hpos, hvel, hmass
 
 
 
@@ -336,7 +349,7 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(cfg, outdir)
     
     # Run
-    rho, pos, vel = run_density(cfg, outdir)
+    rho, pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
     
     # Calculate velocity field
     fvel = None
@@ -345,11 +358,17 @@ def main(cfg: DictConfig) -> None:
         # convert from comoving -> peculiar velocities
         fvel *= (1 + cfg.nbody.zf)
         
-    # Save
+    # Save nbody-type outputs
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
+       
+    # Save bias-type outputs
+    logging.info('Saving cube...')
+    np.save(pjoin(outdir, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
+    np.save(pjoin(outdir, 'halo_vel.npy'), hvel)  # halo velocities [km/s]
+    np.save(pjoin(outdir, 'halo_mass.npy'), hmass)  # halo masses [Msun/h]
  
     logging.info("Done!")
 
