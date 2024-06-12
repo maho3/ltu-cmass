@@ -148,6 +148,45 @@ def load_IC(source_path, cpars):
     return rhoic*corr*0.72  # additional hard-coded factor
 
 
+def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
+
+    from .charm.integrate_ltu_cmass import get_model_interface
+    run_config_name = charm_cfg
+    charm_interface = get_model_interface(run_config_name)
+
+    Npix = 128
+    rs = rho.shape
+    pad = 10
+    dL = L/rs[0]
+
+    if np.less(rs, Npix).all():
+        # Run charm
+        hpos, hmass = charm_interface.process_input_density(
+            rho,
+            rho_IC,
+            cosmology_array=np.array(cosmo),
+            BoxSize=L,
+        )
+    else:
+        rho_pad = np.pad(rho, pad, mode='wrap')
+        rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
+
+        for i in range(pad, rs[0] - pad, Npix):
+            for j in range(pad, rs[1] + pad, Npix):
+                for k in range(pad, rs[2] + pad, Npix):
+                    il, ij, ik = i-pad, j-pad, k-pad
+                    # Run charm
+                    hpos_, hmass_ = charm_interface.process_input_density(
+                        rho_pad[il:il+Npix, ij:ij+Npix, ik:ik+Npix],
+                        rho_IC_pad[il:il+Npix, ij:ij+Npix, ik:ik+Npix],
+                        cosmology_array=np.array(cosmo),
+                        BoxSize=L*Npix/rs[0]
+                    )
+                    raise NotImplementedError('Not implemented yet')
+                    # TODO: finish
+    return hpos, hmass
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -173,19 +212,14 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
-        from .charm.integrate_ltu_cmass import get_model_interface
-        run_config_name = cfg.bias.halo.config_charm
-        charm_interface = get_model_interface(run_config_name)
-
         # load initial conditions at z=50, correct to z=99
         rho_IC = load_IC(source_path, cfg.nbody.cosmo)
 
-        # Run charm
-        hpos, hmass = charm_interface.process_input_density(
-            rho,
-            rho_IC,
-            cosmology_array=np.array(cfg.nbody.cosmo),
-            BoxSize=cfg.nbody.L,
+        # apply CHARM model
+        hpos, hmass = apply_charm(
+            rho, rho_IC,
+            cfg.bias.halo.config_charm,
+            cfg.nbody.L, cfg.nbody.cosmo
         )
 
         # halos are initially put on a grid, perturb their positions

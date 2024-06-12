@@ -22,7 +22,6 @@ import os
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-import astropy.cosmology as cosmology
 from .tools.hod import (thetahod_literature,
                         build_halo_catalog, build_HOD_model)
 from ..utils import (get_source_path, timing_decorator, load_params,

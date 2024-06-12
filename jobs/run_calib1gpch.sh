@@ -1,4 +1,4 @@
-#PBS -N quijote
+#PBS -N 2gpch
 #PBS -q batch
 #PBS -j oe
 #PBS -o ${HOME}/data/jobout/${PBS_JOBNAME}.${PBS_JOBID}.log
@@ -32,8 +32,9 @@ cd /home/mattho/git/ltu-cmass
 # rm ./data/quijote/wn/N${N}/wn_${PBS_ARRAYID}.dat
 
 # # fit_halo_bias
-sim=latin_hypercube_HR
-suite=quijote
+sim=pmwd
+suite=inf_2gpch
+PBS_ARRAYID=0
 
 for i in 0 500 1000 1500
 do
@@ -57,17 +58,19 @@ do
 #     #     echo "halo_mass.npy exists, skipping rho_to_halo"
 #     # else
 #     #     conda activate cmass
-#     #     python -m cmass.bias.rho_to_halo sim=${sim} nbody=quijote nbody.lhid=${idx}
+#     #     
 #     # fi
     module restore cmass
     conda activate cmass
 
-    python -m cmass.survey.remap_cuboid sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite}
+    python -m cmass.bias.rho_to_halo sim=${sim} nbody=2gpch nbody.lhid=${idx}
+    python -m cmass.survey.remap_cuboid sim=${sim} nbody=2gpch nbody.lhid=${idx} nbody.suite=${suite}
 
-    for j in {0..5}
+    for j in {0..1}
     do
-        python -m cmass.bias.apply_hod sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
-        python -m cmass.survey.ngc_selection sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+        python -m cmass.bias.apply_hod sim=${sim} nbody=2gpch nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+        python -m cmass.survey.ngc_selection sim=${sim} nbody=2gpch nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+        python -m cmass.summaries.Pk sim=${sim} nbody=2gpch nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
     done
     
     echo "~~~~~ Finished lhid=${idx} ~~~~~"
