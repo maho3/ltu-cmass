@@ -145,7 +145,7 @@ def load_IC(source_path, cpars):
     cosmo = cosmo_to_colossus(cpars)
     corr = cosmo.growthFactorUnnormalized(z=99)
     corr /= cosmo.growthFactorUnnormalized(z=50)
-    return rhoic*corr
+    return rhoic*corr*0.72  # additional hard-coded factor
 
 
 @timing_decorator
@@ -177,14 +177,8 @@ def main(cfg: DictConfig) -> None:
         run_config_name = cfg.bias.halo.config_charm
         charm_interface = get_model_interface(run_config_name)
 
-        # load initial conditions at z=50
+        # load initial conditions at z=50, correct to z=99
         rho_IC = load_IC(source_path, cfg.nbody.cosmo)
-
-        # convert z=50->99
-        cosmoc = cosmo_to_colossus(cfg.nbody.cosmo)
-        correction = cosmoc.growthFactorUnnormalized(z=99)
-        correction /= cosmoc.growthFactorUnnormalized(z=50)
-        rho_IC *= correction
 
         # Run charm
         hpos, hmass = charm_interface.process_input_density(

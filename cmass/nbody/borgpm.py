@@ -42,7 +42,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
+from .tools import gen_white_noise, load_white_noise, save_nbody, vfield
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
@@ -209,7 +209,10 @@ def main(cfg: DictConfig) -> None:
     # Calculate velocity field
     fvel = None
     if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
+        _, fvel = vfield(
+            pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+            cfg.nbody.cosmo[0], cfg.nbody.cosmo[2], verbose=False
+        )
         # convert from comoving -> peculiar velocities
         fvel *= (1 + cfg.nbody.zf)
 
