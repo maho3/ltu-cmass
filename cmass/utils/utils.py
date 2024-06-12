@@ -53,16 +53,34 @@ def load_params(index, cosmofile):
     return content
 
 
-def cosmo_to_astropy(params):
-    # Converts a list of cosmological parameters into an astropy cosmology object.
-    # Note, ignores s8 and n_s parameters, which are not used in astropy.
+def cosmo_to_astropy(params=None, omega_m=None, omega_b=None,
+                     h=None, n_s=None, sigma8=None):
+    """
+    Converts a list of cosmological parameters into an astropy cosmology
+    object. Note, ignores s8 and n_s parameters, which are not used in astropy.
+    """
 
     # check if params is a list
-    try:
-        params = list(params)
-    except TypeError:
-        return params
-    return FlatLambdaCDM(H0=params[2]*100, Om0=params[0], Ob0=params[1])
+    if isinstance(params, list):
+        return FlatLambdaCDM(H0=params[2]*100, Om0=params[0], Ob0=params[1])
+    return FlatLambdaCDM(H0=h*100, Om0=omega_m, Ob0=omega_b)
+
+
+def get_particle_mass(N, L, omega_m, h):
+    """
+    M_particle = Omega_m * rho_crit * Volume / NumParticles
+
+    Args:
+        N (int): number of particles per dimension
+        L (float): box side length (Mpc/h)
+        omega_m (float): matter density
+        h (float): Hubble constant
+    """
+    cosmo = cosmo_to_astropy(omega_m=omega_m, h=h)
+    rho_crit = cosmo.critical_density0.to('Msun/Mpc^3').value
+    volume = L**3  # (Mpc/h)^3
+    NumParticles = N**3
+    return omega_m * rho_crit * volume / (NumParticles * h**2)  # Msun/h
 
 
 def cosmo_to_colossus(cpars):
