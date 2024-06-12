@@ -83,10 +83,14 @@ def vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
         h (float): Hubble constant
         verbose (bool, optional): print information on progress
     """
+    ppos = ppos.astype(np.float32)
+    pvel = pvel.astype(np.float32)
+
     Npart = len(ppos)
     m_particle = get_particle_mass(Npart, BoxSize, omega_m, h)
     rho = assign_field(ppos, BoxSize, Ngrid, MAS,
-                       value=m_particle, verbose=verbose)
+                       value=None, verbose=verbose)
+    rho *= m_particle
 
     pmom = m_particle * pvel
     mom = np.stack([
