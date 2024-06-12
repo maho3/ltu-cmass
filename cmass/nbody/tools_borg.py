@@ -11,27 +11,42 @@ def build_cosmology(omega_m, omega_b, h, n_s, sigma8):
     return cpar
 
 
-def transfer_EH(chain, box, ai):
-    chain.addModel(borg.forward.models.Primordial(box, ai))
-    chain.addModel(borg.forward.models.EisensteinHu(box))
-
-
-def transfer_CLASS(chain, box, cpar, ai):
-    # not currently used
+def compute_As(cpar):
+    # requires BORG-CLASS
     sigma8_true = np.copy(cpar.sigma8)
     cpar.sigma8 = 0
-    cpar.A_s = 2.3e-9  # will be modified to correspond to correct sigma
-    cosmo = borg.cosmo.ClassCosmo(
-        cpar, k_per_decade=10, k_max=50, extra={'YHe': '0.24'})
-    cosmo.computeSigma8()  # will compute sigma for the provided A_s
+    cpar.A_s = 2.3e-9
+    k_max, k_per_decade = 10, 100
+    extra_class = {}
+    extra_class['YHe'] = '0.24'
+    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
+    cosmo.computeSigma8()
     cos = cosmo.getCosmology()
-    # Update A_s
     cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
+    cpar.sigma8 = sigma8_true
+    return cosmo
+
+
+def transfer_EH(chain, box):
+    chain @= borg.forward.model_lib.M_PRIMORDIAL(
+        box, opts=dict(a_final=1.0))
+    chain @= borg.forward.model_lib.M_TRANSFER_EHU(
+        box, opts=dict(reverse_sign=True))
+    return chain
+
+
+def transfer_CLASS(chain, box, cpar):
+    # Compute As
+    cpar = compute_As(cpar)
+
     # Add primordial fluctuations
-    chain.addModel(borg.forward.model_lib.M_PRIMORDIAL_AS(box))
+    chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
+
     # Add CLASS transfer function
+    extra_class = {"YHe": "0.24", "z_max_pk": "200"}
     transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
-        box, opts={"a_transfer": ai, "use_class_sign": False})
-    transfer_class.setModelParams(
-        {"extra_class_arguments": {"YHe": "0.24", "z_max_pk": "200"}})
-    chain.addModel(transfer_class)
+        box, opts=dict(a_transfer=1.0))
+    transfer_class.setModelParams({"extra_class_arguments": extra_class})
+    chain @= transfer_class
+
+    return chain
