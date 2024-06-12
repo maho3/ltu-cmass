@@ -177,8 +177,16 @@ def main(cfg: DictConfig) -> None:
         run_config_name = cfg.bias.halo.config_charm
         charm_interface = get_model_interface(run_config_name)
 
+        # load initial conditions at z=50
         rho_IC = load_IC(source_path, cfg.nbody.cosmo)
 
+        # convert z=50->99
+        cosmoc = cosmo_to_colossus(cfg.nbody.cosmo)
+        correction = cosmoc.growthFactorUnnormalized(z=99)
+        correction /= cosmoc.growthFactorUnnormalized(z=50)
+        rho_IC *= correction
+
+        # Run charm
         hpos, hmass = charm_interface.process_input_density(
             rho,
             rho_IC,
@@ -196,6 +204,10 @@ def main(cfg: DictConfig) -> None:
 
         # ensure periodicity
         hpos = hpos % cfg.nbody.L
+
+        # Limit to M>1e13
+        mask = hmass > 13
+        hpos, hmass = hpos[mask], hmass[mask]
 
         # conform to mass-bin format of other bias models TODO: refactor?
         hpos, hmass = [hpos], [hmass]

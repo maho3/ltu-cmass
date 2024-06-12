@@ -104,7 +104,7 @@ def run_density(wn, cpar, cfg):
             do_rsd=False,
             supersampling=nbody.supersampling,
             part_factor=1.01,
-            forcesampling=nbody.B,  # TODO: change to supersampling*B
+            forcesampling=nbody.B*nbody.supersampling,
             pm_start_z=nbody.zi,
             pm_nsteps=nbody.N_steps,
             tcola=nbody.COLA
