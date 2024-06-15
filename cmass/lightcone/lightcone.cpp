@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <cassert>
+#include <climits>
 
 #include <vector>
 #include <functional>
@@ -181,6 +182,9 @@ struct Lightcone
         seed{seed_},
         C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
     {
+        if (Nsnaps>=256) // can't fit in our data type
+            throw std::runtime_error("too many snapshots");
+
         if (verbose) std::printf("process_times\n");
         process_times();
 
@@ -208,6 +212,9 @@ struct Lightcone
         if (std::find(snap_indices_done.begin(), snap_indices_done.end(), snap_idx)
             != snap_indices_done.end())
             throw std::runtime_error("adding the same snapshot twice");
+
+        if ( Ngal > (std::numeric_limits<galid_t>::max()/256) )
+            throw std::runtime_error("too many galaxies");
 
         if (verbose) std::printf("\tremap_snapshot\n");
         remap_snapshot(Ngal, xgal, vgal, vhlo);
@@ -291,7 +298,6 @@ struct Lightcone
                           const std::vector<double> &,
                           const std::vector<double> &,
                           const std::vector<double> &);
-    static galid_t galid (galid_t snap_idx, galid_t gal_idx);
 };
 
 #ifdef TEST
@@ -520,6 +526,11 @@ void Lightcone::remap_snapshot (size_t Ngal,
     vhlo = std::move(tmp_vhlo);
 }
 
+static inline galid_t make_galid (galid_t snap_idx, galid_t gal_idx)
+{
+    return ( snap_idx << ((sizeof(galid_t)-1)*CHAR_BIT) ) + gal_idx;
+}
+
 void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                                  const std::vector<double> &xgal,
                                  const std::vector<double> &vgal,
@@ -614,7 +625,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 if (m) goto not_chosen;
 
                 // compute the galaxy ID
-                galid = Lightcone::galid(snap_idx, jj);
+                galid = make_galid(snap_idx, jj);
 
                 // this is executed in parallel, modifying global variables
                 #pragma omp critical (CHOOSE_APPEND)

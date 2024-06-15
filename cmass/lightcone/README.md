@@ -70,5 +70,15 @@ Using the `add_snap` method. This can be called in any order of snapshots.
 ## getting result
 
 Using the `finalize` method. Call after calling `add_snap` for all snapshots.
-Returns a tuple RA, DEC, z, where the angles are in degrees.
+Returns a tuple RA, DEC, z, galid where the angles are in degrees.
 These are already rotated into the NGC footprint.
+
+The galid return value is a unique ID for each galaxy. This is an unsigned integer (currently 32bit),
+whose leading byte is the snapshot index this galaxy came from, and the remaining lower bytes are the
+index into the original galaxy list passed to `add_snap`.
+The `example.py` file contains the following function to recover this information:
+```python
+def split_galid (gid) :
+    # returns snapshot index, galaxy index
+   return np.divmod(gid, 2**((gid.itemsize-1)*8))
+```
