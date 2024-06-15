@@ -1,8 +1,9 @@
 """
-Simulate density field using BORG LPT models.
+Simulate density field using BORG PM models.
+NOTE: This works with the private BORG version, available to Aquila members.
 
 Requires:
-    - borg
+    - pmwd
 
 Params:
     - nbody.suite: suite name
@@ -72,7 +73,7 @@ def get_ICs(cfg):
             path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
         else:
             path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
-        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
+        return - load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N, seed=nbody.lhid)
 
@@ -95,23 +96,75 @@ def run_density(wn, cpar, cfg):
         raise NotImplementedError(
             f'Transfer function "{nbody.transfer}" not implemented.')
 
-    if nbody.order == 1:
-        lpt = borg.forward.model_lib.M_LPT_CIC(box, opts=dict(a_initial=1.0))
-    elif nbody.order == 2:
-        lpt = borg.forward.model_lib.M_2LPT_CIC(
-            box,
-            opts=dict(
-                a_initial=1.0,
-                a_final=1.0,
-                do_rsd=False,
-                supersampling=1,
-                lightcone=False,
-                part_factor=1.01
-            )
+    pm = borg.forward.model_lib.M_PM_CIC(
+        box,
+        opts=dict(
+            a_initial=1.0,
+            a_final=nbody.af,
+            do_rsd=False,
+            supersampling=nbody.supersampling,
+            part_factor=1.01,
+            forcesampling=nbody.B,
+            pm_start_z=nbody.zi,
+            pm_nsteps=nbody.N_steps,
+            tcola=nbody.COLA
         )
+    )
+
+    class notifier:
+        def __init__(self, asave):
+            self.step_id = 0
+            self.asave = asave
+            self.rhos = {}
+            self.fvels = {}
+
+        def assign_snap(self):
+            # after learning the step intervals, assign where to save snaps
+            asteps = np.arange(self.a1, 1, self.da)
+            tosave = [
+                np.argmin(np.abs(asteps - a)) for a in self.asave
+            ]
+            tosave = np.unique(tosave)
+            self.tosave = tosave
+
+        def __call__(self, a, Np, ids, poss, vels):
+            self.step_id += 1
+            if self.step_id == 1:  # ignore initial step
+                return
+            elif self.step_id == 2:  # save the first step
+                self.a1 = a
+                return
+            elif self.step_id == 3:  # learn the step intervals
+                self.da = a - self.a1
+                self.assign_snap()
+            if self.step_id-2 not in self.tosave:  # ignore intermediate steps
+                return
+            logging.info(f"Saving snap a={a:.6f}, step {self.step_id}")
+            rho, fvel = vfield(
+                poss, vels,
+                Ngrid=nbody.N,
+                BoxSize=nbody.L,
+                MAS='CIC',
+                omega_m=cpar.omega_m,
+                h=cpar.h
+            )
+            self.rhos[a] = rho
+            self.fvels[a] = fvel
+
+    if hasattr(nbody, 'zsave'):
+        zsave = np.array(nbody.zsave)
+        asave = 1/(1+zsave)
     else:
-        raise NotImplementedError(f'Order "{nbody.order}" not implemented.')
-    chain @= lpt
+        asave = []
+
+    noti = notifier(asave=asave)
+    pm.setStepNotifier(
+        noti,
+        with_particles=True
+    )
+
+    chain @= pm
+    chain.setAdjointRequired(False)
 
     chain.setCosmoParams(cpar)
 
@@ -119,15 +172,29 @@ def run_density(wn, cpar, cfg):
     logging.info('Running forward...')
     chain.forwardModel_v2(wn)
 
-    Npart = lpt.getNumberOfParticles()
-    rho = np.empty(chain.getOutputBoxModel().N)
+    Npart = pm.getNumberOfParticles()
     pos = np.empty(shape=(Npart, 3))
     vel = np.empty(shape=(Npart, 3))
-    chain.getDensityFinal(rho)
-    lpt.getParticlePositions(pos)
-    lpt.getParticleVelocities(vel)
+    pm.getParticlePositions(pos)
+    pm.getParticleVelocities(vel)
 
-    return rho, pos, vel
+    snapshots = {
+        'rhos': noti.rhos,
+        'fvels': noti.fvels
+    }
+
+    vel *= 100  # km/s
+
+    rho, fvel = vfield(
+        pos, vel,
+        Ngrid=nbody.N,
+        BoxSize=nbody.L,
+        MAS='CIC',
+        omega_m=cpar.omega_m,
+        h=cpar.h
+    )
+
+    return rho, fvel, snapshots
 
 
 @timing_decorator
@@ -151,20 +218,21 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, cpar, cfg)
+    rho, fvel, snapshots = run_density(wn, cpar, cfg)
 
-    # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        _, fvel = vfield(pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-                         cfg.nbody.cosmo[0], cfg.nbody.cosmo[2])
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    # # Calculate velocity field  # TODO: remove
+    # fvel = None
+    # if cfg.nbody.save_velocities:
+    #     fvel = vfield_CIC(pos, vel, cfg)
+    #     # convert from comoving -> peculiar velocities
+    #     fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    outdir = get_source_path(cfg, "borgpm", check=False)
+    save_nbody(outdir, rho, fvel, pos=None, vel=None,
+               save_particles=cfg.nbody.save_particles,
+               save_velocities=cfg.nbody.save_velocities)
+    np.savez(pjoin(outdir, 'snapshots.npz'), **snapshots)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

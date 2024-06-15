@@ -6,7 +6,7 @@ import lc
 N = 3000000
 
 # where mask .ply files and redshift histogram are stored
-boss_dir = '/tigress/lthiele/boss_dr12'
+boss_dir = '../../data/obs'
 
 # scale factors, need to be monotonically decreasing
 snap_times = [0.7, 0.65, 0.6, ]
@@ -26,7 +26,7 @@ l = lc.Lightcone(
 
 # add some snapshots
 rng = np.random.default_rng()
-for snap_idx, a in enumerate(snap_times) :
+for snap_idx, a in enumerate(snap_times):
     xgal = rng.random((N, 3)) * 3e3
     vgal = (rng.random((N, 3))-0.5)*300
     vhlo = (rng.random((N, 3))-0.5)*300
@@ -36,7 +36,7 @@ ra, dec, z, galid = l.finalize()
 
 # check if mask is working correctly
 fig, ax = plt.subplots(figsize=(10, 10))
-choose = (z>0.5) * (z<0.6)
+choose = (z > 0.5) * (z < 0.6)
 ax.plot(ra[choose], dec[choose], linestyle='none', marker='o', markersize=0.1)
 ax.set_xlabel('RA [deg]')
 ax.set_ylabel('DEC [deg]')

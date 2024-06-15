@@ -2,7 +2,8 @@
 Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
 
 Requires:
-    - nbodykit
+    - halotools
+    - astropy
 
 Input:
     - pos: halo positions
@@ -16,16 +17,16 @@ Output:
 """
 
 import numpy as np
-import argparse
 import logging
 import os
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-import nbodykit.lab as nblab
-from nbodykit.hod import Zheng07Model
-from .tools.hod import thetahod_literature
-from ..utils import get_source_path, timing_decorator, load_params
+import astropy.cosmology as cosmology
+from .tools.hod import (thetahod_literature,
+                        build_halo_catalog, build_HOD_model)
+from ..utils import (get_source_path, timing_decorator, load_params,
+                     cosmo_to_astropy)
 
 
 def parse_config(cfg):
@@ -53,7 +54,7 @@ def get_hod_params(seed=0):
     return theta
 
 
-@timing_decorator
+@ timing_decorator
 def load_cuboid(source_dir):
     pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
     vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
@@ -61,46 +62,35 @@ def load_cuboid(source_dir):
     return pos, vel, mass
 
 
-@timing_decorator
+@ timing_decorator
 def populate_hod(
-        pos, vel, mass,
-        theta, cosmo, redshift, mdef, L,
-        seed=0):
+    pos, vel, mass,
+    cosmo, cfg, seed=0, mdef='vir'
+):
+    cosmo = cosmo_to_astropy(cosmo)
 
-    # create a structured array to hold the halo catalog
-    dtype = [('Position', (np.float32, 3)),
-             ('Velocity', (np.float32, 3)),
-             ('Mass', np.float32)]
-    halos = np.empty(len(pos), dtype=dtype)
-    halos['Position'] = pos
-    halos['Velocity'] = vel
-    halos['Mass'] = 10**mass
-
-    source = nblab.ArrayCatalog(halos)
-    source.attrs['BoxSize'] = L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
-
-    cosmology = nblab.cosmology.Planck15.clone(
-        h=cosmo[2],
-        Omega0_b=cosmo[1],
-        Omega0_cdm=cosmo[0] - cosmo[1],
-        m_ncdm=None,
-        n_s=cosmo[3])
-
-    # We don't need to match sigma8, because HOD is invariant.
-    # cosmology = cosmology.match(sigma8=cosmo[4])
-
-    halos = nblab.HaloCatalog(
-        source,
-        cosmo=cosmology,
-        redshift=redshift,
-        mdef=mdef,
+    BoxSize = cfg.nbody.L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
+    catalog = build_halo_catalog(
+        pos, vel, 10**mass, cfg.nbody.zf, BoxSize, cosmo,
+        mdef=mdef
     )
-    hod = halos.populate(Zheng07Model, seed=seed, **theta)
-    return hod
+
+    hod_params = cfg.bias.hod.theta
+
+    hod = build_HOD_model(
+        cosmo, cfg.nbody.zf, hod_model='zheng07', mdef=mdef,
+        **hod_params
+    )
+
+    hod.populate_mock(catalog, seed=seed)
+
+    galcat = hod.mock.galaxy_table.as_array()
+
+    return galcat
 
 
-@timing_decorator
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@ timing_decorator
+@ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
@@ -116,20 +106,24 @@ def main(cfg: DictConfig) -> None:
     logging.info('Populating HOD...')
     hod = populate_hod(
         pos, vel, mass,
-        cfg.bias.hod.theta, cfg.nbody.cosmo, 0, 'vir', cfg.nbody.L,
+        cfg.nbody.cosmo, cfg,
         seed=cfg.bias.hod.seed
     )
 
-    pos, vel = np.array(hod['Position']), np.array(hod['Velocity'])
+    gpos = np.array([hod['x'], hod['y'], hod['z']]).T
+    gvel = np.array([hod['vx'], hod['vy'], hod['vz']]).T
+    meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
 
     savepath = pjoin(source_path, 'hod')
     os.makedirs(savepath, exist_ok=True)
 
     logging.info(f'Saving to {savepath}/hod{cfg.bias.hod.seed}...')
     # galaxy positions [Mpc/h]
-    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_pos.npy'), pos)
+    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_pos.npy'), gpos)
     # galaxy velocities [km/s]
-    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_vel.npy'), vel)
+    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_vel.npy'), gvel)
+    # galaxy metadata
+    np.savez(pjoin(savepath, f'hod{cfg.bias.hod.seed}_meta.npz'), **meta)
 
     logging.info('Done!')
 
