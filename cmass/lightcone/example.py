@@ -32,7 +32,7 @@ for snap_idx, a in enumerate(snap_times) :
     vhlo = (rng.random((N, 3))-0.5)*300
     l.add_snap(snap_idx, xgal, vgal, vhlo)
 
-ra, dec, z = l.finalize()
+ra, dec, z, galid = l.finalize()
 
 # check if mask is working correctly
 fig, ax = plt.subplots(figsize=(10, 10))

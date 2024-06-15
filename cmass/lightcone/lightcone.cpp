@@ -38,6 +38,8 @@ namespace cmangle {
 #define M_PIl 3.14159265358979323846264338327950288419716939937510L
 #endif
 
+typedef uint32_t galid_t;
+
 namespace Geometry
 {
     int remaps[][9] =
@@ -164,6 +166,7 @@ struct Lightcone
     const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
     gsl_histogram *boss_z_hist;
     std::vector<double> RA, DEC, Z;
+    std::vector<galid_t> GALID;
     std::vector<int> snap_indices_done;
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
@@ -270,8 +273,9 @@ struct Lightcone
         pyb::array_t<double> RAnumpy = pyb::array(RA.size(), RA.data()),
                              DECnumpy = pyb::array(DEC.size(), DEC.data()),
                              Znumpy = pyb::array(Z.size(), Z.data());
+        pyb::array_t<galid_t> GALIDnumpy = pyb::array(GALID.size(), GALID.data());
 
-        return pyb::make_tuple(RAnumpy, DECnumpy, Znumpy);
+        return pyb::make_tuple(RAnumpy, DECnumpy, Znumpy, GALIDnumpy);
     }
 
     void process_times ();
@@ -287,6 +291,7 @@ struct Lightcone
                           const std::vector<double> &,
                           const std::vector<double> &,
                           const std::vector<double> &);
+    static galid_t galid (galid_t snap_idx, galid_t gal_idx);
 };
 
 #ifdef TEST
@@ -538,7 +543,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
         #pragma omp for schedule (dynamic, 1024)
         for (size_t jj=0; jj<Ngal; ++jj)
         {
-            if (!mangle_status_) continue;
+            if (!mangle_status_) [[unlikely]] continue;
 
             for (int kk=0; kk<3; ++kk) los[kk] = xgal[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
             double chi = std::hypot(los[0], los[1], los[2]);
@@ -598,6 +603,8 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 if (ra<0.0) ra += 360.0;
                 ra += Geometry::beta;
 
+                galid_t galid;
+
                 // for the angular mask
                 cmangle::Point pt;
                 cmangle::point_set_from_radec(&pt, ra, dec);
@@ -606,12 +613,16 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 if (!mangle_status_) [[unlikely]] continue;
                 if (m) goto not_chosen;
 
+                // compute the galaxy ID
+                galid = Lightcone::galid(snap_idx, jj);
+
                 // this is executed in parallel, modifying global variables
                 #pragma omp critical (CHOOSE_APPEND)
                 {
                     RA.push_back(ra);
                     DEC.push_back(dec);
                     Z.push_back(z);
+                    GALID.push_back(galid);
                 }
                 continue;
 
@@ -657,6 +668,7 @@ void Lightcone::downsample (double plus_factor)
     }
     
     std::vector<double> ra_tmp, dec_tmp, z_tmp;
+    std::vector<galid_t> galid_tmp;
 
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
     gsl_rng_set(rng, seed);
@@ -670,6 +682,7 @@ void Lightcone::downsample (double plus_factor)
             ra_tmp.push_back(RA[ii]);
             dec_tmp.push_back(DEC[ii]);
             z_tmp.push_back(Z[ii]);
+            galid_tmp.push_back(GALID[ii]);
         }
     }
 
@@ -681,6 +694,7 @@ void Lightcone::downsample (double plus_factor)
     RA = std::move(ra_tmp);
     DEC = std::move(dec_tmp);
     Z = std::move(z_tmp);
+    GALID = std::move(galid_tmp);
 }
 
 struct GalHelper
@@ -688,15 +702,16 @@ struct GalHelper
     // we store the coordinates so we have more efficient lookup hopefully
     // (at the cost of more memory but should be fine)
     double ra, dec, z;
+    galid_t galid;
     int64_t hp_idx;
     unsigned long id;
     pointing ang;
 
     GalHelper ( ) = default;
 
-    GalHelper (unsigned long id_, double ra_, double dec_, double z_,
+    GalHelper (unsigned long id_, double ra_, double dec_, double z_, galid_t galid_,
                const T_Healpix_Base<int64_t> &hp_base) :
-        ra {ra_}, dec {dec_}, z{z_}, id {id_}
+        ra {ra_}, dec {dec_}, z{z_}, id {id_}, galid {galid_}
     {
         double theta = (90.0-dec) * M_PI/180.0;
         double phi = ra * M_PI/180.0;
@@ -745,7 +760,7 @@ double Lightcone::fibcoll ()
         
         #pragma omp for
         for (size_t ii=0; ii<RA.size(); ++ii)
-            all_vec[ii] = GalHelper(gsl_rng_get(rng), RA[ii], DEC[ii], Z[ii], hp_base);
+            all_vec[ii] = GalHelper(gsl_rng_get(rng), RA[ii], DEC[ii], Z[ii], GALID[ii], hp_base);
     }
 
     if constexpr (!only_measure)
@@ -754,6 +769,7 @@ double Lightcone::fibcoll ()
         RA.clear();
         DEC.clear();
         Z.clear();
+        GALID.clear();
     }
 
     // sort these for efficient access with increasing healpix index
@@ -831,6 +847,7 @@ double Lightcone::fibcoll ()
                     RA.push_back(g.ra);
                     DEC.push_back(g.dec);
                     Z.push_back(g.z);
+                    GALID.push_back(g.galid);
                 }
         }
     }
