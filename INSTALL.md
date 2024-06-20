@@ -91,11 +91,19 @@ endif
 ```
 Also change the `SYSTYPE` argument to be `"infinity"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work. 
 
+Lastly, in [your nbody configuration file](./cmass/conf/nbody/pinocchio.yaml) you need to specify the absolute path to your Pinocchio executable. This is the `pinnochio.x` file in the `src` directory of Pinocchio, generated during the `make`. For example, mine is:
+```yaml
+pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
+```
+
 Finally, before running the executable `pinnochio.x`, you must also run
 ```bash
 export LD_LIBRARY_PATH=/softs/fftw3/3.3.10-gnu-mpi/lib:$LD_LIBRARY_PATH
 ```
-to enable pinnochio to access the fftw3_mpi library.
+to enable pinnochio to access the fftw3_mpi library. Then you should be able to run the default configuration:
+```bash
+python -m cmass.nbody.pinocchio nbody=pinocchio
+```
 
 ### Installing camb, CLASS, or syren [optional]
 Pinocchio then requires you to generate a linear power spectrum on your own. We provide integration with [camb](https://github.com/cmbant/CAMB), [CLASS](https://github.com/lesgourg/class_public), or [syren](https://github.com/DeaglanBartlett/symbolic_pofk).

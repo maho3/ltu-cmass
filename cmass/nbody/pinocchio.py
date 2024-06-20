@@ -28,6 +28,7 @@ def parse_config(cfg):
     return cfg
 
 
+@timing_decorator
 def get_ICs(cfg, outdir):
 
     nbody = cfg.nbody
@@ -64,21 +65,22 @@ def get_ICs(cfg, outdir):
     return
 
 
+@timing_decorator
 def generate_pk_file(cfg, outdir):
 
     if cfg.nbody.transfer == 'EH':
         return
 
     kmin = 2 * np.pi / cfg.nbody.L
-    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / \
-        cfg.nbody.L  #  Larger than Nyquist
+    #  Larger than Nyquist
+    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / cfg.nbody.L
     k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
 
-    if cfg.nbody.transfer == 'CAMB':
+    if cfg.nbody.transfer.upper() == 'CAMB':
         pk = get_camb_pk(k, *cfg.nbody.cosmo)
-    elif cfg.nbody.transfer == 'CLASS':
+    elif cfg.nbody.transfer.upper() == 'CLASS':
         pk = get_class_pk(k, *cfg.nbody.cosmo)
-    elif cfg.nbody.transfer == 'SYREN':
+    elif cfg.nbody.transfer.upper() == 'SYREN':
         pk = get_syren_pk(k, *cfg.nbody.cosmo)
     else:
         raise NotImplementedError(
