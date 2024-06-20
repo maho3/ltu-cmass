@@ -148,43 +148,72 @@ def load_IC(source_path, cpars):
     return rhoic*corr*0.72  # additional hard-coded factor
 
 
-def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
+def batch_cube(x, Nsub, width, stride):
+    """Batches a cube x into Nsub sub-cubes per side, each of size Nbatch with stride dN."""
+    batches = []
+    for i in range(Nsub):
+        for j in range(Nsub):
+            for k in range(Nsub):
+                batches.append(x[i*stride:i*stride+width,
+                                 j*stride:j*stride+width,
+                                 k*stride:k*stride+width])
+    return np.stack(batches, axis=0)
 
+
+def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
+    """Apply CHARM, accounting for the pre-trained resolution."""
+
+    # Load CHARM
     from .charm.integrate_ltu_cmass import get_model_interface
     run_config_name = charm_cfg
     charm_interface = get_model_interface(run_config_name)
 
-    Npix = 128
-    rs = rho.shape
-    pad = 10
-    dL = L/rs[0]
+    # Hard-code the pre-trained CHARM configuration
+    Npix = 128  # pre-trained resolution
+    pad = 4  # CHARM padding
+    Lcharm = 1000  # CHARM box size
+    Npad = 128+2*pad  # padded resolution
 
-    if np.less(rs, Npix).all():
-        # Run charm
+    N = rho.shape[0]  # input resolution
+    assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize
+
+    Nsub = N//Npix  # number of sub-boxes
+
+    # Pad the input density field
+    rho_pad = np.pad(rho, pad, mode='wrap')
+    rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
+
+    # Split the inputs into batches
+    batch_rho = batch_cube(rho, Nsub, Npix, Npix)
+    batch_rho_pad = batch_cube(rho_pad, Nsub, Npad, Npix)
+    batch_rho_IC = batch_cube(rho_IC, Nsub, Npix, Npix)
+    batch_rho_IC_pad = batch_cube(rho_IC_pad, Nsub, Npad, Npix)
+
+    # Run CHARM on each batch and append outputs
+    hposs, hmasss = [], []
+    for i in range(len(batch_rho)):
+        logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
         hpos, hmass = charm_interface.process_input_density(
-            rho,
-            rho_IC,
+            rho_m_zg=batch_rho[i],
+            rho_m_zIC=batch_rho_IC[i],
+            df_test_pad_zg=batch_rho_pad[i],
+            df_test_pad_zIC=batch_rho_IC_pad[i],
             cosmology_array=np.array(cosmo),
-            BoxSize=L,
+            BoxSize=Lcharm
         )
-    else:
-        rho_pad = np.pad(rho, pad, mode='wrap')
-        rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
+        mask = hmass > 13
+        hposs.append(hpos[mask])
+        hmasss.append(hmass[mask])
 
-        for i in range(pad, rs[0] - pad, Npix):
-            for j in range(pad, rs[1] + pad, Npix):
-                for k in range(pad, rs[2] + pad, Npix):
-                    il, ij, ik = i-pad, j-pad, k-pad
-                    # Run charm
-                    hpos_, hmass_ = charm_interface.process_input_density(
-                        rho_pad[il:il+Npix, ij:ij+Npix, ik:ik+Npix],
-                        rho_IC_pad[il:il+Npix, ij:ij+Npix, ik:ik+Npix],
-                        cosmology_array=np.array(cosmo),
-                        BoxSize=L*Npix/rs[0]
-                    )
-                    raise NotImplementedError('Not implemented yet')
-                    # TODO: finish
-    return hpos, hmass
+    # Shift the positions to the original box
+    l = 0
+    for i in range(Nsub):
+        for j in range(Nsub):
+            for k in range(Nsub):
+                hposs[l] += np.array([i, j, k])*Lcharm
+                l += 1
+
+    return np.concatenate(hposs), np.concatenate(hmasss)
 
 
 @timing_decorator

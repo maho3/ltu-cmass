@@ -285,7 +285,9 @@ class get_model_interface:
         self.model = model
         print(loss_min, epoch_tot_counter)
 
-    def process_input_density(self, rho_m_zg=None, rho_m_zIC=None, cosmology_array=None, BoxSize=1000, test_LH_id=None,
+    def process_input_density(self, rho_m_zg=None, rho_m_zIC=None,
+                              df_test_pad_zg=None, df_test_pad_zIC=None,
+                              cosmology_array=None, BoxSize=1000, test_LH_id=None,
                               load_test_LH_dir='/mnt/ceph/users/spandey/Quijote/data_NGP_self_fastpm_LH',
                               LH_cosmo_val_file='/mnt/home/spandey/ceph/Quijote/latin_hypercube_params.txt',
                               verbose=False):
@@ -300,28 +302,34 @@ class get_model_interface:
         n_pad = n_dim_red * self.nc
 
         if rho_m_zg is None:
+            # load the z=0.5 density, if unspecified
             df_zg = pk.load(open(
                 f'{load_test_LH_dir}/{test_LH_id}/density_HR_full_m_res_128_z=0.5_nbatch_8_nfilter_3_ncnn_0.pk', 'rb'))
             df_test_zg = df_zg['density_cic_unpad_combined']
         else:
             df_test_zg = rho_m_zg
-        df_test_pad_zg = np.pad(df_test_zg, n_pad, 'wrap')
+        if df_test_pad_zg is None:
+            df_test_pad_zg = np.pad(df_test_zg, n_pad, 'wrap')
         if verbose:
             print(
                 f"loaded density at zg=0.5 with shape {df_test_pad_zg.shape}")
 
         if rho_m_zIC is None:
+            # load the z=99 density, if unspecified
             df_zIC = pk.load(open(
                 f'{load_test_LH_dir}/{test_LH_id}/density_HR_full_m_res_128_z=99_nbatch_8_nfilter_3_ncnn_0.pk', 'rb'))
             df_test_zIC = df_zIC['density_cic_unpad_combined']
         else:
             df_test_zIC = rho_m_zIC
-        df_test_pad_zIC = np.pad(df_test_zIC, n_pad, 'wrap')
+        if df_test_pad_zIC is None:
+            df_test_pad_zIC = np.pad(df_test_zIC, n_pad, 'wrap')
         if verbose:
             print(
                 f"loaded density at IC zIC=99 with shape {df_test_pad_zIC.shape}")
 
         z_REDSHIFT_diff_sig_VALUE = self.z_all_FP[-1]
+
+        # smooth density field for input
         VALUE_SIG = float(z_REDSHIFT_diff_sig_VALUE.split('_')[4])
         density_smoothed = gaussian_filter(df_test_pad_zg, sigma=VALUE_SIG)
         df_test_pad_constrast_zg = density_smoothed - df_test_pad_zg
@@ -361,6 +369,7 @@ class get_model_interface:
         if verbose:
             print(f"Running the model")
 
+        # run the model
         Ntot_samp_test, M1_samp_test, M_diff_samp_test, mask_tensor_M1_samp_test, mask_tensor_Mdiff_samp_test, _ = self.model.module.inverse(
             cond_x=df_test_all_pad,
             cond_x_nsh=df_test_all_unpad,
@@ -379,8 +388,9 @@ class get_model_interface:
             train_Mdiff=train_Mdiff,
         )
         if verbose:
-            print(f"Ran the model")
+            print("Ran the model")
 
+        # reshape outputs
         Ntot_samp_test = Ntot_samp_test[0][:, np.newaxis]
         save_subvol_Nhalo = Ntot_samp_test.reshape(
             nsims_test, nax_h_test, nax_h_test, nax_h_test)
@@ -396,6 +406,7 @@ class get_model_interface:
         mask_subvol_Mtot = np.concatenate(
             [mask_subvol_Mtot1, mask_subvol_Mtot2], axis=-1)
 
+        # compute the mass of halos from output
         save_subvol_Mtot = np.zeros(
             (nsims_test, nax_h_test, nax_h_test, nax_h_test, self.ndim_diff + 1))
         # Mmin, Mmax = return_dict_test['Mmin'], return_dict_test['Mmax']
@@ -409,8 +420,8 @@ class get_model_interface:
 
         save_subvol_Mtot *= mask_subvol_Mtot
 
-        Nhalos = save_subvol_Nhalo[0, ...]
-        M_halos = save_subvol_Mtot[0, ...]
+        Nhalos = save_subvol_Nhalo[0, ...]  # histogram of halos in each voxel
+        M_halos = save_subvol_Mtot[0, ...]  # mass of halos in each voxel
 
         # create the meshgrid
         xall = (np.linspace(0, BoxSize, self.ns_h + 1))
@@ -419,6 +430,7 @@ class get_model_interface:
         zarray = np.copy(xarray)
         x_cy, y_cy, z_cy = np.meshgrid(xarray, yarray, zarray, indexing='ij')
 
+        # record discrete halo positions and masses
         x_h_mock, y_h_mock, z_h_mock, lgM_mock = [], [], [], []
         # Nmax_sel = 3
         k = 0
