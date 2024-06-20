@@ -4,9 +4,24 @@ import logging
 import numpy as np
 from ..utils import timing_decorator
 from pmwd import Configuration, Particles, scatter
-import camb
-from classy import Class, CosmoComputationError
-import symbolic_pofk.linear
+import warnings
+
+# Optional imports
+try:
+    import camb
+except ImportError:
+    camb = None
+try:
+    import classy
+    from classy import Class, CosmoComputationError
+except ImportError:
+    classy = None
+try:
+    import symbolic_pofk
+    import symbolic_pofk.linear
+except ImportError:
+    symbolic_pofk = None
+
 
 @timing_decorator
 def gen_white_noise(N, seed=None):
@@ -78,7 +93,12 @@ def vfield_CIC(ppos, pvel, cfg, interp=True):
 
 
 def get_camb_pk(k, omega_m, omega_b, h, n_s, sigma8):
-    
+    if camb is None:
+        raise ImportError(
+            "camb transfer function requested, but camb not installed. "
+            "See ltu-cmass installation instructions."
+        )
+
     pars = camb.CAMBparams()
     pars.set_cosmology(H0 = h*100,
                        ombh2 = omega_b * h ** 2,
@@ -113,6 +133,11 @@ def class_compute(class_params):
         :cosmo (CLASS): Instance of the CLASS code
         :isNormal (bool): Whether error occurred in the computation
     '''
+    if classy is None:
+        raise ImportError(
+            "CLASS computation requested, but class not installed. "
+            "See ltu-cmass installation instructions."
+        )
     cosmo = Class()
     cosmo.set(class_params)
     try:
@@ -132,6 +157,11 @@ def class_compute(class_params):
 
 
 def get_class_pk(k, omega_m, omega_b, h, n_s, sigma8):
+    if classy is None:
+        raise ImportError(
+            "CLASS transfer function requested, but class not installed. "
+            "See ltu-cmass installation instructions."
+        )
 
     As_fid = 2.0e-9
     class_params = {
@@ -164,5 +194,10 @@ def get_class_pk(k, omega_m, omega_b, h, n_s, sigma8):
 
 
 def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):    
+    if symbolic_pofk is None:
+        raise ImportError(
+            "syren transfer function requested, but syren not installed. "
+            "See ltu-cmass installation instructions."
+        )
     return symbolic_pofk.linear.plin_emulated(k, sigma8, omega_m, omega_b, h, n_s,
         emulator='fiducial', extrapolate=True)

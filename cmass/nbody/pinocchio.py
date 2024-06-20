@@ -338,6 +338,7 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     
     outdir = get_source_path(cfg, f"pinocchio", check=False)
+    os.makedirs(outdir, exist_ok=True)
     
     # Setup power spectrum file if needed
     generate_pk_file(cfg, outdir)
