@@ -6,8 +6,9 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import MAS_library as MASL
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import (gen_white_noise, load_white_noise, save_nbody, 
+from .tools import (gen_white_noise, load_white_noise, save_nbody,
                     vfield_CIC, get_camb_pk, get_class_pk, get_syren_pk)
+
 
 def parse_config(cfg):
     with open_dict(cfg):
@@ -28,10 +29,10 @@ def parse_config(cfg):
 
 
 def get_ICs(cfg, outdir):
-    
+
     nbody = cfg.nbody
     N = nbody.N
-    
+
     # Load the ics in Fourier space
     if nbody.matchIC:
         path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
@@ -42,13 +43,13 @@ def get_ICs(cfg, outdir):
         ic = load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         ic = gen_white_noise(N, seed=nbody.lhid)
-        
+
     # Convert to real space
     ic = np.fft.irfftn(ic, norm="ortho").astype(np.float32)
 
-    # Make header
+    #  Make header
     header = np.array([0, N, N, N, nbody.lhid, 0], dtype=np.int32)
-    
+
     # Write the white noise field to a binary file
     filename = pjoin(outdir, "WhiteNoise")
     with open(filename, 'wb') as file:
@@ -59,19 +60,20 @@ def get_ICs(cfg, outdir):
             file.write(np.array([planesize], dtype=np.int32).tobytes())
             plane.tofile(file)
             file.write(np.array([planesize], dtype=np.int32).tobytes())
-    
+
     return
 
 
 def generate_pk_file(cfg, outdir):
-    
+
     if cfg.nbody.transfer == 'EH':
         return
-    
+
     kmin = 2 * np.pi / cfg.nbody.L
-    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / cfg.nbody.L  # Larger than Nyquist
+    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / \
+        cfg.nbody.L  #  Larger than Nyquist
     k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
-    
+
     if cfg.nbody.transfer == 'CAMB':
         pk = get_camb_pk(k, *cfg.nbody.cosmo)
     elif cfg.nbody.transfer == 'CLASS':
@@ -79,28 +81,30 @@ def generate_pk_file(cfg, outdir):
     elif cfg.nbody.transfer == 'SYREN':
         pk = get_syren_pk(k, *cfg.nbody.cosmo)
     else:
-        raise NotImplementedError(f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
-    
-    np.savetxt(pjoin(outdir, "input_power_spectrum.txt"), np.transpose(np.array([k, pk])))
-    
+        raise NotImplementedError(
+            f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
+
+    np.savetxt(pjoin(outdir, "input_power_spectrum.txt"),
+               np.transpose(np.array([k, pk])))
+
     return
 
 
 def generate_param_file(cfg, outdir):
-    
+
     random_seed = cfg.nbody.lhid
-    
+
     # Convert args to variables needed
     filename = pjoin(outdir, "parameter_file")
-    output_list= pjoin(outdir, "outputs")
+    output_list = pjoin(outdir, "outputs")
     run_flag = f"pinocchio-L{int(cfg.nbody.L)}-N{cfg.nbody.N}-{cfg.nbody.lhid}"
     omega0, omega_b, h, n_s, sigma8 = cfg.nbody.cosmo
     omega_lambda = 1. - omega0
-    
+
     # Cosmological constant in current setup
     de_w0 = -1.0
     de_wa = 0.0
-    
+
     # Choose output mass function
     mass_functions = [
         "Press_Schechter_1974",
@@ -115,12 +119,12 @@ def generate_param_file(cfg, outdir):
         "Watson_2013",
         "Crocce_2010_universal"
     ]
-    if cfg.nbody.mass_function in mass_functions: 
+    if cfg.nbody.mass_function in mass_functions:
         AMF = mass_functions.index(cfg.nbody.mass_function)
     else:
         AMF = len(mass_functions) - 1
         logging.info(f'Choosing analytic mass function {mass_functions[AMF]}')
-        
+
     # Make outputs file
     content = (
         "# This file contains the list of output redshifts, in chronological\n"
@@ -129,17 +133,18 @@ def generate_param_file(cfg, outdir):
         "# is computed with continuous time sampling.\n\n"
     )
     output_redshifts = [cfg.nbody.zf]
-    content += "\n".join(map(str, sorted(output_redshifts, reverse=True))) + "\n"
+    content += "\n".join(map(str, sorted(output_redshifts,
+                         reverse=True))) + "\n"
     with open(output_list, 'w') as file:
         file.write(content)
-        
+
     if cfg.nbody.transfer == 'EH':
         pk_file = "no"
     else:
         pk_file = "input_power_spectrum.txt"
-    
+
     # Make paramater file
-    
+
     content = f"""# This is a parameter file for the Pinocchio 4.0 code
 
 # run properties
@@ -208,28 +213,35 @@ PLCAperture            30           % cone aperture for the past light cone
 
 @timing_decorator
 def run_density(cfg, outdir):
-    
+
     # Run pinoccio
     cwd = os.getcwd()
     os.chdir(outdir)
     os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
     os.chdir(cwd)
-    
+
     # Load the data
-    filename = pjoin(outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
+    filename = pjoin(
+        outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
     data = {}
-    
+
     with open(filename, 'rb') as f:
 
         # Function to read a block
         def read_block(expected_name, dtype, count):
-            initial_block_size = np.fromfile(f, dtype=np.int32, count=1)[0]
-            block_name = np.fromfile(f, dtype='S4', count=1)[0].decode().strip()
-            block_size_with_name = np.fromfile(f, dtype=np.int32, count=1)[0]
+            initial_block_size = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
+            block_name = np.fromfile(f, dtype='S4', count=1)[
+                0].decode().strip()
+            block_size_with_name = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
             if block_name != expected_name:
-                raise ValueError(f"Expected block name '{expected_name}', but got '{block_name}'")
+                raise ValueError(
+                    f"Expected block name '{expected_name}', "
+                    f"but got '{block_name}'")
             data_block = np.fromfile(f, dtype=dtype, count=count)
-            trailing_block_size = np.fromfile(f, dtype=np.int32, count=1)[0]
+            trailing_block_size = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
             return data_block
 
         # Read the HEADER block
@@ -257,13 +269,16 @@ def run_density(cfg, outdir):
             ('fill', np.int8, 52)
         ])
         header_block = read_block('HEAD', header_dtype, 1)[0]
-        data['header'] = {name: header_block[name] for name in header_dtype.names}
+        data['header'] = {name: header_block[name]
+                          for name in header_dtype.names}
 
         # Number of particles
         num_particles = header_block['NPart'][1]
 
         # Read INFO block
-        info_dtype = np.dtype([('name', 'S4'), ('type', 'S8'), ('ndim', np.int32), ('active', np.int32, 6)])
+        info_dtype = np.dtype(
+            [('name', 'S4'), ('type', 'S8'), ('ndim', np.int32),
+             ('active', np.int32, 6)])
         read_block('INFO', info_dtype, 4)
 
         # Read empty FMAX block
@@ -297,16 +312,17 @@ def run_density(cfg, outdir):
         ])
         positions = read_block('VEL', vel_dtype, 1)
         data['velocities'] = positions['vel'].reshape(-1, 3)
-        
+
     # CIC density field
-    rho = np.zeros((cfg.nbody.N,cfg.nbody.N,cfg.nbody.N), dtype=np.float32)
-    MASL.MA(data['positions'].astype(np.float32), rho, cfg.nbody.L, "CIC", verbose=True)
-    rho = np.transpose(rho, (2,1,0))
+    rho = np.zeros((cfg.nbody.N, cfg.nbody.N, cfg.nbody.N), dtype=np.float32)
+    MASL.MA(data['positions'].astype(np.float32),
+            rho, cfg.nbody.L, "CIC", verbose=True)
+    rho = np.transpose(rho, (2, 1, 0))
 
     # Align axes
-    data['positions'][:,[0,1,2]] = data['positions'][:,[2,1,0]]
-    data['velocities'][:,[0,1,2]] = data['velocities'][:,[2,1,0]]
-    
+    data['positions'][:, [0, 1, 2]] = data['positions'][:, [2, 1, 0]]
+    data['velocities'][:, [0, 1, 2]] = data['velocities'][:, [2, 1, 0]]
+
     # Load halo data
     #    0) group ID
     #    1) group mass (Msun/h)
@@ -314,13 +330,14 @@ def run_density(cfg, outdir):
     # 5- 7) final position (Mpc/h)
     # 8-10) velocity (km/s)
     #   11) number of particles
-    filename = pjoin(outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
-    hmass = np.log10(np.loadtxt(filename,unpack=False,usecols=(1,)))
-    hpos = np.loadtxt(filename,unpack=False,usecols=(7,6,5))
-    hvel = np.loadtxt(filename,unpack=False,usecols=(10,9,8))
-    
-    return rho, data['positions'], data['velocities'], hpos, hvel, hmass
+    filename = pjoin(
+        outdir, f'pinocchio.{cfg.nbody.zf: .4f}.pinocchio-L{cfg.nbody.L} -'
+                f'N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
+    hmass = np.log10(np.loadtxt(filename, unpack=False, usecols=(1,)))
+    hpos = np.loadtxt(filename, unpack=False, usecols=(7, 6, 5))
+    hvel = np.loadtxt(filename, unpack=False, usecols=(10, 9, 8))
 
+    return rho, data['positions'], data['velocities'], hpos, hvel, hmass
 
 
 @timing_decorator
@@ -336,41 +353,41 @@ def main(cfg: DictConfig) -> None:
         "Logging directory: " +
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    
-    outdir = get_source_path(cfg, f"pinocchio", check=False)
+
+    outdir = get_source_path(cfg, "pinocchio", check=False)
     os.makedirs(outdir, exist_ok=True)
-    
+
     # Setup power spectrum file if needed
     generate_pk_file(cfg, outdir)
-    
+
     # Convert ICs to correct format
     get_ICs(cfg, outdir)
-    
+
     # Generate parameter file
     generate_param_file(cfg, outdir)
-    
+
     # Run
     rho, pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
-    
+
     # Calculate velocity field
     fvel = None
     if cfg.nbody.save_velocities:
         fvel = vfield_CIC(pos, vel, cfg)
         # convert from comoving -> peculiar velocities
         fvel *= (1 + cfg.nbody.zf)
-        
+
     # Save nbody-type outputs
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
-       
+
     # Save bias-type outputs
     logging.info('Saving cube...')
     np.save(pjoin(outdir, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
     np.save(pjoin(outdir, 'halo_vel.npy'), hvel)  # halo velocities [km/s]
     np.save(pjoin(outdir, 'halo_mass.npy'), hmass)  # halo masses [Msun/h]
- 
+
     logging.info("Done!")
 
 

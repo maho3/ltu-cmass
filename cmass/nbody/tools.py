@@ -100,12 +100,13 @@ def get_camb_pk(k, omega_m, omega_b, h, n_s, sigma8):
         )
 
     pars = camb.CAMBparams()
-    pars.set_cosmology(H0 = h*100,
-                       ombh2 = omega_b * h ** 2,
-                       omch2 = (omega_m - omega_b) * h ** 2,
-                       mnu = 0.0,
-                       omk = 0,
-                      )
+    pars.set_cosmology(
+        H0=h*100,
+        ombh2=omega_b * h ** 2,
+        omch2=(omega_m - omega_b) * h ** 2,
+        mnu=0.0,
+        omk=0,
+    )
     As_fid = 2.0e-9
     pars.InitPower.set_params(As=As_fid, ns=n_s, r=0)
     pars.set_matter_power(redshifts=[0.], kmax=k[-1])
@@ -116,9 +117,9 @@ def get_camb_pk(k, omega_m, omega_b, h, n_s, sigma8):
     pars.InitPower.set_params(As=As_new, ns=n_s, r=0)
     results = camb.get_results(pars)
     _, _, pk_camb = results.get_matter_power_spectrum(
-                            minkh=k.min(), maxkh=k.max(), npoints=len(k))
-    pk_camb = pk_camb[0,:]
-    
+        minkh=k.min(), maxkh=k.max(), npoints=len(k))
+    pk_camb = pk_camb[0, :]
+
     return pk_camb
 
 
@@ -142,15 +143,18 @@ def class_compute(class_params):
     cosmo.set(class_params)
     try:
         cosmo.compute()
-        isNormal=True
+        isNormal = True
     except CosmoComputationError as e:
         if "DeltaNeff < deltaN[0]" in str(e):
-            # set YHe to 0.25. Value is from https://arxiv.org/abs/1503.08146 and Plank 2018(Section 7.6.1) https://arxiv.org/abs/1807.06209
-            warnings.warn(f"Adjust YHe to 0.25 due to CLASS CosmoComputationError for cosmology {class_params}.")
+            # set YHe to 0.25. Value is from https://arxiv.org/abs/1503.08146
+            # and Plank 2018(Section 7.6.1) https://arxiv.org/abs/1807.06209
+            warnings.warn(
+                "Adjust YHe to 0.25 due to CLASS CosmoComputationError "
+                f"for cosmology {class_params}.")
             class_params['YHe'] = 0.25
             cosmo.set(class_params)
             cosmo.compute()
-            isNormal=False
+            isNormal = False
         else:
             raise e
     return cosmo, isNormal
@@ -176,28 +180,30 @@ def get_class_pk(k, omega_m, omega_b, h, n_s, sigma8):
         'wa_fld': 0.0,
         'Omega_Lambda': 0,  # Set to 0 because we're using w0_fld and wa_fld instead
         'z_max_pk': 3.0,  # Max redshift for P(k) output
-    }   
+    }
     cosmo, isNormal = class_compute(class_params)
     sigma8_class = cosmo.sigma8()
     cosmo.struct_cleanup()
     cosmo.empty()
     As_new = (sigma8 / sigma8_class) ** 2 * As_fid
     class_params['A_s'] = As_new
-    
+
     cosmo, isNormal = class_compute(class_params)
     redshift = 0.0
     plin_class = np.array([cosmo.pk_lin(kk*h, redshift) for kk in k]) * h ** 3
     cosmo.struct_cleanup()
     cosmo.empty()
-    
+
     return plin_class
 
 
-def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):    
+def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):
     if symbolic_pofk is None:
         raise ImportError(
             "syren transfer function requested, but syren not installed. "
             "See ltu-cmass installation instructions."
         )
-    return symbolic_pofk.linear.plin_emulated(k, sigma8, omega_m, omega_b, h, n_s,
-        emulator='fiducial', extrapolate=True)
+    return symbolic_pofk.linear.plin_emulated(
+        k, sigma8, omega_m, omega_b, h, n_s,
+        emulator='fiducial', extrapolate=True
+    )
