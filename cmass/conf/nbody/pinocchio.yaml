@@ -15,7 +15,7 @@ zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt, borgpm and pinocchio-only
-transfer: 'CAMB' # transfer function (EH or CLASS)
+transfer: 'CAMB' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
 # borglpt-only
 order: 2          # order of the LPT expansion

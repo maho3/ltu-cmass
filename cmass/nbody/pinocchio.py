@@ -331,7 +331,7 @@ def run_density(cfg, outdir):
     # 8-10) velocity (km/s)
     #   11) number of particles
     filename = pjoin(
-        outdir, f'pinocchio.{cfg.nbody.zf: .4f}.pinocchio-L{cfg.nbody.L} -'
+        outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
                 f'N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
     hmass = np.log10(np.loadtxt(filename, unpack=False, usecols=(1,)))
     hpos = np.loadtxt(filename, unpack=False, usecols=(7, 6, 5))
