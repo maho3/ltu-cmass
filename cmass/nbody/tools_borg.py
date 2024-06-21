@@ -13,6 +13,9 @@ def build_cosmology(omega_m, omega_b, h, n_s, sigma8):
 
 def compute_As(cpar):
     # requires BORG-CLASS
+    if not hasattr(borg.cosmo, 'ClassCosmo'):
+        raise ImportError(
+            "BORG-CLASS is required to compute As, but is not installed.")
     sigma8_true = np.copy(cpar.sigma8)
     cpar.sigma8 = 0
     cpar.A_s = 2.3e-9
@@ -36,6 +39,10 @@ def transfer_EH(chain, box):
 
 
 def transfer_CLASS(chain, box, cpar):
+    if not hasattr(borg.forward.model_lib, 'M_TRANSFER_CLASS'):
+        raise ImportError(
+            "BORG-CLASS is required to use the CLASS transfer function.")
+
     # Compute As
     cpar = compute_As(cpar)
 

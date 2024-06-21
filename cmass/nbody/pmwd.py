@@ -36,7 +36,7 @@ os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"  # noqa, must go before jax
 
 from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
-                  lpt, scatter)
+                  lpt, pmnbody)
 # TODO: use these instead of different snapshots
 from pmwd import nbody_init, nbody_step
 import jax.numpy as jnp
@@ -46,7 +46,8 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
+from .tools import (
+    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 
 
 def parse_config(cfg):
@@ -141,24 +142,18 @@ def run_density(wn, pmconfs, pmcosmos, cfg):
         ptcl, obsvbl = pmnbody(ptcl, obsvbl, pmcosmos[0], pmconfs[i])
 
         pos = np.array(ptcl.pos())
-        vel = ptcl.vel
+        vel = np.array(ptcl.vel)
 
-        # Compute density
-        scale = cfg.nbody.supersampling * cfg.nbody.B
-        rho = scatter(ptcl, pmconfs[i],
-                      mesh=jnp.zeros(3*(cfg.nbody.N,)),
-                      cell_size=pmconfs[i].cell_size*scale)
-        rho /= scale**3  # renormalize
-
-        rho -= 1  # make it zero mean
         vel *= 100  # km/s
 
-        # Calculate velocity field
-        fvel = None
-        if cfg.nbody.save_velocities:
-            fvel = vfield_CIC(pos, vel, cfg)
-            # convert from comoving -> peculiar velocities
-            fvel *= (1 + nbody.zlist[i])
+        rho, fvel = rho_and_vfield(
+            pos, vel,
+            Ngrid=nbody.N,
+            BoxSize=nbody.L,
+            MAS='CIC',
+            omega_m=nbody.cosmo[0],
+            h=nbody.cosmo[2],
+        )
 
         # Save
         rhos.append(rho)

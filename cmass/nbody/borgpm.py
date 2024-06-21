@@ -42,7 +42,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield
+from .tools import (
+    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
@@ -140,7 +141,7 @@ def run_density(wn, cpar, cfg):
             if self.step_id-2 not in self.tosave:  # ignore intermediate steps
                 return
             logging.info(f"Saving snap a={a:.6f}, step {self.step_id}")
-            rho, fvel = vfield(
+            rho, fvel = rho_and_vfield(
                 poss, vels,
                 Ngrid=nbody.N,
                 BoxSize=nbody.L,
@@ -185,7 +186,7 @@ def run_density(wn, cpar, cfg):
 
     vel *= 100  # km/s
 
-    rho, fvel = vfield(
+    rho, fvel = rho_and_vfield(
         pos, vel,
         Ngrid=nbody.N,
         BoxSize=nbody.L,
@@ -219,13 +220,6 @@ def main(cfg: DictConfig) -> None:
 
     # Run
     rho, fvel, snapshots = run_density(wn, cpar, cfg)
-
-    # # Calculate velocity field  # TODO: remove
-    # fvel = None
-    # if cfg.nbody.save_velocities:
-    #     fvel = vfield_CIC(pos, vel, cfg)
-    #     # convert from comoving -> peculiar velocities
-    #     fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "borgpm", check=False)
