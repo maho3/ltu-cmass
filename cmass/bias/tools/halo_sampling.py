@@ -14,7 +14,7 @@ import jax
 from functools import partial
 from pmwd import Configuration, Particles, scatter
 from ...utils import timing_decorator
-from ...nbody.tools import vfield_CIC
+from ...nbody.tools import rho_and_vfield
 
 
 # General
@@ -317,7 +317,10 @@ def sample_velocities_CIC(hpos, cfg, fvel=None, ppos=None, pvel=None):
         logging.info('Measuring CIC velocity field from particles...')
         if ppos is None or pvel is None:
             raise ValueError('No particles found for CIC interpolation.')
-        fvel = vfield_CIC(ppos, pvel, cfg, interp=False)
+        _, fvel = rho_and_vfield(
+            ppos, pvel,
+            cfg.nbody.L, cfg.nbody.N, 'CIC',
+            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
     # Interpolate to halo positions
     hvel = []

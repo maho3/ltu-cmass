@@ -42,7 +42,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield
+from .tools import (
+    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
@@ -120,34 +121,19 @@ def run_density(wn, cpar, cfg):
     chain.forwardModel_v2(wn)
 
     Npart = pm.getNumberOfParticles()
-    rho = np.empty(chain.getOutputBoxModel().N)
     pos = np.empty(shape=(Npart, 3))
     vel = np.empty(shape=(Npart, 3))
-    chain.getDensityFinal(rho)
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
     vel *= 100  # km/s
 
-    return rho, pos, vel
+    return pos, vel
 
 
 @timing_decorator
 def run_ICs(wn, cpar, cfg):
     nbody = cfg.nbody
-
-    # Compute As
-    sigma8_true = np.copy(cpar.sigma8)
-    cpar.sigma8 = 0
-    cpar.A_s = 2.3e-9
-    k_max, k_per_decade = 10, 100
-    extra_class = {}
-    extra_class['YHe'] = '0.24'
-    cosmo = borg.cosmo.ClassCosmo(cpar, k_per_decade, k_max, extra=extra_class)
-    cosmo.computeSigma8()
-    cos = cosmo.getCosmology()
-    cpar.A_s = (sigma8_true/cos['sigma_8'])**2*cpar.A_s
-    cpar.sigma8 = sigma8_true
 
     # initialize box and chain
     box = borg.forward.BoxModel()
@@ -157,19 +143,13 @@ def run_ICs(wn, cpar, cfg):
     af = 1/(1+50)  # z=50
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL_AS(box)
-        transfer_class = borg.forward.model_lib.M_TRANSFER_CLASS(
-            box, opts=dict(a_transfer=af, z_max_pk=200))
-        transfer_class.setModelParams({"extra_class_arguments": extra_class})
-        chain @= transfer_class
+        chain = transfer_CLASS(chain, box, cpar, a_final=af)
     elif nbody.transfer == 'EH':
-        chain @= borg.forward.model_lib.M_PRIMORDIAL(
-            box, opts=dict(a_final=af, z_max_pk=200))
-        chain @= borg.forward.model_lib.M_TRANSFER_EHU(
-            box, opts=dict(reverse_sign=True))
+        chain = transfer_EH(chain, box, a_final=af)
     else:
-        raise NotImplementedError
-
+        raise NotImplementedError(
+            f'Transfer function "{nbody.transfer}" not implemented.')
+    chain.setAdjointRequired(False)
     chain.setCosmoParams(cpar)
 
     # forward model
@@ -204,17 +184,15 @@ def main(cfg: DictConfig) -> None:
     # Run
     if cfg.nbody.save_z50:
         rho50 = run_ICs(wn, cpar, cfg)
-    rho, pos, vel = run_density(wn, cpar, cfg)
+    pos, vel = run_density(wn, cpar, cfg)
 
-    # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        _, fvel = vfield(
-            pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-            cfg.nbody.cosmo[0], cfg.nbody.cosmo[2], verbose=False
-        )
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    # Calculate density and velocity field
+    rho, fvel = rho_and_vfield(
+        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+    # Convert from comoving -> peculiar velocities
+    fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "borgpm", check=False)

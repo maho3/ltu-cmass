@@ -52,6 +52,7 @@ def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):
         BoxSize (float): size of the box
         Ngrid (int): number of grid points
         MAS (str): mass assignment scheme (NGP, CIC, TSC, PCS)
+        value (np.array, optional): (N,) array of values to assign
         verbose (bool, optional): print information on progress
     """
     # define 3D density field
@@ -63,10 +64,9 @@ def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):
     return delta
 
 
-def vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
+def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
     """
-    Measure the 3D velocity field from particles. Also returns the
-    density field.
+    Measure the 3D density and velocity field from particles.
 
     Args:
         ppos (np.array): (N, 3) array of particle positions
@@ -78,55 +78,24 @@ def vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
         h (float): Hubble constant
         verbose (bool, optional): print information on progress
     """
-    ppos = ppos.astype(np.float32)
-    pvel = pvel.astype(np.float32)
-    Npart = len(ppos)
-    m_particle = get_particle_mass(Npart, BoxSize, omega_m, h)
-    rho = assign_field(ppos, BoxSize, Ngrid, MAS, verbose=verbose)
-    rho *= m_particle
+    ppos, pvel = ppos.astype(np.float32), pvel.astype(np.float32)
 
-    pmom = m_particle * pvel
-    mom = np.stack([
+    Npart = len(ppos)
+
+    # Get particle count field
+    count = assign_field(ppos, BoxSize, Ngrid, MAS,
+                         value=None, verbose=verbose)
+
+    # Sum velocity field
+    vel = np.stack([
         assign_field(ppos, BoxSize, Ngrid, MAS,
-                     value=pmom[..., i], verbose=verbose)
+                     value=pvel[:, i], verbose=verbose)
         for i in range(3)
     ], axis=-1)
 
-    vel = mom / rho[..., None]
-    return rho, vel  # TODO: Implement interpolation?
+    # Normalize
+    m_particle = get_particle_mass(Npart, BoxSize, omega_m, h)
+    rho = count*m_particle
+    vel /= count[..., None]
 
-
-@timing_decorator
-def vfield_CIC(ppos, pvel, cfg, interp=True):
-    raise NotImplementedError
-
-    nbody = cfg.nbody
-    N = nbody.N * nbody.supersampling
-    ptcl_spacing = nbody.L / N
-    ptcl_grid_shape = (N,)*3
-    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape)
-    ptcl = Particles.from_pos(pmconf, ppos)
-
-    scale = N / nbody.Nvfield
-    mesh = np.zeros([nbody.Nvfield]*3)
-    rho = scatter(ptcl, pmconf, val=1,
-                  mesh=mesh, cell_size=pmconf.cell_size*scale)
-    mesh = np.zeros([nbody.Nvfield]*3+[3])
-    mom = scatter(ptcl, pmconf, val=pvel,
-                  mesh=mesh, cell_size=pmconf.cell_size*scale)
-
-    vel = mom / rho[..., None]
-    vel = np.array(vel)
-
-    if interp and np.any(np.isnan(vel)):
-        # interpolate nan values using nearest neighbors
-        davg = 1
-        naninds = np.argwhere(np.all(np.isnan(vel), axis=-1))
-        paddedvel = np.pad(vel, ((davg,), (davg,), (davg,), (0,)), mode='wrap')
-        for i, j, k in naninds:
-            perim = np.array(
-                [paddedvel[i:i+2*davg+1, j:j+2*davg+1, k:k+2*davg+1]])
-            perim = perim[~np.isnan(perim).all(axis=-1)]
-            vel[i, j, k] = np.mean(perim, axis=0)
-
-    return vel
+    return rho, vel  # TODO: Implement interpolation for NaNs?
