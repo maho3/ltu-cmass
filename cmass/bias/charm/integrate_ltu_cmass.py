@@ -1,13 +1,27 @@
+"""
+Module to integrate ltu-cmass with CHARM halo emulators.
+
+Much of this code is not production-quality, but is kept in its original form
+in case of further development.
+
+Note from Matt, the only things I changed in this code were:
+ * applying autopep formatting
+ * allowing to specify the padded inputs in `process_input_density`
+ * commenting out unnecessary imports (to avoid further dependencies)
+TODO: Clean up and simplify
+"""
+
+
 import pathlib
-from scipy.interpolate import InterpolatedUnivariateSpline as IUS
-from scipy.integrate import quad
-from os.path import join as pjoin
+# from scipy.interpolate import InterpolatedUnivariateSpline as IUS
+# from scipy.integrate import quad
+# from os.path import join as pjoin
 from omegaconf import DictConfig, OmegaConf, open_dict
 from copy import deepcopy
 import hydra
 import logging
-import matplotlib.pyplot as pl
-import matplotlib
+# import matplotlib.pyplot as pl
+# import matplotlib
 import pickle as pk
 import yaml
 from tqdm import tqdm
