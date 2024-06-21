@@ -3,7 +3,7 @@ import logging
 import datetime
 import os
 from os.path import join as pjoin
-from astropy.cosmology import FlatLambdaCDM
+from astropy.cosmology import Cosmology, FlatLambdaCDM
 
 
 def get_source_path(cfg, simtype, check=True):
@@ -58,11 +58,13 @@ def cosmo_to_astropy(params=None, omega_m=None, omega_b=None,
     Converts a list of cosmological parameters into an astropy cosmology
     object. Note, ignores s8 and n_s parameters, which are not used in astropy.
     """
-
-    # check if params is a list
-    if isinstance(params, list):
+    if isinstance(params, Cosmology):
+        return params
+    try:
+        params = list(params)
         return FlatLambdaCDM(H0=params[2]*100, Om0=params[0], Ob0=params[1])
-    return FlatLambdaCDM(H0=h*100, Om0=omega_m, Ob0=omega_b)
+    except TypeError:
+        return FlatLambdaCDM(H0=h*100, Om0=omega_m, Ob0=omega_b)
 
 
 def get_particle_mass(N, L, omega_m, h):
