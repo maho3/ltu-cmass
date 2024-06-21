@@ -32,8 +32,6 @@ Output:
 
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
-os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 
 from os.path import join as pjoin
 import numpy as np
