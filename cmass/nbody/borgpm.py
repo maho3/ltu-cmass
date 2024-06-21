@@ -42,7 +42,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
+from .tools import (
+    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
 
 
@@ -120,16 +121,14 @@ def run_density(wn, cpar, cfg):
     chain.forwardModel_v2(wn)
 
     Npart = pm.getNumberOfParticles()
-    rho = np.empty(chain.getOutputBoxModel().N)
     pos = np.empty(shape=(Npart, 3))
     vel = np.empty(shape=(Npart, 3))
-    chain.getDensityFinal(rho)
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
     vel *= 100  # km/s
 
-    return rho, pos, vel
+    return pos, vel
 
 
 @timing_decorator
@@ -153,14 +152,15 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, cpar, cfg)
+    pos, vel = run_density(wn, cpar, cfg)
 
     # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    rho, fvel = rho_and_vfield(
+        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+    # Convert from comoving -> peculiar velocities
+    fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "borgpm", check=False)

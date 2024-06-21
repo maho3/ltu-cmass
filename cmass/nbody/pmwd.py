@@ -44,7 +44,8 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
-from .tools import gen_white_noise, load_white_noise, save_nbody, vfield_CIC
+from .tools import (
+    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 
 
 def parse_config(cfg):
@@ -97,7 +98,7 @@ def get_ICs(cfg):
         return gen_white_noise(N, seed=nbody.lhid)
 
 
-@timing_decorator
+@ timing_decorator
 def run_density(wn, pmconf, pmcosmo, cfg):
     ic = linear_modes(wn, pmcosmo, pmconf)
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
@@ -105,25 +106,14 @@ def run_density(wn, pmconf, pmcosmo, cfg):
     ptcl, obsvbl = nbody(ptcl, obsvbl, pmcosmo, pmconf)
 
     pos = np.array(ptcl.pos())
-    vel = ptcl.vel
+    vel = np.array(ptcl.vel)
 
-    # Compute density
-    scale = cfg.nbody.supersampling * cfg.nbody.B
-    rho = scatter(
-        ptcl, pmconf,
-        mesh=jnp.zeros(3*(cfg.nbody.N,)),
-        cell_size=pmconf.cell_size*scale,
-        offset=-0.5
-    )
-    rho /= scale**3  # renormalize
-
-    rho -= 1  # make it zero mean
     vel *= 100  # km/s
-    return rho, pos, vel
+    return pos, vel
 
 
-@timing_decorator
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@ timing_decorator
+@ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
@@ -143,14 +133,15 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
 
     # Run
-    rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
+    pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
 
     # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    rho, fvel = rho_and_vfield(
+        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+    # Convert from comoving -> peculiar velocities
+    fvel *= (1 + cfg.nbody.zf)
 
     # Save
     outdir = get_source_path(cfg, "pmwd", check=False)
