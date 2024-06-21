@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import MAS_library as MASL
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (gen_white_noise, load_white_noise, save_nbody,
-                    vfield_CIC, get_camb_pk, get_class_pk, get_syren_pk)
+                    rho_and_vfield, get_camb_pk, get_class_pk, get_syren_pk)
 
 
 def parse_config(cfg):
@@ -315,12 +315,6 @@ def run_density(cfg, outdir):
         positions = read_block('VEL', vel_dtype, 1)
         data['velocities'] = positions['vel'].reshape(-1, 3)
 
-    # CIC density field
-    rho = np.zeros((cfg.nbody.N, cfg.nbody.N, cfg.nbody.N), dtype=np.float32)
-    MASL.MA(data['positions'].astype(np.float32),
-            rho, cfg.nbody.L, "CIC", verbose=True)
-    rho = np.transpose(rho, (2, 1, 0))
-
     # Align axes
     data['positions'][:, [0, 1, 2]] = data['positions'][:, [2, 1, 0]]
     data['velocities'][:, [0, 1, 2]] = data['velocities'][:, [2, 1, 0]]
@@ -339,7 +333,7 @@ def run_density(cfg, outdir):
     hpos = np.loadtxt(filename, unpack=False, usecols=(7, 6, 5))
     hvel = np.loadtxt(filename, unpack=False, usecols=(10, 9, 8))
 
-    return rho, data['positions'], data['velocities'], hpos, hvel, hmass
+    return data['positions'], data['velocities'], hpos, hvel, hmass
 
 
 @timing_decorator
@@ -369,14 +363,15 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(cfg, outdir)
 
     # Run
-    rho, pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
+    pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
 
     # Calculate velocity field
-    fvel = None
-    if cfg.nbody.save_velocities:
-        fvel = vfield_CIC(pos, vel, cfg)
-        # convert from comoving -> peculiar velocities
-        fvel *= (1 + cfg.nbody.zf)
+    rho, fvel = rho_and_vfield(
+        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+    # Convert from comoving -> peculiar velocities
+    fvel *= (1 + cfg.nbody.zf)
 
     # Save nbody-type outputs
     save_nbody(outdir, rho, fvel, pos, vel,
