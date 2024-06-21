@@ -98,7 +98,7 @@ def get_ICs(cfg):
         return gen_white_noise(N, seed=nbody.lhid)
 
 
-@ timing_decorator
+@timing_decorator
 def run_density(wn, pmconf, pmcosmo, cfg):
     ic = linear_modes(wn, pmcosmo, pmconf)
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
@@ -112,8 +112,8 @@ def run_density(wn, pmconf, pmcosmo, cfg):
     return pos, vel
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
