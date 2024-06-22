@@ -11,10 +11,14 @@ Input:
 """
 
 import os
+os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
+
 import numpy as np
 import logging
 from os.path import join as pjoin
 from scipy.spatial.transform import Rotation as R
+import jax
+from cuboid_remap import Cuboid, remap_Lbox
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
@@ -36,6 +40,21 @@ def load_galaxies_sim(source_dir, seed):
     pos = np.load(pjoin(source_dir, 'hod', f'hod{seed}_pos.npy'))
     vel = np.load(pjoin(source_dir, 'hod', f'hod{seed}_vel.npy'))
     return pos, vel
+
+
+@timing_decorator
+def remap(ppos, pvel, cfg):
+    L = cfg.nbody.L
+    u1, u2, u3 = cfg.survey.u1, cfg.survey.u2, cfg.survey.u3
+
+    # remap the particles to the cuboid
+    new_size = list(L*np.array(remap_Lbox(u1, u2, u3)))
+    logging.info(f'Remapping from {[L]*3} to {new_size}.')
+
+    c = Cuboid(u1, u2, u3)
+    ppos = jax.vmap(c.Transform)(ppos/L)*L
+    pvel = jax.vmap(c.TransformVelocity)(pvel)
+    return np.array(ppos), np.array(pvel)
 
 
 @timing_decorator
@@ -123,6 +142,9 @@ def main(cfg: DictConfig) -> None:
 
     # Load galaxies
     pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
+
+    # Apply cuboid remapping
+    pos, vel = remap(pos, vel, cfg)
 
     # Rotate to align with CMASS
     pos, vel = rotate(pos, vel)
