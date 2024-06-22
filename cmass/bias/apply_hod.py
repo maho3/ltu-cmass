@@ -22,11 +22,10 @@ import os
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-import astropy.cosmology as cosmology
-from .tools.hod import (thetahod_literature,
-                        build_halo_catalog, build_HOD_model)
-from ..utils import (get_source_path, timing_decorator, load_params,
-                     cosmo_to_astropy)
+from .tools.hod import (
+    thetahod_literature, build_halo_catalog, build_HOD_model)
+from ..utils import (
+    get_source_path, timing_decorator, load_params, cosmo_to_astropy)
 
 
 def parse_config(cfg):
@@ -55,9 +54,9 @@ def get_hod_params(seed=0):
 
 
 @ timing_decorator
-def load_cuboid(source_dir):
-    pos = np.load(pjoin(source_dir, 'halo_cuboid_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'halo_cuboid_vel.npy'))
+def load_halos(source_dir):
+    pos = np.load(pjoin(source_dir, 'halo_pos.npy'))
+    vel = np.load(pjoin(source_dir, 'halo_vel.npy'))
     mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
     return pos, vel, mass
 
@@ -69,7 +68,7 @@ def populate_hod(
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
-    BoxSize = cfg.nbody.L*np.array([np.sqrt(2), 1, 1/np.sqrt(2)])
+    BoxSize = cfg.nbody.L*np.ones(3)
     catalog = build_halo_catalog(
         pos, vel, 10**mass, cfg.nbody.zf, BoxSize, cosmo,
         mdef=mdef
@@ -99,10 +98,12 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
+    # Load halos
     logging.info('Loading halos...')
     source_path = get_source_path(cfg, cfg.sim)
-    pos, vel, mass = load_cuboid(source_path)
+    pos, vel, mass = load_halos(source_path)
 
+    # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
         pos, vel, mass,
@@ -110,13 +111,16 @@ def main(cfg: DictConfig) -> None:
         seed=cfg.bias.hod.seed
     )
 
+    # Organize outputs
     gpos = np.array([hod['x'], hod['y'], hod['z']]).T
     gvel = np.array([hod['vx'], hod['vy'], hod['vz']]).T
     meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
 
+    # Setup save directory
     savepath = pjoin(source_path, 'hod')
     os.makedirs(savepath, exist_ok=True)
 
+    # Save
     logging.info(f'Saving to {savepath}/hod{cfg.bias.hod.seed}...')
     # galaxy positions [Mpc/h]
     np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_pos.npy'), gpos)
