@@ -23,8 +23,9 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 
-from .tools import (xyz_to_sky, BOSS_angular, BOSS_veto,
-                    BOSS_redshift, BOSS_fiber)
+from .tools import (
+    xyz_to_sky, sky_to_xyz, rotate_to_z,
+    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
 from ..utils import (get_source_path, timing_decorator, load_params)
 
 
@@ -58,13 +59,23 @@ def remap(ppos, pvel, cfg):
 
 
 @timing_decorator
-def rotate(pos, vel):
-    cmass_cen = [-924.42673929,  -44.04583784,
-                 750.98510587]  # mean of comoving range
-    r = R.from_quat([0, 0, np.sin(np.pi/4), np.cos(np.pi/4)]).as_matrix()
-    pos, vel = pos@r, vel@r
-    pos -= (pos.max(axis=0) + pos.min(axis=0))/2
-    pos += cmass_cen
+def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
+    pos, vel = pos.copy(), vel.copy()
+
+    # shift to origin
+    pos -= pos.mean(axis=0)
+
+    # find footprint center in comoving coordinates, conditioned on cosmo
+    mid_xyz = sky_to_xyz(mid_rdz, cosmo)
+
+    # rotate to same orientation as footprint
+    _, rot_inv = rotate_to_z(mid_xyz, cosmo)
+    pos = rot_inv.apply(pos)
+    vel = rot_inv.apply(vel)
+
+    # shift to center of footprint
+    pos += mid_xyz
+
     return pos, vel
 
 
@@ -146,8 +157,9 @@ def main(cfg: DictConfig) -> None:
     # Apply cuboid remapping
     pos, vel = remap(pos, vel, cfg)
 
-    # Rotate to align with CMASS
-    pos, vel = rotate(pos, vel)
+    # Rotate and shift to align with CMASS
+    pos, vel = move_to_footprint(
+        pos, vel, cfg.survey.mid_rdz, cfg.nbody.cosmo, cfg.nbody.L)
 
     # Calculate sky coordinates
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
