@@ -2,6 +2,13 @@
 Simulate density field using BORG PM models.
 NOTE: This works with the private BORG version, available to Aquila members.
 
+Note, for MPI:
+```
+THREADS=8
+mpirun -np $THREADS -genv OMP_NUM_THREADS=$THREADS -genv BORG_TBB_NUM_THREADS=$THREADS python -m cmass.nbody.borgpm nbody=test
+```
+This still doesn't work for the super high-res 3Gpc/h at mem=512GB.
+
 Requires:
     - pmwd
 
@@ -31,18 +38,28 @@ Output:
 """
 
 import os
-os.environ["PYBORG_QUIET"] = "yes"  # noqa
+
+# os.environ["PYBORG_QUIET"] = "yes"  # noqa
+# os.environ["BORG_TBB_NUM_THREADS"] = "4"  # noqa
+# os.environ["OMP_NUM_THREADS"] = "4"  # noqa
 
 from os.path import join as pjoin
 import numpy as np
 import logging
 import hydra
+from mpi4py import MPI
+
 from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
     gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
 from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
+
+# For logging MPI problems
+# console = borg.console()
+# console.outputToFile(f"rank{rank}.log")
+# console.setLogfileVerboseLevel(5)
 
 
 def parse_config(cfg):
@@ -87,6 +104,7 @@ def run_density(wn, cpar, cfg):
     box.N = 3*(nbody.N,)
 
     chain = borg.forward.ChainForwardModel(box)
+    startN0, localN0, _, _ = chain.getMPISlice()
     if nbody.transfer == 'CLASS':
         chain = transfer_CLASS(chain, box, cpar)
     elif nbody.transfer == 'EH':
@@ -116,7 +134,7 @@ def run_density(wn, cpar, cfg):
 
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(wn)
+    chain.forwardModel_v2(wn[startN0:startN0+localN0])
 
     Npart = pm.getNumberOfParticles()
     pos = np.empty(shape=(Npart, 3))
@@ -140,6 +158,7 @@ def run_ICs(wn, cpar, cfg):
 
     af = 1/(1+50)  # z=50
     chain = borg.forward.ChainForwardModel(box)
+    startN0, localN0, _, _ = chain.getMPISlice()
     if nbody.transfer == 'CLASS':
         chain = transfer_CLASS(chain, box, cpar, a_final=af)
     elif nbody.transfer == 'EH':
@@ -152,9 +171,10 @@ def run_ICs(wn, cpar, cfg):
 
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(wn)
+    chain.forwardModel_v2(wn[startN0:startN0+localN0])
 
-    rhoic = np.empty(chain.getOutputBoxModel().N)
+    _, out_localN0, out_N1, out_N2 = chain.getOutputMPISlice()
+    rhoic = np.empty((out_localN0, out_N1, out_N2))
     chain.getDensityFinal(rhoic)
     return rhoic
 
@@ -162,6 +182,10 @@ def run_ICs(wn, cpar, cfg):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+    # Load MPI rank
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
@@ -179,10 +203,26 @@ def main(cfg: DictConfig) -> None:
     # Get ICs
     wn = get_ICs(cfg)
 
-    # Run
+    # Run z=50 ICs
     if cfg.nbody.save_z50:
         rho50 = run_ICs(wn, cpar, cfg)
+        rho50 = comm.gather(rho50, root=0)
+        if rank == 0:
+            rho50 = np.concatenate(rho50, axis=0)
+
+    # Run density field
     pos, vel = run_density(wn, cpar, cfg)
+
+    # Gather particle positions and velocities
+    pos = comm.gather(pos, root=0)
+    vel = comm.gather(vel, root=0)
+
+    # Post-process and save results
+    if rank != 0:
+        logging.info(f"Rank {rank} done!")
+        return  # Only compute remaining on rank 0
+    pos = np.concatenate(pos, axis=0)
+    vel = np.concatenate(vel, axis=0)
 
     # Calculate density and velocity field
     rho, fvel = rho_and_vfield(

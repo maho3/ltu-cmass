@@ -1,20 +1,19 @@
-#PBS -N charm_1gpch_z0.5
+#PBS -N charm_z0.5
 #PBS -q batch
 #PBS -j oe
 #PBS -o ${HOME}/data/jobout/${PBS_JOBNAME}.${PBS_JOBID}.log
 #PBS -l walltime=4:00:00
-#PBS -t 0-499
-#PBS -l nodes=1:ppn=32,mem=64gb
+#PBS -t 0-3
+#PBS -l nodes=1:ppn=128,mem=512gb
 # for pmwd PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
 # for fit_halo_bias PBS -l nodes=1:has1gpu:ppn=32,mem=128gb
-# for borg 
+# for borg PBS -l nodes=1:ppn=32,mem=64gb
 
 source /data80/mattho/anaconda3/bin/activate
 cd /home/mattho/git/ltu-cmass
 
 sim=borgpm
-suite=charm_1gpch_z0.5
-
+# suite=charm_z0.5
 for i in 0 500 1000 1500
 do
     idx=$(($i + ${PBS_ARRAYID}))
@@ -40,28 +39,32 @@ do
 #     #     
 #     # fi
 
-    N=128
-    cd ./quijote_wn
+    # Generate white noise
+    # N=384
+    # cd ./quijote_wn
     # sh gen_quijote_ic.sh ${N} ${idx}
-    cd ..
+    # cd ..
 
-    # module restore myborg
-    # conda activate borg310
-    # python -m cmass.nbody.borgpm nbody=quijote nbody.lhid=${idx}
+    # Run borgpm
+    module restore myborg
+    conda activate borg310
+    python -m cmass.nbody.borgpm nbody=test nbody.lhid=${idx}
     # rm ./data/quijote/wn/N${N}/wn_${idx}.dat
 
-    module restore cmass
-    conda activate cmass
 
-    # python -m cmass.bias.rho_to_halo sim=${sim} nbody=quijote nbody.lhid=${idx}
-    # python -m cmass.survey.remap_cuboid sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite}
+    # # Run the rest of things
+    # module restore cmass
+    # conda activate cmass
 
-    for j in {0..1}
-    do
-        python -m cmass.bias.apply_hod sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
-        python -m cmass.survey.ngc_selection sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
-        python -m cmass.summaries.Pk sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
-    done
+    # # python -m cmass.bias.rho_to_halo sim=${sim} nbody=quijote nbody.lhid=${idx}
+    # # python -m cmass.survey.remap_cuboid sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite}
+
+    # for j in {0..1}
+    # do
+    #     python -m cmass.bias.apply_hod sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+    #     python -m cmass.survey.ngc_selection sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+    #     python -m cmass.summaries.Pk sim=${sim} nbody=quijote nbody.lhid=${idx} nbody.suite=${suite} bias.hod.seed=${j}
+    # done
     
     echo "~~~~~ Finished lhid=${idx} ~~~~~"
 done
