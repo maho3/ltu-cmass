@@ -24,7 +24,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 
 from .tools import (
-    xyz_to_sky, sky_to_xyz, rotate_to_z,
+    xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
 from ..utils import (get_source_path, timing_decorator, load_params)
 
@@ -153,6 +153,10 @@ def main(cfg: DictConfig) -> None:
 
     # Load galaxies
     pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
+
+    # [Optionally] rotate and shuffle cubic volume
+    pos, vel = random_rotate_translate(
+        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
 
     # Apply cuboid remapping
     pos, vel = remap(pos, vel, cfg)

@@ -80,6 +80,8 @@ def sky_to_xyz(rdz, cosmo):
 
     return pos.value.T
 
+# Geometry functions
+
 
 def rotate_to_z(xyz, cosmo):
     """Returns a Rotation object which rotates a sightline (comoving position)
@@ -126,8 +128,47 @@ def rotate_to_z(xyz, cosmo):
     return rot, irot
 
 
-# mask functions
+def random_rotate_translate(xyz, L, vel=None, seed=0):
+    """Randomly rotate and translate a cube of points.
 
+    Rotations are fixed to [0, 90, 180, 270] degrees on each axis,
+    to satisfy periodic boundary conditions.
+
+    Args:
+    - xyz (np.ndarray): (N, 3) array of positions in the cube.
+    - L (float): side length of the cube.
+    - vel (np.ndarray, optional): (N, 3) array of velocities. 
+    - seed (int): random seed for reproducibility. If 0, no transformation
+        is applied.
+    """
+
+    assert np.all((xyz >= 0) & (xyz <= L)), "xyz must be in [0, L]"
+    xyz, vel = map(deepcopy, [xyz, vel])
+
+    if seed == 0:  # no transformation
+        offset = np.zeros(3)
+        rotation = R.identity()
+    else:
+        np.random.seed(seed)
+        offset = np.random.rand(3)*L
+        rotation = R.from_euler(
+            'xyz', np.random.choice([0, 90, 180, 270], 3),
+            degrees=True)
+
+    # Rotate
+    xyz -= L/2
+    xyz = rotation.apply(xyz)
+    xyz += L/2
+    vel = rotation.apply(vel) if vel is not None else None
+
+    # Translate
+    xyz += offset
+    xyz %= L
+
+    return xyz, vel
+
+
+# mask functions
 
 def BOSS_angular(ra, dec, wdir='./data'):
     ''' Given RA and Dec, check whether the galaxies are within the angular
