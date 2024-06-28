@@ -4,7 +4,6 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
-import MAS_library as MASL
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (gen_white_noise, load_white_noise, save_nbody,
                     rho_and_vfield, get_camb_pk, get_class_pk, get_syren_pk)
@@ -224,7 +223,9 @@ def run_density(cfg, outdir):
 
     # Load the data
     filename = pjoin(
-        outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
+        outdir,
+        f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
+        f'N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
     data = {}
 
     with open(filename, 'rb') as f:
