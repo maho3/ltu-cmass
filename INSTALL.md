@@ -4,22 +4,29 @@ Getting Started
 
 Welcome to the ltu-cmass installation instructions.
 
+## Table of Contents
 Primary installation:
-1. [Clone the repository](#clone-the-repository)
-2. [Install dependencies](#install-dependencies)
-3. [Install `cmass`](#install-cmass)
-4. [Configure the working directory](#configure-the-working-directory)
-5. [Running the pipeline](#running-the-pipeline)
+- [Clone the Repository](#clone-the-repository)
+- [Activate a virtual environment](#activate-a-virtual-environment)
+- [Install `cmass`](#install-cmass)
+- [Install forked `pmwd`](#install-forked-pmwd)
+- [Installing BORG \[optional\]](#installing-borg-optional)
+- [Installing Pinocchio \[optional\]](#installing-pinocchio-optional)
+- [Compiling Pinocchio on Infinity@IAP](#compiling-pinocchio-on-infinityiap)
+- [Installing camb, CLASS, or syren \[optional\]](#installing-camb-class-or-syren-optional)
+- [Configure the Working Directory](#configure-the-working-directory)
+- [Running the pipeline](#running-the-pipeline)
 
 Additional functionality:
-* [Configuring the pipeline](#configuring-the-pipeline)
-* [Working with Quijote ICs](#generating-quijote-ics-and-refitting-halo-bias-models)
+- [Configuring the pipeline](#configuring-the-pipeline)
+- [Running filtering](#running-filtering)
+- [Generating Quijote ICs and refitting halo bias models](#generating-quijote-ics-and-refitting-halo-bias-models)
 
 Some general design principles:
 
 - The repository is built as a collection of scripts designed to transform cosmological simulations into mocks of galaxy surveys. Each component script is designed to be run through command line on a computing cluster (e.g. `python -m cmass.nbody.pmwd`).
 - I/O is done mostly through reading and saving `.npy` files on disk. The scripts expect a certain structure of data storage, located within the working directory specified in [`global.cfg`](global.cfg). See an example directory tree in [Data Structure](#configure-the-working-directory).
-- We employ dynamic loading strategy, which means that the dependency modules are only loaded when needed. This is done to allow usage of the scripts when not all prerequisites can be installed simultaneously. However, this means all functions and classes must be loaded through relative imports (e.g. `from .tools import do_something` instead of `import tools; tools.do_something()`).
+- We employ dynamic loading, which means that the dependency modules are only loaded when needed. This is done to allow usage of the scripts when not all prerequisites can be installed simultaneously. However, this means all functions and classes must be loaded through relative imports (e.g. `from .tools import do_something` instead of `import tools; tools.do_something()`).
 
 
 ## Clone the Repository 
@@ -65,14 +72,72 @@ pip install --no-cache-dir aquila-borg
 ```
 The build process for this package may take a while (~20 minutes). Note, this public version of BORG lacks several features, such as BORG-PM simulators. For access to these, consider joining the [Aquila consortium](https://www.aquila-consortium.org/) :).
 
+## Installing Pinocchio [optional]
+This pipeline includes the option to use the [Pinocchio](https://github.com/pigimonaco/Pinocchio) 2LPT gravity solver and halo emulator. This is available in `cmass.nbody.pinocchio`. 
+
+Pinocchio requires you to have an MPI library, `fftw3`, and `gsl` installed on your machine. You then download and compile Pinocchio for your system. The original installation instructions are [available here](https://github.com/pigimonaco/Pinocchio/blob/master/INSTALLATION), but we provide a working example for the Infinity@IAP cluster below.
+
+### Compiling Pinocchio on Infinity@IAP
+To build pinnochio on infinity, first load `openmpi`
+```bash
+module load openmpi/5.0.3-gnu
+```
+After cloning pinnochio from https://github.com/pigimonaco/Pinocchio, edit the Makefile to be compatible with infinity:
+```bash
+ifeq ($(SYSTYPE),"infinity")
+CC          =  mpicc
+CDEBUG      = -ggdb3 -Wall
+COPTIMIZED  = -O3 -Wno-unused-result
+FFTW_LIBR   = -L/softs/fftw3/3.3.10-gnu-mpi/lib -lfftw3_mpi -lfftw3
+FFTW_INCL   = -I/softs/fftw3/3.3.10-gnu-mpi/include
+MPI_LIBR    = -L/softs/openmpi/5.0.3-gnu/include
+MPI_INCL    =
+GSL_LIBR    = -lgsl -lgslcblas -lm
+GSL_INCL    = -I/usr/include
+endif
+```
+Also change the `SYSTYPE` argument to be `"infinity"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work. 
+
+Lastly, in [your nbody configuration file](./cmass/conf/nbody/pinocchio.yaml) you need to specify the absolute path to your Pinocchio executable. This is the `pinnochio.x` file in the `src` directory of Pinocchio, generated during the `make`. For example, mine is:
+```yaml
+pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
+```
+
+Finally, before running the executable `pinnochio.x`, you must also run
+```bash
+export LD_LIBRARY_PATH=/softs/fftw3/3.3.10-gnu-mpi/lib:$LD_LIBRARY_PATH
+```
+to enable pinnochio to access the fftw3_mpi library. Then you should be able to run the default configuration:
+```bash
+python -m cmass.nbody.pinocchio nbody=pinocchio
+```
+
+### Installing camb, CLASS, or syren [optional]
+Pinocchio then requires you to generate a linear power spectrum on your own. We provide integration with [camb](https://github.com/cmbant/CAMB), [CLASS](https://github.com/lesgourg/class_public), or [syren](https://github.com/DeaglanBartlett/symbolic_pofk).
+```bash
+# Install CAMB
+pip install camb
+# Install syren
+pip install git+https://github.com/DeaglanBartlett/symbolic_pofk.git
+```
+To install CLASS's python wrapper, follow the instructions in the [CLASS repository](https://github.com/lesgourg/class_public/wiki/Python-wrapper).
+
+
 ## Configure the Working Directory
-ltu-cmass expects a certain working directory structure to know how to move data around. First, pick a directory on your machine where you want to store the data. On computing clusters, this is usually in the scratch space. Then, change the global configuration in [`ltu-cmass/cmass/conf/global.yaml`](./cmass/conf/global.yaml) to point to this directory, as follows:
+`ltu-cmass` expects a certain working directory structure to know how to move data around. First, pick a directory on your machine where you want to store the data. On computing clusters, this is usually in the scratch space. Then, change the global configuration in [`ltu-cmass/cmass/conf/global.yaml`](./cmass/conf/global.yaml) to point to this directory, as follows:
 ```yaml
 meta:
     wdir: "/path/to/working/directory"
 ```
 All data will be stored in this directory, and the pipeline will expect to find the data in this directory.
 
+Once you've changed this file, you can remove it from git tracking with:
+```bash
+git update-index --skip-worktree cmass/conf/global.yaml
+```
+This ensures that when you then go to push changes to the repository, you don't accidentally push your local configuration.
+
+## Download observational masks and calibration files
 To run the pipeline in the following step, you will need some calibration files and observational masks. These can be downloaded from the `/learningtheuniverse/ltu-cmass-starter` directory on OSN ([See access instructions here](./DATA.md)). They should be stored in the working directory as following:
 ```yaml
 +-- /path/to/working/directory
@@ -165,7 +230,7 @@ This would generate, e.g. ra/dec/z `rdz0_filter.npy` and weight `rdz0_filter_wei
 
 ## Generating Quijote ICs and refitting halo bias models
 
-You can also use the scripts in [`quijote_wn/NgenicWhiteNoise`](./quijote_wn/NgenicWhiteNoise) to generate initial white noise fields for the Quijote simulations. Then, these can be used to seed the ltu-cmass gravity solvers, and further to calibrate the halo biasing models.
+You can also use the scripts in [`quijote_wn/NgenicWhiteNoise`](./quijote_wn/NgenicWhiteNoise) to generate initial white noise fields for the Quijote simulations. Then, these can be used to seed the `ltu-cmass` gravity solvers, and further to calibrate the halo biasing models.
 
 To generate the Quijote ICs, you must first make the executable.
 ```bash

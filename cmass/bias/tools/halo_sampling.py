@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import jax.scipy.ndimage
 import jax
 from functools import partial
-from pmwd import Configuration, Particles, scatter
+import warnings
 from ...utils import timing_decorator
 from ...nbody.tools import rho_and_vfield
 
@@ -310,7 +310,9 @@ def sample_3d(phi: np.ndarray, Nt: int, L: float, frac_sig_x: float, origin: np.
 # velocity fields
 
 @timing_decorator
-def sample_velocities_CIC(hpos, cfg, fvel=None, ppos=None, pvel=None):
+def sample_velocities_CIC(
+        hpos, cfg, fvel=None, rho=None, ppos=None, pvel=None):
+
     nbody = cfg.nbody
 
     if fvel is None:
@@ -321,6 +323,14 @@ def sample_velocities_CIC(hpos, cfg, fvel=None, ppos=None, pvel=None):
             ppos, pvel,
             cfg.nbody.L, cfg.nbody.N, 'CIC',
             omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+    if np.any(np.isnan(fvel)):
+        warnings.warn('NaNs in velocity field from CIC interpolation. '
+                      'Substituting NaNs for theory prediction.')
+        v_theory = get_vtheory(
+            rho, L_BOX=nbody.L, smooth_R=2*nbody.L / nbody.N,
+            f=cfg.nbody.cosmo[0]**0.55)
+        fvel[np.isnan(fvel)] = v_theory[np.isnan(fvel)]
 
     # Interpolate to halo positions
     hvel = []
@@ -352,7 +362,7 @@ def sample_velocities_kNN(hpos, ppos, pvel):
 
 @timing_decorator
 def sample_velocities_density(hpos, rho, L, Omega_m, smooth_R):
-    vel = get_vgrid(rho, L, smooth_R, f=Omega_m**0.55)
+    vel = get_vtheory(rho, L, smooth_R, f=Omega_m**0.55)
     hvel = [interp_field(vel, hpos[i], L, np.zeros(3), order=1).T
             for i in range(len(hpos))]
     return hvel
@@ -465,7 +475,7 @@ def project_radial(vec: jnp.ndarray, coords: jnp.ndarray, origin: jnp.ndarray) -
     return vr
 
 
-def get_vgrid(delta: jnp.ndarray, L_BOX: float, smooth_R: float, f: float) -> jnp.ndarray:
+def get_vtheory(delta: jnp.ndarray, L_BOX: float, smooth_R: float, f: float) -> jnp.ndarray:
     """
     Convert an overdensity field to a velocity field
 

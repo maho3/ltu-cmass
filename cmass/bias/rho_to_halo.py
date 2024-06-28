@@ -97,6 +97,29 @@ def sample_positions(hsamp, cfg):
 
 
 @timing_decorator
+def sample_velocities(hpos, cfg, rho=None, fvel=None, ppos=None, pvel=None):
+    if cfg.bias.halo.vel == 'density':
+        # estimate halo velocities from matter density field
+        hvel = sample_velocities_density(
+            hpos, rho, L=cfg.nbody.L, Omega_m=cfg.nbody.cosmo[0],
+            smooth_R=2*cfg.nbody.L/cfg.nbody.N)
+    elif cfg.bias.halo.vel == 'CIC':
+        # estimate halo velocities from CIC-interpolated particle velocities
+        hvel = sample_velocities_CIC(hpos, cfg, fvel, rho, ppos, pvel)
+    elif cfg.bias.halo.vel == 'kNN':
+        # estimate halo velocities from kNN-interpolated particle velocities
+        # Not used often
+        if (ppos is None) or (pvel is None):
+            raise ValueError('No particles found for kNN interpolation.')
+        ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
+        hvel = sample_velocities_kNN(hpos, ppos, pvel)
+    else:
+        raise NotImplementedError(
+            f'Velocity type {cfg.bias.halo.vel} not implemented.')
+    return hvel
+
+
+@timing_decorator
 def sample_masses(Nsamp, medg, order=1):
     """Interpolate the mass PDF and sample it continuously."""
     mcen = (medg[1:] + medg[:-1])/2
@@ -280,22 +303,7 @@ def main(cfg: DictConfig) -> None:
         hmass = sample_masses([len(x) for x in hpos], medges)
 
     logging.info('Calculating velocities...')
-    if cfg.bias.halo.vel == 'density':
-        # estimate halo velocities from matter density field
-        hvel = sample_velocities_density(hpos, rho, cfg)
-    elif cfg.bias.halo.vel == 'CIC':
-        # estimate halo velocities from CIC-interpolated particle velocities
-        hvel = sample_velocities_CIC(hpos, cfg, fvel)
-    elif cfg.bias.halo.vel == 'kNN':
-        # estimate halo velocities from kNN-interpolated particle velocities
-        if (ppos is None) or (pvel is None):
-            raise ValueError('No particles found for kNN interpolation.')
-        ppos, pvel = pad_3d(ppos, pvel, Lbox=cfg.L, Lpad=10)
-        hvel = [sample_velocities_kNN([hpos[i]], ppos, pvel)[0]
-                for i in range(len(hpos))]
-    else:
-        raise NotImplementedError(
-            f'Velocity type {cfg.bias.halo.vel} not implemented.')
+    hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
 
     logging.info('Combine...')
 
