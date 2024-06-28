@@ -1,5 +1,5 @@
 # for calibrating halo biasing models with quijote
-suite: calib_1gpch_z0.5
+suite: pinocchio_1gpch_z0.5
 
 # General parameters
 L: 1000           # Mpc/h
@@ -8,14 +8,14 @@ lhid: 3           # latin hypercube id
 matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
-save_velocities: true  # whether to save velocity field data
+save_velocities: false  # whether to save velocity field data
 
 zi: 20            # initial redshift
 zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt, borgpm and pinocchio-only
-transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
+transfer: 'CAMB' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
 # borglpt-only
 order: 2          # order of the LPT expansion
