@@ -16,7 +16,6 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 import numpy as np
 import logging
 from os.path import join as pjoin
-from scipy.spatial.transform import Rotation as R
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
 import hydra
@@ -44,10 +43,7 @@ def load_galaxies_sim(source_dir, seed):
 
 
 @timing_decorator
-def remap(ppos, pvel, cfg):
-    L = cfg.nbody.L
-    u1, u2, u3 = cfg.survey.u1, cfg.survey.u2, cfg.survey.u3
-
+def remap(ppos, pvel, L, u1, u2, u3):
     # remap the particles to the cuboid
     new_size = list(L*np.array(remap_Lbox(u1, u2, u3)))
     logging.info(f'Remapping from {[L]*3} to {new_size}.')
@@ -126,15 +122,34 @@ def custom_cuts(rdz, cfg):
 
 @timing_decorator
 def reweight(rdz, wdir='./data'):
+    # load observed n(z)
     n_z = np.load(
         pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
+    # load simulated n(z)
     hsim, _ = np.histogram(rdz[:, -1], bins=be)
-    samp_weight = hobs / hsim
+    hobs, hsim = hobs.astype(int), hsim.astype(int)
+    for i in range(len(hsim)):
+        if hsim[i] < hobs[i]:
+            logging.warning(
+                f'hsim ({hsim[i]}) < hobs ({hobs[i]}) in bin: '
+                f'{be[i]:.5f}<z<{be[i+1]:.5f},\n'
+                'More simulated galaxies than observed. '
+                'Reweighting may not be accurate.')
+
+    # sample at most as many as observed
+    hsamp = np.minimum(hobs, hsim)
+
+    # mask
+    mask = np.zeros(len(rdz), dtype=bool)
     bind = np.digitize(rdz[:, -1], be) - 1
-    mask = np.random.rand(len(rdz)) < samp_weight[bind]
+    for i in range(len(be) - 1):
+        in_bin = np.argwhere(bind == i).flatten()
+        in_samp = np.random.choice(in_bin, size=hsamp[i], replace=False)
+        mask[in_samp] = True
+
     return rdz[mask]
 
 
@@ -159,7 +174,9 @@ def main(cfg: DictConfig) -> None:
         pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
 
     # Apply cuboid remapping
-    pos, vel = remap(pos, vel, cfg)
+    pos, vel = remap(
+        pos, vel, cfg.nbody.L,
+        cfg.survey.u1, cfg.survey.u2, cfg.survey.u3)
 
     # Rotate and shift to align with CMASS
     pos, vel = move_to_footprint(
@@ -174,7 +191,7 @@ def main(cfg: DictConfig) -> None:
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)
 
-    # Reweight
+    # Reweight (Todo: fiber collisions should iterate with this?)
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save

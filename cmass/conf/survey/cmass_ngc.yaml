@@ -16,4 +16,4 @@ fibermode: 1  # 0: no collisions, 1: one removed, 2: both removed
 # z_range: [0.4, 0.7]
 
 # Middle ra, dec, z of CMASS sample (See test_remove_cuboid for details)
-mid_rdz: [186.42231868123542, 32.55919031460393, 0.5500079542398453]
+mid_rdz: [184.83975076425324, 34.03863916513374, 0.4194598771198273]
