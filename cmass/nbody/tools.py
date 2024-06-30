@@ -118,7 +118,7 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
     return rho, vel  # TODO: Implement interpolation for NaNs?
 
 
-# power spectrum stuff
+# power spectrum stuff (for pinnochio)
 
 def get_camb_pk(k, omega_m, omega_b, h, n_s, sigma8):
     if camb is None:
