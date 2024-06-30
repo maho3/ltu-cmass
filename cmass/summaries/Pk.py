@@ -89,7 +89,7 @@ def main(cfg: DictConfig) -> None:
     rrdz = load_randoms(cfg.meta.wdir)
 
     # fixed because we don't know true cosmo
-    cosmo = astropy.cosmology.Planck15
+    cosmo = astropy.cosmology.Planck18
 
     # compute P(k)
     k, p0k, p2k, p4k = compute_Pk(

@@ -8,6 +8,7 @@ from os.path import join as pjoin
 import numpy as np
 import pymangle
 import pandas as pd
+from copy import deepcopy
 
 from astropy.io import fits
 from astropy.coordinates import search_around_sky
@@ -15,6 +16,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.constants import c
 from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation as R
 
 from ..utils import timing_decorator, cosmo_to_astropy
 
@@ -22,10 +24,17 @@ from ..utils import timing_decorator, cosmo_to_astropy
 # cosmo functions
 
 
-def xyz_to_sky(pos, vel, cosmo):
+def xyz_to_sky(pos, vel=None, cosmo=None):
     """Converts cartesian coordinates to sky coordinates (ra, dec, z).
     Inspired by nbodykit.transform.CartesianToSky.
     """
+    if vel is None:
+        vel = np.zeros_like(pos)  # no peculiar velocity
+    if cosmo is None:
+        raise ValueError('cosmo must be provided.')
+
+    pos, vel = map(deepcopy, [pos, vel])  # avoid modifying input
+    pos, vel = map(np.atleast_2d, [pos, vel])  # ensure 2D arrays
     cosmo = cosmo_to_astropy(cosmo)
 
     pos /= cosmo.h  # convert from Mpc/h to Mpc
@@ -60,6 +69,7 @@ def xyz_to_sky(pos, vel, cosmo):
 
 def sky_to_xyz(rdz, cosmo):
     """Converts sky coordinates (ra, dec, z) to cartesian coordinates."""
+    rdz = np.asarray(rdz)
     cosmo = cosmo_to_astropy(cosmo)
 
     ra, dec, z = rdz.T
@@ -70,9 +80,95 @@ def sky_to_xyz(rdz, cosmo):
 
     return pos.value.T
 
+# Geometry functions
+
+
+def rotate_to_z(xyz, cosmo):
+    """Returns a Rotation object which rotates a sightline (comoving position)
+    to the z-axis.
+
+    Args:
+        xyz (array): (3,) array of center position of sky footprint.
+            In Mpc/h.
+        cosmo (array): Cosmological parameters
+            [Omega_m, Omega_b, h, n_s, sigma8].
+
+    Returns:
+        rot (Rotation): Rotation object which rotates the sightline to z-axis.
+        irot (Rotation): Inverse rotation object.
+    """
+
+    # calculate direction vector
+    mvec = xyz / np.linalg.norm(xyz)
+
+    # use a nearby point in +RA to affix x-axis
+    rdz = xyz_to_sky(xyz, np.zeros(3), cosmo)[0]
+    rdz += [0.001, 0, 0]  # add 0.001
+    xyz1 = sky_to_xyz(rdz, cosmo)
+
+    # calculate x-axis vector (to be rotated later to x-axis)
+    xvec = xyz1 - xyz
+    xvec /= np.linalg.norm(xvec)
+
+    # rotate xyz to z
+    rotz_axis = np.cross(mvec, [0, 0, 1])
+    rotz_axis /= np.linalg.norm(rotz_axis)
+    rotz_angle = np.arccos(np.dot(mvec, [0, 0, 1]))
+    rotz = R.from_rotvec(rotz_angle*rotz_axis)
+
+    # rotate xvec to x-axis
+    xvec = rotz.apply(xvec)
+    rotx_angle = -np.arctan2(xvec[1], xvec[0])
+    rotx = R.from_rotvec(rotx_angle*np.array([0, 0, 1]))
+
+    # combine rotations and measure inverse
+    rot = rotx*rotz
+    irot = rot.inv()
+
+    return rot, irot
+
+
+def random_rotate_translate(xyz, L, vel=None, seed=0):
+    """Randomly rotate and translate a cube of points.
+
+    Rotations are fixed to [0, 90, 180, 270] degrees on each axis,
+    to satisfy periodic boundary conditions.
+
+    Args:
+    - xyz (np.ndarray): (N, 3) array of positions in the cube.
+    - L (float): side length of the cube.
+    - vel (np.ndarray, optional): (N, 3) array of velocities. 
+    - seed (int): random seed for reproducibility. If 0, no transformation
+        is applied.
+    """
+
+    assert np.all((xyz >= 0) & (xyz <= L)), "xyz must be in [0, L]"
+    xyz, vel = map(deepcopy, [xyz, vel])
+
+    if seed == 0:  # no transformation
+        offset = np.zeros(3)
+        rotation = R.identity()
+    else:
+        np.random.seed(seed)
+        offset = np.random.rand(3)*L
+        rotation = R.from_euler(
+            'xyz', np.random.choice([0, 90, 180, 270], 3),
+            degrees=True)
+
+    # Rotate
+    xyz -= L/2
+    xyz = rotation.apply(xyz)
+    xyz += L/2
+    vel = rotation.apply(vel) if vel is not None else None
+
+    # Translate
+    xyz += offset
+    xyz %= L
+
+    return xyz, vel
+
 
 # mask functions
-
 
 def BOSS_angular(ra, dec, wdir='./data'):
     ''' Given RA and Dec, check whether the galaxies are within the angular
