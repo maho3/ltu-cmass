@@ -329,7 +329,9 @@ def sample_velocities_CIC(
                       'Substituting NaNs for theory prediction.')
         v_theory = get_vtheory(
             rho, L_BOX=nbody.L, smooth_R=2*nbody.L / nbody.N,
-            f=cfg.nbody.cosmo[0]**0.55)
+            f=cfg.nbody.cosmo[0]**0.55
+        )  # TODO: Replace f with colossus growth factor?
+        v_theory = np.transpose(v_theory, (1, 2, 3, 0))
         fvel[np.isnan(fvel)] = v_theory[np.isnan(fvel)]
 
     # Interpolate to halo positions
@@ -552,8 +554,8 @@ def get_vtheory(delta: jnp.ndarray, L_BOX: float, smooth_R: float, f: float) -> 
         f * delta_k_complex * k[2] / k_norm / k_norm
 
     # Convert back to real space
-    vx = (jnp.fft.irfftn(v_kx) * V / dV)
-    vy = (jnp.fft.irfftn(v_ky) * V / dV)
-    vz = (jnp.fft.irfftn(v_kz) * V / dV)
+    vx = (jnp.fft.irfftn(v_kx) * (V / dV))
+    vy = (jnp.fft.irfftn(v_ky) * (V / dV))
+    vz = (jnp.fft.irfftn(v_kz) * (V / dV))
 
     return jnp.array([vx, vy, vz])

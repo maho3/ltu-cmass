@@ -157,6 +157,10 @@ def main(cfg: DictConfig) -> None:
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
+    # Convert to overdensity field
+    rho /= np.mean(rho)
+    rho -= 1
+
     # Convert from comoving -> peculiar velocities
     fvel *= (1 + cfg.nbody.zf)
 
