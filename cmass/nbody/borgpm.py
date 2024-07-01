@@ -54,7 +54,8 @@ import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
     gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
-from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
+from .tools_borg import (
+    build_cosmology, transfer_EH, transfer_CLASS, apply_transfer_fn)
 
 # For logging MPI problems
 # console = borg.console()
@@ -116,7 +117,7 @@ def run_density(wn, cpar, cfg):
     pm = borg.forward.model_lib.M_PM_CIC(
         box,
         opts=dict(
-            a_initial=1.0,
+            a_initial=1.0,  # ignored, reset by transfer fn
             a_final=nbody.af,
             do_rsd=False,
             supersampling=nbody.supersampling,
@@ -147,36 +148,36 @@ def run_density(wn, cpar, cfg):
     return pos, vel
 
 
-@timing_decorator
-def run_ICs(wn, cpar, cfg):
-    nbody = cfg.nbody
+# @timing_decorator
+# def run_ICs(wn, cpar, cfg):
+#     nbody = cfg.nbody
 
-    # initialize box and chain
-    box = borg.forward.BoxModel()
-    box.L = 3*(nbody.L,)
-    box.N = 3*(nbody.N,)
+#     # initialize box and chain
+#     box = borg.forward.BoxModel()
+#     box.L = 3*(nbody.L,)
+#     box.N = 3*(nbody.N,)
 
-    af = 1/(1+50)  # z=50
-    chain = borg.forward.ChainForwardModel(box)
-    startN0, localN0, _, _ = chain.getMPISlice()
-    if nbody.transfer == 'CLASS':
-        chain = transfer_CLASS(chain, box, cpar, a_final=af)
-    elif nbody.transfer == 'EH':
-        chain = transfer_EH(chain, box, a_final=af)
-    else:
-        raise NotImplementedError(
-            f'Transfer function "{nbody.transfer}" not implemented.')
-    chain.setAdjointRequired(False)
-    chain.setCosmoParams(cpar)
+#     af = 1/(1+50)  # z=50
+#     chain = borg.forward.ChainForwardModel(box)
+#     startN0, localN0, _, _ = chain.getMPISlice()
+#     if nbody.transfer == 'CLASS':
+#         chain = transfer_CLASS(chain, box, cpar, a_final=af)
+#     elif nbody.transfer == 'EH':
+#         chain = transfer_EH(chain, box, a_final=af)
+#     else:
+#         raise NotImplementedError(
+#             f'Transfer function "{nbody.transfer}" not implemented.')
+#     chain.setAdjointRequired(False)
+#     chain.setCosmoParams(cpar)
 
-    # forward model
-    logging.info('Running forward...')
-    chain.forwardModel_v2(wn[startN0:startN0+localN0])
+#     # forward model
+#     logging.info('Running forward...')
+#     chain.forwardModel_v2(wn[startN0:startN0+localN0])
 
-    _, out_localN0, out_N1, out_N2 = chain.getOutputMPISlice()
-    rhoic = np.empty((out_localN0, out_N1, out_N2))
-    chain.getDensityFinal(rhoic)
-    return rhoic
+#     _, out_localN0, out_N1, out_N2 = chain.getOutputMPISlice()
+#     rhoic = np.empty((out_localN0, out_N1, out_N2))
+#     chain.getDensityFinal(rhoic)
+#     return rhoic
 
 
 @timing_decorator
@@ -203,12 +204,18 @@ def main(cfg: DictConfig) -> None:
     # Get ICs
     wn = get_ICs(cfg)
 
-    # Run z=50 ICs
-    if cfg.nbody.save_z50:
-        rho50 = run_ICs(wn, cpar, cfg)
-        rho50 = comm.gather(rho50, root=0)
-        if rank == 0:
-            rho50 = np.concatenate(rho50, axis=0)
+    # # Run z=50 ICs
+    # if rank == 0 and cfg.nbody.save_z50:
+    #     rho50 = run_ICs(wn, cpar, cfg)
+    # rho50 = comm.gather(rho50, root=0)
+    # if rank == 0:
+    #     rho50 = np.concatenate(rho50, axis=0)
+    # Apply transfer fn to ICs (for CHARM)
+    if cfg.nbody.save_transfer:
+        rho_transfer = apply_transfer_fn(
+            wn, cfg.nbody.L, cfg.nbody.N, cpar,
+            af=1./(1+99),  # z=99, for CHARM inputs
+            transfer=cfg.nbody.transfer)
 
     # Run density field
     pos, vel = run_density(wn, cpar, cfg)
@@ -240,8 +247,8 @@ def main(cfg: DictConfig) -> None:
     outdir = get_source_path(cfg, "borgpm", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
-    if cfg.nbody.save_z50:
-        np.save(pjoin(outdir, 'rho_z50.npy'), rho50)
+    if cfg.nbody.save_transfer:
+        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

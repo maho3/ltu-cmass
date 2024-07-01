@@ -41,7 +41,8 @@ import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
     gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
-from .tools_borg import build_cosmology, transfer_EH, transfer_CLASS
+from .tools_borg import (
+    build_cosmology, transfer_EH, transfer_CLASS, apply_transfer_fn)
 
 
 def parse_config(cfg):
@@ -87,7 +88,7 @@ def run_density(wn, cpar, cfg):
 
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
-        chain = transfer_CLASS(chain, box, cpar)
+        chain = transfer_CLASS(chain, box, cpar, a_final=nbody.af)
     elif nbody.transfer == 'EH':
         chain = transfer_EH(chain, box)
     else:
@@ -95,15 +96,24 @@ def run_density(wn, cpar, cfg):
             f'Transfer function "{nbody.transfer}" not implemented.')
 
     if nbody.order == 1:
-        lpt = borg.forward.model_lib.M_LPT_CIC(box, opts=dict(a_initial=1.0))
+        lpt = borg.forward.model_lib.M_LPT_CIC(
+            box,
+            opts=dict(
+                a_initial=1.0,  # ignored, reset by transfer fn
+                a_final=nbody.af,
+                do_rsd=False,
+                supersampling=nbody.supersampling,
+                lightcone=False,
+                part_factor=1.01
+            ))
     elif nbody.order == 2:
         lpt = borg.forward.model_lib.M_2LPT_CIC(
             box,
             opts=dict(
-                a_initial=1.0,
-                a_final=1.0,
+                a_initial=1.0,  # ignored, reset by transfer fn
+                a_final=nbody.af,
                 do_rsd=False,
-                supersampling=1,
+                supersampling=nbody.supersampling,
                 lightcone=False,
                 part_factor=1.01
             )
@@ -146,6 +156,14 @@ def main(cfg: DictConfig) -> None:
 
     # Get ICs
     wn = get_ICs(cfg)
+    wn *= -1  # BORG uses opposite sign
+
+    # Apply transfer fn to ICs (for CHARM)
+    if cfg.nbody.save_transfer:
+        rho_transfer = apply_transfer_fn(
+            wn, cfg.nbody.L, cfg.nbody.N, cpar,
+            af=1./(1+99),  # z=99, for CHARM inputs
+            transfer=cfg.nbody.transfer)
 
     # Run
     pos, vel = run_density(wn, cpar, cfg)
@@ -166,6 +184,8 @@ def main(cfg: DictConfig) -> None:
     outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    if cfg.nbody.save_transfer:
+        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
