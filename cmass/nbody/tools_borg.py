@@ -70,6 +70,7 @@ def apply_transfer_fn(wn, L, N, cosmo, af=1./(1+99), transfer='CLASS'):
     box.N = 3*(N,)
 
     chain = borg.forward.ChainForwardModel(box)
+    startN0, localN0, _, _ = chain.getMPISlice()
     if transfer == 'CLASS':
         chain = transfer_CLASS(chain, box, cosmo, a_final=af)
     elif transfer == 'EH':
@@ -83,8 +84,9 @@ def apply_transfer_fn(wn, L, N, cosmo, af=1./(1+99), transfer='CLASS'):
 
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(wn)
+    chain.forwardModel_v2(wn[startN0:startN0+localN0])
 
-    rhoic = np.empty(box.N)
-    chain.getDensityFinal(rhoic)
-    return rhoic
+    out_startN0, out_localN0, out_N1, out_N2 = chain.getOutputMPISlice()
+    rho = np.empty((out_localN0, out_N1, out_N2))
+    chain.getDensityFinal(rho)
+    return rho
