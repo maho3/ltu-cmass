@@ -34,12 +34,14 @@ from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 from .tools.halo_models import TruncatedPowerLaw
-from .tools.halo_sampling import (pad_3d, sample_3d,
-                                  sample_velocities_density,
-                                  sample_velocities_kNN,
-                                  sample_velocities_CIC)
-from ..utils import (get_source_path, timing_decorator,
-                     load_params, cosmo_to_colossus)
+from .tools.halo_sampling import (
+    pad_3d, sample_3d,
+    sample_velocities_density,
+    sample_velocities_kNN,
+    sample_velocities_CIC)
+from ..utils import (
+    get_source_path, timing_decorator,
+    load_params, cosmo_to_colossus)
 import colossus.cosmology.cosmology as csm
 
 
@@ -101,11 +103,13 @@ def sample_velocities(hpos, cfg, rho=None, fvel=None, ppos=None, pvel=None):
     if cfg.bias.halo.vel == 'density':
         # estimate halo velocities from matter density field
         hvel = sample_velocities_density(
-            hpos, rho, L=cfg.nbody.L, Omega_m=cfg.nbody.cosmo[0],
+            hpos=hpos, rho=rho, L=cfg.nbody.L, Omega_m=cfg.nbody.cosmo[0],
             smooth_R=2*cfg.nbody.L/cfg.nbody.N)
     elif cfg.bias.halo.vel == 'CIC':
         # estimate halo velocities from CIC-interpolated particle velocities
-        hvel = sample_velocities_CIC(hpos, cfg, fvel, rho, ppos, pvel)
+        hvel = sample_velocities_CIC(
+            hpos=hpos, fvel=fvel, L=cfg.nbody.L, rho=rho,
+            N=cfg.nbody.N, cosmo=cfg.nbody.cosmo, z=cfg.nbody.zf)
     elif cfg.bias.halo.vel == 'kNN':
         # estimate halo velocities from kNN-interpolated particle velocities
         # Not used often
