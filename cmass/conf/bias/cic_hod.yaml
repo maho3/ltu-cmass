@@ -1,6 +1,9 @@
 
 # halo biasing
 halo:
+  model: CHARM # power law # CHARM
+  config_charm: config_v0.yaml
+
   # where to find halo bias model
   base_suite: calib_1gpch_z0.5
   L: 1000

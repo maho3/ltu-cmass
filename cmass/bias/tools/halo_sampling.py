@@ -13,8 +13,7 @@ import jax.scipy.ndimage
 import jax
 from functools import partial
 import warnings
-from ...utils import timing_decorator
-from ...nbody.tools import rho_and_vfield
+from ...utils import timing_decorator, cosmo_to_astropy
 
 
 # General
@@ -311,26 +310,27 @@ def sample_3d(phi: np.ndarray, Nt: int, L: float, frac_sig_x: float, origin: np.
 
 @timing_decorator
 def sample_velocities_CIC(
-        hpos, cfg, fvel=None, rho=None, ppos=None, pvel=None):
-
-    nbody = cfg.nbody
-
-    if fvel is None:
-        logging.info('Measuring CIC velocity field from particles...')
-        if ppos is None or pvel is None:
-            raise ValueError('No particles found for CIC interpolation.')
-        _, fvel = rho_and_vfield(
-            ppos, pvel,
-            cfg.nbody.L, cfg.nbody.N, 'CIC',
-            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
-
+    hpos,  # halo positions
+    fvel,  # field velocity
+    L,  # box length
+    # Only for theory interpolation:
+    rho=None,  # density field
+    N=None,  # number of grid points per side
+    cosmo=None,  # cosmology
+    z=None,  # redshift
+    smooth_R=None,  # smoothing scale
+):
+    # Fill in NaNs with theory
     if np.any(np.isnan(fvel)):
         warnings.warn('NaNs in velocity field from CIC interpolation. '
                       'Substituting NaNs for theory prediction.')
+        if smooth_R is None:
+            smooth_R = 2*L/N
+        cosmo = cosmo_to_astropy(params=cosmo)
         v_theory = get_vtheory(
-            rho, L_BOX=nbody.L, smooth_R=2*nbody.L / nbody.N,
-            f=cfg.nbody.cosmo[0]**0.55
-        )  # TODO: Replace f with colossus growth factor?
+            rho, L_BOX=L, smooth_R=smooth_R,
+            f=cosmo.Om(z)**0.55  # arxiv:1311.0726
+        )
         v_theory = np.transpose(v_theory, (1, 2, 3, 0))
         fvel[np.isnan(fvel)] = v_theory[np.isnan(fvel)]
 
@@ -341,7 +341,7 @@ def sample_velocities_CIC(
             hvel.append([])
         else:
             hvel.append(
-                interp_field(fvel.T, hpos[i], nbody.L, np.zeros(3), order=1).T)
+                interp_field(fvel.T, hpos[i], L, np.zeros(3), order=1).T)
 
     for i in range(len(hvel)):
         if np.any(np.isnan(hvel[i])):
@@ -363,8 +363,9 @@ def sample_velocities_kNN(hpos, ppos, pvel):
 
 
 @timing_decorator
-def sample_velocities_density(hpos, rho, L, Omega_m, smooth_R):
-    vel = get_vtheory(rho, L, smooth_R, f=Omega_m**0.55)
+def sample_velocities_density(hpos, rho, L, smooth_R, cosmo, z):
+    cosmo = cosmo_to_astropy(params=cosmo)
+    vel = get_vtheory(rho, L, smooth_R, f=cosmo.Om(z)**0.55)
     hvel = [interp_field(vel, hpos[i], L, np.zeros(3), order=1).T
             for i in range(len(hpos))]
     return hvel

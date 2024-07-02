@@ -35,9 +35,8 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
 os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"  # noqa, must go before jax
 
-from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
-                  lpt, nbody, scatter)
-import jax.numpy as jnp
+from pmwd import (Configuration, Cosmology, boltzmann,
+                  linear_modes, lpt, nbody)
 import logging
 import numpy as np
 from os.path import join as pjoin

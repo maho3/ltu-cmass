@@ -1,5 +1,5 @@
 # for calibrating halo biasing models with quijote
-suite: calib_1gpch_z0.5
+suite: charm_1gpch_z0.5  # calib 
 
 # General parameters
 L: 1000           # Mpc/h
@@ -10,9 +10,12 @@ Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 
-zi: 20            # initial redshift
+zi: 20            # initial redshift (for grav solver)
 zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
+
+# whether to save z=99 ICs (for CHARM bias model)
+save_z50: True
 
 # borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
