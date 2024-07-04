@@ -9,6 +9,7 @@ hydra-core
 camb
 classy
 pylians
+mpi4py
 git+https://github.com/eelregit/pmwd.git
 git+https://github.com/maho3/cuboid_remap_jax.git
 git+https://github.com/DeaglanBartlett/symbolic_pofk.git

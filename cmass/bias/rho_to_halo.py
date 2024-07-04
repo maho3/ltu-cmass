@@ -40,9 +40,7 @@ from .tools.halo_sampling import (
     sample_velocities_kNN,
     sample_velocities_CIC)
 from ..utils import (
-    get_source_path, timing_decorator,
-    load_params, cosmo_to_colossus)
-import colossus.cosmology.cosmology as csm
+    get_source_path, timing_decorator, load_params)
 
 
 def parse_config(cfg):

@@ -110,7 +110,7 @@ def run_density(wn, cpar, cfg):
 
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(wn)  # [startN0:startN0+localN0])
+    chain.forwardModel_v2(wn)
 
     Npart = lpt.getNumberOfParticles()
     pos = np.empty(shape=(Npart, 3), dtype=np.float64)

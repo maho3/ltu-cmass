@@ -2,12 +2,7 @@
 Simulate density field using BORG PM models.
 NOTE: This works with the private BORG version, available to Aquila members.
 
-Note, for MPI:
-```
-THREADS=8
-mpirun -np $THREADS -genv OMP_NUM_THREADS=$THREADS -genv BORG_TBB_NUM_THREADS=$THREADS python -m cmass.nbody.borgpm nbody=test
-```
-This still doesn't work for the super high-res 3Gpc/h at mem=512GB.
+Note, for MPI implementation, see jobs/mpiborg.sh
 
 Requires:
     - pmwd
@@ -57,11 +52,6 @@ from .tools import (
 from .tools_borg import (
     build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
     getMPISlice, gather_MPI)
-
-# For logging MPI problems
-# console = borg.console()
-# console.outputToFile(f"rank{rank}.log")
-# console.setLogfileVerboseLevel(5)
 
 
 def parse_config(cfg):
