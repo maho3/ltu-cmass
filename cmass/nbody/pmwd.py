@@ -44,7 +44,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
-    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
+    get_ICs, save_nbody, rho_and_vfield)
 
 
 def parse_config(cfg):
@@ -81,20 +81,6 @@ def configure_pmwd(cfg):
         Omega_b=cosmo[1], h=cosmo[2])
     pmcosmo = boltzmann(pmcosmo, pmconf)
     return pmconf, pmcosmo
-
-
-def get_ICs(cfg):
-    nbody = cfg.nbody
-    N = nbody.N*nbody.supersampling
-    if nbody.matchIC:
-        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
-        if nbody.quijote:
-            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
-        else:
-            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
-        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
-    else:
-        return gen_white_noise(N, seed=nbody.lhid)
 
 
 @timing_decorator

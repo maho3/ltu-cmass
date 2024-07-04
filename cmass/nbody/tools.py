@@ -45,6 +45,20 @@ def load_white_noise(path_to_ic, N, quijote=False):
     return modes
 
 
+def get_ICs(cfg):
+    nbody = cfg.nbody
+    N = nbody.N*nbody.supersampling
+    if nbody.matchIC:
+        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
+        if nbody.quijote:
+            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+        else:
+            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
+    else:
+        return gen_white_noise(N, seed=nbody.lhid)
+
+
 @timing_decorator
 def save_nbody(savedir, rho, fvel, pos, vel,
                save_particles=True, save_velocities=True):
@@ -115,7 +129,24 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
     rho = count*m_particle
     vel /= count[..., None]
 
-    return rho, vel  # TODO: Implement interpolation for NaNs?
+    return rho, vel
+
+
+def bin_cube(arr, M):
+    """Bins a cube of shape (A, B, C) into subcubes of shape (M,M,M).
+    Average over each subcube, producing an output of shape (A//M,B//M,C//M)
+
+    Args:
+        arr (np.array): cube to bin
+        M (int): bin size
+    """
+    A, B, C = arr.shape
+    assert (A % M == 0) and (B % M == 0) and (C % M == 0), \
+        "Array shape must be divisible by M"
+    reshaped = arr.reshape(A // M, M, B // M, M, C // M, M)
+    transposed = reshaped.transpose(0, 2, 4, 1, 3, 5)
+    reshaped = transposed.reshape(A // M, B // M, C // M, -1)
+    return reshaped.mean(axis=-1)
 
 
 # power spectrum stuff (for pinnochio)

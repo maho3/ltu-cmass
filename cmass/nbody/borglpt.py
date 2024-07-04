@@ -25,12 +25,14 @@ Params:
 
 Output:
     - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
+    - fvel: peculiar velocity field
+    - rho_transfer: density field after transfer function
 """
 
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
+# os.environ["BORG_TBB_NUM_THREADS"] = "8"  # noqa
+# os.environ["OMP_NUM_THREADS"] = "8"  # noqa
 
 from os.path import join as pjoin
 import numpy as np
@@ -42,9 +44,10 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
-    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
+    get_ICs, save_nbody, rho_and_vfield)
 from .tools_borg import (
-    build_cosmology, transfer_EH, transfer_CLASS, apply_transfer_fn)
+    build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
+    getMPISlice, gather_MPI)
 
 
 def parse_config(cfg):
@@ -65,31 +68,17 @@ def parse_config(cfg):
     return cfg
 
 
-def get_ICs(cfg):
-    nbody = cfg.nbody
-    N = nbody.N
-    if nbody.matchIC:
-        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
-        if nbody.quijote:
-            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
-        else:
-            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
-        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
-    else:
-        return gen_white_noise(N, seed=nbody.lhid)
-
-
 @timing_decorator
 def run_density(wn, cpar, cfg):
     nbody = cfg.nbody
+    N = nbody.N*nbody.supersampling
 
     # initialize box and chain
     box = borg.forward.BoxModel()
     box.L = 3*(nbody.L,)
-    box.N = 3*(nbody.N,)
+    box.N = 3*(N,)
 
     chain = borg.forward.ChainForwardModel(box)
-    startN0, localN0, _, _ = chain.getMPISlice()
     if nbody.transfer == 'CLASS':
         chain = transfer_CLASS(chain, box, cpar, a_final=nbody.af)
     elif nbody.transfer == 'EH':
@@ -110,34 +99,31 @@ def run_density(wn, cpar, cfg):
             a_initial=1.0,  # ignored, reset by transfer fn
             a_final=nbody.af,
             do_rsd=False,
-            supersampling=nbody.supersampling,
+            supersampling=1,
             lightcone=False,
-            part_factor=1.1
+            part_factor=1.2
         )
     )
     chain @= lpt
 
     chain.setCosmoParams(cpar)
 
-    import psutil
-    process = psutil.Process()
-    print(process.memory_info().rss/1e9)  # in GB
-
     # forward model
     logging.info('Running forward...')
-    chain.forwardModel_v2(wn[startN0:startN0+localN0])
-
-    print(process.memory_info().rss/1e9)  # in GB
+    chain.forwardModel_v2(wn)  # [startN0:startN0+localN0])
 
     Npart = lpt.getNumberOfParticles()
-    pos = np.empty(shape=(Npart, 3))
-    vel = np.empty(shape=(Npart, 3))
+    pos = np.empty(shape=(Npart, 3), dtype=np.float64)
+    vel = np.empty(shape=(Npart, 3), dtype=np.float64)
     lpt.getParticlePositions(pos)
     lpt.getParticleVelocities(vel)
 
-    print(process.memory_info().rss/1e9)  # in GB
+    pos = pos.astype(np.float32)
+    vel = vel.astype(np.float32)
 
     vel *= 100  # km/s
+
+    del chain, box, lpt
 
     return pos, vel
 
@@ -159,25 +145,27 @@ def main(cfg: DictConfig) -> None:
         "Logging directory: " +
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+
+    # Output directory
     outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
     os.makedirs(outdir, exist_ok=True)
 
-    # Setup
+    # Setup cosmology
     cpar = build_cosmology(*cfg.nbody.cosmo)
 
     # Get ICs
+    # Note: these are loaded in all ranks, to minimize MPI memory usage
     wn = get_ICs(cfg)
     wn *= -1  # BORG uses opposite sign
 
+    # Get MPI slice
+    startN0, localN0, _, _ = getMPISlice(cfg)
+    wn = wn[startN0:startN0+localN0]
+
     # Apply transfer fn to ICs (for CHARM)
     if cfg.nbody.save_transfer:
-        rho_transfer = apply_transfer_fn(
-            wn, cfg.nbody.L, cfg.nbody.N, cpar,
-            af=1./(1+99),  # z=99, for CHARM inputs
-            transfer=cfg.nbody.transfer)
-        rho_transfer = comm.gather(rho_transfer, root=0)
+        rho_transfer = run_transfer(wn, cpar, cfg)
         if rank == 0:
-            rho_transfer = np.concatenate(rho_transfer, axis=0)
             np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
         del rho_transfer
 
@@ -185,34 +173,30 @@ def main(cfg: DictConfig) -> None:
     pos, vel = run_density(wn, cpar, cfg)
 
     # Gather particle positions and velocities
-    pos = comm.gather(pos, root=0)
-    vel = comm.gather(vel, root=0)
+    pos, vel = gather_MPI(pos, vel)
+    logging.info(f'rank {rank} done')
 
-    # Post-process and save results
-    if rank != 0:
-        logging.info(f"Rank {rank} done!")
-        return  # Only compute remaining on rank 0
-    pos = np.concatenate(pos, axis=0)
-    vel = np.concatenate(vel, axis=0)
+    if rank == 0:
+        # Calculate density and velocity field
+        rho, fvel = rho_and_vfield(
+            pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2], verbose=False)
 
-    # Calculate density and velocity field
-    rho, fvel = rho_and_vfield(
-        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+        # Convert to overdensity field
+        rho /= np.mean(rho)
+        rho -= 1
 
-    # Convert to overdensity field
-    rho /= np.mean(rho)
-    rho -= 1
+        # Convert from comoving -> peculiar velocities
+        fvel *= (1 + cfg.nbody.zf)
 
-    # Convert from comoving -> peculiar velocities
-    fvel *= (1 + cfg.nbody.zf)
-
-    # Save
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
-    logging.info("Done!")
+        # Save
+        save_nbody(outdir, rho, fvel, pos, vel,
+                   cfg.nbody.save_particles, cfg.nbody.save_velocities)
+        with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+            OmegaConf.save(cfg, f)
+        logging.info("Done!")
+    comm.Barrier()
+    return
 
 
 if __name__ == '__main__':

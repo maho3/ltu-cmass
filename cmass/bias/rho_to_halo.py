@@ -164,19 +164,13 @@ def sample_masses(Nsamp, medg, order=1):
     return hmass
 
 
-def load_IC(source_path, cpars):
-    filepath = pjoin(source_path, 'rho_z50.npy')
-    rhoic = np.load(filepath)
-
-    # correct for growth factor
-    cosmo = cosmo_to_colossus(cpars)
-    corr = cosmo.growthFactorUnnormalized(z=99)
-    corr /= cosmo.growthFactorUnnormalized(z=50)
-    return rhoic*corr*0.72  # additional hard-coded factor
+def load_transfer(source_path):
+    filepath = pjoin(source_path, 'rho_transfer.npy')
+    return np.load(filepath)
 
 
 def batch_cube(x, Nsub, width, stride):
-    """Batches a cube x into Nsub sub-cubes per side, each of size Nbatch with stride dN."""
+    """Batches a cube x into Nsub sub-cubes per side, with width and stride."""
     batches = []
     for i in range(Nsub):
         for j in range(Nsub):
@@ -252,24 +246,16 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     source_path = get_source_path(cfg, cfg.sim)
-    bcfg = deepcopy(cfg)
-    bcfg.nbody.suite = bcfg.bias.halo.base_suite
-    bcfg.nbody.L = bcfg.bias.halo.L
-    bcfg.nbody.N = bcfg.bias.halo.N
-    bias_path = get_source_path(bcfg, cfg.sim)
 
-    logging.info('Loading bias parameters...')
-    popt, medges = load_bias_params(bias_path)
-
+    # Load configs
     logging.info('Loading sims...')
     rho, fvel, ppos, pvel = load_nbody(source_path)
 
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
         # load initial conditions at z=50, correct to z=99
-        rho_IC = load_IC(source_path, cfg.nbody.cosmo)
+        rho_IC = load_transfer(source_path)
 
         # apply CHARM model
         hpos, hmass = apply_charm(
@@ -297,6 +283,16 @@ def main(cfg: DictConfig) -> None:
         hpos, hmass = [hpos], [hmass]
 
     else:
+        # Load bias parameters
+        bcfg = deepcopy(cfg)
+        bcfg.nbody.suite = bcfg.bias.halo.base_suite
+        bcfg.nbody.L = bcfg.bias.halo.L
+        bcfg.nbody.N = bcfg.bias.halo.N
+        bias_path = get_source_path(bcfg, cfg.sim)
+
+        logging.info('Loading bias parameters...')
+        popt, medges = load_bias_params(bias_path)
+
         logging.info('Sampling power law...')
         hcount = sample_counts(rho, popt)
 
