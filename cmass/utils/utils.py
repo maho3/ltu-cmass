@@ -4,6 +4,7 @@ import datetime
 import os
 from os.path import join as pjoin
 from astropy.cosmology import Cosmology, FlatLambdaCDM
+from colossus.cosmology import cosmology as csm
 
 
 def get_source_path(cfg, simtype, check=True):
@@ -82,3 +83,16 @@ def get_particle_mass(N, L, omega_m, h):
     volume = L**3  # (Mpc/h)^3
     NumParticles = N**3
     return omega_m * rho_crit * volume / (NumParticles * h**2)  # Msun/h
+
+
+def cosmo_to_colossus(cpars):
+    try:
+        params = list(cpars)
+    except TypeError:
+        return params
+
+    params = {'flat': True, 'H0': 100*cpars[2], 'Om0': cpars[0],
+              'Ob0': cpars[1], 'sigma8': cpars[4], 'ns': cpars[3]}
+    csm.addCosmology('myCosmo', **params)
+    cosmo = csm.setCosmology('myCosmo')
+    return cosmo

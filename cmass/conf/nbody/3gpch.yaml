@@ -15,8 +15,8 @@ zf: 0.5           # final redshift
 zsave: [0.6, 0.55, 0.5, 0.45, 0.4]  # snapshot redshifts to save
 supersampling: 1  # particles resolution relative to meshgrid
 
-# borglpt and borgpm-only
-transfer: 'CLASS' # transfer function (EH or CLASS)
+# borglpt, borgpm and pinocchio-only
+transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
 # borglpt-only
 order: 2          # order of the LPT expansion
@@ -27,3 +27,7 @@ N_steps: 64       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA
+
+# pinocchio only
+mass_function: Watson_2013  # which output HMF to use
+pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x

@@ -1,5 +1,5 @@
 # for calibrating halo biasing models with quijote
-suite: calib_1gpch_z0.5
+suite: calib_1gpch_z0.5  # calib 
 
 # General parameters
 L: 1000           # Mpc/h
@@ -9,14 +9,15 @@ matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
+save_transfer: True  # whether to save z=99 ICs (for CHARM bias model)
 
 zi: 20            # initial redshift
 zf: 0.4           # final redshift
 zsave: [0.6, 0.55, 0.5, 0.45, 0.4]  # snapshot redshifts to save
 supersampling: 3  # particles resolution relative to meshgrid
 
-# borglpt and borgpm-only
-transfer: 'CLASS' # transfer function (EH or CLASS)
+# borglpt, borgpm and pinocchio-only
+transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
 # borglpt-only
 order: 2          # order of the LPT expansion
@@ -27,3 +28,7 @@ N_steps: 32       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA
+
+# pinocchio only
+mass_function: Watson_2013  # which output HMF to use
+pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x

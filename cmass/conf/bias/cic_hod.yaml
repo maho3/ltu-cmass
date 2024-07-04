@@ -1,8 +1,13 @@
 
 # halo biasing
 halo:
-  # where to find halo bias model
-  base_suite: calib_1gpch_z0.5
+  model: CHARM  # CHARM or LIMD
+
+  # CHARM-specific parameters
+  config_charm: config_v0.yaml
+
+  # LIMD-specific parameters
+  base_suite: calib_1gpch_z0.5  # base suite for LIMD
   L: 1000
   N: 128
 

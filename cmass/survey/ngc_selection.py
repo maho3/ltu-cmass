@@ -11,16 +11,20 @@ Input:
 """
 
 import os
+os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
+
 import numpy as np
 import logging
 from os.path import join as pjoin
-from scipy.spatial.transform import Rotation as R
+import jax
+from cuboid_remap import Cuboid, remap_Lbox
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 
-from .tools import (xyz_to_sky, BOSS_angular, BOSS_veto,
-                    BOSS_redshift, BOSS_fiber)
+from .tools import (
+    xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
+    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
 from ..utils import (get_source_path, timing_decorator, load_params)
 
 
@@ -39,13 +43,35 @@ def load_galaxies_sim(source_dir, seed):
 
 
 @timing_decorator
-def rotate(pos, vel):
-    cmass_cen = [-924.42673929,  -44.04583784,
-                 750.98510587]  # mean of comoving range
-    r = R.from_quat([0, 0, np.sin(np.pi/4), np.cos(np.pi/4)]).as_matrix()
-    pos, vel = pos@r, vel@r
-    pos -= (pos.max(axis=0) + pos.min(axis=0))/2
-    pos += cmass_cen
+def remap(ppos, pvel, L, u1, u2, u3):
+    # remap the particles to the cuboid
+    new_size = list(L*np.array(remap_Lbox(u1, u2, u3)))
+    logging.info(f'Remapping from {[L]*3} to {new_size}.')
+
+    c = Cuboid(u1, u2, u3)
+    ppos = jax.vmap(c.Transform)(ppos/L)*L
+    pvel = jax.vmap(c.TransformVelocity)(pvel)
+    return np.array(ppos), np.array(pvel)
+
+
+@timing_decorator
+def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
+    pos, vel = pos.copy(), vel.copy()
+
+    # shift to origin
+    pos -= pos.mean(axis=0)
+
+    # find footprint center in comoving coordinates, conditioned on cosmo
+    mid_xyz = sky_to_xyz(mid_rdz, cosmo)
+
+    # rotate to same orientation as footprint
+    _, rot_inv = rotate_to_z(mid_xyz, cosmo)
+    pos = rot_inv.apply(pos)
+    vel = rot_inv.apply(vel)
+
+    # shift to center of footprint
+    pos += mid_xyz
+
     return pos, vel
 
 
@@ -96,15 +122,34 @@ def custom_cuts(rdz, cfg):
 
 @timing_decorator
 def reweight(rdz, wdir='./data'):
+    # load observed n(z)
     n_z = np.load(
         pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
+    # load simulated n(z)
     hsim, _ = np.histogram(rdz[:, -1], bins=be)
-    samp_weight = hobs / hsim
+    hobs, hsim = hobs.astype(int), hsim.astype(int)
+    for i in range(len(hsim)):
+        if hsim[i] < hobs[i]:
+            logging.warning(
+                f'hsim ({hsim[i]}) < hobs ({hobs[i]}) in bin: '
+                f'{be[i]:.5f}<z<{be[i+1]:.5f},\n'
+                'More simulated galaxies than observed. '
+                'Reweighting may not be accurate.')
+
+    # sample at most as many as observed
+    hsamp = np.minimum(hobs, hsim)
+
+    # mask
+    mask = np.zeros(len(rdz), dtype=bool)
     bind = np.digitize(rdz[:, -1], be) - 1
-    mask = np.random.rand(len(rdz)) < samp_weight[bind]
+    for i in range(len(be) - 1):
+        in_bin = np.argwhere(bind == i).flatten()
+        in_samp = np.random.choice(in_bin, size=hsamp[i], replace=False)
+        mask[in_samp] = True
+
     return rdz[mask]
 
 
@@ -124,8 +169,18 @@ def main(cfg: DictConfig) -> None:
     # Load galaxies
     pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
 
-    # Rotate to align with CMASS
-    pos, vel = rotate(pos, vel)
+    # [Optionally] rotate and shuffle cubic volume
+    pos, vel = random_rotate_translate(
+        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
+
+    # Apply cuboid remapping
+    pos, vel = remap(
+        pos, vel, cfg.nbody.L,
+        cfg.survey.u1, cfg.survey.u2, cfg.survey.u3)
+
+    # Rotate and shift to align with CMASS
+    pos, vel = move_to_footprint(
+        pos, vel, cfg.survey.mid_rdz, cfg.nbody.cosmo, cfg.nbody.L)
 
     # Calculate sky coordinates
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
@@ -136,7 +191,7 @@ def main(cfg: DictConfig) -> None:
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)
 
-    # Reweight
+    # Reweight (Todo: fiber collisions should iterate with this?)
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
