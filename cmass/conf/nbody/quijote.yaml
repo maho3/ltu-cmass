@@ -1,5 +1,5 @@
 # for calibrating halo biasing models with quijote
-suite: calib_1gpch_z0.5
+suite: calib_1gpch_z0.5  # calib 
 
 # General parameters
 L: 1000           # Mpc/h
@@ -9,8 +9,9 @@ matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 Nvfield: 128      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
+save_transfer: True  # whether to save z=99 ICs (for CHARM bias model)
 
-zi: 20            # initial redshift
+zi: 20            # initial redshift (for grav solver)
 zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
 

@@ -35,9 +35,9 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
 os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.95'  # noqa, must go before jax
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"  # noqa, must go before jax
 
-from pmwd import (Configuration, Cosmology, boltzmann, linear_modes,
-                  lpt, nbody, scatter)
-import jax.numpy as jnp
+from pmwd import (
+    Configuration, Cosmology, boltzmann, linear_modes, lpt, nbody)
+from pmwd.pm_util import fftinv
 import logging
 import numpy as np
 from os.path import join as pjoin
@@ -45,7 +45,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import get_source_path, timing_decorator, load_params
 from .tools import (
-    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
+    get_ICs, save_nbody, rho_and_vfield)
 
 
 def parse_config(cfg):
@@ -66,17 +66,17 @@ def parse_config(cfg):
     return cfg
 
 
-def configure_pmwd(cfg):
-    nbody = cfg.nbody
-    cosmo = nbody.cosmo
-
-    N = nbody.N*nbody.supersampling
-    ptcl_spacing = nbody.L/N
+def configure_pmwd(
+    N, L, supersampling, B, ai, af, N_steps, cosmo
+):
+    N = N*supersampling
+    ptcl_spacing = L/N
     ptcl_grid_shape = (N,)*3
-    pmconf = Configuration(ptcl_spacing, ptcl_grid_shape,
-                           a_start=nbody.ai, a_stop=nbody.af,
-                           a_nbody_maxstep=(nbody.af-nbody.ai)/nbody.N_steps,
-                           mesh_shape=cfg.nbody.B)
+    pmconf = Configuration(
+        ptcl_spacing, ptcl_grid_shape,
+        a_start=ai, a_stop=af,
+        a_nbody_maxstep=(af-ai)/N_steps,
+        mesh_shape=B)
     pmcosmo = Cosmology.from_sigma8(
         pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
         Omega_b=cosmo[1], h=cosmo[2])
@@ -84,22 +84,18 @@ def configure_pmwd(cfg):
     return pmconf, pmcosmo
 
 
-def get_ICs(cfg):
-    nbody = cfg.nbody
-    N = nbody.N*nbody.supersampling
-    if nbody.matchIC:
-        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
-        if nbody.quijote:
-            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
-        else:
-            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
-        return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
-    else:
-        return gen_white_noise(N, seed=nbody.lhid)
+@timing_decorator
+def run_transfer(wn, pmconf, pmcosmo):
+    rho = linear_modes(wn, pmcosmo, pmconf)
+    rho = fftinv(
+        rho, shape=pmconf.ptcl_grid_shape,
+        norm=pmconf.ptcl_spacing)
+    rho /= 100  # needed to align with borg, idk why
+    return rho
 
 
 @timing_decorator
-def run_density(wn, pmconf, pmcosmo, cfg):
+def run_density(wn, pmconf, pmcosmo):
     ic = linear_modes(wn, pmcosmo, pmconf)
     ptcl, obsvbl = lpt(ic, pmcosmo, pmconf)
 
@@ -126,14 +122,33 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    # Setup
-    pmconf, pmcosmo = configure_pmwd(cfg)
+    # Output directory
+    outdir = get_source_path(cfg, "pmwd", check=False)
+    os.makedirs(outdir, exist_ok=True)
 
     # Get ICs
     wn = get_ICs(cfg)
 
-    # Run
-    pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
+    # Run transfer function
+    if cfg.nbody.save_transfer:
+        pmconf, pmcosmo = configure_pmwd(
+            N=cfg.nbody.N, L=cfg.nbody.L,
+            supersampling=cfg.nbody.supersampling,
+            B=cfg.nbody.B,
+            ai=1./(1+99),  # z=99
+            af=1,  # ignored
+            N_steps=cfg.nbody.N_steps, cosmo=cfg.nbody.cosmo)
+        rho_transfer = run_transfer(wn, pmconf, pmcosmo)
+        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+        del rho_transfer
+
+    # Run density
+    pmconf, pmcosmo = configure_pmwd(
+        N=cfg.nbody.N, L=cfg.nbody.L,
+        supersampling=cfg.nbody.supersampling,
+        B=cfg.nbody.B, ai=cfg.nbody.ai, af=cfg.nbody.af,
+        N_steps=cfg.nbody.N_steps, cosmo=cfg.nbody.cosmo)
+    pos, vel = run_density(wn, pmconf, pmcosmo)
 
     # Calculate velocity field
     rho, fvel = rho_and_vfield(
@@ -148,7 +163,6 @@ def main(cfg: DictConfig) -> None:
     fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    outdir = get_source_path(cfg, "pmwd", check=False)
     save_nbody(outdir, rho, fvel, pos, vel,
                cfg.nbody.save_particles, cfg.nbody.save_velocities)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:

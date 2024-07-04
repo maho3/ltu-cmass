@@ -42,8 +42,7 @@ def compute_Pk(
     if rweights is None:
         rweights = np.ones(len(rrdz))
 
-    if isinstance(cosmo, list):
-        cosmo = cosmo_to_astropy(cosmo)
+    cosmo = cosmo_to_astropy(cosmo)
 
     # convert ra, dec, z to cartesian coordinates
     gpos = sky_to_xyz(grdz, cosmo)

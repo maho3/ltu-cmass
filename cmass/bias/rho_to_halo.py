@@ -34,11 +34,13 @@ from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 from .tools.halo_models import TruncatedPowerLaw
-from .tools.halo_sampling import (pad_3d, sample_3d,
-                                  sample_velocities_density,
-                                  sample_velocities_kNN,
-                                  sample_velocities_CIC)
-from ..utils import get_source_path, timing_decorator, load_params
+from .tools.halo_sampling import (
+    pad_3d, sample_3d,
+    sample_velocities_density,
+    sample_velocities_kNN,
+    sample_velocities_CIC)
+from ..utils import (
+    get_source_path, timing_decorator, load_params)
 
 
 def parse_config(cfg):
@@ -99,11 +101,13 @@ def sample_velocities(hpos, cfg, rho=None, fvel=None, ppos=None, pvel=None):
     if cfg.bias.halo.vel == 'density':
         # estimate halo velocities from matter density field
         hvel = sample_velocities_density(
-            hpos, rho, L=cfg.nbody.L, Omega_m=cfg.nbody.cosmo[0],
+            hpos=hpos, rho=rho, L=cfg.nbody.L, Omega_m=cfg.nbody.cosmo[0],
             smooth_R=2*cfg.nbody.L/cfg.nbody.N)
     elif cfg.bias.halo.vel == 'CIC':
         # estimate halo velocities from CIC-interpolated particle velocities
-        hvel = sample_velocities_CIC(hpos, cfg, fvel, rho, ppos, pvel)
+        hvel = sample_velocities_CIC(
+            hpos=hpos, fvel=fvel, L=cfg.nbody.L, rho=rho,
+            N=cfg.nbody.N, cosmo=cfg.nbody.cosmo, z=cfg.nbody.zf)
     elif cfg.bias.halo.vel == 'kNN':
         # estimate halo velocities from kNN-interpolated particle velocities
         # Not used often
@@ -158,6 +162,79 @@ def sample_masses(Nsamp, medg, order=1):
     return hmass
 
 
+def load_transfer(source_path):
+    filepath = pjoin(source_path, 'rho_transfer.npy')
+    return np.load(filepath)
+
+
+def batch_cube(x, Nsub, width, stride):
+    """Batches a cube x into Nsub sub-cubes per side, with width and stride."""
+    batches = []
+    for i in range(Nsub):
+        for j in range(Nsub):
+            for k in range(Nsub):
+                batches.append(x[i*stride:i*stride+width,
+                                 j*stride:j*stride+width,
+                                 k*stride:k*stride+width])
+    return np.stack(batches, axis=0)
+
+
+def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
+    """Apply CHARM, accounting for the pre-trained resolution."""
+
+    # Load CHARM
+    from .charm.integrate_ltu_cmass import get_model_interface
+    run_config_name = charm_cfg
+    charm_interface = get_model_interface(run_config_name)
+
+    # Hard-code the pre-trained CHARM configuration
+    Npix = 128  # pre-trained resolution
+    pad = 4  # CHARM padding
+    Lcharm = 1000  # CHARM box size
+    Npad = 128+2*pad  # padded resolution
+
+    N = rho.shape[0]  # input resolution
+    assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize
+
+    Nsub = N//Npix  # number of sub-boxes
+
+    # Pad the input density field
+    rho_pad = np.pad(rho, pad, mode='wrap')
+    rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
+
+    # Split the inputs into batches
+    batch_rho = batch_cube(rho, Nsub, Npix, Npix)
+    batch_rho_pad = batch_cube(rho_pad, Nsub, Npad, Npix)
+    batch_rho_IC = batch_cube(rho_IC, Nsub, Npix, Npix)
+    batch_rho_IC_pad = batch_cube(rho_IC_pad, Nsub, Npad, Npix)
+
+    # Run CHARM on each batch and append outputs
+    hposs, hmasss = [], []
+    for i in range(len(batch_rho)):
+        logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
+        hpos, hmass = charm_interface.process_input_density(
+            rho_m_zg=batch_rho[i],
+            rho_m_zIC=batch_rho_IC[i],
+            df_test_pad_zg=batch_rho_pad[i],
+            df_test_pad_zIC=batch_rho_IC_pad[i],
+            cosmology_array=np.array(cosmo),
+            BoxSize=Lcharm
+        )
+        mask = hmass > 13
+        hposs.append(hpos[mask])
+        hmasss.append(hmass[mask])
+
+    # Shift the positions to the original box
+    l = 0
+    for i in range(Nsub):
+        for j in range(Nsub):
+            for k in range(Nsub):
+                hposs[l] += np.array([i, j, k])*Lcharm
+                l += 1
+
+    return np.concatenate(hposs), np.concatenate(hmasss)
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -167,31 +244,67 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     source_path = get_source_path(cfg, cfg.sim)
-    bcfg = deepcopy(cfg)
-    bcfg.nbody.suite = bcfg.bias.halo.base_suite
-    bcfg.nbody.L = bcfg.bias.halo.L
-    bcfg.nbody.N = bcfg.bias.halo.N
-    bias_path = get_source_path(bcfg, cfg.sim)
 
-    logging.info('Loading bias parameters...')
-    popt, medges = load_bias_params(bias_path)
-
+    # Load configs
     logging.info('Loading sims...')
     rho, fvel, ppos, pvel = load_nbody(source_path)
 
-    logging.info('Sampling power law...')
-    hcount = sample_counts(rho, popt)
+    if cfg.bias.halo.model == "CHARM":
+        logging.info('Using CHARM model...')
+        # load initial conditions at z=50, correct to z=99
+        rho_IC = load_transfer(source_path)
 
-    logging.info('Sampling halo positions as a Poisson field...')
-    hpos = sample_positions(hcount, cfg)
+        # apply CHARM model
+        hpos, hmass = apply_charm(
+            rho, rho_IC,
+            cfg.bias.halo.config_charm,
+            cfg.nbody.L, cfg.nbody.cosmo
+        )
+
+        # halos are initially put on a grid, perturb their positions
+        voxL = cfg.nbody.L/cfg.nbody.N
+        hpos += np.random.uniform(
+            low=-voxL/2,
+            high=voxL/2,
+            size=hpos.shape
+        )  # TODO: Should this use `sample_3d`?
+
+        # ensure periodicity
+        hpos = hpos % cfg.nbody.L
+
+        # Limit to M>1e13
+        mask = hmass > 13
+        hpos, hmass = hpos[mask], hmass[mask]
+
+        # conform to mass-bin format of other bias models TODO: refactor?
+        hpos, hmass = [hpos], [hmass]
+
+    elif cfg.bias.halo.model == "LIMD":
+        # Load bias parameters
+        bcfg = deepcopy(cfg)
+        bcfg.nbody.suite = bcfg.bias.halo.base_suite
+        bcfg.nbody.L = bcfg.bias.halo.L
+        bcfg.nbody.N = bcfg.bias.halo.N
+        bias_path = get_source_path(bcfg, cfg.sim)
+
+        logging.info('Loading bias parameters...')
+        popt, medges = load_bias_params(bias_path)
+
+        logging.info('Sampling power law...')
+        hcount = sample_counts(rho, popt)
+
+        logging.info('Sampling halo positions as a Poisson field...')
+        hpos = sample_positions(hcount, cfg)
+
+        logging.info('Sampling masses...')
+        hmass = sample_masses([len(x) for x in hpos], medges)
+    else:
+        raise NotImplementedError(
+            f'Model {cfg.bias.halo.model} not implemented.')
 
     logging.info('Calculating velocities...')
     hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
-
-    logging.info('Sampling masses...')
-    hmass = sample_masses([len(x) for x in hpos], medges)
 
     logging.info('Combine...')
 

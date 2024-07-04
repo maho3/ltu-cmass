@@ -9,10 +9,13 @@ matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 Nvfield: 256      # velocity field resolution
 save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
+save_transfer: true  # whether to save z=99 ICs (for CHARM bias model)
 
 zi: 20            # initial redshift
 zf: 0.5           # final redshift
-supersampling: 2  # particles resolution relative to meshgrid
+supersampling: 3  # particles resolution relative to meshgrid
+
+
 
 # borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
@@ -22,7 +25,7 @@ order: 2          # order of the LPT expansion
 
 # pmwd and borgpm-only
 B: 2              # force grid resolution relative to particle grid
-N_steps: 20       # number of PM integration steps
+N_steps: 32       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA
