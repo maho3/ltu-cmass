@@ -1,5 +1,9 @@
 """
-Simulate density field using pmwd.
+Simulate density field using pmwd. This script is similar to
+cmass.nbody.pmwd, with the major difference
+* It saves multiple snapshots of the density field and velocity field.
+
+Note: THIS SCRIPT IS OUTDATED AND DOESN'T WORK.
 
 Requires:
     - pmwd

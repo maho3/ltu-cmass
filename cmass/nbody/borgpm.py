@@ -33,7 +33,6 @@ Output:
 """
 
 import os
-
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 # os.environ["BORG_TBB_NUM_THREADS"] = "4"  # noqa
 # os.environ["OMP_NUM_THREADS"] = "4"  # noqa

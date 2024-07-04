@@ -1,7 +1,8 @@
+import logging
 import numpy as np
 import aquila_borg as borg
 from mpi4py import MPI
-from .tools import bin_cube
+from .tools import bin_cube, rho_and_vfield
 from ..utils import timing_decorator
 
 
@@ -208,3 +209,49 @@ def gather_MPI(pos, vel):
     if rank != 0:
         return pos, vel
     return pos_gathered.reshape(-1, cols), vel_gathered.reshape(-1, cols)
+
+
+# Lightcone stuff
+class BorgNotifier:
+    def __init__(self, asave, N, L, omega_m, h):
+        self.step_id = 0
+        self.asave = asave
+        self.N = N
+        self.L = L
+        self.omega_m = omega_m
+        self.h = h
+        self.rhos = {}
+        self.fvels = {}
+
+    def assign_snap(self):
+        # after learning the step intervals, assign where to save snaps
+        asteps = np.arange(self.a1, 1, self.da)
+        tosave = [
+            np.argmin(np.abs(asteps - a)) for a in self.asave
+        ]
+        tosave = np.unique(tosave)
+        self.tosave = tosave
+
+    def __call__(self, a, Np, ids, poss, vels):
+        self.step_id += 1
+        if self.step_id == 1:  # ignore initial step
+            return
+        elif self.step_id == 2:  # save the first step
+            self.a1 = a
+            return
+        elif self.step_id == 3:  # learn the step intervals
+            self.da = a - self.a1
+            self.assign_snap()
+        if self.step_id-2 not in self.tosave:  # ignore intermediate steps
+            return
+        logging.info(f"Saving snap a={a:.6f}, step {self.step_id}")
+        rho, fvel = rho_and_vfield(
+            poss, vels,
+            Ngrid=self.N,
+            BoxSize=self.L,
+            MAS='CIC',
+            omega_m=self.omega_m,
+            h=self.h
+        )
+        self.rhos[a] = rho
+        self.fvels[a] = fvel
