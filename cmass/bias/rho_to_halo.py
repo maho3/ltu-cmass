@@ -282,7 +282,7 @@ def main(cfg: DictConfig) -> None:
         # conform to mass-bin format of other bias models TODO: refactor?
         hpos, hmass = [hpos], [hmass]
 
-    else:
+    elif cfg.bias.halo.model == "LIMD":
         # Load bias parameters
         bcfg = deepcopy(cfg)
         bcfg.nbody.suite = bcfg.bias.halo.base_suite
@@ -301,6 +301,9 @@ def main(cfg: DictConfig) -> None:
 
         logging.info('Sampling masses...')
         hmass = sample_masses([len(x) for x in hpos], medges)
+    else:
+        raise NotImplementedError(
+            f'Model {cfg.bias.halo.model} not implemented.')
 
     logging.info('Calculating velocities...')
     hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
