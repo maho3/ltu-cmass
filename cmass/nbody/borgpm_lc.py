@@ -70,7 +70,7 @@ def parse_config(cfg):
 
 
 @timing_decorator
-def run_density(wn, cpar, cfg):
+def run_density(wn, cpar, cfg, outdir=None):
     nbody = cfg.nbody
     N = nbody.N*nbody.supersampling
 
@@ -103,15 +103,14 @@ def run_density(wn, cpar, cfg):
         )
     )
 
-    if hasattr(nbody, 'zsave'):
-        zsave = np.array(nbody.zsave)
-        asave = 1/(1+zsave)
+    if hasattr(nbody, 'asave'):
+        asave = nbody.asave
     else:
         asave = []
 
     noti = BorgNotifier(
         asave=asave, N=cfg.nbody.N, L=cfg.nbody.L,
-        omega_m=cpar.omega_m, h=cpar.h)
+        omega_m=cpar.omega_m, h=cpar.h, outdir=outdir)
     pm.setStepNotifier(
         noti,
         with_particles=True
@@ -132,11 +131,6 @@ def run_density(wn, cpar, cfg):
     pm.getParticlePositions(pos)
     pm.getParticleVelocities(vel)
 
-    snapshots = {
-        'rhos': noti.rhos,
-        'fvels': noti.fvels
-    }
-
     vel *= 100  # km/s
 
     rho, fvel = rho_and_vfield(
@@ -148,7 +142,7 @@ def run_density(wn, cpar, cfg):
         h=cpar.h
     )
 
-    return rho, fvel, snapshots
+    return rho, fvel
 
 
 @timing_decorator
@@ -178,7 +172,7 @@ def main(cfg: DictConfig) -> None:
     wn *= -1  # BORG uses opposite sign
 
     # Run density field
-    rho, fvel, snapshots = run_density(wn, cpar, cfg)
+    rho, fvel = run_density(wn, cpar, cfg, outdir=outdir)
 
     # Apply transfer fn to ICs (for CHARM)
     if cfg.nbody.save_transfer:
@@ -190,7 +184,6 @@ def main(cfg: DictConfig) -> None:
     save_nbody(outdir, rho, fvel, pos=None, vel=None,
                save_particles=cfg.nbody.save_particles,
                save_velocities=cfg.nbody.save_velocities)
-    np.savez(pjoin(outdir, 'snapshots.npz'), **snapshots)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

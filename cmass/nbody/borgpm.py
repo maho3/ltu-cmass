@@ -191,7 +191,8 @@ def main(cfg: DictConfig) -> None:
 
         # Save
         save_nbody(outdir, rho, fvel, pos, vel,
-                   cfg.nbody.save_particles, cfg.nbody.save_velocities)
+                   save_particles=cfg.nbody.save_particles,
+                   save_velocities=cfg.nbody.save_velocities)
         with open(pjoin(outdir, 'config.yaml'), 'w') as f:
             OmegaConf.save(cfg, f)
         logging.info("Done!")

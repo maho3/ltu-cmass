@@ -1,7 +1,9 @@
+from os.path import join
 import logging
 import numpy as np
 import aquila_borg as borg
 from mpi4py import MPI
+import h5py
 from .tools import bin_cube, rho_and_vfield
 from ..utils import timing_decorator
 
@@ -213,45 +215,73 @@ def gather_MPI(pos, vel):
 
 # Lightcone stuff
 class BorgNotifier:
-    def __init__(self, asave, N, L, omega_m, h):
+    def __init__(self, asave, N, L, omega_m, h, outdir):
         self.step_id = 0
         self.asave = asave
         self.N = N
         self.L = L
         self.omega_m = omega_m
         self.h = h
-        self.rhos = {}
-        self.fvels = {}
+        self.outdir = outdir
 
-    def assign_snap(self):
-        # after learning the step intervals, assign where to save snaps
-        asteps = np.arange(self.a1, 1, self.da)
-        tosave = [
-            np.argmin(np.abs(asteps - a)) for a in self.asave
-        ]
-        tosave = np.unique(tosave)
-        self.tosave = tosave
+        self.outpath = join(outdir, 'snapshots.h5')
+        logging.info(f"Saving snapshots to {self.outpath}")
 
-    def __call__(self, a, Np, ids, poss, vels):
-        self.step_id += 1
-        if self.step_id == 1:  # ignore initial step
-            return
-        elif self.step_id == 2:  # save the first step
-            self.a1 = a
-            return
-        elif self.step_id == 3:  # learn the step intervals
-            self.da = a - self.a1
-            self.assign_snap()
-        if self.step_id-2 not in self.tosave:  # ignore intermediate steps
-            return
-        logging.info(f"Saving snap a={a:.6f}, step {self.step_id}")
+        dummypos = np.empty((N, N, N), dtype=np.float32)
+        dummyvel = np.empty((N, N, N, 3), dtype=np.float32)
+        with h5py.File(self.outpath, 'w') as f:
+            for i in range(len(asave)):
+                key = f'a={asave[i]:.6f}'
+                group = f.create_group(key)
+                group.create_dataset('rho', data=dummypos)
+                group.create_dataset('fvel', data=dummyvel)
+
+    @staticmethod
+    def interpolate(xi, xf, ai, af, a):
+        # Linearly interpolate between xi and xf
+        # TODO: Replace with Bezier interpolation?
+        return xi + (xf - xi) * (a - ai) / (af - ai)
+
+    def mass_assignment(self, pos, vel):
         rho, fvel = rho_and_vfield(
-            poss, vels,
+            pos, vel,
             Ngrid=self.N,
             BoxSize=self.L,
             MAS='CIC',
             omega_m=self.omega_m,
             h=self.h
         )
-        self.rhos[a] = rho
-        self.fvels[a] = fvel
+
+        # convert to overdensity
+        rho /= np.mean(rho)
+        rho -= 1
+
+        # get right units
+        fvel *= 100  # km/s
+
+        return rho, fvel
+
+    def save(self, a, rho, fvel):
+        with h5py.File(self.outpath, 'a') as f:
+            key = f'a={a:.6f}'
+            if key in f:
+                group = f[key]
+                group['rho'][...] = rho
+                group['fvel'][...] = fvel
+            else:
+                raise KeyError(f"Key {key} not found in file {self.outpath}")
+
+    def __call__(self, a, Np, ids, pos, vel):
+        if self.step_id != 0:
+            for af in self.asave:
+                if (af >= self.a0) and (af <= a):
+                    logging.info(f"Saving snap a={af:.6f}.")
+                    _pos = self.interpolate(self.pos0, pos, self.a0, a, af)
+                    _vel = self.interpolate(self.vel0, vel, self.a0, a, af)
+                    rho, fvel = self.mass_assignment(_pos, _vel)
+                    self.save(af, rho, fvel)
+
+        self.pos0 = pos
+        self.vel0 = vel
+        self.a0 = a
+        self.step_id += 1
