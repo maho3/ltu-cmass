@@ -243,10 +243,6 @@ class BorgNotifier:
             h=self.h
         )
 
-        # convert to overdensity
-        rho /= np.mean(rho)
-        rho -= 1
-
         # get right units
         fvel *= 100  # km/s
 
@@ -255,8 +251,6 @@ class BorgNotifier:
     def save(self, a, rho, fvel):
         with h5py.File(self.outpath, 'a') as f:
             key = f'{a:.6f}'
-            if key in f:
-                del f[key]
             group = f.create_group(key)
             group.create_dataset('rho', data=rho)
             group.create_dataset('fvel', data=fvel)
@@ -266,9 +260,21 @@ class BorgNotifier:
             for af in self.asave:
                 if (af >= self.a0) and (af <= a):
                     logging.info(f"Saving snap a={af:.6f}.")
+                    # interpolate along the trajectory
                     _pos = self.interpolate(self.pos0, pos, self.a0, a, af)
                     _vel = self.interpolate(self.vel0, vel, self.a0, a, af)
+
+                    # mass assignment
                     rho, fvel = self.mass_assignment(_pos, _vel)
+
+                    # convert to overdensity
+                    rho /= np.mean(rho)
+                    rho -= 1
+
+                    # convert to peculiar velocities
+                    fvel /= af
+
+                    # save
                     self.save(af, rho, fvel)
 
         self.pos0 = pos

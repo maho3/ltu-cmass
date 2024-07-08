@@ -2,6 +2,7 @@ import os
 from os.path import join as pjoin
 import logging
 import numpy as np
+import h5py
 from ..utils import load_params, timing_decorator, get_particle_mass
 import warnings
 import MAS_library as MASL
@@ -83,21 +84,21 @@ def get_ICs(cfg):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, fvel, pos, vel, snap_id=None,
-               save_particles=True, save_velocities=True):
-    suf = f'_snap{snap_id:02}' if snap_id is not None else ''
-
+def save_nbody(savedir, a, rho, fvel, ppos, pvel):
     os.makedirs(savedir, exist_ok=True)
-    np.save(pjoin(savedir, f'rho{suf}.npy'), rho)  # density contrast
-    if save_velocities:
-        np.save(
-            pjoin(savedir, f'fvel{suf}.npy'), fvel)  # velocity field [km/s]
-    if save_particles:
-        # particle positions [Mpc/h]
-        np.save(pjoin(savedir, f'ppos{suf}.npy'), pos)
-        # particle velocities [km/s]
-        np.save(pjoin(savedir, f'pvel{suf}.npy'), vel)
-    logging.info(f'Saved to {savedir}.')
+    savefile = pjoin(savedir, 'snapshots.h5')
+
+    logging.info(f'Saving to {savefile}...')
+    with h5py.File(savefile, 'w') as f:
+        key = f'{a:.6f}'
+        group = f.create_group(key)
+        group.create_dataset('rho', data=rho)  # density contrast
+        group.create_dataset('fvel', data=fvel)  # velocity field [km/s]
+        if (ppos is not None) and (pvel is not None):
+            # particle positions [Mpc/h]
+            group.create_dataset('ppos', data=ppos)
+            # particle velocities [km/s]
+            group.create_dataset('pvel', data=pvel)
 
 
 def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):

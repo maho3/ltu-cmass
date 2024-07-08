@@ -45,22 +45,6 @@ from ..utils import (
 from ..nbody.tools import parse_nbody_config
 
 
-@timing_decorator
-def load_nbody(source_dir):
-    # density contrast
-    rho = np.load(pjoin(source_dir, 'rho.npy'))
-    fvel, ppos, pvel = None, None, None
-    if os.path.exists(pjoin(source_dir, 'fvel.npy')):
-        # velocity field [km/s]
-        fvel = np.load(pjoin(source_dir, 'fvel.npy'))
-    if os.path.exists(pjoin(source_dir, 'ppos.npy')):
-        # particle positions [Mpc/h]
-        ppos = np.load(pjoin(source_dir, 'ppos.npy'))
-        # particle velocities [km/s]
-        pvel = np.load(pjoin(source_dir, 'pvel.npy'))
-    return rho, fvel, ppos, pvel
-
-
 def load_bias_params(bias_path):
     # load the bias parameters for Truncated Power Law
     popt = np.load(pjoin(bias_path, 'halo_bias.npy'))
@@ -278,6 +262,7 @@ def apply_limd(rho, cfg):
     return hpos, hmass
 
 
+@timing_decorator
 def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
@@ -313,7 +298,12 @@ def load_snapshot(source_path, a):
         group = f[f'{a:.6f}']
         rho = group['rho'][...]
         fvel = group['fvel'][...]
-    return rho, fvel
+        if 'ppos' in group:
+            ppos = group['ppos'][...]
+            pvel = group['pvel'][...]
+        else:
+            ppos, pvel = None, None
+    return rho, fvel, ppos, pvel
 
 
 def delete_outputs(outdir):
@@ -352,8 +342,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.nbody.snapshot_mode:
         for i, a in enumerate(cfg.nbody.asave):
             logging.info(f'Running snapshot {i} at a={a:.6f}...')
-            rho, fvel = load_snapshot(source_path, a)
-            ppos, pvel = None, None
+            rho, fvel, ppos, pvel = load_snapshot(source_path, a)
 
             # Apply bias model
             hpos, hvel, hmass = run_snapshot(
@@ -364,7 +353,7 @@ def main(cfg: DictConfig) -> None:
     else:
         # Load single snapshot
         logging.info('Loading single snapshot...')
-        rho, fvel, ppos, pvel = load_nbody(source_path)
+        rho, fvel, ppos, pvel = load_snapshot(source_path, cfg.nbody.af)
 
         # Apply bias model
         hpos, hvel, hmass = run_snapshot(
