@@ -103,13 +103,10 @@ def run_density(wn, cpar, cfg, outdir=None):
         )
     )
 
-    if hasattr(nbody, 'asave'):
-        asave = nbody.asave
-    else:
-        asave = []
-
+    # This is a custom notifier that saves the density and velocity fields
+    # at each desired step
     noti = BorgNotifier(
-        asave=asave, N=cfg.nbody.N, L=cfg.nbody.L,
+        asave=nbody.asave, N=nbody.N, L=nbody.L,
         omega_m=cpar.omega_m, h=cpar.h, outdir=outdir)
     pm.setStepNotifier(
         noti,
@@ -125,24 +122,7 @@ def run_density(wn, cpar, cfg, outdir=None):
     logging.info('Running forward...')
     chain.forwardModel_v2(wn)
 
-    Npart = pm.getNumberOfParticles()
-    pos = np.empty(shape=(Npart, 3))
-    vel = np.empty(shape=(Npart, 3))
-    pm.getParticlePositions(pos)
-    pm.getParticleVelocities(vel)
-
-    vel *= 100  # km/s
-
-    rho, fvel = rho_and_vfield(
-        pos, vel,
-        Ngrid=nbody.N,
-        BoxSize=nbody.L,
-        MAS='CIC',
-        omega_m=cpar.omega_m,
-        h=cpar.h
-    )
-
-    return rho, fvel
+    # Density fields are saved during forward run, so nothing is returned
 
 
 @timing_decorator
@@ -159,6 +139,11 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
+    # Check if we're in snapshot mode
+    if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
+        raise ValueError("snapshot_mode is false, but borgpm_lc.py"
+                         "is only for snapshot mode.")
+
     # Output directory
     outdir = get_source_path(cfg, "borgpm", check=False)
     os.makedirs(outdir, exist_ok=True)
@@ -171,19 +156,16 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
     wn *= -1  # BORG uses opposite sign
 
-    # Run density field
-    rho, fvel = run_density(wn, cpar, cfg, outdir=outdir)
-
     # Apply transfer fn to ICs (for CHARM)
     if cfg.nbody.save_transfer:
         rho_transfer = run_transfer(wn, cpar, cfg)
         np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
         del rho_transfer
 
-    # Save
-    save_nbody(outdir, rho, fvel, pos=None, vel=None,
-               save_particles=cfg.nbody.save_particles,
-               save_velocities=cfg.nbody.save_velocities)
+    # Run and save density field
+    run_density(wn, cpar, cfg, outdir=outdir)
+
+    # Save config
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")
