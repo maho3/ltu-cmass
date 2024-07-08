@@ -60,6 +60,7 @@ def parse_config(cfg):
         nbody.af = 1 / (1 + nbody.zf)  # final scale factor
         nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
+        nbody.asave = [nbody.af]
 
         # load cosmology
         nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)

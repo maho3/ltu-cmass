@@ -227,16 +227,6 @@ class BorgNotifier:
         self.outpath = join(outdir, 'snapshots.h5')
         logging.info(f"Saving snapshots to {self.outpath}")
 
-        _pos = np.empty((N, N, N), dtype=np.float32)
-        _vel = np.empty((N, N, N, 3), dtype=np.float32)
-        with h5py.File(self.outpath, 'w') as f:
-            f.attrs['asave'] = asave
-            for i in range(len(asave)):
-                key = f'{asave[i]:.6f}'
-                group = f.create_group(key)
-                group.create_dataset('rho', data=_pos)
-                group.create_dataset('fvel', data=_vel)
-
     @staticmethod
     def interpolate(xi, xf, ai, af, a):
         # Linearly interpolate between xi and xf
@@ -266,11 +256,10 @@ class BorgNotifier:
         with h5py.File(self.outpath, 'a') as f:
             key = f'{a:.6f}'
             if key in f:
-                group = f[key]
-                group['rho'][...] = rho
-                group['fvel'][...] = fvel
-            else:
-                raise KeyError(f"Key {key} not found in file {self.outpath}")
+                del f[key]
+            group = f.create_group(key)
+            group.create_dataset('rho', data=rho)
+            group.create_dataset('fvel', data=fvel)
 
     def __call__(self, a, Np, ids, pos, vel):
         if self.step_id != 0:

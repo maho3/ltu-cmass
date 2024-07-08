@@ -141,7 +141,7 @@ def main(cfg: DictConfig) -> None:
 
     # Check if we're in snapshot mode
     if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
-        raise ValueError("snapshot_mode is false, but borgpm_lc.py"
+        raise ValueError("snapshot_mode config is false, but borgpm_lc"
                          "is only for snapshot mode.")
 
     # Output directory

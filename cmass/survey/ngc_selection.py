@@ -15,6 +15,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 
 import numpy as np
 import logging
+import h5py
 from os.path import join as pjoin
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
@@ -36,9 +37,12 @@ def parse_config(cfg):
 
 
 @timing_decorator
-def load_galaxies_sim(source_dir, seed):
-    pos = np.load(pjoin(source_dir, 'hod', f'hod{seed}_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'hod', f'hod{seed}_vel.npy'))
+def load_galaxies_sim(source_dir, a, seed):
+    filepath = pjoin(source_dir, 'hod', f'galaxies{seed}.h5')
+    with h5py.File(filepath, 'r') as f:
+        key = f'{a:.6f}'
+        pos = f[key]['pos'][...]
+        vel = f[key]['vel'][...]
     return pos, vel
 
 
@@ -163,11 +167,15 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     source_path = get_source_path(cfg, cfg.sim)
 
+    # Check that we are not in snapshot_mode
+    if hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode:
+        raise ValueError('snapshot_mode config is true, but ngc_selection'
+                         ' is only for non snapshot mode.')
+
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
+    pos, vel = load_galaxies_sim(source_path, cfg.nbody.af, cfg.bias.hod.seed)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
