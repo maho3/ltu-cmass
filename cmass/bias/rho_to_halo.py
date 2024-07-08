@@ -30,7 +30,7 @@ import logging
 import hydra
 import h5py
 from copy import deepcopy
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf
 from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
@@ -41,16 +41,8 @@ from .tools.halo_sampling import (
     sample_velocities_kNN,
     sample_velocities_CIC)
 from ..utils import (
-    get_source_path, timing_decorator, load_params)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        nbody = cfg.nbody
-        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
-        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
-    return cfg
+    get_source_path, timing_decorator)
+from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
@@ -345,7 +337,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
 

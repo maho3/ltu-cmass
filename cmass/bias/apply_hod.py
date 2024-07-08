@@ -27,9 +27,10 @@ from .tools.hod import (
     thetahod_literature, build_halo_catalog, build_HOD_model)
 from ..utils import (
     get_source_path, timing_decorator, load_params, cosmo_to_astropy)
+from ..nbody.tools import parse_nbody_config
 
 
-def parse_config(cfg):
+def parse_hod(cfg):
     with open_dict(cfg):
         # HOD parameters
         cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
@@ -127,7 +128,8 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
+    cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup save directory

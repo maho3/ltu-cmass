@@ -48,37 +48,11 @@ import logging
 import numpy as np
 from os.path import join as pjoin
 import hydra
-from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import get_source_path, timing_decorator, load_params
+from omegaconf import DictConfig, OmegaConf
+from ..utils import get_source_path, timing_decorator
 from .tools import (
-    gen_white_noise, load_white_noise, save_nbody, rho_and_vfield)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        nbody = cfg.nbody
-
-        # set redshift snapshots evenly-spaced
-        if nbody.zmax == nbody.zmin:
-            if nbody.nsnap != 1:
-                logging.warning('Setting nsnap to 1')
-            nbody.nsnap = 1
-            nbody.zlist = [nbody.zmin]
-        else:
-            nbody.zlist = np.linspace(
-                nbody.zmin, nbody.zmax, nbody.nsnap+2)[1:-1].tolist()
-
-        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
-        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
-
-        # load cosmology
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
-
-    if cfg.nbody.quijote:
-        logging.info('Matching ICs to Quijote')
-        assert cfg.nbody.L == 1000  # enforce same size of quijote
-
-    return cfg
+    parse_nbody_config, gen_white_noise, load_white_noise,
+    save_nbody, rho_and_vfield)
 
 
 def configure_pmwd(cfg):
@@ -179,7 +153,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +

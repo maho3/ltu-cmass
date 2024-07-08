@@ -20,20 +20,13 @@ from os.path import join as pjoin
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
 import hydra
-from omegaconf import DictConfig, OmegaConf, open_dict
-
+from omegaconf import DictConfig, OmegaConf
 
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
-from ..utils import (get_source_path, timing_decorator, load_params)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        # Cosmology
-        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
+from ..utils import (get_source_path, timing_decorator)
+from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
@@ -165,7 +158,7 @@ def main(cfg: DictConfig) -> None:
         cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
 
