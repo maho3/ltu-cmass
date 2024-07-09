@@ -14,6 +14,7 @@ Primary installation:
 - [Installing Pinocchio \[optional\]](#installing-pinocchio-optional)
 - [Compiling Pinocchio on Infinity@IAP](#compiling-pinocchio-on-infinityiap)
 - [Installing camb, CLASS, or syren \[optional\]](#installing-camb-class-or-syren-optional)
+- [Compiling lightcone extrapolation [optional]](#compiling-lightcone-extrapolation-optional)
 - [Configure the Working Directory](#configure-the-working-directory)
 - [Running the pipeline](#running-the-pipeline)
 
