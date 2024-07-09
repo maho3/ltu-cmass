@@ -12,7 +12,12 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
-from ..lightcone import lc
+try:
+    from ..lightcone import lc
+except ImportError:
+    raise ImportError(
+        'Lightcone extrapolation not compiled. Please `make` the '
+        'lightcone package in cmass/lightcone')
 
 
 def load_galaxies(source_dir, a, seed):
