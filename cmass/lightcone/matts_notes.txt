@@ -1,4 +1,0 @@
-Compiles and runs with:
-
-Currently Loaded Modulefiles:
- 1) inteloneapi/2022.1.2   2) openmpi/4.1.2-intel   3) gsl/2.7.1   4) gcc/13.3.0

@@ -1,5 +1,5 @@
 # for running inference on 2 Gpc/h volumes
-suite: test
+suite: inf_3gpch
 
 # General parameters
 L: 3000           # Mpc/h
@@ -12,8 +12,7 @@ save_velocities: true  # whether to save velocity field data
 
 zi: 20            # initial redshift
 zf: 0.5           # final redshift
-zsave: [0.6, 0.55, 0.5, 0.45, 0.4]  # snapshot redshifts to save
-supersampling: 1  # particles resolution relative to meshgrid
+supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
@@ -22,8 +21,8 @@ transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLAS
 order: 2          # order of the LPT expansion
 
 # pmwd and borgpm-only
-B: 1              # force grid resolution relative to particle grid
-N_steps: 64       # number of PM integration steps
+B: 2              # force grid resolution relative to particle grid
+N_steps: 20       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA

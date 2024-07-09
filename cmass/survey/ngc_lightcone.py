@@ -12,6 +12,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
+from .tools import save_lightcone
 try:
     from ..lightcone import lc
 except ImportError:
@@ -36,17 +37,6 @@ def load_halo_velocities(source_dir, a):
         key = f'{a:.6f}'
         vel = f[key]['vel'][...]
     return vel
-
-
-def save_lightcone(outdir, ra, dec, z, galsnap, galidx, hod_seed=0):
-    outfile = pjoin(outdir, 'obs', f'lightcone{hod_seed}.h5')
-    logging.info(f'Saving lightcone to {outfile}')
-    with h5py.File(outfile, 'w') as f:
-        f.create_dataset('ra', data=ra)            # Right ascension [deg]
-        f.create_dataset('dec', data=dec)          # Declination [deg]
-        f.create_dataset('z', data=z)              # Redshift
-        f.create_dataset('galsnap', data=galsnap)  # Snapshot index
-        f.create_dataset('galidx', data=galidx)    # Galaxy index
 
 
 def split_galsnap_galidx(gid):

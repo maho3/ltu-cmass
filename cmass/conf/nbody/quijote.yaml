@@ -11,9 +11,8 @@ save_particles: false  # whether to save particle data
 save_velocities: true  # whether to save velocity field data
 save_transfer: True  # whether to save z=99 ICs (for CHARM bias model)
 
-zi: 20            # initial redshift
-zf: 0.4           # final redshift
-zsave: [0.6, 0.55, 0.5, 0.45, 0.4]  # snapshot redshifts to save
+zi: 20            # initial redshift (for grav solver)
+zf: 0.5           # final redshift
 supersampling: 3  # particles resolution relative to meshgrid
 
 # borglpt, borgpm and pinocchio-only

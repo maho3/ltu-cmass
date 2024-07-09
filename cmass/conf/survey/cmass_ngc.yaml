@@ -20,4 +20,4 @@ mid_rdz: [184.83975076425324, 34.03863916513374, 0.4194598771198273]
 
 
 # For lightcone extrapolation
-boss_dir: "${meta.wdir}/obs/"
+boss_dir: "${meta.wdir}/obs/"  # path to observational masks

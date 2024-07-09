@@ -355,12 +355,14 @@ def main(cfg: DictConfig) -> None:
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
+    if not cfg.nbody.save_particles:
+        pos, vel = None, None
+
     # Convert from comoving -> physical velocities
     fvel *= (1 + cfg.nbody.zf)
 
     # Save nbody-type outputs
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    save_nbody(outdir, rho, fvel, pos, vel)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
 

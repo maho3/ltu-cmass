@@ -164,6 +164,9 @@ def main(cfg: DictConfig) -> None:
             pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
             omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2], verbose=False)
 
+        if not cfg.nbody.save_particles:
+            pos, vel = None, None
+
         # Convert to overdensity field
         rho /= np.mean(rho)
         rho -= 1
@@ -172,8 +175,7 @@ def main(cfg: DictConfig) -> None:
         fvel *= (1 + cfg.nbody.zf)
 
         # Save
-        save_nbody(outdir, rho, fvel, pos, vel,
-                   cfg.nbody.save_particles, cfg.nbody.save_velocities)
+        save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
         with open(pjoin(outdir, 'config.yaml'), 'w') as f:
             OmegaConf.save(cfg, f)
         logging.info("Done!")

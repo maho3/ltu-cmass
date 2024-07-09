@@ -24,7 +24,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
-    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
+    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
+    save_lightcone)
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
 
@@ -198,10 +199,14 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
-
-    # ra, dec, redshift
-    np.save(pjoin(source_path, 'obs', f'rdz{cfg.bias.hod.seed}.npy'), rdz)
+    outdir = pjoin(source_path, 'obs')
+    os.makedirs(outdir, exist_ok=True)
+    save_lightcone(
+        outdir,
+        ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
+        galsnap=np.zeros(len(rdz), dtype=int),
+        galidx=np.arange(len(rdz)),
+        hod_seed=cfg.bias.hod.seed)
 
 
 if __name__ == "__main__":
