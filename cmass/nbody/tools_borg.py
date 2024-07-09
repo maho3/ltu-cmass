@@ -227,6 +227,9 @@ class BorgNotifier:
         self.outpath = join(outdir, 'snapshots.h5')
         logging.info(f"Saving snapshots to {self.outpath}")
 
+        with h5py.File(self.outpath, 'a') as f:
+            f.attrs['asave'] = asave
+
     @staticmethod
     def interpolate(xi, xf, ai, af, a):
         # Linearly interpolate between xi and xf
@@ -271,7 +274,7 @@ class BorgNotifier:
                     rho /= np.mean(rho)
                     rho -= 1
 
-                    # convert to peculiar velocities
+                    # convert comoving to physical velocities
                     fvel /= af
 
                     # save

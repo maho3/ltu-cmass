@@ -75,17 +75,19 @@ def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
 @timing_decorator
 def apply_mask(rdz, wdir, fibermode=0):
     logging.info('Applying redshift cut...')
-    len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
+    logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
 
     logging.info('Applying angular mask...')
     inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[inpoly]
+    logging.info(f'Removed {len(inpoly)-len(rdz)}/{len(inpoly)} galaxies')
 
     logging.info('Applying veto mask...')
     inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[~inveto]
+    logging.info(f'Removed {len(inveto)-len(rdz)}/{len(inveto)} galaxies')
 
     if fibermode != 0:
         logging.info('Applying fiber collisions...')
@@ -94,8 +96,8 @@ def apply_mask(rdz, wdir, fibermode=0):
             sep=0.01722,  # ang. sep. for CMASS in deg
             mode=fibermode)
         rdz = rdz[mask]
+        logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
 
-    logging.info(f'Fraction of galaxies kept: {len(rdz) / len_rdz:.3f}')
     return rdz
 
 

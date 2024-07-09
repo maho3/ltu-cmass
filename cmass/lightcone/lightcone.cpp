@@ -39,7 +39,7 @@ namespace cmangle {
 #define M_PIl 3.14159265358979323846264338327950288419716939937510L
 #endif
 
-typedef uint32_t galid_t;
+typedef uint64_t galid_t;  // Matt: I had to increase this from 32->64
 
 namespace Geometry
 {

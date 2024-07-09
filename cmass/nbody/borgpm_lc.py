@@ -107,6 +107,12 @@ def run_density(wn, cpar, cfg, outdir=None):
     # Density fields are saved during forward run, so nothing is returned
 
 
+def delete_outputs(outdir):
+    outpath = pjoin(outdir, 'snapshots.h5')
+    if os.path.isfile(outpath):
+        os.remove(outpath)
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -145,6 +151,7 @@ def main(cfg: DictConfig) -> None:
         del rho_transfer
 
     # Run and save density field
+    delete_outputs(outdir)
     run_density(wn, cpar, cfg, outdir=outdir)
 
     # Save config
