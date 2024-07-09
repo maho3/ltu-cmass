@@ -90,12 +90,15 @@ def main(cfg: DictConfig) -> None:
 
     # Load mask
     logging.info(f'Loading mask from {cfg.survey.boss_dir}')
-    maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=False)
+    maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
+
+    # Get path to lightcone module (where n(z) is saved)
+    nz_dir = os.path.dirname(lc.__file__)
 
     # Setup lightcone constructor
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     lightcone = lc.Lightcone(
-        boss_dir=cfg.survey.boss_dir,
+        boss_dir=nz_dir,
         mask=maskobs,
         Omega_m=cfg.nbody.cosmo[0],
         zmin=0.4,
@@ -103,6 +106,8 @@ def main(cfg: DictConfig) -> None:
         snap_times=snap_times,
         verbose=True,
         stitch_before_RSD=True,
+        augment=0,
+        seed=42
     )
 
     logging.info(f'Stitching snapshots a={snap_times}')
