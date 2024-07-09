@@ -1,8 +1,13 @@
 """
-Simulate density field using BORG LPT models.
+Simulate density field using BORG PM models. This script is similar to
+cmass.nbody.borgpm, with two major differences:
+* It doesn't manage MPI processes. TODO: Implement this!
+* It saves multiple snapshots of the density field and velocity field.
+
+NOTE: This works with the private BORG version, available to Aquila members.
 
 Requires:
-    - borg
+    - pmwd
 
 Params:
     - nbody.suite: suite name
@@ -25,33 +30,29 @@ Params:
 
 Output:
     - rho: density field
-    - fvel: peculiar velocity field
-    - rho_transfer: density field after transfer function
+    - ppos: particle positions
+    - pvel: particle velocities
 """
 
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
-# os.environ["BORG_TBB_NUM_THREADS"] = "8"  # noqa
-# os.environ["OMP_NUM_THREADS"] = "8"  # noqa
 
 from os.path import join as pjoin
 import numpy as np
 import logging
 import hydra
-from mpi4py import MPI
-
 from omegaconf import DictConfig, OmegaConf
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator
 from .tools import (
-    parse_nbody_config, get_ICs, save_nbody, rho_and_vfield)
+    parse_nbody_config, get_ICs)
 from .tools_borg import (
     build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
-    getMPISlice, gather_MPI)
+    BorgNotifier)
 
 
 @timing_decorator
-def run_density(wn, cpar, cfg):
+def run_density(wn, cpar, cfg, outdir=None):
     nbody = cfg.nbody
     N = nbody.N*nbody.supersampling
 
@@ -62,31 +63,40 @@ def run_density(wn, cpar, cfg):
 
     chain = borg.forward.ChainForwardModel(box)
     if nbody.transfer == 'CLASS':
-        chain = transfer_CLASS(chain, box, cpar, a_final=nbody.af)
+        chain = transfer_CLASS(chain, box, cpar)
     elif nbody.transfer == 'EH':
         chain = transfer_EH(chain, box)
     else:
         raise NotImplementedError(
             f'Transfer function "{nbody.transfer}" not implemented.')
 
-    if nbody.order == 1:
-        lpt = borg.forward.model_lib.M_LPT_CIC
-    elif nbody.order == 2:
-        lpt = borg.forward.model_lib.M_2LPT_CIC
-    else:
-        raise NotImplementedError(f'Order "{nbody.order}" not implemented.')
-    lpt = lpt(
+    pm = borg.forward.model_lib.M_PM_CIC(
         box,
         opts=dict(
             a_initial=1.0,  # ignored, reset by transfer fn
             a_final=nbody.af,
             do_rsd=False,
             supersampling=1,
-            lightcone=False,
-            part_factor=1.2
+            part_factor=1.01,
+            forcesampling=nbody.B,
+            pm_start_z=nbody.zi,
+            pm_nsteps=nbody.N_steps,
+            tcola=nbody.COLA
         )
     )
-    chain @= lpt
+
+    # This is a custom notifier that saves the density and velocity fields
+    # at each desired step
+    noti = BorgNotifier(
+        asave=nbody.asave, N=nbody.N, L=nbody.L,
+        omega_m=cpar.omega_m, h=cpar.h, outdir=outdir)
+    pm.setStepNotifier(
+        noti,
+        with_particles=True
+    )
+
+    chain @= pm
+    chain.setAdjointRequired(False)
 
     chain.setCosmoParams(cpar)
 
@@ -94,29 +104,18 @@ def run_density(wn, cpar, cfg):
     logging.info('Running forward...')
     chain.forwardModel_v2(wn)
 
-    Npart = lpt.getNumberOfParticles()
-    pos = np.empty(shape=(Npart, 3), dtype=np.float64)
-    vel = np.empty(shape=(Npart, 3), dtype=np.float64)
-    lpt.getParticlePositions(pos)
-    lpt.getParticleVelocities(vel)
+    # Density fields are saved during forward run, so nothing is returned
 
-    pos = pos.astype(np.float32)
-    vel = vel.astype(np.float32)
 
-    vel *= 100  # km/s
-
-    del chain, box, lpt
-
-    return pos, vel
+def delete_outputs(outdir):
+    outpath = pjoin(outdir, 'snapshots.h5')
+    if os.path.isfile(outpath):
+        os.remove(outpath)
 
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    # Load MPI rank
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
@@ -128,8 +127,13 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
+    # Check if we're in snapshot mode
+    if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
+        raise ValueError("snapshot_mode config is false, but borgpm_lc"
+                         "is only for snapshot mode.")
+
     # Output directory
-    outdir = get_source_path(cfg, f"borg{cfg.nbody.order}lpt", check=False)
+    outdir = get_source_path(cfg, "borgpm", check=False)
     os.makedirs(outdir, exist_ok=True)
 
     # Setup cosmology
@@ -140,47 +144,20 @@ def main(cfg: DictConfig) -> None:
     wn = get_ICs(cfg)
     wn *= -1  # BORG uses opposite sign
 
-    # Get MPI slice
-    startN0, localN0, _, _ = getMPISlice(cfg)
-    wn = wn[startN0:startN0+localN0]
-
     # Apply transfer fn to ICs (for CHARM)
     if cfg.nbody.save_transfer:
         rho_transfer = run_transfer(wn, cpar, cfg)
-        if rank == 0:
-            np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
         del rho_transfer
 
-    # Run density field
-    pos, vel = run_density(wn, cpar, cfg)
+    # Run and save density field
+    delete_outputs(outdir)
+    run_density(wn, cpar, cfg, outdir=outdir)
 
-    # Gather particle positions and velocities
-    pos, vel = gather_MPI(pos, vel)
-    logging.info(f'rank {rank} done')
-
-    if rank == 0:
-        # Calculate density and velocity field
-        rho, fvel = rho_and_vfield(
-            pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2], verbose=False)
-
-        if not cfg.nbody.save_particles:
-            pos, vel = None, None
-
-        # Convert to overdensity field
-        rho /= np.mean(rho)
-        rho -= 1
-
-        # Convert from comoving -> physical velocities
-        fvel *= (1 + cfg.nbody.zf)
-
-        # Save
-        save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
-        with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-            OmegaConf.save(cfg, f)
-        logging.info("Done!")
-    comm.Barrier()
-    return
+    # Save config
+    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+        OmegaConf.save(cfg, f)
+    logging.info("Done!")
 
 
 if __name__ == '__main__':

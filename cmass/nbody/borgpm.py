@@ -33,7 +33,6 @@ Output:
 """
 
 import os
-
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 # os.environ["BORG_TBB_NUM_THREADS"] = "4"  # noqa
 # os.environ["OMP_NUM_THREADS"] = "4"  # noqa
@@ -44,32 +43,14 @@ import logging
 import hydra
 from mpi4py import MPI
 
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf
 import aquila_borg as borg
-from ..utils import get_source_path, timing_decorator, load_params
+from ..utils import get_source_path, timing_decorator
 from .tools import (
-    get_ICs, save_nbody, rho_and_vfield)
+    parse_nbody_config, get_ICs, save_nbody, rho_and_vfield)
 from .tools_borg import (
     build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
     getMPISlice, gather_MPI)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        nbody = cfg.nbody
-        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
-        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
-        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
-        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
-
-        # load cosmology
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
-
-    if cfg.nbody.quijote:
-        logging.info('Matching ICs to Quijote')
-        assert cfg.nbody.L == 1000  # enforce same size of quijote
-
-    return cfg
 
 
 @timing_decorator
@@ -140,7 +121,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -181,18 +162,20 @@ def main(cfg: DictConfig) -> None:
         # Calculate density and velocity field
         rho, fvel = rho_and_vfield(
             pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2], verbose=True)
+            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2], verbose=False)
+
+        if not cfg.nbody.save_particles:
+            pos, vel = None, None
 
         # Convert to overdensity field
         rho /= np.mean(rho)
         rho -= 1
 
-        # Convert from comoving -> peculiar velocities
+        # Convert from comoving -> physical velocities
         fvel *= (1 + cfg.nbody.zf)
 
         # Save
-        save_nbody(outdir, rho, fvel, pos, vel,
-                   cfg.nbody.save_particles, cfg.nbody.save_velocities)
+        save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
         with open(pjoin(outdir, 'config.yaml'), 'w') as f:
             OmegaConf.save(cfg, f)
         logging.info("Done!")
