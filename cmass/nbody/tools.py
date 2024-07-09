@@ -95,9 +95,9 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
         group.create_dataset('rho', data=rho)  # density contrast
         group.create_dataset('fvel', data=fvel)  # velocity field [km/s]
         if (ppos is not None) and (pvel is not None):
-            # particle positions [Mpc/h]
+            # particle comoving positions [Mpc/h]
             group.create_dataset('ppos', data=ppos)
-            # particle velocities [km/s]
+            # particle physical velocities [km/s]
             group.create_dataset('pvel', data=pvel)
 
 

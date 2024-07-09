@@ -168,7 +168,7 @@ def main(cfg: DictConfig) -> None:
         rho /= np.mean(rho)
         rho -= 1
 
-        # Convert from comoving -> peculiar velocities
+        # Convert from comoving -> physical velocities
         fvel *= (1 + cfg.nbody.zf)
 
         # Save

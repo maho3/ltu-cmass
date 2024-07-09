@@ -355,7 +355,7 @@ def main(cfg: DictConfig) -> None:
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
-    # Convert from comoving -> peculiar velocities
+    # Convert from comoving -> physical velocities
     fvel *= (1 + cfg.nbody.zf)
 
     # Save nbody-type outputs
