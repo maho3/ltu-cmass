@@ -14,7 +14,7 @@ Welcome to the ltu-cmass installation instructions. This provides the minimal in
 
 ## Design
 - This is a collection of scripts designed to transform cosmological simulations into mocks of galaxy surveys. Each component script is designed to be run through command line on a computing cluster (e.g. `python -m cmass.nbody.pmwd`).
-- I/O is done mostly through reading and saving `h5py` files on disk. The scripts expect a certain structure of data storage, located within the working directory specified in [`global.cfg`](global.cfg). See an example directory tree in [Data Structure](#configure-the-working-directory).
+- I/O is done mostly through reading and saving `h5py` files on disk. The scripts expect a certain structure of data storage, located within the working directory specified in [`global.cfg`](../cmass/conf/global.cfg). See an example directory tree in [Data Structure](#configure-the-working-directory).
 - Dependency modules are only loaded when needed. This is so that all prerequisites need not be installed simultaneously. However, this means everything must be loaded through relative imports (e.g. `from .tools import do_something` instead of `import tools; tools.do_something()`).
 
 
@@ -29,7 +29,7 @@ We recommend installing things in a fresh Python environment, such as anaconda. 
 conda create -n cmass python=3.10
 conda activate cmass
 ```
-Install cmass and its dependencies (in [setup.cfg](./setup.cfg)) automatically using:
+Install cmass and its dependencies (in [setup.cfg](../setup.cfg)) automatically using:
 ```bash
 cd ltu-cmass
 pip install -e .
@@ -47,7 +47,7 @@ Some notes:
 ## Configure the Working Directory
 `ltu-cmass` expects a certain working directory structure to know how to move data around. First, pick a directory on your machine where you want to store the data. On computing clusters, this is usually in the scratch space. 
 
-Then, change the global configuration in [`ltu-cmass/cmass/conf/global.yaml`](./cmass/conf/global.yaml) to point to this directory, as follows:
+Then, change the global configuration in [`ltu-cmass/cmass/conf/global.yaml`](../cmass/conf/global.yaml) to point to this directory, as follows:
 ```yaml
 meta:
     wdir: "/path/to/working/directory"
@@ -126,7 +126,7 @@ After all the above steps are completed, you should see the data results in your
 
 
 ## Configuring the pipeline
-The default configurations of each stage of `ltu-cmass` are stored in [`cmass/conf`](./cmass/conf). We use [hydra](https://hydra.cc/docs/tutorials/basic/your_first_app/simple_cli/) as a configuration framework. Hydra allows us to define a configuration schema and then override it with command-line arguments. This makes it easy to run the same code with different configurations.
+The default configurations of each stage of `ltu-cmass` are stored in [`cmass/conf`](../cmass/conf). We use [hydra](https://hydra.cc/docs/tutorials/basic/your_first_app/simple_cli/) as a configuration framework. Hydra allows us to define a configuration schema and then override it with command-line arguments. This makes it easy to run the same code with different configurations.
 
 For example, if I want to run `cmass.nbody.pmwd` twice using different latin hypercube (LH) cosmologies, I would run:
 ```bash
@@ -139,14 +139,14 @@ We can then define different suites of simulations based on large-scale configur
 ```bash
 python -m cmass.nbody.pmwd nbody=2gpch
 ```
-You can see other default configurations in [`cmass/conf`](./cmass/conf).
+You can see other default configurations in [`cmass/conf`](../cmass/conf).
 
 
 ## Additional Functionality
 
 We include various additional functionality beyond the minimal working example above. These are provided in separate documentation, including:
-- [Running with Quijote initial conditions and fitting bias models](../options/QUIJOTE.md)
-- [Installing and running BORG nbody simulators](../options/BORG.md)
-- [Building and running lightcone extrapolation](../options/LIGHTCONE.md)
-- [Building and running the PINOCCHIO simulator](../options/PINOCCHIO.md)
-- [Filtering and weighting galaxy positions](../options/FILTERING.md)
+- [Running with Quijote initial conditions and fitting bias models](./options/QUIJOTE.md)
+- [Installing and running BORG nbody simulators](./options/BORG.md)
+- [Building and running lightcone extrapolation](./options/LIGHTCONE.md)
+- [Building and running the PINOCCHIO simulator](./options/PINOCCHIO.md)
+- [Filtering and weighting galaxy positions](./options/FILTERING.md)

@@ -19,4 +19,4 @@ This will generate various `*.o` and `*.a` files in the `cmass/lightcone` direct
 ```bash
 python -c "from cmass.lightcone import lc"
 ```
-This will allow you to run `cmass.survey.ngc_lightcone`. Further installation and usage instructions can be found in [../cmass/lightcone/README.md](../cmass/lightcone/README.md).
+This will allow you to run `cmass.survey.ngc_lightcone`. Further installation and usage instructions can be found in [cmass/lightcone/README.md](../../cmass/lightcone/README.md).

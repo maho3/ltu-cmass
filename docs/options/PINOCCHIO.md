@@ -25,7 +25,7 @@ endif
 ```
 Also change the `SYSTYPE` argument to be `"infinity"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work. 
 
-Lastly, in [your nbody configuration file](./cmass/conf/nbody/pinocchio.yaml) you need to specify the absolute path to your Pinocchio executable. This is the `pinnochio.x` file in the `src` directory of Pinocchio, generated during the `make`. For example, mine is:
+Lastly, in [your nbody configuration file](../../cmass/conf/nbody/pinocchio.yaml) you need to specify the absolute path to your Pinocchio executable. This is the `pinnochio.x` file in the `src` directory of Pinocchio, generated during the `make`. For example, mine is:
 ```yaml
 pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
 ```
