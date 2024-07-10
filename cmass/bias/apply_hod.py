@@ -1,19 +1,22 @@
 """
 Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
 
-Requires:
-    - halotools
-    - astropy
-
 Input:
-    - pos: halo positions
-    - vel: halo velocities
-    - mass: halo masses
-    - seed: random seed for sampling HOD parameters
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
 
 Output:
-    - pos: galaxy positions
-    - vel: galaxy velocities
+    - hod/galaxies{hod_seed}.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - gal_type: galaxy type (central or satellite)
+        - hostid: host halo ID
+
+NOTE:
+    - TODO: Implement Zheng+ex 10-parameter model
+    - TODO: Allow cosmology-dependent HOD priors
 """
 
 import numpy as np

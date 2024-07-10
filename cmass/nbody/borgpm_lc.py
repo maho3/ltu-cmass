@@ -1,54 +1,32 @@
 """
-Simulate density field using BORG PM models. This script is similar to
-cmass.nbody.borgpm, with two major differences:
-* It doesn't manage MPI processes. TODO: Implement this!
-* It saves multiple snapshots of the density field and velocity field.
+Simulate density field using BORG Particle Mesh. Saves multiple snapshots
+interpolated amidst the PM steps
 
-NOTE: This works with the private BORG version, available to Aquila members.
-
-Requires:
-    - pmwd
-
-Params:
-    - nbody.suite: suite name
-
-    - nbody.L: box size (in Mpc/h)
-    - nbody.N: number of grid points per dimension in density field
-    - nbody.lhid: index of the cosmological parameters in the
-        latin_hypercube_params_bonus.txt file
-    - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
-    - nbody.save_particles: whether to save particle positions and velocities
-
-
-    - nbody.zi: initial redshift
-    - nbody.zf: final redshift
-    - nbody.supersampling: particle resolution factor relative to density field
-
-    - nbody.transfer: transfer function 'CLASS' or 'EH'
-    - nbody.order: LPT order (1 or 2)
-
+Input:
+    - wn: initial white noise field
 
 Output:
-    - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
+    - snapshots.h5 (multiple snapshots)
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+
+NOTE:
+    - This works with the private BORG version, available to Aquila members.
+    - This doesn't manage MPI processes. TODO: Implement this!
 """
 
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 
-from os.path import join as pjoin
-import numpy as np
-import logging
-import hydra
-from omegaconf import DictConfig, OmegaConf
-import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator
-from .tools import (
-    parse_nbody_config, get_ICs)
-from .tools_borg import (
-    build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
-    BorgNotifier)
+import aquila_borg as borg
+from omegaconf import DictConfig, OmegaConf
+import hydra
+import logging
+import numpy as np
+from os.path import join as pjoin
 
 
 @timing_decorator

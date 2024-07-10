@@ -3,23 +3,23 @@ Sample halos from the density field using a bias model. Assumes
 a continuous Poissonian distribution of halos by interpolating
 between the grid points of the density field
 
-Requires:
-    - scipy
-    - sklearn
-    - jax
-    - pmwd
 
 Input:
-    - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
-    - popt: bias parameters
-    - medges: mass bin edges
+    - snapshots.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+    - Pre-trained TruncatedPowerLaw or CHARM (included)
 
 Output:
-    - hpos: halo positions
-    - hvel: halo velocities
-    - hmass: halo masses
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
+
+NOTE:
+    - Works with LIMD bias models or CHARM
 """
 
 import os  # noqa
