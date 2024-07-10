@@ -1,6 +1,28 @@
 """
 Stitches together snapshots to create an extrapolated lightcone and
-applies BOSS survey mask.
+applies CMASS NGC survey mask and selection effects.
+
+Input:
+    - halos.h5
+        - vel: halo velocities
+    - hod/galaxies{hod_seed}.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - hostid: host halo ID
+
+Output:
+    - obs/lightcone{hod_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
+        - galsnap: snapshot index
+        - galidx: galaxy index
+
+NOTE:
+    - This only works for snapshot mode, wherein lightcone evolution is
+    mimicked by stitching snapshots together. For the non-snapshot mode
+    alternative, use 'ngc_selection.py'.
+    - The fiber collisions are applied in-sync with resampling.
 """
 
 import os

@@ -1,36 +1,19 @@
 """
-Simulate density field using pmwd.
+Simulate density field using pmwd Particle Mesh.
 
-Requires:
-    - pmwd
-
-Params:
-    - nbody.suite: suite name
-
-    - nbody.L: box size (in Mpc/h)
-    - nbody.N: number of grid points per dimension in density field
-    - nbody.lhid: index of the cosmological parameters in the
-        latin_hypercube_params_bonus.txt file
-    - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
-    - nbody.save_particles: whether to save particle positions and velocities
-
-
-    - nbody.zi: initial redshift
-    - nbody.zf: final redshift
-    - nbody.supersampling: particle resolution factor relative to density field
-
-    - nbody.B: force grid resolution factor relative to density field
-    - nbody.N_steps: number of steps in the nbody simulation
-
+Input:
+    - wn: initial white noise field
 
 Output:
-    - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
+    - snapshots.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
 
-Note:
-    If making this lightcone, consider dynamically using:
-        from pmwd import nbody_init, nbody_step
+NOTE:
+    - [dev] If making this lightcone, consider using:
+            from pmwd import nbody_init, nbody_step
 """
 
 

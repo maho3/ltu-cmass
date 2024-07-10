@@ -1,13 +1,25 @@
 """
-Applies BOSS survey mask to a lightcone-shaped volume of galaxies.
-
-Requires:
-    - pymangle
-    - astropy
+Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
+and applies CMASS NGC survey mask and selection effects.
 
 Input:
-    - pos: (N, 3) array of galaxy positions
-    - vel: (N, 3) array of galaxy velocities
+    - hod/galaxies{hod_seed}.h5
+        - pos: halo positions
+        - vel: halo velocities
+
+Output:
+    - obs/lightcone{hod_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
+        - galsnap: snapshot index
+        - galidx: galaxy index
+
+NOTE:
+    - This only works for non-snapshot mode, wherein lightcone evolution is
+    ignored. For the snapshot mode alternative, use 'ngc_lightcone.py'.
+    - The fiber collisions are applied before resampling, and not in-sync with
+    it. This often leads to a slightly lower n(z) in some z-bins than desired.
 """
 
 import os

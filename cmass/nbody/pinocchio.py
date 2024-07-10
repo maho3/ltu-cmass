@@ -1,3 +1,24 @@
+"""
+Simulate density field and halo catalogs using PINOCCHIO.
+
+Input:
+    - wn: initial white noise field
+
+Output:
+    - snapshots.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
+
+NOTE:
+    - TODO: halos currently save in .npy, but they should save in .h5
+"""
+
 import os
 from os.path import join as pjoin
 import numpy as np
