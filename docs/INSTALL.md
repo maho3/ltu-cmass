@@ -14,7 +14,7 @@ Welcome to the ltu-cmass installation instructions. This provides the minimal in
 
 ## Design
 - This is a collection of scripts designed to transform cosmological simulations into mocks of galaxy surveys. Each component script is designed to be run through command line on a computing cluster (e.g. `python -m cmass.nbody.pmwd`).
-- I/O is done mostly through reading and saving `h5py` files on disk. The scripts expect a certain structure of data storage, located within the working directory specified in [`global.cfg`](../cmass/conf/global.cfg). See an example directory tree in [Data Structure](#configure-the-working-directory).
+- I/O is done mostly through reading and saving `h5py` files on disk. The scripts expect a certain structure of data storage, located within the working directory specified in [`global.cfg`](../cmass/conf/global.cfg). See an example directory tree in [Running the Pipeline](#running-the-pipeline).
 - Dependency modules are only loaded when needed. This is so that all prerequisites need not be installed simultaneously. However, this means everything must be loaded through relative imports (e.g. `from .tools import do_something` instead of `import tools; tools.do_something()`).
 
 
