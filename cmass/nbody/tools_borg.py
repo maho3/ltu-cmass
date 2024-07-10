@@ -1,7 +1,10 @@
+from os.path import join
+import logging
 import numpy as np
 import aquila_borg as borg
 from mpi4py import MPI
-from .tools import bin_cube
+import h5py
+from .tools import bin_cube, rho_and_vfield
 from ..utils import timing_decorator
 
 
@@ -208,3 +211,76 @@ def gather_MPI(pos, vel):
     if rank != 0:
         return pos, vel
     return pos_gathered.reshape(-1, cols), vel_gathered.reshape(-1, cols)
+
+
+# Lightcone stuff
+class BorgNotifier:
+    def __init__(self, asave, N, L, omega_m, h, outdir):
+        self.step_id = 0
+        self.asave = asave
+        self.N = N
+        self.L = L
+        self.omega_m = omega_m
+        self.h = h
+        self.outdir = outdir
+
+        self.outpath = join(outdir, 'snapshots.h5')
+        logging.info(f"Saving snapshots to {self.outpath}")
+
+        with h5py.File(self.outpath, 'a') as f:
+            f.attrs['asave'] = asave
+
+    @staticmethod
+    def interpolate(xi, xf, ai, af, a):
+        # Linearly interpolate between xi and xf
+        # TODO: Replace with Bezier interpolation?
+        return xi + (xf - xi) * (a - ai) / (af - ai)
+
+    def mass_assignment(self, pos, vel):
+        rho, fvel = rho_and_vfield(
+            pos, vel,
+            Ngrid=self.N,
+            BoxSize=self.L,
+            MAS='CIC',
+            omega_m=self.omega_m,
+            h=self.h
+        )
+
+        # get right units
+        fvel *= 100  # km/s
+
+        return rho, fvel
+
+    def save(self, a, rho, fvel):
+        with h5py.File(self.outpath, 'a') as f:
+            key = f'{a:.6f}'
+            group = f.create_group(key)
+            group.create_dataset('rho', data=rho)
+            group.create_dataset('fvel', data=fvel)
+
+    def __call__(self, a, Np, ids, pos, vel):
+        if self.step_id != 0:
+            for af in self.asave:
+                if (af >= self.a0) and (af <= a):
+                    logging.info(f"Saving snap a={af:.6f}.")
+                    # interpolate along the trajectory
+                    _pos = self.interpolate(self.pos0, pos, self.a0, a, af)
+                    _vel = self.interpolate(self.vel0, vel, self.a0, a, af)
+
+                    # mass assignment
+                    rho, fvel = self.mass_assignment(_pos, _vel)
+
+                    # convert to overdensity
+                    rho /= np.mean(rho)
+                    rho -= 1
+
+                    # convert comoving to physical velocities
+                    fvel /= af
+
+                    # save
+                    self.save(af, rho, fvel)
+
+        self.pos0 = pos
+        self.vel0 = vel
+        self.a0 = a
+        self.step_id += 1

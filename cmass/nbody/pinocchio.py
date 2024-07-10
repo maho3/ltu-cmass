@@ -1,30 +1,35 @@
+"""
+Simulate density field and halo catalogs using PINOCCHIO.
+
+Input:
+    - wn: initial white noise field
+
+Output:
+    - snapshots.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
+
+NOTE:
+    - TODO: halos currently save in .npy, but they should save in .h5
+"""
+
 import os
 from os.path import join as pjoin
 import numpy as np
 import logging
 import hydra
-from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import get_source_path, timing_decorator, load_params
-from .tools import (gen_white_noise, load_white_noise, save_nbody,
-                    rho_and_vfield, get_camb_pk, get_class_pk, get_syren_pk)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        nbody = cfg.nbody
-        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
-        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
-        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
-        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
-
-        # load cosmology
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
-
-    if cfg.nbody.quijote:
-        logging.info('Matching ICs to Quijote')
-        assert cfg.nbody.L == 1000  # enforce same size of quijote
-
-    return cfg
+from omegaconf import DictConfig, OmegaConf
+from ..utils import get_source_path, timing_decorator
+from .tools import (
+    parse_nbody_config, gen_white_noise, load_white_noise,
+    save_nbody, rho_and_vfield,
+    get_camb_pk, get_class_pk, get_syren_pk)
 
 
 @timing_decorator
@@ -344,7 +349,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -371,12 +376,14 @@ def main(cfg: DictConfig) -> None:
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
-    # Convert from comoving -> peculiar velocities
+    if not cfg.nbody.save_particles:
+        pos, vel = None, None
+
+    # Convert from comoving -> physical velocities
     fvel *= (1 + cfg.nbody.zf)
 
     # Save nbody-type outputs
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    save_nbody(outdir, rho, fvel, pos, vel)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
 

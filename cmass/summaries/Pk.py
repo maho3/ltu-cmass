@@ -2,19 +2,20 @@
 A script to compute the 1D power spectrum of the galaxies in a survey
 geometry using nbodykit.
 
-Requires:
-    - nbodykit
-    - astropy
-    - pandas
-
 Input:
-    - rdz: (N, 3) array of galaxy ra, dec, and redshifts
+    - obs/lightcone{hod_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
 
 Output:
     - k_gal: wavenumbers
     - Pk0_gal: power spectrum monopole
     - Pk2_gal: power spectrum quadrupole
     - Pk4_gal: power spectrum hexadecapole
+
+NOTE:
+    - TODO: This doesn't work with the new h5py files yet.
 """
 
 import os

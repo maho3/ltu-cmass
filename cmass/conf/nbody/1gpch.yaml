@@ -6,13 +6,18 @@ L: 1000           # Mpc/h
 N: 128            # meshgrid resolution
 lhid: 3           # latin hypercube id
 matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
-Nvfield: 128      # velocity field resolution
+supersampling: 1  # particles resolution relative to meshgrid
 save_particles: false  # whether to save particle data
-save_velocities: true  # whether to save velocity field data
+save_transfer: true    # whether to save transfer fn densities (for CHARM)
 
 zi: 20            # initial redshift
 zf: 0.5           # final redshift
-supersampling: 1  # particles resolution relative to meshgrid
+
+# whether to save multiple snapshots and use lightcone extrapolation
+snapshot_mode: false
+# increasing snapshot scale factors to save (evenly spaced in a)
+asave: []
+
 
 # borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
