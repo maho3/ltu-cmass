@@ -23,7 +23,7 @@ python -m cmass.summaries.Pk nbody=3gpch
 ```
 
 ## Getting Started
-See basic installation and usage instructions in [INSTALL.md](INSTALL.md). For further information, see the [docs](./docs).
+See basic installation and usage instructions in [INSTALL.md](./docs/INSTALL.md). For further information, see the [docs](./docs).
 
 
 ## Organization
@@ -31,7 +31,7 @@ See basic installation and usage instructions in [INSTALL.md](INSTALL.md). For f
 Below, we list the functionality of each script in the repository as well as its major dependencies:
 
 ### cmass/conf
-- This folder contains [`hydra`](https://hydra.cc/docs/tutorials/basic/your_first_app/simple_cli/) configuration files for the pipeline. 
+This folder contains [`hydra`](https://hydra.cc/docs/tutorials/basic/your_first_app/simple_cli/) configuration files for the pipeline. 
 - `config.yaml` - Construction of default configurations
 - `global.yaml` - Global parameters (working directory, logging, etc.)
 - `nbody` - Various gravity solver configs (resolution, timesteps, box size, etc.)
@@ -40,12 +40,12 @@ Below, we list the functionality of each script in the repository as well as its
 - `survey` - Survey mask configs (geometry, fiber collisions, etc.)
 
 
-
-
 ### cmass.nbody
 - `borglpt` - Simulate a cubic volume using BORG 1/2LPT. 
 - `borgpm` - Simulate a cubic volume using BORG PM. 
+- `borgpm_lc` - Simulate a cubic volume using BORG PM, saving multiple snapshots for later lightcone extrapolation.
 - `pmwd` - Simulate a cubic volume using [`pmwd`](https://github.com/eelregit/pmwd/tree/master).
+- `pinnochio` - Simulate a cubic volume using [Pinocchio](https://adlibitum.oats.inaf.it/pierluigi.monaco/pinocchio.html).
 
 ### cmass.bias
 - `fit_halo_bias` - Fit a halo biasing model to map density fields to halo counts. 
@@ -58,7 +58,3 @@ Below, we list the functionality of each script in the repository as well as its
 
 ### cmass.summaries
 - `Pk` - Measure the power spectrum of a galaxy catalog. Requires: `pypower`.
-
-### Notebooks
-- `preprocess.ipynb` -  Executes various preprocessing tasks prepare for mass simulation. Designed to be run once at the start of code development. [Deprecated]
-- `validation.ipynb` - Validates outputs at intermediate stages in the forward pipeline. [Deprecated]
