@@ -20,13 +20,13 @@ NOTE:
 import os
 os.environ["PYBORG_QUIET"] = "yes"  # noqa
 
-from ..utils import get_source_path, timing_decorator
 import aquila_borg as borg
 from omegaconf import DictConfig, OmegaConf
 import hydra
 import logging
 import numpy as np
 from os.path import join as pjoin
+from ..utils import get_source_path, timing_decorator
 
 
 @timing_decorator
