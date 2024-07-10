@@ -1,13 +1,18 @@
 """
 Moves a cubic halo catalog to the CMASS footprint, and applies custom cuts.
 
-Requires:
-    - pymangle
-    - astropy
-
 Input:
-    - pos: (N, 3) array of galaxy positions
-    - vel: (N, 3) array of galaxy velocities
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+
+Output:
+    - halo_rdzm.npy: ra, dec, redshift, mass
+
+NOTE:
+    - This only works for non-snapshot mode, wherein lightcone evolution is
+    ignored.
+    - TODO: Use Leander's lightcone extrapolation to do this
 """
 
 import os
