@@ -32,7 +32,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator
 from .tools import (
-    parse_nbody_config, get_ICs, save_nbody, rho_and_vfield)
+    parse_nbody_config, get_ICs, save_nbody, save_transfer,
+    rho_and_vfield)
 
 
 def configure_pmwd(
@@ -108,7 +109,7 @@ def main(cfg: DictConfig) -> None:
             af=1,  # ignored
             N_steps=cfg.nbody.N_steps, cosmo=cfg.nbody.cosmo)
         rho_transfer = run_transfer(wn, pmconf, pmcosmo)
-        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+        save_transfer(outdir, rho_transfer)
         del rho_transfer
 
     # Run density

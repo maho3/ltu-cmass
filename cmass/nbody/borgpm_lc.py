@@ -28,7 +28,7 @@ import numpy as np
 from os.path import join as pjoin
 from ..utils import get_source_path, timing_decorator
 from .tools import (
-    parse_nbody_config, get_ICs)
+    parse_nbody_config, get_ICs, save_transfer)
 from .tools_borg import (
     build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
     BorgNotifier)
@@ -130,7 +130,7 @@ def main(cfg: DictConfig) -> None:
     # Apply transfer fn to ICs (for CHARM)
     if cfg.nbody.save_transfer:
         rho_transfer = run_transfer(wn, cpar, cfg)
-        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+        save_transfer(outdir, rho_transfer)
         del rho_transfer
 
     # Run and save density field

@@ -143,8 +143,9 @@ def sample_masses(Nsamp, medg, order=1):
 
 
 def load_transfer(source_path):
-    filepath = pjoin(source_path, 'rho_transfer.npy')
-    return np.load(filepath)
+    filepath = pjoin(source_path, 'transfer.h5')
+    with h5py.File(filepath, 'r') as f:
+        return f['rho'][...]
 
 
 def batch_cube(x, Nsub, width, stride):
