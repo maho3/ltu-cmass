@@ -6,7 +6,7 @@ Input:
     - wn: initial white noise field
 
 Output:
-    - snapshots.h5 (multiple snapshots)
+    - nbody.h5 (multiple snapshots)
         - rho: density contrast field
         - fvel: velocity field
         - pos: particle positions [optional]
@@ -91,7 +91,7 @@ def run_density(wn, cpar, cfg, outdir=None):
 
 
 def delete_outputs(outdir):
-    outpath = pjoin(outdir, 'snapshots.h5')
+    outpath = pjoin(outdir, 'nbody.h5')
     if os.path.isfile(outpath):
         os.remove(outpath)
 

@@ -5,7 +5,7 @@ between the grid points of the density field
 
 
 Input:
-    - snapshots.h5
+    - nbody.h5
         - rho: density contrast field
         - fvel: velocity field
         - pos: particle positions [optional]
@@ -294,7 +294,7 @@ def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'snapshots.h5'), 'r') as f:
+    with h5py.File(pjoin(source_path, 'nbody.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         rho = group['rho'][...]
         fvel = group['fvel'][...]

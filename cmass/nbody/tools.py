@@ -86,7 +86,7 @@ def get_ICs(cfg):
 @timing_decorator
 def save_nbody(savedir, a, rho, fvel, ppos, pvel):
     os.makedirs(savedir, exist_ok=True)
-    savefile = pjoin(savedir, 'snapshots.h5')
+    savefile = pjoin(savedir, 'nbody.h5')
 
     logging.info(f'Saving to {savefile}...')
     with h5py.File(savefile, 'w') as f:

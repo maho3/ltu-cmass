@@ -6,7 +6,7 @@ Input:
     - wn: initial white noise field
 
 Output:
-    - snapshots.h5
+    - nbody.h5
         - rho: density contrast field
         - fvel: velocity field
         - pos: particle positions [optional]
