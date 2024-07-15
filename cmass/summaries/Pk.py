@@ -14,8 +14,6 @@ Output:
     - Pk2_gal: power spectrum quadrupole
     - Pk4_gal: power spectrum hexadecapole
 
-NOTE:
-    - TODO: This doesn't work with the new h5py files yet.
 """
 
 import os
@@ -25,9 +23,10 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import astropy
+import h5py
 from pypower import CatalogFFTPower
 
-from .tools import load_galaxies_obs, load_randoms
+from .tools import load_lightcone, load_randoms
 from ..survey.tools import sky_to_xyz
 from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 
@@ -69,6 +68,14 @@ def compute_Pk(
     return k, p0k, p2k, p4k
 
 
+def save_summary(outpath, name, **kwargs):
+    os.makedirs(outpath, exist_ok=True)
+    with h5py.File(outpath, 'a') as f:
+        group = f.create_group(name)
+        for key, value in kwargs.items():
+            group.create_dataset(key, data=value)
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -82,10 +89,10 @@ def main(cfg: DictConfig) -> None:
     use_filter = hasattr(cfg, 'filter')
     if use_filter:
         logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
-        grdz, gweights = load_galaxies_obs(
+        grdz, gweights = load_lightcone(
             source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
     else:
-        grdz, gweights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
+        grdz, gweights = load_lightcone(source_path, cfg.bias.hod.seed)
 
     rrdz = load_randoms(cfg.meta.wdir)
 
@@ -99,16 +106,15 @@ def main(cfg: DictConfig) -> None:
     )
 
     # save results
-    outpath = pjoin(source_path, 'Pk')
+    outpath = pjoin(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
-    if not use_filter:
-        outname = f'Pk{cfg.bias.hod.seed}.npz'
-    else:
-        outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
+    outname = f'hod{cfg.bias.hod.seed}'
+    if use_filter:
+        outname += f'_{cfg.filter.filter_name}'
+    outname += '.h5'
     outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
-    np.savez(outpath, k_gal=k, p0k_gal=p0k,
-             p2k_gal=p2k, p4k_gal=p4k)
+    save_summary(outpath, 'Pk', k=k, p0k=p0k, p2k=p2k, p4k=p4k)
 
 
 if __name__ == "__main__":

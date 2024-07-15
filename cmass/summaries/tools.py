@@ -1,6 +1,7 @@
 import os
 from os.path import join as pjoin
 import numpy as np
+import h5py
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
 
@@ -45,15 +46,23 @@ def get_nofz(z, fsky, cosmo=None):
 
 
 @timing_decorator
-def load_galaxies_obs(source_dir, seed, filter_name=None):
+def load_lightcone(source_dir, hod_seed, filter_name=None):
     if filter_name is None:
-        rdz = np.load(pjoin(source_dir, 'obs', f'rdz{seed}.npy'))
-        weight = np.ones(len(rdz))
+        infile = pjoin(source_dir, 'obs', f'lightcone{hod_seed}.h5')
     else:
-        rdz = np.load(pjoin(source_dir, 'obs/filtered',
-                      f'rdz{seed}_{filter_name}.npy'))
-        weight = np.load(pjoin(source_dir, 'obs/filtered',
-                         f'rdz{seed}_{filter_name}_weight.npy'))
+        infile = pjoin(source_dir, 'obs/filtered',
+                       f'lightcone{hod_seed}_{filter_name}.h5')
+
+    with h5py.File(infile, 'r') as f:
+        ra = f['ra'][...]
+        dec = f['dec'][...]
+        z = f['z'][...]
+        rdz = np.stack([ra, dec, z], axis=-1)
+
+        if 'weight' in f:
+            weight = f['weight'][...]
+        else:
+            weight = np.ones(len(rdz))
 
     return rdz, weight
 
