@@ -116,11 +116,11 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   +-- config.yaml   # record of the configuration file
 |   |   |   |   |   +-- nbody.h5  # density and velocity fields
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
-|   |   |   |   |   +-- hod
-|   |   |   |   |   |   +-- galaxies0.h5   # galaxy positions/velocities, for HOD seed 0
+|   |   |   |   |   +-- galaxies
+|   |   |   |   |   |   +-- hod0.h5   # galaxy positions/velocities, for HOD seed 0
 |   |   |   |   |   +-- obs           
 |   |   |   |   |   |   +-- lightcone0.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
-|   |   |   |   |   +-- Pk
+|   |   |   |   |   +-- summary
 |   |   |   |   |   |   +-- Pk0.npz        # survey-space power spectrum
 ```
 

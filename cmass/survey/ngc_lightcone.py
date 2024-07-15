@@ -44,7 +44,7 @@ except ImportError:
 
 
 def load_galaxies(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'hod', f'galaxies{seed}.h5')
+    filepath = pjoin(source_dir, 'galaxies', f'hod{seed}.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
         pos = f[key]['pos'][...]
