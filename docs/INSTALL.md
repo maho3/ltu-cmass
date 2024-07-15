@@ -101,9 +101,6 @@ python -m cmass.bias.apply_hod nbody=1gpch
 
 # Construct the lightcone and apply the NGC survey mask
 python -m cmass.survey.ngc_selection nbody=1gpch
-
-# Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk nbody=1gpch
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
@@ -120,8 +117,6 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   |   +-- galaxies0.h5   # galaxy positions/velocities, for HOD seed 0
 |   |   |   |   |   +-- obs           
 |   |   |   |   |   |   +-- lightcone0.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
-|   |   |   |   |   +-- Pk
-|   |   |   |   |   |   +-- Pk0.npz        # survey-space power spectrum
 ```
 
 
@@ -145,6 +140,7 @@ You can see other default configurations in [`cmass/conf`](../cmass/conf).
 ## Additional Functionality
 
 We include various additional functionality beyond the minimal working example above. These are provided in separate documentation, including:
+- [Installing `pmesh` and running pypower](./options/PMESH.md)
 - [Running with Quijote initial conditions and fitting bias models](./options/QUIJOTE.md)
 - [Installing and running BORG nbody simulators](./options/BORG.md)
 - [Building and running lightcone extrapolation](./options/LIGHTCONE.md)
