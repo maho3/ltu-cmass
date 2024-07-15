@@ -7,14 +7,13 @@ Input:
 """
 
 import os
-import numpy as np
 import logging
 from os.path import join as pjoin
 import hydra
 import importlib
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import (get_source_path, timing_decorator, load_params)
-from ..summaries.tools import load_lightcone
+from ..summary.tools import load_lightcone
 from ..survey.tools import save_lightcone
 
 

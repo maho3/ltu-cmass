@@ -68,7 +68,6 @@ def load_lightcone(source_dir, hod_seed, filter_name=None):
 
 
 def save_summary(outpath, name, **kwargs):
-    os.makedirs(outpath, exist_ok=True)
     with h5py.File(outpath, 'a') as f:
         group = f.create_group(name)
         for key, value in kwargs.items():

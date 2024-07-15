@@ -103,7 +103,7 @@ python -m cmass.bias.apply_hod nbody=1gpch
 python -m cmass.survey.ngc_selection nbody=1gpch
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk nbody=1gpch
+python -m cmass.summary.Pk nbody=1gpch
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
