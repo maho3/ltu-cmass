@@ -22,7 +22,7 @@ conda activate $TESTENV
 # Install pmesh (for pypower)
 echo "Install pmesh"
 module purge
-module load openmpi gsl gcc
+module load openmpi/4.1.2-intel gsl/2.7.1 gcc/13.3.0  # example configuration
 pip install numpy mpi4py cython==0.29.33 --no-cache-dir
 pip install pmesh
 
@@ -30,6 +30,7 @@ pip install pmesh
 echo "Build lightcone"
 cd $INSTALLPATH/cmass/lightcone
 make clean
+pip install pybind11
 make
 cd $INSTALLPATH
 
