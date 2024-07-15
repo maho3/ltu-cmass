@@ -14,9 +14,6 @@ Output:
         - pos: halo positions
         - vel: halo velocities
         - mass: halo masses
-
-NOTE:
-    - TODO: halos currently save in .npy, but they should save in .h5
 """
 
 import os
@@ -30,6 +27,7 @@ from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise,
     save_nbody, rho_and_vfield,
     get_camb_pk, get_class_pk, get_syren_pk)
+from ..bias.rho_to_halo import save_snapshot
 
 
 @timing_decorator
@@ -383,15 +381,13 @@ def main(cfg: DictConfig) -> None:
     fvel *= (1 + cfg.nbody.zf)
 
     # Save nbody-type outputs
-    save_nbody(outdir, rho, fvel, pos, vel)
+    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
 
     # Save bias-type outputs
     logging.info('Saving cube...')
-    np.save(pjoin(outdir, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
-    np.save(pjoin(outdir, 'halo_vel.npy'), hvel)  # halo velocities [km/s]
-    np.save(pjoin(outdir, 'halo_mass.npy'), hmass)  # halo masses [Msun/h]
+    save_snapshot(outdir, cfg.nbody.af, hpos, hvel, hmass)
 
     logging.info("Done!")
 
