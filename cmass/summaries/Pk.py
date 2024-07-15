@@ -23,10 +23,9 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import astropy
-import h5py
 from pypower import CatalogFFTPower
 
-from .tools import load_lightcone, load_randoms
+from .tools import load_lightcone, save_summary, load_randoms
 from ..survey.tools import sky_to_xyz
 from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 
@@ -66,14 +65,6 @@ def compute_Pk(
     p2k = poles(ell=2, complex=False)
     p4k = poles(ell=4, complex=False)
     return k, p0k, p2k, p4k
-
-
-def save_summary(outpath, name, **kwargs):
-    os.makedirs(outpath, exist_ok=True)
-    with h5py.File(outpath, 'a') as f:
-        group = f.create_group(name)
-        for key, value in kwargs.items():
-            group.create_dataset(key, data=value)
 
 
 @timing_decorator

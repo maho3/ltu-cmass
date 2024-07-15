@@ -67,6 +67,14 @@ def load_lightcone(source_dir, hod_seed, filter_name=None):
     return rdz, weight
 
 
+def save_summary(outpath, name, **kwargs):
+    os.makedirs(outpath, exist_ok=True)
+    with h5py.File(outpath, 'a') as f:
+        group = f.create_group(name)
+        for key, value in kwargs.items():
+            group.create_dataset(key, data=value)
+
+
 @timing_decorator
 def load_randoms(wdir):
     path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')

@@ -11,9 +11,11 @@ import numpy as np
 import logging
 from os.path import join as pjoin
 import hydra
+import importlib
 from omegaconf import DictConfig, OmegaConf, open_dict
 from ..utils import (get_source_path, timing_decorator, load_params)
-import importlib
+from ..summaries.tools import load_lightcone
+from ..survey.tools import save_lightcone
 
 
 def parse_config(cfg):
@@ -45,19 +47,25 @@ def main(cfg: DictConfig) -> None:
     source_path = get_source_path(cfg, cfg.sim)
 
     # load rdz
-    rdz = np.load(pjoin(source_path, 'obs', f'rdz{cfg.bias.hod.seed}.npy'))
+    rdz, _ = load_lightcone(source_path, cfg.bias.hod.seed)
 
     # import the filter function
     filter = get_filter(cfg.filter.filter_name)
 
     # apply filter
-    filtered_rdz, weight = filter(rdz, **cfg.filter.filter_args)
+    rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-    os.makedirs(pjoin(source_path, 'obs', 'filtered'), exist_ok=True)
-    prefix = f'rdz{cfg.bias.hod.seed}_{cfg.filter.filter_name}'
-    np.save(pjoin(source_path, 'obs/filtered', f'{prefix}.npy'), filtered_rdz)
-    np.save(pjoin(source_path, 'obs/filtered', f'{prefix}_weight.npy'), weight)
+    outdir = pjoin(source_path, 'obs', 'filtered')
+    os.makedirs(outdir, exist_ok=True)
+    suffix = f'_{cfg.filter.filter_name}'
+    save_lightcone(
+        outdir,
+        ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
+        weight=weight,
+        hod_seed=cfg.bias.hod.seed,
+        suffix=suffix
+    )
 
 
 if __name__ == "__main__":
