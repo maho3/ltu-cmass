@@ -34,23 +34,13 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
-from .tools import save_lightcone
+from .tools import save_lightcone, load_galaxies
 try:
     from ..lightcone import lc
 except ImportError:
     raise ImportError(
         'Lightcone extrapolation not compiled. Please `make` the '
         'lightcone package in cmass/lightcone')
-
-
-def load_galaxies(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'galaxies', f'hod{seed}.h5')
-    with h5py.File(filepath, 'r') as f:
-        key = f'{a:.6f}'
-        pos = f[key]['pos'][...]
-        vel = f[key]['vel'][...]
-        hostid = f[key]['hostid'][...]
-    return pos, vel, hostid
 
 
 def load_halo_velocities(source_dir, a):
@@ -132,7 +122,7 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    outdir = pjoin(source_path, 'obs')
+    outdir = pjoin(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(outdir, ra, dec, z, galsnap, galidx,
                    hod_seed=hod_seed)

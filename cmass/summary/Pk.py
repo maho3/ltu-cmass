@@ -99,7 +99,7 @@ def main(cfg: DictConfig) -> None:
     # save results
     outpath = pjoin(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
-    outname = f'hod{cfg.bias.hod.seed}'
+    outname = f'hod{cfg.bias.hod.seed:03}'
     if use_filter:
         outname += f'_{cfg.filter.filter_name}'
     outname += '.h5'

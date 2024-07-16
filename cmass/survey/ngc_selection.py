@@ -37,19 +37,9 @@ from omegaconf import DictConfig, OmegaConf
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
-    save_lightcone)
+    save_lightcone, load_galaxies)
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
-
-
-@timing_decorator
-def load_galaxies_sim(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'galaxies', f'hod{seed}.h5')
-    with h5py.File(filepath, 'r') as f:
-        key = f'{a:.6f}'
-        pos = f[key]['pos'][...]
-        vel = f[key]['vel'][...]
-    return pos, vel
 
 
 @timing_decorator
@@ -183,7 +173,7 @@ def main(cfg: DictConfig) -> None:
                          ' is only for non snapshot mode.')
 
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_path, cfg.nbody.af, cfg.bias.hod.seed)
+    pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, cfg.bias.hod.seed)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
@@ -211,7 +201,7 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    outdir = pjoin(source_path, 'obs')
+    outdir = pjoin(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,

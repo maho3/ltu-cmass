@@ -269,9 +269,19 @@ def gen_randoms(wdir='./data'):
     return randoms.values
 
 
+def load_galaxies(source_dir, a, seed):
+    filepath = pjoin(source_dir, 'galaxies', f'hod{seed:03}.h5')
+    with h5py.File(filepath, 'r') as f:
+        key = f'{a:.6f}'
+        pos = f[key]['pos'][...]
+        vel = f[key]['vel'][...]
+        hostid = f[key]['hostid'][...]
+    return pos, vel, hostid
+
+
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, suffix=''):
-    outfile = pjoin(outdir, f'lightcone{hod_seed}{suffix}.h5')
+    outfile = pjoin(outdir, f'hod{hod_seed:03}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
         f.create_dataset('ra', data=ra)                # Right ascension [deg]
