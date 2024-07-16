@@ -26,6 +26,7 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
+import h5py
 
 from .tools.quijote import load_quijote_halos
 from .tools.halo_models import TruncatedPowerLaw
@@ -117,8 +118,9 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Saving...')
     source_path = get_source_path(cfg, cfg.sim)
-    np.save(pjoin(source_path, 'halo_bias.npy'), popt)
-    np.save(pjoin(source_path, 'halo_medges.npy'), medges)
+    with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
+        f.create_dataset('popt', data=popt)
+        f.create_dataset('medges', data=medges)
     logging.info('Done!')
 
 

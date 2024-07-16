@@ -47,8 +47,9 @@ from ..nbody.tools import parse_nbody_config
 
 def load_bias_params(bias_path):
     # load the bias parameters for Truncated Power Law
-    popt = np.load(pjoin(bias_path, 'halo_bias.npy'))
-    medges = np.load(pjoin(bias_path, 'halo_medges.npy'))
+    with h5py.File(pjoin(bias_path, 'bias.h5'), 'r') as f:
+        popt = f['popt'][...]
+        medges = f['medges'][...]
     return popt, medges
 
 
