@@ -81,9 +81,15 @@ def main(cfg: DictConfig) -> None:
     if use_filter:
         logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
         grdz, gweights = load_lightcone(
-            source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
+            source_path,
+            hod_seed=cfg.bias.hod.seed,
+            aug_seed=cfg.survey.aug_seed,
+            filter_name=cfg.filter.filter_name)
     else:
-        grdz, gweights = load_lightcone(source_path, cfg.bias.hod.seed)
+        grdz, gweights = load_lightcone(
+            source_path,
+            hod_seed=cfg.bias.hod.seed,
+            aug_seed=cfg.survey.aug_seed)
 
     rrdz = load_randoms(cfg.meta.wdir)
 
@@ -99,7 +105,7 @@ def main(cfg: DictConfig) -> None:
     # save results
     outpath = pjoin(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
-    outname = f'hod{cfg.bias.hod.seed:03}'
+    outname = f'hod{cfg.bias.hod.seed:03}_aug{cfg.survey.aug_seed:03}'
     if use_filter:
         outname += f'_{cfg.filter.filter_name}'
     outname += '.h5'

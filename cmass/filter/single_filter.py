@@ -46,7 +46,8 @@ def main(cfg: DictConfig) -> None:
     source_path = get_source_path(cfg, cfg.sim)
 
     # load rdz
-    rdz, _ = load_lightcone(source_path, cfg.bias.hod.seed)
+    rdz, _ = load_lightcone(
+        source_path, cfg.bias.hod.seed, cfg.survey.aug_seed)
 
     # import the filter function
     filter = get_filter(cfg.filter.filter_name)
@@ -63,6 +64,7 @@ def main(cfg: DictConfig) -> None:
         ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
         weight=weight,
         hod_seed=cfg.bias.hod.seed,
+        aug_seed=cfg.survey.aug_seed,
         suffix=suffix
     )
 

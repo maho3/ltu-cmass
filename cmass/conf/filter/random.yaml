@@ -1,6 +1,6 @@
 
 # single filter
-filter_name: random
+filter_name: random_filter
 
 filter_args:
   rate: 0.1 # how many percent of the data to keep

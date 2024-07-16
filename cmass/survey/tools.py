@@ -280,8 +280,8 @@ def load_galaxies(source_dir, a, seed):
 
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
-                   weight=None, hod_seed=0, suffix=''):
-    outfile = pjoin(outdir, f'hod{hod_seed:03}{suffix}.h5')
+                   weight=None, hod_seed=0, aug_seed=0, suffix=''):
+    outfile = pjoin(outdir, f'hod{hod_seed:03}_aug{aug_seed:03}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
         f.create_dataset('ra', data=ra)                # Right ascension [deg]

@@ -89,6 +89,7 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
+    aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     # Check that we are in snapshot_mode
     if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
@@ -113,7 +114,7 @@ def main(cfg: DictConfig) -> None:
         snap_times=snap_times,
         verbose=True,
         stitch_before_RSD=True,
-        augment=0,
+        augment=aug_seed,
         seed=42
     )
 
@@ -124,8 +125,14 @@ def main(cfg: DictConfig) -> None:
     # Save
     outdir = pjoin(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
-    save_lightcone(outdir, ra, dec, z, galsnap, galidx,
-                   hod_seed=hod_seed)
+    save_lightcone(
+        outdir,
+        ra=ra, dec=dec, z=z,
+        galsnap=galsnap,
+        galidx=galidx,
+        hod_seed=hod_seed,
+        aug_seed=aug_seed
+    )
 
 
 if __name__ == "__main__":

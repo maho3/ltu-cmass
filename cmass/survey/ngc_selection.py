@@ -166,6 +166,8 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
+    hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
+    aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     # Check that we are not in snapshot_mode
     if hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode:
@@ -173,11 +175,11 @@ def main(cfg: DictConfig) -> None:
                          ' is only for non snapshot mode.')
 
     # Load galaxies
-    pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, cfg.bias.hod.seed)
+    pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
-        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
+        pos, L=cfg.nbody.L, vel=vel, seed=aug_seed)
 
     # Apply cuboid remapping
     pos, vel = remap(
@@ -208,7 +210,8 @@ def main(cfg: DictConfig) -> None:
         ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
         galsnap=np.zeros(len(rdz), dtype=int),
         galidx=np.arange(len(rdz)),
-        hod_seed=cfg.bias.hod.seed)
+        hod_seed=hod_seed,
+        aug_seed=aug_seed)
 
 
 if __name__ == "__main__":
