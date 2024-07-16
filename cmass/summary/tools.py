@@ -50,7 +50,7 @@ def load_lightcone(source_dir, hod_seed, filter_name=None):
     if filter_name is None:
         infile = pjoin(source_dir, 'obs', f'lightcone{hod_seed}.h5')
     else:
-        infile = pjoin(source_dir, 'obs/filtered',
+        infile = pjoin(source_dir, 'filter',
                        f'lightcone{hod_seed}_{filter_name}.h5')
 
     with h5py.File(infile, 'r') as f:

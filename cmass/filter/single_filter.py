@@ -55,7 +55,7 @@ def main(cfg: DictConfig) -> None:
     rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-    outdir = pjoin(source_path, 'obs', 'filtered')
+    outdir = pjoin(source_path, 'filter')
     os.makedirs(outdir, exist_ok=True)
     suffix = f'_{cfg.filter.filter_name}'
     save_lightcone(
