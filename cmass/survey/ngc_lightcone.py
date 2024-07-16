@@ -5,13 +5,13 @@ applies CMASS NGC survey mask and selection effects.
 Input:
     - halos.h5
         - vel: halo velocities
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
         - hostid: host halo ID
 
 Output:
-    - obs/lightcone{hod_seed}.h5
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
         - ra: right ascension
         - dec: declination
         - z: redshift
@@ -34,23 +34,13 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
-from .tools import save_lightcone
+from .tools import save_lightcone, load_galaxies
 try:
     from ..lightcone import lc
 except ImportError:
     raise ImportError(
         'Lightcone extrapolation not compiled. Please `make` the '
         'lightcone package in cmass/lightcone')
-
-
-def load_galaxies(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'hod', f'galaxies{seed}.h5')
-    with h5py.File(filepath, 'r') as f:
-        key = f'{a:.6f}'
-        pos = f[key]['pos'][...]
-        vel = f[key]['vel'][...]
-        hostid = f[key]['hostid'][...]
-    return pos, vel, hostid
 
 
 def load_halo_velocities(source_dir, a):
@@ -99,6 +89,7 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
+    aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     # Check that we are in snapshot_mode
     if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
@@ -123,7 +114,7 @@ def main(cfg: DictConfig) -> None:
         snap_times=snap_times,
         verbose=True,
         stitch_before_RSD=True,
-        augment=0,
+        augment=aug_seed,
         seed=42
     )
 
@@ -132,9 +123,16 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
-    save_lightcone(source_path, ra, dec, z, galsnap, galidx,
-                   hod_seed=hod_seed)
+    outdir = pjoin(source_path, 'lightcone')
+    os.makedirs(outdir, exist_ok=True)
+    save_lightcone(
+        outdir,
+        ra=ra, dec=dec, z=z,
+        galsnap=galsnap,
+        galidx=galidx,
+        hod_seed=hod_seed,
+        aug_seed=aug_seed
+    )
 
 
 if __name__ == "__main__":

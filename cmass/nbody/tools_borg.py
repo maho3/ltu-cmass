@@ -224,7 +224,7 @@ class BorgNotifier:
         self.h = h
         self.outdir = outdir
 
-        self.outpath = join(outdir, 'snapshots.h5')
+        self.outpath = join(outdir, 'nbody.h5')
         logging.info(f"Saving snapshots to {self.outpath}")
 
         with h5py.File(self.outpath, 'a') as f:

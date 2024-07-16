@@ -5,7 +5,7 @@ Input:
     - wn: initial white noise field
 
 Output:
-    - snapshots.h5
+    - nbody.h5
         - rho: density contrast field
         - fvel: velocity field
         - pos: particle positions [optional]
@@ -31,7 +31,8 @@ from omegaconf import DictConfig, OmegaConf
 import aquila_borg as borg
 from ..utils import get_source_path, timing_decorator
 from .tools import (
-    parse_nbody_config, get_ICs, save_nbody, rho_and_vfield)
+    parse_nbody_config, get_ICs, save_nbody, save_transfer,
+    rho_and_vfield)
 from .tools_borg import (
     build_cosmology, transfer_EH, transfer_CLASS, run_transfer,
     getMPISlice, gather_MPI)
@@ -132,7 +133,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.nbody.save_transfer:
         rho_transfer = run_transfer(wn, cpar, cfg)
         if rank == 0:
-            np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+            save_transfer(outdir, rho_transfer)
         del rho_transfer
 
     # Run density field
