@@ -1,6 +1,6 @@
 
 # Relative path to the quijote simulation halos
-path_to_qhalos: 'quijote/source/Halos/latin_hypercube_HR'
+path_to_qhalos: 'quijote/source/Halos/FoF/latin_hypercube_HR'
 
 # whether to use the quijote density field, or the one from the calibration suite
 use_rho_quijote: false

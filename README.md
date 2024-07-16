@@ -19,7 +19,7 @@ python -m cmass.bias.apply_hod nbody=3gpch
 python -m cmass.survey.ngc_selection nbody=3gpch
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk nbody=3gpch
+python -m cmass.summary.Pk nbody=3gpch
 ```
 
 ## Getting Started
@@ -56,5 +56,5 @@ This folder contains [`hydra`](https://hydra.cc/docs/tutorials/basic/your_first_
 - `ngc_selection` - Applies CMASS NGC survey mask to a lightcone-shaped volume of galaxies. 
 - `ngc_lightcone` - Stitches multiple snapshots together to create an extrapolated lightcone, following the method of [nuvoid_production](https://github.com/leanderthiele/nuvoid_production). Then applies the CMASS NGC survey mask.
 
-### cmass.summaries
-- `Pk` - Measure the power spectrum of a galaxy catalog. Requires: `pypower`.
+### cmass.summary
+- `Pk` - Measure the power spectrum of a galaxy catalog.

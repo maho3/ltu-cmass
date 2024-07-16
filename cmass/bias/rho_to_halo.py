@@ -5,7 +5,7 @@ between the grid points of the density field
 
 
 Input:
-    - snapshots.h5
+    - nbody.h5
         - rho: density contrast field
         - fvel: velocity field
         - pos: particle positions [optional]
@@ -47,8 +47,9 @@ from ..nbody.tools import parse_nbody_config
 
 def load_bias_params(bias_path):
     # load the bias parameters for Truncated Power Law
-    popt = np.load(pjoin(bias_path, 'halo_bias.npy'))
-    medges = np.load(pjoin(bias_path, 'halo_medges.npy'))
+    with h5py.File(pjoin(bias_path, 'bias.h5'), 'r') as f:
+        popt = f['popt'][...]
+        medges = f['medges'][...]
     return popt, medges
 
 
@@ -143,8 +144,9 @@ def sample_masses(Nsamp, medg, order=1):
 
 
 def load_transfer(source_path):
-    filepath = pjoin(source_path, 'rho_transfer.npy')
-    return np.load(filepath)
+    filepath = pjoin(source_path, 'transfer.h5')
+    with h5py.File(filepath, 'r') as f:
+        return f['rho'][...]
 
 
 def batch_cube(x, Nsub, width, stride):
@@ -294,7 +296,7 @@ def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'snapshots.h5'), 'r') as f:
+    with h5py.File(pjoin(source_path, 'nbody.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         rho = group['rho'][...]
         fvel = group['fvel'][...]

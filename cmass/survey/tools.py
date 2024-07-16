@@ -269,12 +269,27 @@ def gen_randoms(wdir='./data'):
     return randoms.values
 
 
-def save_lightcone(outdir, ra, dec, z, galsnap, galidx, hod_seed=0):
-    outfile = pjoin(outdir, 'obs', f'lightcone{hod_seed}.h5')
+def load_galaxies(source_dir, a, seed):
+    filepath = pjoin(source_dir, 'galaxies', f'hod{seed:03}.h5')
+    with h5py.File(filepath, 'r') as f:
+        key = f'{a:.6f}'
+        pos = f[key]['pos'][...]
+        vel = f[key]['vel'][...]
+        hostid = f[key]['hostid'][...]
+    return pos, vel, hostid
+
+
+def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
+                   weight=None, hod_seed=0, aug_seed=0, suffix=''):
+    outfile = pjoin(outdir, f'hod{hod_seed:03}_aug{aug_seed:03}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
-        f.create_dataset('ra', data=ra)            # Right ascension [deg]
-        f.create_dataset('dec', data=dec)          # Declination [deg]
-        f.create_dataset('z', data=z)              # Redshift
-        f.create_dataset('galsnap', data=galsnap)  # Snapshot index
-        f.create_dataset('galidx', data=galidx)    # Galaxy index
+        f.create_dataset('ra', data=ra)                # Right ascension [deg]
+        f.create_dataset('dec', data=dec)              # Declination [deg]
+        f.create_dataset('z', data=z)                  # Redshift
+        if galsnap is not None:
+            f.create_dataset('galsnap', data=galsnap)  # Snapshot index
+        if galidx is not None:
+            f.create_dataset('galidx', data=galidx)    # Galaxy index
+        if weight is not None:
+            f.create_dataset('weight', data=weight)    # Weight

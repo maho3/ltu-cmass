@@ -3,12 +3,12 @@ Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
 and applies CMASS NGC survey mask and selection effects.
 
 Input:
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
 
 Output:
-    - obs/lightcone{hod_seed}.h5
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
         - ra: right ascension
         - dec: declination
         - z: redshift
@@ -37,19 +37,9 @@ from omegaconf import DictConfig, OmegaConf
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
-    save_lightcone)
+    save_lightcone, load_galaxies)
 from ..utils import (get_source_path, timing_decorator)
 from ..nbody.tools import parse_nbody_config
-
-
-@timing_decorator
-def load_galaxies_sim(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'hod', f'galaxies{seed}.h5')
-    with h5py.File(filepath, 'r') as f:
-        key = f'{a:.6f}'
-        pos = f[key]['pos'][...]
-        vel = f[key]['vel'][...]
-    return pos, vel
 
 
 @timing_decorator
@@ -176,6 +166,8 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(cfg, cfg.sim)
+    hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
+    aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     # Check that we are not in snapshot_mode
     if hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode:
@@ -183,11 +175,11 @@ def main(cfg: DictConfig) -> None:
                          ' is only for non snapshot mode.')
 
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_path, cfg.nbody.af, cfg.bias.hod.seed)
+    pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
-        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
+        pos, L=cfg.nbody.L, vel=vel, seed=aug_seed)
 
     # Apply cuboid remapping
     pos, vel = remap(
@@ -211,14 +203,15 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    outdir = pjoin(source_path, 'obs')
+    outdir = pjoin(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
         ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
         galsnap=np.zeros(len(rdz), dtype=int),
         galidx=np.arange(len(rdz)),
-        hod_seed=cfg.bias.hod.seed)
+        hod_seed=hod_seed,
+        aug_seed=aug_seed)
 
 
 if __name__ == "__main__":

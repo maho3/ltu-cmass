@@ -103,7 +103,7 @@ python -m cmass.bias.apply_hod nbody=1gpch
 python -m cmass.survey.ngc_selection nbody=1gpch
 
 # Measure the power spectrum of the galaxy catalog
-python -m cmass.summaries.Pk nbody=1gpch
+python -m cmass.summary.Pk nbody=1gpch
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
@@ -114,14 +114,14 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   +-- L1000-N128 # comoving size and resolution of the simulation
 |   |   |   |   +-- 0      # number of the latin-hypercube ID
 |   |   |   |   |   +-- config.yaml   # record of the configuration file
-|   |   |   |   |   +-- snapshots.h5  # density and velocity fields
+|   |   |   |   |   +-- nbody.h5  # density and velocity fields
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
-|   |   |   |   |   +-- hod
-|   |   |   |   |   |   +-- galaxies0.h5   # galaxy positions/velocities, for HOD seed 0
-|   |   |   |   |   +-- obs           
-|   |   |   |   |   |   +-- lightcone0.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
-|   |   |   |   |   +-- Pk
-|   |   |   |   |   |   +-- Pk0.npz        # survey-space power spectrum
+|   |   |   |   |   +-- galaxies
+|   |   |   |   |   |   +-- hod000.h5   # galaxy positions/velocities, for HOD seed 0
+|   |   |   |   |   +-- lightcone           
+|   |   |   |   |   |   +-- hod000_aug000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
+|   |   |   |   |   +-- summary
+|   |   |   |   |   |   +-- hod000_aug000.npz        # survey-space power spectrum
 ```
 
 
