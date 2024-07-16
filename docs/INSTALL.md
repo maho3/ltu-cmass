@@ -117,11 +117,11 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   +-- nbody.h5  # density and velocity fields
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
 |   |   |   |   |   +-- galaxies
-|   |   |   |   |   |   +-- hod0.h5   # galaxy positions/velocities, for HOD seed 0
-|   |   |   |   |   +-- obs           
-|   |   |   |   |   |   +-- lightcone0.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
+|   |   |   |   |   |   +-- hod000.h5   # galaxy positions/velocities, for HOD seed 0
+|   |   |   |   |   +-- lightcone           
+|   |   |   |   |   |   +-- hod000_aug000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
 |   |   |   |   |   +-- summary
-|   |   |   |   |   |   +-- Pk0.npz        # survey-space power spectrum
+|   |   |   |   |   |   +-- hod000_aug000.npz        # survey-space power spectrum
 ```
 
 
