@@ -132,8 +132,9 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
-    save_lightcone(source_path, ra, dec, z, galsnap, galidx,
+    outdir = pjoin(source_path, 'obs')
+    os.makedirs(outdir, exist_ok=True)
+    save_lightcone(outdir, ra, dec, z, galsnap, galidx,
                    hod_seed=hod_seed)
 
 

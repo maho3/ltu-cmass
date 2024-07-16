@@ -271,7 +271,7 @@ def gen_randoms(wdir='./data'):
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, suffix=''):
-    outfile = pjoin(outdir, 'obs', f'lightcone{hod_seed}{suffix}.h5')
+    outfile = pjoin(outdir, f'lightcone{hod_seed}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
         f.create_dataset('ra', data=ra)                # Right ascension [deg]
