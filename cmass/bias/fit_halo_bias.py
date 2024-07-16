@@ -2,17 +2,15 @@
 Fits a TruncatedPowerLaw bias model to the density field vs. halo counts in
 the Quijote simulations.
 
-Requires:
-    - scipy
-    - astropy
-
 Input:
-    - posh: (N, 3) array of halo positions
-    - mass: (N,) array of halo masses
-    - rho: (N, N, N) array of density field
+    - nbody.h5
+        - rho: density contrast field
+    - Quijote halo catalogs
 
 Output:
-    - popt: (10, 3) array of bias parameters
+    - bias.h5
+        - popt: best-fit parameters for each mass bin
+        - medges: mass bin edges
 """
 
 import os  # noqa
@@ -26,10 +24,13 @@ from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
+import h5py
 
 from .tools.quijote import load_quijote_halos
 from .tools.halo_models import TruncatedPowerLaw
+from .rho_to_halo import load_snapshot
 from ..utils import get_source_path, timing_decorator
+from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
@@ -69,6 +70,7 @@ def load_rho(cfg):
             cfg.fit.path_to_qrhos,
             f'{cfg.nbody.lhid}',
             f'df_m_{N}_z={z}.npy')
+        return np.load(rho_path)
     else:
         source_path = get_source_path(cfg, cfg.sim)
         source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
@@ -78,9 +80,8 @@ def load_rho(cfg):
             raise ValueError(
                 f"Source redshift {source_cfg.nbody.zf} does not match "
                 f"target redshift {z}.")
-
-        rho_path = pjoin(source_path, 'rho.npy')
-    return np.load(rho_path)
+        rho, _, _, _ = load_snapshot(source_cfg, cfg.nbody.af)
+        return rho
 
 
 def fit_mass_bin(rho, hcounts, verbose=False, attempts=5):
@@ -107,6 +108,8 @@ def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'fit'])
 
+    # Build run config
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     hcounts, medges = load_halo_histogram(cfg)
@@ -117,8 +120,9 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Saving...')
     source_path = get_source_path(cfg, cfg.sim)
-    np.save(pjoin(source_path, 'halo_bias.npy'), popt)
-    np.save(pjoin(source_path, 'halo_medges.npy'), medges)
+    with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
+        f.create_dataset('popt', data=popt)
+        f.create_dataset('medges', data=medges)
     logging.info('Done!')
 
 

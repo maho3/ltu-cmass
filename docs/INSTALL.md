@@ -111,12 +111,14 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   +-- L1000-N128 # comoving size and resolution of the simulation
 |   |   |   |   +-- 0      # number of the latin-hypercube ID
 |   |   |   |   |   +-- config.yaml   # record of the configuration file
-|   |   |   |   |   +-- snapshots.h5  # density and velocity fields
+|   |   |   |   |   +-- nbody.h5  # density and velocity fields
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
-|   |   |   |   |   +-- hod
-|   |   |   |   |   |   +-- galaxies0.h5   # galaxy positions/velocities, for HOD seed 0
-|   |   |   |   |   +-- obs           
-|   |   |   |   |   |   +-- lightcone0.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
+|   |   |   |   |   +-- galaxies
+|   |   |   |   |   |   +-- hod000.h5   # galaxy positions/velocities, for HOD seed 0
+|   |   |   |   |   +-- lightcone           
+|   |   |   |   |   |   +-- hod000_aug000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
+|   |   |   |   |   +-- summary
+|   |   |   |   |   |   +-- hod000_aug000.npz        # survey-space power spectrum
 ```
 
 

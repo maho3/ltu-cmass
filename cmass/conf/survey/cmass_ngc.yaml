@@ -1,6 +1,6 @@
 
-# Random rotation seed
-rot_seed: 0
+# Data augmentation seed (for random rotations)
+aug_seed: 0
 
 # cuboid remap
 u1: [1,1,0]
