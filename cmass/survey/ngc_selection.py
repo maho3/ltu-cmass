@@ -3,12 +3,12 @@ Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
 and applies CMASS NGC survey mask and selection effects.
 
 Input:
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
 
 Output:
-    - obs/lightcone{hod_seed}.h5
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
         - ra: right ascension
         - dec: declination
         - z: redshift

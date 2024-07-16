@@ -8,7 +8,7 @@ Input:
         - mass: halo masses
 
 Output:
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
         - gal_type: galaxy type (central or satellite)

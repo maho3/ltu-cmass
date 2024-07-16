@@ -3,17 +3,18 @@ A script to compute the 1D power spectrum of the galaxies in a survey
 geometry using nbodykit.
 
 Input:
-    - obs/lightcone{hod_seed}.h5
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
         - ra: right ascension
         - dec: declination
         - z: redshift
 
 Output:
-    - k_gal: wavenumbers
-    - Pk0_gal: power spectrum monopole
-    - Pk2_gal: power spectrum quadrupole
-    - Pk4_gal: power spectrum hexadecapole
-
+    - summary/hod{hod_seed}_aug{augmentation_seed}.h5
+        - Pk: power spectrum
+            - k: wavenumbers
+            - p0k: power spectrum monopole
+            - p2k: power spectrum quadrupole
+            - p4k: power spectrum hexadecapole
 """
 
 import os

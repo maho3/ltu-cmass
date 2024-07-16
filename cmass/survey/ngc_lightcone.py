@@ -5,13 +5,13 @@ applies CMASS NGC survey mask and selection effects.
 Input:
     - halos.h5
         - vel: halo velocities
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
         - hostid: host halo ID
 
 Output:
-    - obs/lightcone{hod_seed}.h5
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
         - ra: right ascension
         - dec: declination
         - z: redshift

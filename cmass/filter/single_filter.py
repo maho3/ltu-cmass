@@ -2,8 +2,17 @@
 Applies a filter to the rdz data
 
 Input:
-    - rdz: (N, 3) array of observed (ra, dec ,z)
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
 
+Output:
+    - filter/hod{hod_seed}_aug{augmentation_seed}_{filter_name}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
+        - weight: filter weight
 """
 
 import os
