@@ -8,7 +8,7 @@ Input:
         - mass: halo masses
 
 Output:
-    - hod/galaxies{hod_seed}.h5
+    - galaxies/hod{hod_seed}.h5
         - pos: halo positions
         - vel: halo velocities
         - gal_type: galaxy type (central or satellite)
@@ -137,9 +137,9 @@ def main(cfg: DictConfig) -> None:
 
     # Setup save directory
     source_path = get_source_path(cfg, cfg.sim)
-    save_path = pjoin(source_path, 'hod')
+    save_path = pjoin(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = pjoin(save_path, f'galaxies{cfg.bias.hod.seed}.h5')
+    save_file = pjoin(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs

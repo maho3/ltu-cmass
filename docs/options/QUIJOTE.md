@@ -25,9 +25,10 @@ Lastly, you can use these phase-matched density fields to refit the halo biasing
 |   +-- quijote
 |   |   +-- source
 |   |   |   +-- Halos
-|   |   |   |   +-- latin_hypercube_HR
-|   |   |   |   |   +-- 0
-|   |   |   |   |   +-- 1
-|   |   |   |   |   +-- ...
+|   |   |   |   +-- FoF
+|   |   |   |   |   +-- latin_hypercube_HR
+|   |   |   |   |   |   +-- 0
+|   |   |   |   |   |   +-- 1
+|   |   |   |   |   |   +-- ...
 ```
 and my `path_to_qhalos` would be `quijote/source/Halos/latin_hypercube_HR`.
