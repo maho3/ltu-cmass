@@ -28,24 +28,10 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 
 from .tools import (
-    xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
-    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
+    xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate)
 from ..utils import (get_source_path, timing_decorator, load_params)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        # Cosmology
-        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
-
-
-@timing_decorator
-def load_halos_sim(source_dir, seed):
-    pos = np.load(pjoin(source_dir, 'halo_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'halo_vel.npy'))
-    mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
-    return pos, vel, mass
+from ..bias.apply_hod import load_snapshot
+from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
@@ -107,17 +93,17 @@ def main(cfg: DictConfig) -> None:
         cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(cfg, cfg.sim)
 
     # Load halos
-    pos, vel, mass = load_halos_sim(source_path, cfg.bias.hod.seed)
+    pos, vel, mass = load_snapshot(source_path, cfg.nbody.af)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
-        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
+        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.aug_seed)
 
     # Apply cuboid remapping
     pos, vel = remap(
