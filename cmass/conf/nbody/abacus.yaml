@@ -4,8 +4,8 @@ suite: abacus
 # General parameters
 L: 2000           # Mpc/h
 N: 128            # meshgrid resolution
-lhid: 0           # latin hypercube id
-matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
+lhid: 130           # latin hypercube id
+matchIC: 1        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 supersampling: 3  # particles resolution relative to meshgrid
 save_particles: false  # whether to save particle data
 save_transfer: false    # whether to save z=99 ICs (for CHARM bias model)

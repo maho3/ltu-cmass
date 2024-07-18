@@ -11,4 +11,6 @@ hydra:
 meta:
   wdir: "/home/mattho/git/ltu-cmass/data"
   logdir: "${meta.wdir}/logs/"
-  cosmofile: "./params/latin_hypercube_params.txt"
+  cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
+  # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
+  # cosmofile: "./params/abacus_cosmologies.txt"      # for abacus-like
