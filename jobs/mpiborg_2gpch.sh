@@ -6,7 +6,7 @@
 #PBS -l walltime=2:00:00
 #PBS -j oe
 #PBS -m a
-#PBS -t 12-1000
+#PBS -t 1001
 #PBS -o ${HOME}/data/jobout/${PBS_JOBNAME}.${PBS_JOBID}.log
 
 
@@ -24,5 +24,6 @@ TASKS=$(($NODES * $PPN))
 
 # Change directory to adequate workdir
 cd /home/mattho/data/cmass-ili/rundir_cmass
-lhid=$(($PBS_ARRAYID))
-mpirun -genv OMP_NUM_THREADS=$THREADS -genv BORG_TBB_NUM_THREADS=$THREADS -f $PBS_NODEFILE -np $TASKS python -m cmass.nbody.borgpm nbody=test nbody.lhid=$lhid
+# lhid=$(($PBS_ARRAYID))
+lhid=1001
+mpirun -genv OMP_NUM_THREADS=$THREADS -genv BORG_TBB_NUM_THREADS=$THREADS -f $PBS_NODEFILE -np $TASKS python -m cmass.nbody.borgpm nbody=2gpch_0704 nbody.lhid=$lhid
