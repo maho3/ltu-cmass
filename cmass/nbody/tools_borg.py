@@ -106,10 +106,11 @@ def run_transfer(wn, cpar, cfg):
 
     # Bin transfer field to match density field resolution
     rho_transfer = bin_cube(rho_transfer, cfg.nbody.supersampling)
+    rho_transfer = rho_transfer.astype(np.float32)
 
     # Gather and save
     if rank == 0:
-        gathered = np.empty((cfg.nbody.N,)*3, dtype=np.float64)
+        gathered = np.empty((cfg.nbody.N,)*3, dtype=np.float32)
     else:
         gathered = None
     comm.Gather(rho_transfer, gathered, root=0)
