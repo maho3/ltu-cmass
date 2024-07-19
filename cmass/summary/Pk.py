@@ -2,19 +2,19 @@
 A script to compute the 1D power spectrum of the galaxies in a survey
 geometry using nbodykit.
 
-Requires:
-    - nbodykit
-    - astropy
-    - pandas
-
 Input:
-    - rdz: (N, 3) array of galaxy ra, dec, and redshifts
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
 
 Output:
-    - k_gal: wavenumbers
-    - Pk0_gal: power spectrum monopole
-    - Pk2_gal: power spectrum quadrupole
-    - Pk4_gal: power spectrum hexadecapole
+    - summary/hod{hod_seed}_aug{augmentation_seed}.h5
+        - Pk: power spectrum
+            - k: wavenumbers
+            - p0k: power spectrum monopole
+            - p2k: power spectrum quadrupole
+            - p4k: power spectrum hexadecapole
 """
 
 import os
@@ -26,7 +26,7 @@ from omegaconf import DictConfig, OmegaConf
 import astropy
 from pypower import CatalogFFTPower
 
-from .tools import load_galaxies_obs, load_randoms
+from .tools import load_lightcone, save_summary, load_randoms
 from ..survey.tools import sky_to_xyz
 from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 
@@ -81,10 +81,16 @@ def main(cfg: DictConfig) -> None:
     use_filter = hasattr(cfg, 'filter')
     if use_filter:
         logging.info(f'Using filtered obs from {cfg.filter.filter_name}...')
-        grdz, gweights = load_galaxies_obs(
-            source_path, cfg.bias.hod.seed, cfg.filter.filter_name)
+        grdz, gweights = load_lightcone(
+            source_path,
+            hod_seed=cfg.bias.hod.seed,
+            aug_seed=cfg.survey.aug_seed,
+            filter_name=cfg.filter.filter_name)
     else:
-        grdz, gweights = load_galaxies_obs(source_path, cfg.bias.hod.seed)
+        grdz, gweights = load_lightcone(
+            source_path,
+            hod_seed=cfg.bias.hod.seed,
+            aug_seed=cfg.survey.aug_seed)
 
     rrdz = load_randoms(cfg.meta.wdir)
 
@@ -98,16 +104,15 @@ def main(cfg: DictConfig) -> None:
     )
 
     # save results
-    outpath = pjoin(source_path, 'Pk')
+    outpath = pjoin(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
-    if not use_filter:
-        outname = f'Pk{cfg.bias.hod.seed}.npz'
-    else:
-        outname = f'Pk{cfg.bias.hod.seed}_{cfg.filter.filter_name}.npz'
+    outname = f'hod{cfg.bias.hod.seed:03}_aug{cfg.survey.aug_seed:03}'
+    if use_filter:
+        outname += f'_{cfg.filter.filter_name}'
+    outname += '.h5'
     outpath = pjoin(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
-    np.savez(outpath, k_gal=k, p0k_gal=p0k,
-             p2k_gal=p2k, p4k_gal=p4k)
+    save_summary(outpath, 'Pk', k=k, p0k=p0k, p2k=p2k, p4k=p4k)
 
 
 if __name__ == "__main__":

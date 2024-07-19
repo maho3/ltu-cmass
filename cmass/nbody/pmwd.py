@@ -1,32 +1,19 @@
 """
-Simulate density field using pmwd.
+Simulate density field using pmwd Particle Mesh.
 
-Requires:
-    - pmwd
-
-Params:
-    - nbody.suite: suite name
-
-    - nbody.L: box size (in Mpc/h)
-    - nbody.N: number of grid points per dimension in density field
-    - nbody.lhid: index of the cosmological parameters in the
-        latin_hypercube_params_bonus.txt file
-    - nbody.matchIC: whether to match ICs to file (0 no, 1 yes, 2 quijote)
-    - nbody.save_particles: whether to save particle positions and velocities
-
-
-    - nbody.zi: initial redshift
-    - nbody.zf: final redshift
-    - nbody.supersampling: particle resolution factor relative to density field
-
-    - nbody.B: force grid resolution factor relative to density field
-    - nbody.N_steps: number of steps in the nbody simulation
-
+Input:
+    - wn: initial white noise field
 
 Output:
-    - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
+    - nbody.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+
+NOTE:
+    - [dev] If making this lightcone, consider using:
+            from pmwd import nbody_init, nbody_step
 """
 
 
@@ -42,28 +29,11 @@ import logging
 import numpy as np
 from os.path import join as pjoin
 import hydra
-from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import get_source_path, timing_decorator, load_params
+from omegaconf import DictConfig, OmegaConf
+from ..utils import get_source_path, timing_decorator
 from .tools import (
-    get_ICs, save_nbody, rho_and_vfield)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        nbody = cfg.nbody
-        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
-        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
-        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
-        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
-
-        # load cosmology
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
-
-    if cfg.nbody.quijote:
-        logging.info('Matching ICs to Quijote')
-        assert cfg.nbody.L == 1000  # enforce same size of quijote
-
-    return cfg
+    parse_nbody_config, get_ICs, save_nbody, save_transfer,
+    rho_and_vfield)
 
 
 def configure_pmwd(
@@ -115,7 +85,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -139,7 +109,7 @@ def main(cfg: DictConfig) -> None:
             af=1,  # ignored
             N_steps=cfg.nbody.N_steps, cosmo=cfg.nbody.cosmo)
         rho_transfer = run_transfer(wn, pmconf, pmcosmo)
-        np.save(pjoin(outdir, 'rho_transfer.npy'), rho_transfer)
+        save_transfer(outdir, rho_transfer)
         del rho_transfer
 
     # Run density
@@ -155,16 +125,18 @@ def main(cfg: DictConfig) -> None:
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
 
+    if not cfg.nbody.save_particles:
+        pos, vel = None, None
+
     # Convert to overdensity field
     rho /= np.mean(rho)
     rho -= 1
 
-    # Convert from comoving -> peculiar velocities
+    # Convert from comoving -> physical velocities
     fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    save_nbody(outdir, rho, fvel, pos, vel,
-               cfg.nbody.save_particles, cfg.nbody.save_velocities)
+    save_nbody(outdir, rho, fvel, pos, vel)
     with open(pjoin(outdir, 'config.yaml'), 'w') as f:
         OmegaConf.save(cfg, f)
     logging.info("Done!")

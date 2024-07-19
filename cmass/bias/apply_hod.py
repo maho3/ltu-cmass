@@ -1,19 +1,22 @@
 """
 Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
 
-Requires:
-    - halotools
-    - astropy
-
 Input:
-    - pos: halo positions
-    - vel: halo velocities
-    - mass: halo masses
-    - seed: random seed for sampling HOD parameters
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
 
 Output:
-    - pos: galaxy positions
-    - vel: galaxy velocities
+    - galaxies/hod{hod_seed}.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - gal_type: galaxy type (central or satellite)
+        - hostid: host halo ID
+
+NOTE:
+    - TODO: Implement Zheng+ex 10-parameter model
+    - TODO: Allow cosmology-dependent HOD priors
 """
 
 import numpy as np
@@ -21,14 +24,16 @@ import logging
 import os
 from os.path import join as pjoin
 import hydra
+import h5py
 from omegaconf import DictConfig, OmegaConf, open_dict
 from .tools.hod import (
     thetahod_literature, build_halo_catalog, build_HOD_model)
 from ..utils import (
     get_source_path, timing_decorator, load_params, cosmo_to_astropy)
+from ..nbody.tools import parse_nbody_config
 
 
-def parse_config(cfg):
+def parse_hod(cfg):
     with open_dict(cfg):
         # HOD parameters
         cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
@@ -54,23 +59,15 @@ def get_hod_params(seed=0):
 
 
 @ timing_decorator
-def load_halos(source_dir):
-    pos = np.load(pjoin(source_dir, 'halo_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'halo_vel.npy'))
-    mass = np.load(pjoin(source_dir, 'halo_mass.npy'))
-    return pos, vel, mass
-
-
-@ timing_decorator
 def populate_hod(
-    pos, vel, mass,
+    hpos, hvel, hmass,
     cosmo, cfg, seed=0, mdef='vir'
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
     BoxSize = cfg.nbody.L*np.ones(3)
     catalog = build_halo_catalog(
-        pos, vel, 10**mass, cfg.nbody.zf, BoxSize, cosmo,
+        hpos, hvel, 10**hmass, cfg.nbody.zf, BoxSize, cosmo,
         mdef=mdef
     )
 
@@ -88,21 +85,7 @@ def populate_hod(
     return galcat
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
-
-    # Build run config
-    cfg = parse_config(cfg)
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
-    # Load halos
-    logging.info('Loading halos...')
-    source_path = get_source_path(cfg, cfg.sim)
-    pos, vel, mass = load_halos(source_path)
-
+def run_snapshot(pos, vel, mass, cfg):
     # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
@@ -115,19 +98,65 @@ def main(cfg: DictConfig) -> None:
     gpos = np.array([hod['x'], hod['y'], hod['z']]).T
     gvel = np.array([hod['vx'], hod['vy'], hod['vz']]).T
     meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
+    return gpos, gvel, meta
+
+
+def load_snapshot(source_path, a):
+    with h5py.File(pjoin(source_path, 'halos.h5'), 'r') as f:
+        group = f[f'{a:.6f}']
+        hpos = group['pos'][...]
+        hvel = group['vel'][...]
+        hmass = group['mass'][...]
+    return hpos, hvel, hmass
+
+
+def delete_outputs(outpath):
+    if os.path.isfile(outpath):
+        os.remove(outpath)
+
+
+def save_snapshot(outpath, a, gpos, gvel, **meta):
+    with h5py.File(outpath, 'a') as f:
+        group = f.create_group(f'{a:.6f}')
+        group.create_dataset('pos', data=gpos)
+        group.create_dataset('vel', data=gvel)
+        for key, value in meta.items():
+            group.create_dataset(key, data=value)
+
+
+@ timing_decorator
+@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+
+    # Build run config
+    cfg = parse_nbody_config(cfg)
+    cfg = parse_hod(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup save directory
-    savepath = pjoin(source_path, 'hod')
-    os.makedirs(savepath, exist_ok=True)
+    source_path = get_source_path(cfg, cfg.sim)
+    save_path = pjoin(source_path, 'galaxies')
+    os.makedirs(save_path, exist_ok=True)
+    save_file = pjoin(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    logging.info(f'Saving to {save_file}...')
 
-    # Save
-    logging.info(f'Saving to {savepath}/hod{cfg.bias.hod.seed}...')
-    # galaxy positions [Mpc/h]
-    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_pos.npy'), gpos)
-    # galaxy velocities [km/s]
-    np.save(pjoin(savepath, f'hod{cfg.bias.hod.seed}_vel.npy'), gvel)
-    # galaxy metadata
-    np.savez(pjoin(savepath, f'hod{cfg.bias.hod.seed}_meta.npz'), **meta)
+    # Delete existing outputs
+    delete_outputs(save_file)
+
+    # Run each snapshot
+    for i, a in enumerate(cfg.nbody.asave):
+        logging.info(f'Running snapshot {i} at a={a:.6f}...')
+
+        # Load snapshot
+        hpos, hvel, hmass = load_snapshot(source_path, a)
+
+        # Populate HOD
+        gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
+
+        # Save snapshot
+        save_snapshot(save_file, a, gpos, gvel, **meta)
 
     logging.info('Done!')
 

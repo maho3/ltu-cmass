@@ -1,6 +1,6 @@
 
-# Random rotation seed
-rot_seed: 0
+# Data augmentation seed (for random rotations)
+aug_seed: 0
 
 # cuboid remap
 u1: [1,1,0]
@@ -17,3 +17,7 @@ fibermode: 1  # 0: no collisions, 1: one removed, 2: both removed
 
 # Middle ra, dec, z of CMASS sample (See test_remove_cuboid for details)
 mid_rdz: [184.83975076425324, 34.03863916513374, 0.4194598771198273]
+
+
+# For lightcone extrapolation
+boss_dir: "${meta.wdir}/obs/"  # path to observational masks

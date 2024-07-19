@@ -3,23 +3,23 @@ Sample halos from the density field using a bias model. Assumes
 a continuous Poissonian distribution of halos by interpolating
 between the grid points of the density field
 
-Requires:
-    - scipy
-    - sklearn
-    - jax
-    - pmwd
 
 Input:
-    - rho: density field
-    - ppos: particle positions
-    - pvel: particle velocities
-    - popt: bias parameters
-    - medges: mass bin edges
+    - nbody.h5
+        - rho: density contrast field
+        - fvel: velocity field
+        - pos: particle positions [optional]
+        - vel: particle velocities [optional]
+    - Pre-trained TruncatedPowerLaw or CHARM (included)
 
 Output:
-    - hpos: halo positions
-    - hvel: halo velocities
-    - hmass: halo masses
+    - halos.h5
+        - pos: halo positions
+        - vel: halo velocities
+        - mass: halo masses
+
+NOTE:
+    - Works with LIMD bias models or CHARM
 """
 
 import os  # noqa
@@ -28,8 +28,9 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'  # noqa, must go before jax
 import numpy as np
 import logging
 import hydra
+import h5py
 from copy import deepcopy
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf
 from os.path import join as pjoin
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
@@ -40,35 +41,15 @@ from .tools.halo_sampling import (
     sample_velocities_kNN,
     sample_velocities_CIC)
 from ..utils import (
-    get_source_path, timing_decorator, load_params)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
-
-
-@timing_decorator
-def load_nbody(source_dir):
-    # density contrast
-    rho = np.load(pjoin(source_dir, 'rho.npy'))
-    fvel, ppos, pvel = None, None, None
-    if os.path.exists(pjoin(source_dir, 'fvel.npy')):
-        # velocity field [km/s]
-        fvel = np.load(pjoin(source_dir, 'fvel.npy'))
-    if os.path.exists(pjoin(source_dir, 'ppos.npy')):
-        # particle positions [Mpc/h]
-        ppos = np.load(pjoin(source_dir, 'ppos.npy'))
-        # particle velocities [km/s]
-        pvel = np.load(pjoin(source_dir, 'pvel.npy'))
-    return rho, fvel, ppos, pvel
+    get_source_path, timing_decorator)
+from ..nbody.tools import parse_nbody_config
 
 
 def load_bias_params(bias_path):
     # load the bias parameters for Truncated Power Law
-    popt = np.load(pjoin(bias_path, 'halo_bias.npy'))
-    medges = np.load(pjoin(bias_path, 'halo_medges.npy'))
+    with h5py.File(pjoin(bias_path, 'bias.h5'), 'r') as f:
+        popt = f['popt'][...]
+        medges = f['medges'][...]
     return popt, medges
 
 
@@ -163,8 +144,9 @@ def sample_masses(Nsamp, medg, order=1):
 
 
 def load_transfer(source_path):
-    filepath = pjoin(source_path, 'rho_transfer.npy')
-    return np.load(filepath)
+    filepath = pjoin(source_path, 'transfer.h5')
+    with h5py.File(filepath, 'r') as f:
+        return f['rho'][...]
 
 
 def batch_cube(x, Nsub, width, stride):
@@ -232,73 +214,70 @@ def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
                 hposs[l] += np.array([i, j, k])*Lcharm
                 l += 1
 
-    return np.concatenate(hposs), np.concatenate(hmasss)
+    # Combine the outputs
+    hposs, hmasss = np.concatenate(hposs), np.concatenate(hmasss)
+
+    # halos are initially put on a grid, perturb their positions
+    voxL = L/N
+    hposs += np.random.uniform(
+        low=-voxL/2,
+        high=voxL/2,
+        size=hposs.shape
+    )  # TODO: Should this use `sample_3d`?
+
+    # ensure periodicity
+    hposs = hposs % L
+
+    # Limit to M>1e13
+    mask = hmasss > 13
+    hposs, hmasss = hposs[mask], hmasss[mask]
+
+    # conform to mass-bin format of other bias models TODO: refactor?
+    hposs, hmasss = [hposs], [hmasss]
+
+    return hposs, hmasss
+
+
+def apply_limd(rho, cfg):
+    # Load bias parameters
+    bcfg = deepcopy(cfg)
+    bcfg.nbody.suite = bcfg.bias.halo.base_suite
+    bcfg.nbody.L = bcfg.bias.halo.L
+    bcfg.nbody.N = bcfg.bias.halo.N
+    bias_path = get_source_path(bcfg, cfg.sim)
+
+    logging.info('Loading bias parameters...')
+    popt, medges = load_bias_params(bias_path)
+
+    # Sample halo counts
+    logging.info('Sampling power law...')
+    hcount = sample_counts(rho, popt)
+
+    # Sample halo positions
+    logging.info('Sampling halo positions as a Poisson field...')
+    hpos = sample_positions(hcount, cfg)
+
+    # Sample halo masses
+    logging.info('Sampling masses...')
+    hmass = sample_masses([len(x) for x in hpos], medges)
+
+    return hpos, hmass
 
 
 @timing_decorator
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
-
-    # Build run config
-    cfg = parse_config(cfg)
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    source_path = get_source_path(cfg, cfg.sim)
-
-    # Load configs
-    logging.info('Loading sims...')
-    rho, fvel, ppos, pvel = load_nbody(source_path)
-
+def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
-        # load initial conditions at z=50, correct to z=99
-        rho_IC = load_transfer(source_path)
 
         # apply CHARM model
         hpos, hmass = apply_charm(
-            rho, rho_IC,
+            rho, rho_transfer,
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
-
-        # halos are initially put on a grid, perturb their positions
-        voxL = cfg.nbody.L/cfg.nbody.N
-        hpos += np.random.uniform(
-            low=-voxL/2,
-            high=voxL/2,
-            size=hpos.shape
-        )  # TODO: Should this use `sample_3d`?
-
-        # ensure periodicity
-        hpos = hpos % cfg.nbody.L
-
-        # Limit to M>1e13
-        mask = hmass > 13
-        hpos, hmass = hpos[mask], hmass[mask]
-
-        # conform to mass-bin format of other bias models TODO: refactor?
-        hpos, hmass = [hpos], [hmass]
-
     elif cfg.bias.halo.model == "LIMD":
-        # Load bias parameters
-        bcfg = deepcopy(cfg)
-        bcfg.nbody.suite = bcfg.bias.halo.base_suite
-        bcfg.nbody.L = bcfg.bias.halo.L
-        bcfg.nbody.N = bcfg.bias.halo.N
-        bias_path = get_source_path(bcfg, cfg.sim)
-
-        logging.info('Loading bias parameters...')
-        popt, medges = load_bias_params(bias_path)
-
-        logging.info('Sampling power law...')
-        hcount = sample_counts(rho, popt)
-
-        logging.info('Sampling halo positions as a Poisson field...')
-        hpos = sample_positions(hcount, cfg)
-
-        logging.info('Sampling masses...')
-        hmass = sample_masses([len(x) for x in hpos], medges)
+        logging.info('Using LIMD model...')
+        hpos, hmass = apply_limd(rho, cfg)
     else:
         raise NotImplementedError(
             f'Model {cfg.bias.halo.model} not implemented.')
@@ -313,10 +292,77 @@ def main(cfg: DictConfig) -> None:
         return np.concatenate(x, axis=0)
     hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
 
-    logging.info('Saving cube...')
-    np.save(pjoin(source_path, 'halo_pos.npy'), hpos)  # halo positions [Mpc/h]
-    np.save(pjoin(source_path, 'halo_vel.npy'), hvel)  # halo velocities [km/s]
-    np.save(pjoin(source_path, 'halo_mass.npy'), hmass)  # halo masses [Msun/h]
+    return hpos, hvel, hmass
+
+
+def load_snapshot(source_path, a):
+    with h5py.File(pjoin(source_path, 'nbody.h5'), 'r') as f:
+        group = f[f'{a:.6f}']
+        rho = group['rho'][...]
+        fvel = group['fvel'][...]
+        if 'ppos' in group:
+            ppos = group['ppos'][...]
+            pvel = group['pvel'][...]
+        else:
+            ppos, pvel = None, None
+    return rho, fvel, ppos, pvel
+
+
+def delete_outputs(outdir):
+    outpath = pjoin(outdir, 'halos.h5')
+    if os.path.isfile(outpath):
+        os.remove(outpath)
+
+
+def save_snapshot(outdir, a, hpos, hvel, hmass):
+    with h5py.File(pjoin(outdir, 'halos.h5'), 'a') as f:
+        group = f.create_group(f'{a:.6f}')
+        group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
+        group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
+        group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
+
+
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+
+    # Build run config
+    cfg = parse_nbody_config(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+    source_path = get_source_path(cfg, cfg.sim)
+
+    # Delete existing outputs
+    delete_outputs(source_path)
+
+    # Load transfer fn density (for CHARM)
+    rho_transfer = None
+    if cfg.bias.halo.model == 'CHARM':
+        rho_transfer = load_transfer(source_path)
+
+    if cfg.nbody.snapshot_mode:
+        for i, a in enumerate(cfg.nbody.asave):
+            logging.info(f'Running snapshot {i} at a={a:.6f}...')
+            rho, fvel, ppos, pvel = load_snapshot(source_path, a)
+
+            # Apply bias model
+            hpos, hvel, hmass = run_snapshot(
+                rho, fvel, cfg, rho_transfer, ppos, pvel)
+
+            logging.info(f'Saving halo catalog to {source_path}')
+            save_snapshot(source_path, a, hpos, hvel, hmass)
+    else:
+        # Load single snapshot
+        logging.info('Loading single snapshot...')
+        rho, fvel, ppos, pvel = load_snapshot(source_path, cfg.nbody.af)
+
+        # Apply bias model
+        hpos, hvel, hmass = run_snapshot(
+            rho, fvel, cfg, rho_transfer, ppos, pvel)
+
+        logging.info(f'Saving halo catalog to {source_path}')
+        save_snapshot(source_path, cfg.nbody.af, hpos, hvel, hmass)
 
     logging.info('Done!')
 

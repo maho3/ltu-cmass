@@ -1,13 +1,25 @@
 """
-Applies BOSS survey mask to a lightcone-shaped volume of galaxies.
-
-Requires:
-    - pymangle
-    - astropy
+Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
+and applies CMASS NGC survey mask and selection effects.
 
 Input:
-    - pos: (N, 3) array of galaxy positions
-    - vel: (N, 3) array of galaxy velocities
+    - galaxies/hod{hod_seed}.h5
+        - pos: halo positions
+        - vel: halo velocities
+
+Output:
+    - lightcone/hod{hod_seed}_aug{augmentation_seed}.h5
+        - ra: right ascension
+        - dec: declination
+        - z: redshift
+        - galsnap: snapshot index
+        - galidx: galaxy index
+
+NOTE:
+    - This only works for non-snapshot mode, wherein lightcone evolution is
+    ignored. For the snapshot mode alternative, use 'ngc_lightcone.py'.
+    - The fiber collisions are applied before resampling, and not in-sync with
+    it. This often leads to a slightly lower n(z) in some z-bins than desired.
 """
 
 import os
@@ -15,31 +27,19 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 
 import numpy as np
 import logging
+import h5py
 from os.path import join as pjoin
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
 import hydra
-from omegaconf import DictConfig, OmegaConf, open_dict
-
+from omegaconf import DictConfig, OmegaConf
 
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
-    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber)
-from ..utils import (get_source_path, timing_decorator, load_params)
-
-
-def parse_config(cfg):
-    with open_dict(cfg):
-        # Cosmology
-        cfg.nbody.cosmo = load_params(cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
-
-
-@timing_decorator
-def load_galaxies_sim(source_dir, seed):
-    pos = np.load(pjoin(source_dir, 'hod', f'hod{seed}_pos.npy'))
-    vel = np.load(pjoin(source_dir, 'hod', f'hod{seed}_vel.npy'))
-    return pos, vel
+    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
+    save_lightcone, load_galaxies)
+from ..utils import (get_source_path, timing_decorator)
+from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
@@ -78,17 +78,19 @@ def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
 @timing_decorator
 def apply_mask(rdz, wdir, fibermode=0):
     logging.info('Applying redshift cut...')
-    len_rdz = len(rdz)
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
+    logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
 
     logging.info('Applying angular mask...')
     inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[inpoly]
+    logging.info(f'Removed {len(inpoly)-len(rdz)}/{len(inpoly)} galaxies')
 
     logging.info('Applying veto mask...')
     inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
     rdz = rdz[~inveto]
+    logging.info(f'Removed {len(inveto)-len(rdz)}/{len(inveto)} galaxies')
 
     if fibermode != 0:
         logging.info('Applying fiber collisions...')
@@ -97,8 +99,8 @@ def apply_mask(rdz, wdir, fibermode=0):
             sep=0.01722,  # ang. sep. for CMASS in deg
             mode=fibermode)
         rdz = rdz[mask]
+        logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
 
-    logging.info(f'Fraction of galaxies kept: {len(rdz) / len_rdz:.3f}')
     return rdz
 
 
@@ -161,17 +163,23 @@ def main(cfg: DictConfig) -> None:
         cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
 
     # Build run config
-    cfg = parse_config(cfg)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     source_path = get_source_path(cfg, cfg.sim)
+    hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
+    aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
+
+    # Check that we are not in snapshot_mode
+    if hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode:
+        raise ValueError('snapshot_mode config is true, but ngc_selection'
+                         ' is only for non snapshot mode.')
 
     # Load galaxies
-    pos, vel = load_galaxies_sim(source_path, cfg.bias.hod.seed)
+    pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
 
     # [Optionally] rotate and shuffle cubic volume
     pos, vel = random_rotate_translate(
-        pos, L=cfg.nbody.L, vel=vel, seed=cfg.survey.rot_seed)
+        pos, L=cfg.nbody.L, vel=vel, seed=aug_seed)
 
     # Apply cuboid remapping
     pos, vel = remap(
@@ -195,10 +203,15 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    os.makedirs(pjoin(source_path, 'obs'), exist_ok=True)
-
-    # ra, dec, redshift
-    np.save(pjoin(source_path, 'obs', f'rdz{cfg.bias.hod.seed}.npy'), rdz)
+    outdir = pjoin(source_path, 'lightcone')
+    os.makedirs(outdir, exist_ok=True)
+    save_lightcone(
+        outdir,
+        ra=rdz[:, 0], dec=rdz[:, 1], z=rdz[:, 2],
+        galsnap=np.zeros(len(rdz), dtype=int),
+        galidx=np.arange(len(rdz)),
+        hod_seed=hod_seed,
+        aug_seed=aug_seed)
 
 
 if __name__ == "__main__":

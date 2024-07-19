@@ -2,9 +2,11 @@ import os
 from os.path import join as pjoin
 import logging
 import numpy as np
-from ..utils import timing_decorator, get_particle_mass
+import h5py
+from ..utils import load_params, timing_decorator, get_particle_mass
 import warnings
 import MAS_library as MASL
+from omegaconf import open_dict
 
 # Optional imports
 try:
@@ -21,6 +23,28 @@ try:
     import symbolic_pofk.linear
 except ImportError:
     symbolic_pofk = None
+
+
+def parse_nbody_config(cfg):
+    with open_dict(cfg):
+        nbody = cfg.nbody
+        nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
+        nbody.af = 1 / (1 + nbody.zf)  # final scale factor
+        nbody.quijote = nbody.matchIC == 2  # whether to match ICs to Quijote
+        nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
+
+        # default asave
+        if not (hasattr(nbody, 'snapshot_mode') and nbody.snapshot_mode):
+            nbody.asave = [nbody.af]
+
+        # load cosmology
+        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
+
+    if cfg.nbody.quijote:
+        logging.info('Matching ICs to Quijote')
+        assert cfg.nbody.L == 1000  # enforce same size of quijote
+
+    return cfg
 
 
 @timing_decorator
@@ -60,16 +84,31 @@ def get_ICs(cfg):
 
 
 @timing_decorator
-def save_nbody(savedir, rho, fvel, pos, vel,
-               save_particles=True, save_velocities=True):
+def save_transfer(savedir, rho):
     os.makedirs(savedir, exist_ok=True)
-    np.save(pjoin(savedir, 'rho.npy'), rho)  # density contrast
-    if save_velocities:
-        np.save(pjoin(savedir, 'fvel.npy'), fvel)  # velocity field [km/s]
-    if save_particles:
-        np.save(pjoin(savedir, 'ppos.npy'), pos)  # particle positions [Mpc/h]
-        np.save(pjoin(savedir, 'pvel.npy'), vel)  # particle velocities [km/s]
-    logging.info(f'Saved to {savedir}.')
+    savefile = pjoin(savedir, 'transfer.h5')
+
+    logging.info(f'Saving to {savefile}...')
+    with h5py.File(savefile, 'w') as f:
+        f.create_dataset('rho', data=rho)
+
+
+@ timing_decorator
+def save_nbody(savedir, a, rho, fvel, ppos, pvel):
+    os.makedirs(savedir, exist_ok=True)
+    savefile = pjoin(savedir, 'nbody.h5')
+
+    logging.info(f'Saving to {savefile}...')
+    with h5py.File(savefile, 'w') as f:
+        key = f'{a:.6f}'
+        group = f.create_group(key)
+        group.create_dataset('rho', data=rho)  # density contrast
+        group.create_dataset('fvel', data=fvel)  # velocity field [km/s]
+        if (ppos is not None) and (pvel is not None):
+            # particle comoving positions [Mpc/h]
+            group.create_dataset('ppos', data=ppos)
+            # particle physical velocities [km/s]
+            group.create_dataset('pvel', data=pvel)
 
 
 def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):
