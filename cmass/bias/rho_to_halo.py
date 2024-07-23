@@ -250,7 +250,7 @@ def apply_limd(rho, cfg):
     )
 
     logging.info('Loading bias parameters...')
-    popt, medges = load_bias_params(bias_path)
+    popt, medges = load_bias_params(bias_path, cfg.nbody.af)
 
     # Sample halo counts
     logging.info('Sampling power law...')
