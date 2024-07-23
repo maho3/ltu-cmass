@@ -44,11 +44,12 @@ from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
-def load_bias_params(bias_path):
+def load_bias_params(bias_path, a):
     # load the bias parameters for Truncated Power Law
     with h5py.File(join(bias_path, 'bias.h5'), 'r') as f:
-        popt = f['popt'][...]
-        medges = f['medges'][...]
+        key = f'{a:.6f}'
+        popt = f[key]['popt'][...]
+        medges = f[key]['medges'][...]
     return popt, medges
 
 
@@ -249,7 +250,7 @@ def apply_limd(rho, cfg):
     )
 
     logging.info('Loading bias parameters...')
-    popt, medges = load_bias_params(bias_path)
+    popt, medges = load_bias_params(bias_path, cfg.nbody.af)
 
     # Sample halo counts
     logging.info('Sampling power law...')

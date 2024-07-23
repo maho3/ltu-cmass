@@ -106,6 +106,13 @@ def fit_bias_params(rho, hcounts, verbose=True, attempts=5):
     return np.stack(params, axis=0)
 
 
+def save_bias(source_path, a, medges, popt):
+    with h5py.File(join(source_path, 'bias.h5'), 'w') as f:
+        group = f.create_group(f'{a:.6f}')
+        group.create_dataset('popt', data=popt)
+        group.create_dataset('medges', data=medges)
+
+
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
@@ -126,10 +133,8 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
-    with h5py.File(join(source_path, 'bias.h5'), 'w') as f:
-        f.create_dataset('popt', data=popt)
-        f.create_dataset('medges', data=medges)
-    save_cfg(outdir, cfg, field='fit')
+    save_bias(source_path, cfg.nbody.af, medges, popt)
+    save_cfg(source_path, cfg, field='fit')
     logging.info('Done!')
 
 

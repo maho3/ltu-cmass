@@ -79,7 +79,7 @@ def main(cfg: DictConfig) -> None:
         aug_seed=cfg.survey.aug_seed,
         suffix=suffix
     )
-    save_cfg(outdir, cfg, field='filter')
+    save_cfg(source_path, cfg, field='filter')
     logging.info('Done!')
 
 
