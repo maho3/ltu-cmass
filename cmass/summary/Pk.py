@@ -20,7 +20,7 @@ Output:
 import os
 import numpy as np
 import logging
-from os.path import join as pjoin
+from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import astropy
@@ -107,13 +107,13 @@ def main(cfg: DictConfig) -> None:
     )
 
     # save results
-    outpath = pjoin(source_path, 'summary')
+    outpath = join(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
     outname = f'hod{cfg.bias.hod.seed:03}_aug{cfg.survey.aug_seed:03}'
     if use_filter:
         outname += f'_{cfg.filter.filter_name}'
     outname += '.h5'
-    outpath = pjoin(outpath, outname)
+    outpath = join(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
     save_summary(outpath, 'Pk', k=k, p0k=p0k, p2k=p2k, p4k=p4k)
 

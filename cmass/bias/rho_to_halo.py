@@ -31,7 +31,7 @@ import hydra
 import h5py
 from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf
-from os.path import join as pjoin
+from os.path import join
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 from .tools.halo_models import TruncatedPowerLaw
@@ -46,7 +46,7 @@ from ..nbody.tools import parse_nbody_config
 
 def load_bias_params(bias_path):
     # load the bias parameters for Truncated Power Law
-    with h5py.File(pjoin(bias_path, 'bias.h5'), 'r') as f:
+    with h5py.File(join(bias_path, 'bias.h5'), 'r') as f:
         popt = f['popt'][...]
         medges = f['medges'][...]
     return popt, medges
@@ -143,7 +143,7 @@ def sample_masses(Nsamp, medg, order=1):
 
 
 def load_transfer(source_path):
-    filepath = pjoin(source_path, 'transfer.h5')
+    filepath = join(source_path, 'transfer.h5')
     with h5py.File(filepath, 'r') as f:
         return f['rho'][...]
 
@@ -298,7 +298,7 @@ def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'nbody.h5'), 'r') as f:
+    with h5py.File(join(source_path, 'nbody.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         rho = group['rho'][...]
         fvel = group['fvel'][...]
@@ -311,13 +311,13 @@ def load_snapshot(source_path, a):
 
 
 def delete_outputs(outdir):
-    outpath = pjoin(outdir, 'halos.h5')
+    outpath = join(outdir, 'halos.h5')
     if os.path.isfile(outpath):
         os.remove(outpath)
 
 
 def save_snapshot(outdir, a, hpos, hvel, hmass):
-    with h5py.File(pjoin(outdir, 'halos.h5'), 'a') as f:
+    with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
         group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]

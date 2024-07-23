@@ -22,7 +22,7 @@ NOTE:
 import numpy as np
 import logging
 import os
-from os.path import join as pjoin
+from os.path import join
 import hydra
 import h5py
 from omegaconf import DictConfig, OmegaConf, open_dict
@@ -102,7 +102,7 @@ def run_snapshot(pos, vel, mass, cfg):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'halos.h5'), 'r') as f:
+    with h5py.File(join(source_path, 'halos.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         hpos = group['pos'][...]
         hvel = group['vel'][...]
@@ -140,9 +140,9 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
-    save_path = pjoin(source_path, 'galaxies')
+    save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = pjoin(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    save_file = join(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs

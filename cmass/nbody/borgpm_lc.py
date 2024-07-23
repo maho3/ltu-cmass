@@ -25,7 +25,7 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 import logging
 import numpy as np
-from os.path import join as pjoin
+from os.path import join
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, get_ICs, save_transfer)
@@ -91,7 +91,7 @@ def run_density(wn, cpar, cfg, outdir=None):
 
 
 def delete_outputs(outdir):
-    outpath = pjoin(outdir, 'nbody.h5')
+    outpath = join(outdir, 'nbody.h5')
     if os.path.isfile(outpath):
         os.remove(outpath)
 

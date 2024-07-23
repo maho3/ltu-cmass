@@ -2,7 +2,7 @@
 import logging
 import datetime
 import os
-from os.path import join as pjoin
+from os.path import join
 from astropy.cosmology import Cosmology, FlatLambdaCDM
 from colossus.cosmology import cosmology as csm
 from omegaconf import OmegaConf
@@ -10,9 +10,9 @@ from omegaconf import OmegaConf
 
 def get_source_path(wdir, suite, sim, L, N, lhid, check=True):
     # get the path to the source directory, and check at each level
-    sim_dir = pjoin(wdir, suite, sim)
-    cfg_dir = pjoin(sim_dir, f'L{L}-N{N}')
-    lh_dir = pjoin(cfg_dir, str(lhid))
+    sim_dir = join(wdir, suite, sim)
+    cfg_dir = join(sim_dir, f'L{L}-N{N}')
+    lh_dir = join(cfg_dir, str(lhid))
 
     if check:
         if not os.path.isdir(sim_dir):
@@ -41,12 +41,12 @@ def timing_decorator(func, *args, **kwargs):
 
 
 def save_cfg(source_path, cfg, field=None):
-    if os.path.isfile(pjoin(source_path, 'config.yaml')):
-        old_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
+    if os.path.isfile(join(source_path, 'config.yaml')):
+        old_cfg = OmegaConf.load(join(source_path, 'config.yaml'))
         if field is not None:
             cfg = OmegaConf.masked_copy(cfg, field)
             cfg = OmegaConf.merge(old_cfg, cfg)
-    OmegaConf.save(cfg, pjoin(source_path, 'config.yaml'))
+    OmegaConf.save(cfg, join(source_path, 'config.yaml'))
 
 
 def load_params(index, cosmofile):

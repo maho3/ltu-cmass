@@ -20,7 +20,7 @@ os.environ['JAX_ENABLE_X64'] = '1'  # noqa
 
 import numpy as np
 import logging
-from os.path import join as pjoin
+from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
@@ -36,7 +36,7 @@ from ..nbody.tools import parse_nbody_config
 @timing_decorator
 def load_halo_histogram(cfg):
     # setup metadata
-    snapdir = pjoin(
+    snapdir = join(
         cfg.meta.wdir,
         cfg.fit.path_to_qhalos,
         f'{cfg.nbody.lhid}')
@@ -65,7 +65,7 @@ def load_halo_histogram(cfg):
 def load_rho(cfg):
     N, z = cfg.nbody.N, cfg.nbody.zf
     if cfg.fit.use_rho_quijote:
-        rho_path = pjoin(
+        rho_path = join(
             cfg.meta.wdir,
             cfg.fit.path_to_qrhos,
             f'{cfg.nbody.lhid}',
@@ -76,7 +76,7 @@ def load_rho(cfg):
             cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
             cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
         )
-        source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
+        source_cfg = OmegaConf.load(join(source_path, 'config.yaml'))
 
         # check that the source rho is the same as the one we want
         if source_cfg.nbody.zf != z:
@@ -126,7 +126,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
-    with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
+    with h5py.File(join(source_path, 'bias.h5'), 'w') as f:
         f.create_dataset('popt', data=popt)
         f.create_dataset('medges', data=medges)
     save_cfg(outdir, cfg, field='fit')

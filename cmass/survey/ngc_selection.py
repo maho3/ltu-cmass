@@ -28,7 +28,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 import numpy as np
 import logging
 import h5py
-from os.path import join as pjoin
+from os.path import join
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
 import hydra
@@ -126,7 +126,7 @@ def custom_cuts(rdz, cfg):
 def reweight(rdz, wdir='./data'):
     # load observed n(z)
     n_z = np.load(
-        pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+        join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
@@ -206,7 +206,7 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    outdir = pjoin(source_path, 'lightcone')
+    outdir = join(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,

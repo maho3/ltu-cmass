@@ -21,7 +21,7 @@ os.environ["PYBORG_QUIET"] = "yes"  # noqa
 # os.environ["BORG_TBB_NUM_THREADS"] = "4"  # noqa
 # os.environ["OMP_NUM_THREADS"] = "4"  # noqa
 
-from os.path import join as pjoin
+from os.path import join
 import numpy as np
 import logging
 import hydra

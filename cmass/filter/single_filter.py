@@ -17,7 +17,7 @@ Output:
 
 import os
 import logging
-from os.path import join as pjoin
+from os.path import join
 import hydra
 import importlib
 from omegaconf import DictConfig, OmegaConf, open_dict
@@ -68,7 +68,7 @@ def main(cfg: DictConfig) -> None:
     rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-    outdir = pjoin(source_path, 'filter')
+    outdir = join(source_path, 'filter')
     os.makedirs(outdir, exist_ok=True)
     suffix = f'_{cfg.filter.filter_name}'
     save_lightcone(

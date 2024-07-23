@@ -29,7 +29,7 @@ import os
 import numpy as np
 import logging
 import h5py
-from os.path import join as pjoin
+from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
@@ -44,7 +44,7 @@ except ImportError:
 
 
 def load_halo_velocities(source_dir, a):
-    filepath = pjoin(source_dir, 'halos.h5')
+    filepath = join(source_dir, 'halos.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
         vel = f[key]['vel'][...]
@@ -126,7 +126,7 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    outdir = pjoin(source_path, 'lightcone')
+    outdir = join(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
