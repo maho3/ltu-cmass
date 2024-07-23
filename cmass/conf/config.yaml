@@ -6,6 +6,7 @@ defaults:
   - bias: cic_hod
   - survey: cmass_ngc
   # - filter: random  # not default
+  - diag: default
   - _self_
 
 sim: pmwd

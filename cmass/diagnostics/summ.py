@@ -8,7 +8,7 @@ import numpy as np
 import logging
 from os.path import join
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import h5py
 
 from ..utils import get_source_path, timing_decorator
@@ -16,9 +16,9 @@ from ..nbody.tools import parse_nbody_config
 from .tools import MA, MAz, calcPk
 
 
-def rho_summ(source_path, L, threads=16):
+def rho_summ(source_path, L, threads=16, from_scratch=True):
     outpath = join(source_path, 'diag', 'rho.h5')
-    if os.path.isfile(outpath):
+    if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Rho diagnostics already computed')
         return True
 
@@ -37,9 +37,9 @@ def rho_summ(source_path, L, threads=16):
     return True
 
 
-def halo_summ(source_path, L, N, h, z, threads=16):
-    outpath = join(source_path, 'diag', 'halo.h5')
-    if os.path.isfile(outpath):
+def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
+    outpath = join(source_path, 'diag', 'halos.h5')
+    if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Halo diagnostics already computed')
         return True
 
@@ -77,9 +77,9 @@ def halo_summ(source_path, L, N, h, z, threads=16):
     return True
 
 
-def gal_summ(source_path, hod_seed, L, N, h, z, threads=16):
-    outpath = join(source_path, 'diag', 'gal.h5')
-    if os.path.isfile(outpath):
+def gal_summ(source_path, hod_seed, L, N, h, z, threads=16, from_scratch=True):
+    outpath = join(source_path, 'diag', 'galaxies.h5')
+    if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
 
@@ -113,30 +113,33 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-
-    # logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'diag'])
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
     source_path = get_source_path(cfg, cfg.sim)
 
-    threads = 16
+    threads = cfg.diag.threads
+    from_scratch = cfg.diag.from_scratch
 
     # measure rho diagnostics
-    done = rho_summ(source_path, cfg.nbody.L, threads=threads)
+    done = rho_summ(source_path, cfg.nbody.L, threads=threads,
+                    from_scratch=from_scratch)
     if not done:
         return
 
     # measure halo diagnostics
     done = halo_summ(
         source_path, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
-        cfg.nbody.zf, threads=threads)
+        cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
     if not done:
         return
 
     # measure gal diagnostics
     done = gal_summ(
-        source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
-        cfg.nbody.zf, threads=threads)
+        source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N,
+        cfg.nbody.cosmo[2], cfg.nbody.zf,
+        threads=threads, from_scratch=from_scratch)
     if not done:
         return
 
