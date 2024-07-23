@@ -15,7 +15,7 @@ TODO: Clean up and simplify
 import pathlib
 # from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 # from scipy.integrate import quad
-# from os.path import join as pjoin
+# from os.path import join
 from omegaconf import DictConfig, OmegaConf, open_dict
 from copy import deepcopy
 import hydra
@@ -513,7 +513,7 @@ class get_model_interface:
 #     # outdir = get_source_path(cfg, "pmwd", check=False)
 #     # save_nbody(outdir, rho, fvel, pos, vel,
 #     #            cfg.nbody.save_particles, cfg.nbody.save_velocities)
-#     # with open(pjoin(outdir, 'config.yaml'), 'w') as f:
+#     # with open(join(outdir, 'config.yaml'), 'w') as f:
 #     #     OmegaConf.save(cfg, f)
 #     logging.info("Done!")
 

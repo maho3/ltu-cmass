@@ -25,8 +25,8 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 import logging
 import numpy as np
-from os.path import join as pjoin
-from ..utils import get_source_path, timing_decorator
+from os.path import join
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, get_ICs, save_transfer)
 from .tools_borg import (
@@ -91,7 +91,7 @@ def run_density(wn, cpar, cfg, outdir=None):
 
 
 def delete_outputs(outdir):
-    outpath = pjoin(outdir, 'nbody.h5')
+    outpath = join(outdir, 'nbody.h5')
     if os.path.isfile(outpath):
         os.remove(outpath)
 
@@ -116,7 +116,10 @@ def main(cfg: DictConfig) -> None:
                          "is only for snapshot mode.")
 
     # Output directory
-    outdir = get_source_path(cfg, "borgpm", check=False)
+    outdir = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, "borgpm",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
     os.makedirs(outdir, exist_ok=True)
 
     # Setup cosmology
@@ -138,8 +141,7 @@ def main(cfg: DictConfig) -> None:
     run_density(wn, cpar, cfg, outdir=outdir)
 
     # Save config
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
+    save_cfg(outdir, cfg)
     logging.info("Done!")
 
 

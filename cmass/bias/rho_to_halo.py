@@ -31,7 +31,7 @@ import hydra
 import h5py
 from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf
-from os.path import join as pjoin
+from os.path import join
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS
 from .tools.halo_models import TruncatedPowerLaw
@@ -40,14 +40,13 @@ from .tools.halo_sampling import (
     sample_velocities_density,
     sample_velocities_kNN,
     sample_velocities_CIC)
-from ..utils import (
-    get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
 def load_bias_params(bias_path, a):
     # load the bias parameters for Truncated Power Law
-    with h5py.File(pjoin(bias_path, 'bias.h5'), 'r') as f:
+    with h5py.File(join(bias_path, 'bias.h5'), 'r') as f:
         key = f'{a:.6f}'
         popt = f[key]['popt'][...]
         medges = f[key]['medges'][...]
@@ -145,7 +144,7 @@ def sample_masses(Nsamp, medg, order=1):
 
 
 def load_transfer(source_path):
-    filepath = pjoin(source_path, 'transfer.h5')
+    filepath = join(source_path, 'transfer.h5')
     with h5py.File(filepath, 'r') as f:
         return f['rho'][...]
 
@@ -245,7 +244,10 @@ def apply_limd(rho, cfg):
     bcfg.nbody.suite = bcfg.bias.halo.base_suite
     bcfg.nbody.L = bcfg.bias.halo.L
     bcfg.nbody.N = bcfg.bias.halo.N
-    bias_path = get_source_path(bcfg, cfg.sim)
+    bias_path = get_source_path(
+        bcfg.meta.wdir, bcfg.nbody.suite, cfg.sim,
+        bcfg.nbody.L, bcfg.nbody.N, bcfg.nbody.lhid
+    )
 
     logging.info('Loading bias parameters...')
     popt, medges = load_bias_params(bias_path)
@@ -297,7 +299,7 @@ def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'nbody.h5'), 'r') as f:
+    with h5py.File(join(source_path, 'nbody.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         rho = group['rho'][...]
         fvel = group['fvel'][...]
@@ -310,13 +312,13 @@ def load_snapshot(source_path, a):
 
 
 def delete_outputs(outdir):
-    outpath = pjoin(outdir, 'halos.h5')
+    outpath = join(outdir, 'halos.h5')
     if os.path.isfile(outpath):
         os.remove(outpath)
 
 
 def save_snapshot(outdir, a, hpos, hvel, hmass):
-    with h5py.File(pjoin(outdir, 'halos.h5'), 'a') as f:
+    with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
         group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
@@ -332,7 +334,10 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
 
     # Delete existing outputs
     delete_outputs(source_path)
@@ -365,6 +370,7 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Saving halo catalog to {source_path}')
         save_snapshot(source_path, cfg.nbody.af, hpos, hvel, hmass)
 
+    save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
 
 
