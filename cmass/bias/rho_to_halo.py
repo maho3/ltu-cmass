@@ -40,8 +40,7 @@ from .tools.halo_sampling import (
     sample_velocities_density,
     sample_velocities_kNN,
     sample_velocities_CIC)
-from ..utils import (
-    get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
@@ -364,6 +363,7 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Saving halo catalog to {source_path}')
         save_snapshot(source_path, cfg.nbody.af, hpos, hvel, hmass)
 
+    save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
 
 

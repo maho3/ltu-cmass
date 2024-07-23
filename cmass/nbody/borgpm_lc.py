@@ -26,7 +26,7 @@ import hydra
 import logging
 import numpy as np
 from os.path import join as pjoin
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, get_ICs, save_transfer)
 from .tools_borg import (
@@ -138,8 +138,7 @@ def main(cfg: DictConfig) -> None:
     run_density(wn, cpar, cfg, outdir=outdir)
 
     # Save config
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
+    save_cfg(outdir, cfg)
     logging.info("Done!")
 
 

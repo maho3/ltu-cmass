@@ -29,7 +29,7 @@ import h5py
 from .tools.quijote import load_quijote_halos
 from .tools.halo_models import TruncatedPowerLaw
 from .rho_to_halo import load_snapshot
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
@@ -123,6 +123,7 @@ def main(cfg: DictConfig) -> None:
     with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
         f.create_dataset('popt', data=popt)
         f.create_dataset('medges', data=medges)
+    save_cfg(outdir, cfg, field='fit')
     logging.info('Done!')
 
 

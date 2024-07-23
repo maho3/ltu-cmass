@@ -38,7 +38,7 @@ from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
     save_lightcone, load_galaxies)
-from ..utils import (get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
@@ -212,6 +212,7 @@ def main(cfg: DictConfig) -> None:
         galidx=np.arange(len(rdz)),
         hod_seed=hod_seed,
         aug_seed=aug_seed)
+    save_cfg(outdir, cfg, field='survey')
 
 
 if __name__ == "__main__":

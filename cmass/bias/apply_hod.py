@@ -29,7 +29,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 from .tools.hod import (
     thetahod_literature, build_halo_catalog, build_HOD_model)
 from ..utils import (
-    get_source_path, timing_decorator, load_params, cosmo_to_astropy)
+    get_source_path, timing_decorator, load_params, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
 
 
@@ -158,6 +158,7 @@ def main(cfg: DictConfig) -> None:
         # Save snapshot
         save_snapshot(save_file, a, gpos, gvel, **meta)
 
+    save_cfg(outdir, cfg, field='bias')
     logging.info('Done!')
 
 

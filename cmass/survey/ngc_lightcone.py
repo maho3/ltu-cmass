@@ -32,7 +32,7 @@ import h5py
 from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import (get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, load_galaxies
 try:
@@ -133,6 +133,7 @@ def main(cfg: DictConfig) -> None:
         hod_seed=hod_seed,
         aug_seed=aug_seed
     )
+    save_cfg(outdir, cfg, field='survey')
 
 
 if __name__ == "__main__":

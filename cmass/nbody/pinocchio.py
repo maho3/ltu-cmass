@@ -22,7 +22,7 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise,
     save_nbody, rho_and_vfield,
@@ -382,8 +382,7 @@ def main(cfg: DictConfig) -> None:
 
     # Save nbody-type outputs
     save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
+    save_cfg(outdir, cfg)
 
     # Save bias-type outputs
     logging.info('Saving cube...')

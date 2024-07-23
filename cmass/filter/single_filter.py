@@ -21,7 +21,7 @@ from os.path import join as pjoin
 import hydra
 import importlib
 from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import (get_source_path, timing_decorator, load_params)
+from ..utils import get_source_path, timing_decorator, load_params, save_cfg
 from ..summary.tools import load_lightcone
 from ..survey.tools import save_lightcone
 
@@ -76,6 +76,8 @@ def main(cfg: DictConfig) -> None:
         aug_seed=cfg.survey.aug_seed,
         suffix=suffix
     )
+    save_cfg(outdir, cfg, field='filter')
+    logging.info('Done!')
 
 
 if __name__ == "__main__":

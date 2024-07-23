@@ -5,6 +5,7 @@ import os
 from os.path import join as pjoin
 from astropy.cosmology import Cosmology, FlatLambdaCDM
 from colossus.cosmology import cosmology as csm
+from omegaconf import OmegaConf
 
 
 def get_source_path(cfg, simtype, check=True):
@@ -40,6 +41,15 @@ def timing_decorator(func, *args, **kwargs):
             f"({int(dt//60)}m{int(dt%60)}s)")
         return out
     return wrapper
+
+
+def save_cfg(source_path, cfg, field=None):
+    if os.path.isfile(pjoin(source_path, 'config.yaml')):
+        old_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
+        if field is not None:
+            cfg = OmegaConf.masked_copy(cfg, field)
+            cfg = OmegaConf.merge(old_cfg, cfg)
+    OmegaConf.save(cfg, pjoin(source_path, 'config.yaml'))
 
 
 def load_params(index, cosmofile):

@@ -29,7 +29,7 @@ from mpi4py import MPI
 
 from omegaconf import DictConfig, OmegaConf
 import aquila_borg as borg
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, get_ICs, save_nbody, save_transfer,
     rho_and_vfield)
@@ -164,8 +164,7 @@ def main(cfg: DictConfig) -> None:
 
         # Save
         save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
-        with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-            OmegaConf.save(cfg, f)
+        save_cfg(outdir, cfg)
         logging.info("Done!")
     comm.Barrier()
     return
