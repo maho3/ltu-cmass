@@ -136,7 +136,10 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup save directory
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
     save_path = pjoin(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
     save_file = pjoin(save_path, f'hod{cfg.bias.hod.seed:03}.h5')

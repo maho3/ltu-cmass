@@ -72,7 +72,10 @@ def load_rho(cfg):
             f'df_m_{N}_z={z}.npy')
         return np.load(rho_path)
     else:
-        source_path = get_source_path(cfg, cfg.sim)
+        source_path = get_source_path(
+            cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+            cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+        )
         source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
 
         # check that the source rho is the same as the one we want
@@ -119,7 +122,10 @@ def main(cfg: DictConfig) -> None:
     popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.attempts)
 
     logging.info('Saving...')
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
     with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
         f.create_dataset('popt', data=popt)
         f.create_dataset('medges', data=medges)

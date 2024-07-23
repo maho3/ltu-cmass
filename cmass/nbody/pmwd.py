@@ -92,7 +92,10 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Output directory
-    outdir = get_source_path(cfg, "pmwd", check=False)
+    outdir = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, "pmwd",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
     os.makedirs(outdir, exist_ok=True)
 
     # Get ICs

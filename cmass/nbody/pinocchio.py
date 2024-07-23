@@ -354,7 +354,10 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    outdir = get_source_path(cfg, "pinocchio", check=False)
+    outdir = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, "pinocchio",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed

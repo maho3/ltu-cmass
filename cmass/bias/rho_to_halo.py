@@ -243,7 +243,10 @@ def apply_limd(rho, cfg):
     bcfg.nbody.suite = bcfg.bias.halo.base_suite
     bcfg.nbody.L = bcfg.bias.halo.L
     bcfg.nbody.N = bcfg.bias.halo.N
-    bias_path = get_source_path(bcfg, cfg.sim)
+    bias_path = get_source_path(
+        bcfg.meta.wdir, bcfg.nbody.suite, cfg.sim,
+        bcfg.nbody.L, bcfg.nbody.N, bcfg.nbody.lhid
+    )
 
     logging.info('Loading bias parameters...')
     popt, medges = load_bias_params(bias_path)
@@ -330,7 +333,10 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
 
     # Delete existing outputs
     delete_outputs(source_path)
