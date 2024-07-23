@@ -1,5 +1,5 @@
 import os
-from os.path import join as pjoin
+from os.path import join
 import numpy as np
 import h5py
 from astropy.stats import scott_bin_width
@@ -48,11 +48,11 @@ def get_nofz(z, fsky, cosmo=None):
 @timing_decorator
 def load_lightcone(source_dir, hod_seed=0, aug_seed=0, filter_name=None):
     if filter_name is None:
-        infile = pjoin(
+        infile = join(
             source_dir, 'lightcone',
             f'hod{hod_seed:03}_aug{aug_seed:03}.h5')
     else:
-        infile = pjoin(
+        infile = join(
             source_dir, 'filter',
             f'hod{hod_seed:03}_aug{aug_seed:03}_{filter_name}.h5')
 
@@ -79,7 +79,7 @@ def save_summary(outpath, name, **kwargs):
 
 @timing_decorator
 def load_randoms(wdir):
-    path = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
+    path = join(wdir, 'obs', 'random0_DR12v5_CMASS_North_PRECOMPUTED.npy')
     if os.path.exists(path):
         return np.load(path)
     randoms = gen_randoms()

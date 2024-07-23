@@ -29,10 +29,10 @@ import os
 import numpy as np
 import logging
 import h5py
-from os.path import join as pjoin
+from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import (get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, load_galaxies
 try:
@@ -44,7 +44,7 @@ except ImportError:
 
 
 def load_halo_velocities(source_dir, a):
-    filepath = pjoin(source_dir, 'halos.h5')
+    filepath = join(source_dir, 'halos.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
         vel = f[key]['vel'][...]
@@ -87,7 +87,10 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
@@ -123,7 +126,7 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    outdir = pjoin(source_path, 'lightcone')
+    outdir = join(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
@@ -133,6 +136,7 @@ def main(cfg: DictConfig) -> None:
         hod_seed=hod_seed,
         aug_seed=aug_seed
     )
+    save_cfg(source_path, cfg, field='survey')
 
 
 if __name__ == "__main__":

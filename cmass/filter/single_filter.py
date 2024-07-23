@@ -17,11 +17,11 @@ Output:
 
 import os
 import logging
-from os.path import join as pjoin
+from os.path import join
 import hydra
 import importlib
 from omegaconf import DictConfig, OmegaConf, open_dict
-from ..utils import (get_source_path, timing_decorator, load_params)
+from ..utils import get_source_path, timing_decorator, load_params, save_cfg
 from ..summary.tools import load_lightcone
 from ..survey.tools import save_lightcone
 
@@ -52,7 +52,10 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg.filter))
 
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
 
     # load rdz
     rdz, _ = load_lightcone(
@@ -65,7 +68,7 @@ def main(cfg: DictConfig) -> None:
     rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-    outdir = pjoin(source_path, 'filter')
+    outdir = join(source_path, 'filter')
     os.makedirs(outdir, exist_ok=True)
     suffix = f'_{cfg.filter.filter_name}'
     save_lightcone(
@@ -76,6 +79,8 @@ def main(cfg: DictConfig) -> None:
         aug_seed=cfg.survey.aug_seed,
         suffix=suffix
     )
+    save_cfg(source_path, cfg, field='filter')
+    logging.info('Done!')
 
 
 if __name__ == "__main__":
