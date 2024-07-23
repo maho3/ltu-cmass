@@ -1,5 +1,5 @@
 import os
-from os.path import join as pjoin
+from os.path import join
 import logging
 import numpy as np
 import h5py
@@ -75,9 +75,9 @@ def get_ICs(cfg):
     if nbody.matchIC:
         path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
         if nbody.quijote:
-            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+            path_to_ic = join(cfg.meta.wdir, 'quijote', path_to_ic)
         else:
-            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+            path_to_ic = join(cfg.meta.wdir, path_to_ic)
         return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N, seed=nbody.lhid)
@@ -86,7 +86,7 @@ def get_ICs(cfg):
 @timing_decorator
 def save_transfer(savedir, rho):
     os.makedirs(savedir, exist_ok=True)
-    savefile = pjoin(savedir, 'transfer.h5')
+    savefile = join(savedir, 'transfer.h5')
 
     logging.info(f'Saving to {savefile}...')
     with h5py.File(savefile, 'w') as f:
@@ -96,7 +96,7 @@ def save_transfer(savedir, rho):
 @ timing_decorator
 def save_nbody(savedir, a, rho, fvel, ppos, pvel):
     os.makedirs(savedir, exist_ok=True)
-    savefile = pjoin(savedir, 'nbody.h5')
+    savefile = join(savedir, 'nbody.h5')
 
     logging.info(f'Saving to {savefile}...')
     with h5py.File(savefile, 'w') as f:

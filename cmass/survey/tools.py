@@ -4,7 +4,7 @@ Many functions are from or inspired by: https://github.com/changhoonhahn/simbig/
 """
 # imports
 import os
-from os.path import join as pjoin
+from os.path import join
 import numpy as np
 import pymangle
 import pandas as pd
@@ -242,13 +242,13 @@ def BOSS_area(wdir='./data'):
 
 @timing_decorator
 def gen_randoms(wdir='./data'):
-    fname = pjoin(wdir, 'obs', 'random0_DR12v5_CMASS_North.fits')
+    fname = join(wdir, 'obs', 'random0_DR12v5_CMASS_North.fits')
     fields = ['RA', 'DEC', 'Z']
     with fits.open(fname) as hdul:
         randoms = np.array([hdul[1].data[x] for x in fields]).T
         randoms = pd.DataFrame(randoms, columns=fields)
 
-    n_z = np.load(pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+    n_z = np.load(join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
                   allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
     cutoffs = np.cumsum(hobs) / np.sum(hobs)
@@ -270,7 +270,7 @@ def gen_randoms(wdir='./data'):
 
 
 def load_galaxies(source_dir, a, seed):
-    filepath = pjoin(source_dir, 'galaxies', f'hod{seed:03}.h5')
+    filepath = join(source_dir, 'galaxies', f'hod{seed:03}.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
         pos = f[key]['pos'][...]
@@ -281,7 +281,7 @@ def load_galaxies(source_dir, a, seed):
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, aug_seed=0, suffix=''):
-    outfile = pjoin(outdir, f'hod{hod_seed:03}_aug{aug_seed:03}{suffix}.h5')
+    outfile = join(outdir, f'hod{hod_seed:03}_aug{aug_seed:03}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
         f.create_dataset('ra', data=ra)                # Right ascension [deg]

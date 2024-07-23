@@ -28,7 +28,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 import numpy as np
 import logging
 import h5py
-from os.path import join as pjoin
+from os.path import join
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
 import hydra
@@ -38,7 +38,7 @@ from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
     save_lightcone, load_galaxies)
-from ..utils import (get_source_path, timing_decorator)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
@@ -126,7 +126,7 @@ def custom_cuts(rdz, cfg):
 def reweight(rdz, wdir='./data'):
     # load observed n(z)
     n_z = np.load(
-        pjoin(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+        join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
         allow_pickle=True).item()
     be, hobs = n_z['be'], n_z['h']
 
@@ -165,7 +165,10 @@ def main(cfg: DictConfig) -> None:
     # Build run config
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    source_path = get_source_path(cfg, cfg.sim)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
@@ -203,7 +206,7 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir)
 
     # Save
-    outdir = pjoin(source_path, 'lightcone')
+    outdir = join(source_path, 'lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
@@ -212,6 +215,7 @@ def main(cfg: DictConfig) -> None:
         galidx=np.arange(len(rdz)),
         hod_seed=hod_seed,
         aug_seed=aug_seed)
+    save_cfg(outdir, cfg, field='survey')
 
 
 if __name__ == "__main__":

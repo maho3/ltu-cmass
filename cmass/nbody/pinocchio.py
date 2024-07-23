@@ -17,12 +17,12 @@ Output:
 """
 
 import os
-from os.path import join as pjoin
+from os.path import join
 import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise,
     save_nbody, rho_and_vfield,
@@ -40,9 +40,9 @@ def get_ICs(cfg, outdir):
     if nbody.matchIC:
         path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
         if nbody.quijote:
-            path_to_ic = pjoin(cfg.meta.wdir, 'quijote', path_to_ic)
+            path_to_ic = join(cfg.meta.wdir, 'quijote', path_to_ic)
         else:
-            path_to_ic = pjoin(cfg.meta.wdir, path_to_ic)
+            path_to_ic = join(cfg.meta.wdir, path_to_ic)
         ic = load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         ic = gen_white_noise(N, seed=nbody.lhid)
@@ -54,7 +54,7 @@ def get_ICs(cfg, outdir):
     header = np.array([0, N, N, N, nbody.lhid, 0], dtype=np.int32)
 
     # Write the white noise field to a binary file
-    filename = pjoin(outdir, "WhiteNoise")
+    filename = join(outdir, "WhiteNoise")
     with open(filename, 'wb') as file:
         header.tofile(file)
         # ic.tofile(file)
@@ -88,7 +88,7 @@ def generate_pk_file(cfg, outdir):
         raise NotImplementedError(
             f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
 
-    np.savetxt(pjoin(outdir, "input_power_spectrum.txt"),
+    np.savetxt(join(outdir, "input_power_spectrum.txt"),
                np.transpose(np.array([k, pk])))
 
     return
@@ -99,8 +99,8 @@ def generate_param_file(cfg, outdir):
     random_seed = cfg.nbody.lhid
 
     # Convert args to variables needed
-    filename = pjoin(outdir, "parameter_file")
-    output_list = pjoin(outdir, "outputs")
+    filename = join(outdir, "parameter_file")
+    output_list = join(outdir, "outputs")
     run_flag = f"pinocchio-L{int(cfg.nbody.L)}-N{cfg.nbody.N}-{cfg.nbody.lhid}"
     omega0, omega_b, h, n_s, sigma8 = cfg.nbody.cosmo
     omega_lambda = 1. - omega0
@@ -225,7 +225,7 @@ def run_density(cfg, outdir):
     os.chdir(cwd)
 
     # Load the data
-    filename = pjoin(
+    filename = join(
         outdir,
         f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
         f'N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
@@ -330,7 +330,7 @@ def run_density(cfg, outdir):
     # 5- 7) final position (Mpc/h)
     # 8-10) velocity (km/s)
     #   11) number of particles
-    filename = pjoin(
+    filename = join(
         outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
                 f'N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
     hmass = np.log10(np.loadtxt(filename, unpack=False, usecols=(1,)))
@@ -354,7 +354,10 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    outdir = get_source_path(cfg, "pinocchio", check=False)
+    outdir = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, "pinocchio",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed
@@ -382,8 +385,7 @@ def main(cfg: DictConfig) -> None:
 
     # Save nbody-type outputs
     save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
+    save_cfg(outdir, cfg)
 
     # Save bias-type outputs
     logging.info('Saving cube...')
