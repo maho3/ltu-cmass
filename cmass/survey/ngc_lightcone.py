@@ -136,7 +136,7 @@ def main(cfg: DictConfig) -> None:
         hod_seed=hod_seed,
         aug_seed=aug_seed
     )
-    save_cfg(outdir, cfg, field='survey')
+    save_cfg(source_path, cfg, field='survey')
 
 
 if __name__ == "__main__":

@@ -161,7 +161,7 @@ def main(cfg: DictConfig) -> None:
         # Save snapshot
         save_snapshot(save_file, a, gpos, gvel, **meta)
 
-    save_cfg(outdir, cfg, field='bias')
+    save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
 
 
