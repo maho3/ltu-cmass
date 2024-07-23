@@ -20,7 +20,7 @@ os.environ['JAX_ENABLE_X64'] = '1'  # noqa
 
 import numpy as np
 import logging
-from os.path import join as pjoin
+from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import tqdm
@@ -29,14 +29,14 @@ import h5py
 from .tools.quijote import load_quijote_halos
 from .tools.halo_models import TruncatedPowerLaw
 from .rho_to_halo import load_snapshot
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
 @timing_decorator
 def load_halo_histogram(cfg):
     # setup metadata
-    snapdir = pjoin(
+    snapdir = join(
         cfg.meta.wdir,
         cfg.fit.path_to_qhalos,
         f'{cfg.nbody.lhid}')
@@ -65,15 +65,18 @@ def load_halo_histogram(cfg):
 def load_rho(cfg):
     N, z = cfg.nbody.N, cfg.nbody.zf
     if cfg.fit.use_rho_quijote:
-        rho_path = pjoin(
+        rho_path = join(
             cfg.meta.wdir,
             cfg.fit.path_to_qrhos,
             f'{cfg.nbody.lhid}',
             f'df_m_{N}_z={z}.npy')
         return np.load(rho_path)
     else:
-        source_path = get_source_path(cfg, cfg.sim)
-        source_cfg = OmegaConf.load(pjoin(source_path, 'config.yaml'))
+        source_path = get_source_path(
+            cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+            cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+        )
+        source_cfg = OmegaConf.load(join(source_path, 'config.yaml'))
 
         # check that the source rho is the same as the one we want
         if source_cfg.nbody.zf != z:
@@ -103,6 +106,13 @@ def fit_bias_params(rho, hcounts, verbose=True, attempts=5):
     return np.stack(params, axis=0)
 
 
+def save_bias(source_path, a, medges, popt):
+    with h5py.File(join(source_path, 'bias.h5'), 'w') as f:
+        group = f.create_group(f'{a:.6f}')
+        group.create_dataset('popt', data=popt)
+        group.create_dataset('medges', data=medges)
+
+
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
@@ -119,10 +129,12 @@ def main(cfg: DictConfig) -> None:
     popt = fit_bias_params(rho, hcounts, cfg.fit.verbose, cfg.fit.attempts)
 
     logging.info('Saving...')
-    source_path = get_source_path(cfg, cfg.sim)
-    with h5py.File(pjoin(source_path, 'bias.h5'), 'w') as f:
-        f.create_dataset('popt', data=popt)
-        f.create_dataset('medges', data=medges)
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
+    save_bias(source_path, cfg.nbody.af, medges, popt)
+    save_cfg(source_path, cfg, field='fit')
     logging.info('Done!')
 
 

@@ -22,14 +22,14 @@ NOTE:
 import numpy as np
 import logging
 import os
-from os.path import join as pjoin
+from os.path import join
 import hydra
 import h5py
 from omegaconf import DictConfig, OmegaConf, open_dict
 from .tools.hod import (
     thetahod_literature, build_halo_catalog, build_HOD_model)
 from ..utils import (
-    get_source_path, timing_decorator, load_params, cosmo_to_astropy)
+    get_source_path, timing_decorator, load_params, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
 
 
@@ -102,7 +102,7 @@ def run_snapshot(pos, vel, mass, cfg):
 
 
 def load_snapshot(source_path, a):
-    with h5py.File(pjoin(source_path, 'halos.h5'), 'r') as f:
+    with h5py.File(join(source_path, 'halos.h5'), 'r') as f:
         group = f[f'{a:.6f}']
         hpos = group['pos'][...]
         hvel = group['vel'][...]
@@ -136,10 +136,13 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Setup save directory
-    source_path = get_source_path(cfg, cfg.sim)
-    save_path = pjoin(source_path, 'galaxies')
+    source_path = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
+    )
+    save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = pjoin(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    save_file = join(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs
@@ -158,6 +161,7 @@ def main(cfg: DictConfig) -> None:
         # Save snapshot
         save_snapshot(save_file, a, gpos, gvel, **meta)
 
+    save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
 
 
