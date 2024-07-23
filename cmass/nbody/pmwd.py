@@ -27,10 +27,9 @@ from pmwd import (
 from pmwd.pm_util import fftinv
 import logging
 import numpy as np
-from os.path import join as pjoin
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, get_ICs, save_nbody, save_transfer,
     rho_and_vfield)
@@ -93,7 +92,10 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     # Output directory
-    outdir = get_source_path(cfg, "pmwd", check=False)
+    outdir = get_source_path(
+        cfg.meta.wdir, cfg.nbody.suite, "pmwd",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
     os.makedirs(outdir, exist_ok=True)
 
     # Get ICs
@@ -137,8 +139,7 @@ def main(cfg: DictConfig) -> None:
 
     # Save
     save_nbody(outdir, rho, fvel, pos, vel)
-    with open(pjoin(outdir, 'config.yaml'), 'w') as f:
-        OmegaConf.save(cfg, f)
+    save_cfg(outdir, cfg)
     logging.info("Done!")
 
 

@@ -1,17 +1,17 @@
-# for comparing Quijote density fields at z=0
-suite: quijote_z0
+# for using MTNG-generated halos
+suite: mtng
 
 # General parameters
-L: 1000           # Mpc/h
-N: 128            # meshgrid resolution
-lhid: 3           # latin hypercube id
-matchIC: 2        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
-supersampling: 1  # particles resolution relative to meshgrid
+L: 3000           # Mpc/h
+N: 384            # meshgrid resolution
+lhid: 0           # latin hypercube id
+matchIC: 1        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
+supersampling: 3  # particles resolution relative to meshgrid
 save_particles: false  # whether to save particle data
-save_transfer: true    # whether to save transfer fn densities (for CHARM)
+save_transfer: false    # whether to save z=99 ICs (for CHARM bias model)
 
-zi: 20            # initial redshift
-zf: 0.0           # final redshift
+zi: 20            # initial redshift (for grav solver)
+zf: 0.5           # final redshift
 
 # whether to save multiple snapshots and use lightcone extrapolation
 snapshot_mode: false
@@ -19,6 +19,7 @@ snapshot_mode: false
 asave: []
 
 
+# ~~~ BELOW ARE NOT RELEVANT FOR MTNG SIMS  ~~~
 # borglpt, borgpm and pinocchio-only
 transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
@@ -27,7 +28,7 @@ order: 2          # order of the LPT expansion
 
 # pmwd and borgpm-only
 B: 2              # force grid resolution relative to particle grid
-N_steps: 20       # number of PM integration steps
+N_steps: 32       # number of PM integration steps
 
 # borgpm-only
 COLA: true        # whether to use COLA

@@ -121,7 +121,7 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   +-- lightcone           
 |   |   |   |   |   |   +-- hod000_aug000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
 |   |   |   |   |   +-- summary
-|   |   |   |   |   |   +-- hod000_aug000.npz        # survey-space power spectrum
+|   |   |   |   |   |   +-- hod000_aug000.h5        # survey-space power spectrum
 ```
 
 

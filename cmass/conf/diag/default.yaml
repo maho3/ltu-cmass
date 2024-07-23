@@ -1,0 +1,6 @@
+
+# whether to calculate diagnostics from scratch, if already saved
+from_scratch: true
+
+# number of threads for P(k) computation
+threads: 16
