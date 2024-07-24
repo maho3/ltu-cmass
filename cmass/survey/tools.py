@@ -139,7 +139,7 @@ def random_rotate_translate(xyz, L, vel=None, seed=0):
     Args:
     - xyz (np.ndarray): (N, 3) array of positions in the cube.
     - L (float): side length of the cube.
-    - vel (np.ndarray, optional): (N, 3) array of velocities. 
+    - vel (np.ndarray, optional): (N, 3) array of velocities.
     - seed (int): random seed for reproducibility. If 0, no transformation
         is applied.
     """
@@ -186,8 +186,8 @@ def BOSS_angular(ra, dec, wdir='./data'):
 
 
 def BOSS_veto(ra, dec, verbose=False, wdir='./data'):
-    ''' given RA and Dec, find the objects that fall within one of the veto 
-    masks of BOSS. At the moment it checks through the veto masks one by one.  
+    ''' given RA and Dec, find the objects that fall within one of the veto
+    masks of BOSS. At the moment it checks through the veto masks one by one.
     '''
     in_veto = np.zeros(len(ra)).astype(bool)
     fvetos = [
@@ -273,6 +273,11 @@ def load_galaxies(source_dir, a, seed):
     filepath = join(source_dir, 'galaxies', f'hod{seed:03}.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
+        if key not in f:
+            raise ValueError(
+                f'Snapshot a={key} not found in {filepath}. Ensure you are '
+                'using the appropriate single-snapshot ngc_selection or the '
+                'multi-snapshot ngc_lightcone.')
         pos = f[key]['pos'][...]
         vel = f[key]['vel'][...]
         hostid = f[key]['hostid'][...]

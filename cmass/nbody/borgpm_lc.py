@@ -110,11 +110,6 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    # Check if we're in snapshot mode
-    if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
-        raise ValueError("snapshot_mode config is false, but borgpm_lc"
-                         "is only for snapshot mode.")
-
     # Output directory
     outdir = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, "borgpm",
