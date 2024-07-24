@@ -13,8 +13,6 @@ save_transfer: true    # whether to save transfer fn densities (for CHARM)
 zi: 20            # initial redshift
 zf: 0.5           # final redshift
 
-# whether to save multiple snapshots and use lightcone extrapolation
-snapshot_mode: false
 # increasing snapshot scale factors to save (evenly spaced in a)
 asave: []
 

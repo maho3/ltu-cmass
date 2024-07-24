@@ -347,28 +347,16 @@ def main(cfg: DictConfig) -> None:
     if cfg.bias.halo.model == 'CHARM':
         rho_transfer = load_transfer(source_path)
 
-    if cfg.nbody.snapshot_mode:
-        for i, a in enumerate(cfg.nbody.asave):
-            logging.info(f'Running snapshot {i} at a={a:.6f}...')
-            rho, fvel, ppos, pvel = load_snapshot(source_path, a)
-
-            # Apply bias model
-            hpos, hvel, hmass = run_snapshot(
-                rho, fvel, cfg, rho_transfer, ppos, pvel)
-
-            logging.info(f'Saving halo catalog to {source_path}')
-            save_snapshot(source_path, a, hpos, hvel, hmass)
-    else:
-        # Load single snapshot
-        logging.info('Loading single snapshot...')
-        rho, fvel, ppos, pvel = load_snapshot(source_path, cfg.nbody.af)
+    for i, a in enumerate(cfg.nbody.asave):
+        logging.info(f'Running snapshot {i} at a={a:.6f}...')
+        rho, fvel, ppos, pvel = load_snapshot(source_path, a)
 
         # Apply bias model
         hpos, hvel, hmass = run_snapshot(
             rho, fvel, cfg, rho_transfer, ppos, pvel)
 
         logging.info(f'Saving halo catalog to {source_path}')
-        save_snapshot(source_path, cfg.nbody.af, hpos, hvel, hmass)
+        save_snapshot(source_path, a, hpos, hvel, hmass)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
