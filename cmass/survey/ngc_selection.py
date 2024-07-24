@@ -172,11 +172,6 @@ def main(cfg: DictConfig) -> None:
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
-    # Check that we are not in snapshot_mode
-    if hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode:
-        raise ValueError('snapshot_mode config is true, but ngc_selection'
-                         ' is only for non snapshot mode.')
-
     # Load galaxies
     pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
 
