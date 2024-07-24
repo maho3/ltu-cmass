@@ -99,7 +99,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
 def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
              from_scratch=True):
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'galaxies.h5')
+    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:03}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
@@ -114,6 +114,7 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
 
     logging.info(f'Saving gal diagnostics to {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
