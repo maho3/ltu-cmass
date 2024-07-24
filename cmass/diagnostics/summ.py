@@ -56,7 +56,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
     # check for file keys
     filename = join(source_path, 'halos.h5')
     if not os.path.isfile(filename):
-        logging.error('halo files not found')
+        logging.error(f'halo file not found: {filename}')
         return False
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
@@ -99,7 +99,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
 def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
              from_scratch=True):
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'galaxies.h5')
+    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:03}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
@@ -107,13 +107,14 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
     # check for file keys
     filename = join(source_path, 'galaxies', f'hod{hod_seed:03}.h5')
     if not os.path.isfile(filename):
-        logging.error('gal files not found')
+        logging.error(f'gal file not found: {filename}')
         return False
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
     logging.info(f'Saving gal diagnostics to {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
@@ -156,29 +157,31 @@ def main(cfg: DictConfig) -> None:
     threads = cfg.diag.threads
     from_scratch = cfg.diag.from_scratch
 
+    all_done = True
+
     # measure rho diagnostics
     done = rho_summ(
         source_path, cfg.nbody.L, threads=threads,
         from_scratch=from_scratch)
-    if not done:
-        return
+    all_done &= done
 
     # measure halo diagnostics
     done = halo_summ(
         source_path, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
         cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
-    if not done:
-        return
+    all_done &= done
 
     # measure gal diagnostics
     done = gal_summ(
         source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N,
         cfg.nbody.cosmo[2], cfg.nbody.zf,
         threads=threads, from_scratch=from_scratch)
-    if not done:
-        return
+    all_done &= done
 
-    logging.info('All diagnostics computed successfully')
+    if all_done:
+        logging.info('All diagnostics computed successfully')
+    else:
+        logging.error('Some diagnostics failed to compute')
 
 
 if __name__ == "__main__":

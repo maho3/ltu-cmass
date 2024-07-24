@@ -94,11 +94,6 @@ def main(cfg: DictConfig) -> None:
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
-    # Check that we are in snapshot_mode
-    if not (hasattr(cfg.nbody, 'snapshot_mode') and cfg.nbody.snapshot_mode):
-        raise ValueError('snapshot_mode config is false, but ngc_lightcone'
-                         ' is only for snapshot mode.')
-
     # Load mask
     logging.info(f'Loading mask from {cfg.survey.boss_dir}')
     maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
