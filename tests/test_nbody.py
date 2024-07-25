@@ -1,24 +1,15 @@
-import subprocess
 import shutil
 import pytest
 import os
 from os.path import join
+from tools import run_bash, check_outputs
 
 
 wdir = '/automnt/data80/mattho/cmass-ili'
 rundir = '/home/mattho/git/ltu-cmass'
-
-
-def check_outputs(sim):
-    desired_files = ['config.yaml', 'nbody.h5']  # , 'transfer.h5']
-    # pinocchio doesn't do transfer files
-    simpath = join(wdir, 'test_nbody', sim, 'L1000-N128', '3')
-    if not os.path.isdir(simpath):
-        raise FileNotFoundError(f'{simpath} not found')
-    for file in desired_files:
-        if file not in os.listdir(simpath):
-            raise FileNotFoundError(f'{file} not found in {simpath}')
-    return True
+nbody = 'testsmall'
+suite = 'test_nbody'
+lhid, L, N = 3, 1000, 128
 
 
 @pytest.fixture(scope='module')
@@ -32,27 +23,20 @@ def setup():
         shutil.rmtree(join(wdir, 'test_nbody'))
 
 
-def run_bash(commands):
-    result = subprocess.run(
-        commands, shell=True,
-        text=True, capture_output=True,
-        check=False)
-    if result.returncode != 0:
-        print('STDOUT:\n' + result.stdout)
-        print('STDERR:\n' + result.stderr)
-    return result
-
-
 def test_pmwd(setup):
     commands = f"""
     module restore cmass
     source /data80/mattho/anaconda3/bin/activate
     conda activate cmass
     cd {rundir}
-    python -m cmass.nbody.pmwd nbody=testsmall nbody.suite=test_nbody
+    python -m cmass.nbody.pmwd nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
-    assert check_outputs('pmwd')
+    assert check_outputs(
+        wdir, 'pmwd', suite,
+        ['config.yaml', 'nbody.h5', 'transfer.h5'],
+        lhid, L, N
+    )
 
 
 def test_pinocchio(setup):
@@ -62,10 +46,14 @@ def test_pinocchio(setup):
     conda activate cmass
     cd {rundir}
     export LD_LIBRARY_PATH=/softs/fftw3/3.3.10-gnu-mpi/lib:$LD_LIBRARY_PATH
-    python -m cmass.nbody.pinocchio nbody=testsmall nbody.suite=test_nbody nbody.transfer=CAMB
+    python -m cmass.nbody.pinocchio nbody={nbody} nbody.suite={suite} nbody.transfer=CAMB
     """
     _ = run_bash(commands)
-    assert check_outputs('pinocchio')
+    assert check_outputs(
+        wdir, 'pinocchio', suite,
+        ['config.yaml', 'nbody.h5'],  # pinocchio doesn't do transfer files
+        lhid, L, N
+    )
 
 
 def test_borglpt(setup):
@@ -74,10 +62,14 @@ def test_borglpt(setup):
     source /data80/mattho/anaconda3/bin/activate
     conda activate borg310
     cd {rundir}
-    python -m cmass.nbody.borglpt nbody=testsmall nbody.suite=test_nbody
+    python -m cmass.nbody.borglpt nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
-    assert check_outputs('borg2lpt')
+    assert check_outputs(
+        wdir, 'borg2lpt', suite,
+        ['config.yaml', 'nbody.h5', 'transfer.h5'],
+        lhid, L, N
+    )
 
 
 def test_borgpm(setup):
@@ -86,7 +78,11 @@ def test_borgpm(setup):
     source /data80/mattho/anaconda3/bin/activate
     conda activate borg310
     cd {rundir}
-    python -m cmass.nbody.borgpm nbody=testsmall nbody.suite=test_nbody
+    python -m cmass.nbody.borgpm nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
-    assert check_outputs('borgpm')
+    assert check_outputs(
+        wdir, 'borgpm', suite,
+        ['config.yaml', 'nbody.h5', 'transfer.h5'],
+        lhid, L, N
+    )

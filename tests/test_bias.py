@@ -1,24 +1,15 @@
-import subprocess
+
 import shutil
 import pytest
 import os
 from os.path import join
+from tools import run_bash, check_outputs
 
 wdir = '/automnt/data80/mattho/cmass-ili'
 rundir = '/home/mattho/git/ltu-cmass'
 nbody = 'testsmall'
 suite = 'test_bias'
-
-
-def run_bash(commands):
-    result = subprocess.run(
-        commands, shell=True,
-        text=True, capture_output=True,
-        check=False)
-    if result.returncode != 0:
-        print('STDOUT:\n' + result.stdout)
-        print('STDERR:\n' + result.stderr)
-    return result
+lhid, L, N = 3, 1000, 128
 
 
 @pytest.fixture(scope="module")
@@ -42,17 +33,6 @@ def setup():
         shutil.rmtree(join(wdir, suite))
 
 
-def check_outputs(sim):
-    desired_files = ['halos.h5']
-    simpath = join(wdir, suite, sim, 'L1000-N128', '3')
-    if not os.path.isdir(simpath):
-        raise FileNotFoundError(f'{simpath} not found')
-    for file in desired_files:
-        if file not in os.listdir(simpath):
-            raise FileNotFoundError(f'{file} not found in {simpath}')
-    return True
-
-
 def test_limd(setup):
     commands = f"""
     module restore cmass
@@ -62,7 +42,11 @@ def test_limd(setup):
     python -m cmass.bias.rho_to_halo nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
     """
     _ = run_bash(commands)
-    assert check_outputs('pmwd')
+    assert check_outputs(
+        wdir, 'pmwd', suite,
+        ['halos.h5'],
+        lhid, L, N
+    )
 
 
 def test_charm(setup):
@@ -74,4 +58,8 @@ def test_charm(setup):
     python -m cmass.bias.rho_to_halo nbody={nbody} nbody.suite={suite} bias.halo.model=CHARM
     """
     _ = run_bash(commands)
-    assert check_outputs('pmwd')
+    assert check_outputs(
+        wdir, 'pmwd', suite,
+        ['halos.h5'],
+        lhid, L, N
+    )
