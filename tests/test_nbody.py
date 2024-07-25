@@ -10,7 +10,8 @@ rundir = '/home/mattho/git/ltu-cmass'
 
 
 def check_outputs(sim):
-    desired_files = ['config.yaml', 'nbody.h5', 'transfer.h5']
+    desired_files = ['config.yaml', 'nbody.h5']  # , 'transfer.h5']
+    # pinocchio doesn't do transfer files
     simpath = join(wdir, 'test_nbody', sim, 'L1000-N128', '3')
     if not os.path.isdir(simpath):
         raise FileNotFoundError(f'{simpath} not found')
