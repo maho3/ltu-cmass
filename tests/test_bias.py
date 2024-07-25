@@ -63,3 +63,20 @@ def test_charm(setup):
         ['halos.h5'],
         lhid, L, N
     )
+
+
+def test_hod(setup):
+    commands = f"""
+    module restore cmass
+    source /data80/mattho/anaconda3/bin/activate
+    conda activate cmass
+    cd {rundir}
+    python -m cmass.bias.rho_to_halo nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
+    python -m cmass.bias.apply_hod nbody={nbody} nbody.suite={suite}
+    """
+    _ = run_bash(commands)
+    assert check_outputs(
+        wdir, 'pmwd', suite,
+        ['galaxies/hod000.h5'],
+        lhid, L, N
+    )

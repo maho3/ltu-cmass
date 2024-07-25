@@ -18,9 +18,9 @@ def setup():
     yield
 
     # Clean up after tests
-    if os.path.isdir(join(wdir, 'test_nbody')):
+    if os.path.isdir(join(wdir, suite)):
         print('Cleaning up')
-        shutil.rmtree(join(wdir, 'test_nbody'))
+        shutil.rmtree(join(wdir, suite))
 
 
 def test_pmwd(setup):
@@ -79,6 +79,22 @@ def test_borgpm(setup):
     conda activate borg310
     cd {rundir}
     python -m cmass.nbody.borgpm nbody={nbody} nbody.suite={suite}
+    """
+    _ = run_bash(commands)
+    assert check_outputs(
+        wdir, 'borgpm', suite,
+        ['config.yaml', 'nbody.h5', 'transfer.h5'],
+        lhid, L, N
+    )
+
+
+def test_borgpm_lc(setup):
+    commands = f"""
+    module restore myborg
+    source /data80/mattho/anaconda3/bin/activate
+    conda activate borg310
+    cd {rundir}
+    python -m cmass.nbody.borgpm_lc nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
     assert check_outputs(

@@ -11,10 +11,10 @@ save_particles: false  # whether to save particle data
 save_transfer: true    # whether to save transfer fn densities (for CHARM)
 
 zi: 10            # initial redshift
-zf: 0.5           # final redshift
+zf: 0.4           # final redshift
 
 # increasing snapshot scale factors to save (evenly spaced in a)
-asave: []
+asave: [0.5, 0.6, 0.7]
 
 
 # borglpt, borgpm and pinocchio-only

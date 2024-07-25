@@ -14,7 +14,7 @@ zi: 10            # initial redshift
 zf: 0.5           # final redshift
 
 # increasing snapshot scale factors to save (evenly spaced in a)
-asave: []
+asave: [0.5, 0.6]
 
 
 # borglpt, borgpm and pinocchio-only

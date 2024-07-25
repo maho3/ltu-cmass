@@ -19,6 +19,6 @@ def check_outputs(wdir, sim, suite, desired_files, lhid=3, L=1000, N=128):
     if not os.path.isdir(simpath):
         raise FileNotFoundError(f'{simpath} not found')
     for file in desired_files:
-        if file not in os.listdir(simpath):
+        if not os.path.isfile(join(simpath, file)):
             raise FileNotFoundError(f'{file} not found in {simpath}')
     return True
