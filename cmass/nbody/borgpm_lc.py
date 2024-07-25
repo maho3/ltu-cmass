@@ -103,7 +103,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=True)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
