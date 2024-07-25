@@ -1,4 +1,4 @@
-#PBS -N install_cmass
+#PBS -N test_install
 #PBS -q batch
 #PBS -j oe
 #PBS -o ${HOME}/data/cmass-ili/logs_test/${PBS_JOBNAME}.${PBS_JOBID}.log

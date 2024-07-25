@@ -7,7 +7,7 @@ from tools import run_bash, check_outputs
 
 wdir = '/automnt/data80/mattho/cmass-ili'
 rundir = '/home/mattho/git/ltu-cmass'
-nbody = 'testbig'
+nbody = 'testsmall'
 suite = 'test_survey'
 lhid, L, N = 3, 1000, 128
 
@@ -35,9 +35,9 @@ def test_ngc_selection(setup):
     # Run bias and selection
     module restore cmass
     conda activate cmass
-    python -m cmass.bias.rho_to_halo nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
-    python -m cmass.bias.apply_hod nbody={nbody} nbody.suite={suite}
-    python -m cmass.survey.ngc_selection nbody={nbody} nbody.suite={suite}
+    python -m cmass.bias.rho_to_halo  sim=borgpm nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
+    python -m cmass.bias.apply_hod sim=borgpm nbody={nbody} nbody.suite={suite}
+    python -m cmass.survey.ngc_selection sim=borgpm nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
     assert check_outputs(
@@ -59,9 +59,9 @@ def test_ngc_lightcone(setup):
     # Run bias and selection
     module restore cmass
     conda activate cmass
-    python -m cmass.bias.rho_to_halo nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
-    python -m cmass.bias.apply_hod nbody={nbody} nbody.suite={suite}
-    python -m cmass.survey.ngc_lightcone nbody={nbody} nbody.suite={suite}
+    python -m cmass.bias.rho_to_halo sim=borgpm nbody={nbody} nbody.suite={suite} bias.halo.model=LIMD
+    python -m cmass.bias.apply_hod sim=borgpm nbody={nbody} nbody.suite={suite}
+    python -m cmass.survey.ngc_lightcone sim=borgpm nbody={nbody} nbody.suite={suite}
     """
     _ = run_bash(commands)
     assert check_outputs(
