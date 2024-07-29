@@ -138,7 +138,7 @@ def main(cfg: DictConfig) -> None:
     fvel *= (1 + cfg.nbody.zf)
 
     # Save
-    save_nbody(outdir, rho, fvel, pos, vel)
+    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
     save_cfg(outdir, cfg)
     logging.info("Done!")
 

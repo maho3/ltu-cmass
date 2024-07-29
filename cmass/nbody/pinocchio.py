@@ -388,7 +388,10 @@ def main(cfg: DictConfig) -> None:
     save_cfg(outdir, cfg)
 
     # Save bias-type outputs
-    logging.info('Saving cube...')
+    outpath = join(outdir, 'halos.h5')
+    logging.info('Saving cube to ' + outpath)
+    if os.path.isfile(outpath):
+        os.remove(outpath)
     save_snapshot(outdir, cfg.nbody.af, hpos, hvel, hmass)
 
     logging.info("Done!")
