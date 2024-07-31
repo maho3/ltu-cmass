@@ -9,7 +9,7 @@ hydra:
         datefmt: "%H:%M:%S"
 
 meta:
-  wdir: "/data101/bartlett/ili/cmass/"
+  wdir: "/home/mattho/git/ltu-cmass/data"
   logdir: "${meta.wdir}/logs/"
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
