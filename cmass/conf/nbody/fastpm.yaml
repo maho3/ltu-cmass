@@ -13,6 +13,9 @@ save_transfer: true    # whether to save transfer fn densities (for CHARM)
 zi: 20            # initial redshift
 zf: 0.0           # final redshift
 
+# increasing snapshot scale factors to save
+asave: [0.2, 0.4, 0.6, 0.8, 1.0]
+
 # borglpt, borgpm and pinocchio-only
 transfer: 'CAMB' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 

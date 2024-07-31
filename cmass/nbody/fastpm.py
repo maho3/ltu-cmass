@@ -6,6 +6,7 @@ import os
 import bigfile
 from omegaconf import DictConfig, OmegaConf
 import glob
+import subprocess
 
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
@@ -43,7 +44,11 @@ def get_ICs(cfg, outdir):
 
 def generate_param_file(cfg, outdir):
     
-    output_redshifts = [cfg.nbody.zf]
+    output_redshifts = np.array(cfg.nbody.asave, dtype=float)
+    if len(output_redshifts) == 0:
+        output_redshifts = [cfg.nbody.zf]
+    else:
+        output_redshifts = 1 / output_redshifts - 1
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
     
     lua_content = f"""
@@ -114,15 +119,31 @@ write_powerspectrum = prefix .. '/powerspec'
 @timing_decorator
 def run_density(cfg, outdir):
     
-    param_file = join(outdir, "parameter_file.lua")
-    os.system(f'{cfg.nbody.fastpm_exec} {param_file}')
+    # Work out how many cpus to use
+    # Need this to exactly divide N * B
+    max_cores = os.cpu_count()
+    max_divisible_cores = None
+    product = cfg.nbody.N * cfg.nbody.B
+    for cores in range(max_cores, 0, -1):
+        if product % cores == 0:
+            max_divisible_cores = cores
+            break
     
+    # Run FastPM
+    param_file = join(outdir, "parameter_file.lua")
+    command = f'mpirun -n {max_divisible_cores} {cfg.nbody.fastpm_exec} {param_file}'
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    process = subprocess.run(command, shell=True, check=True, env=env)
+    
+    # Obtain scale factor closest to af
     all_a = glob.glob(join(outdir, f'fastpm_B{cfg.nbody.B}_*'))
     all_a = [a[-a[::-1].index('_'):] for a in all_a]
     af = 1 / (1 + cfg.nbody.zf)
     i = np.argmin(np.abs(af - np.array(all_a, dtype=float)))
     a = all_a[i]
-    
+
+    # Extract particle positions and velocities for this af
     f = bigfile.File(join(outdir, f'fastpm_B{cfg.nbody.B}_{a}'))
     ds = bigfile.Dataset(f['1/'], ['Position', 'Velocity', 'ID'])
     pos = np.array(ds[:]['Position'])
@@ -138,7 +159,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=True)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -149,6 +170,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, "fastpm",
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
+        
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed
@@ -159,7 +181,7 @@ def main(cfg: DictConfig) -> None:
 
     # Generate parameter file
     generate_param_file(cfg, outdir)
-
+    
     # Run
     pos, vel = run_density(cfg, outdir)
     
@@ -177,7 +199,7 @@ def main(cfg: DictConfig) -> None:
     # Save nbody-type outputs
     save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
     save_cfg(outdir, cfg)
-    
+
     logging.info("Done!")
 
 
