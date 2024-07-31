@@ -115,7 +115,7 @@ write_powerspectrum = prefix .. '/powerspec'
 def run_density(cfg, outdir):
     
     param_file = join(outdir, "parameter_file.lua")
-    # os.system(f'{cfg.nbody.fastpm_exec} {param_file}')
+    os.system(f'{cfg.nbody.fastpm_exec} {param_file}')
     
     all_a = glob.glob(join(outdir, f'fastpm_B{cfg.nbody.B}_*'))
     all_a = [a[-a[::-1].index('_'):] for a in all_a]
