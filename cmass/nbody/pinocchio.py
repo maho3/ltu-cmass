@@ -25,8 +25,7 @@ from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise,
-    save_nbody, rho_and_vfield,
-    get_camb_pk, get_class_pk, get_syren_pk)
+    save_nbody, rho_and_vfield, generate_pk_file)
 from ..bias.rho_to_halo import save_snapshot
 
 
@@ -63,33 +62,6 @@ def get_ICs(cfg, outdir):
             file.write(np.array([planesize], dtype=np.int32).tobytes())
             plane.tofile(file)
             file.write(np.array([planesize], dtype=np.int32).tobytes())
-
-    return
-
-
-@timing_decorator
-def generate_pk_file(cfg, outdir):
-
-    if cfg.nbody.transfer == 'EH':
-        return
-
-    kmin = 2 * np.pi / cfg.nbody.L
-    #  Larger than Nyquist
-    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / cfg.nbody.L
-    k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
-
-    if cfg.nbody.transfer.upper() == 'CAMB':
-        pk = get_camb_pk(k, *cfg.nbody.cosmo)
-    elif cfg.nbody.transfer.upper() == 'CLASS':
-        pk = get_class_pk(k, *cfg.nbody.cosmo)
-    elif cfg.nbody.transfer.upper() == 'SYREN':
-        pk = get_syren_pk(k, *cfg.nbody.cosmo)
-    else:
-        raise NotImplementedError(
-            f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
-
-    np.savetxt(join(outdir, "input_power_spectrum.txt"),
-               np.transpose(np.array([k, pk])))
 
     return
 
@@ -361,7 +333,8 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed
-    generate_pk_file(cfg, outdir)
+    if cfg.nbody.transfer != 'EH':
+        generate_pk_file(cfg, outdir)
 
     # Convert ICs to correct format
     get_ICs(cfg, outdir)

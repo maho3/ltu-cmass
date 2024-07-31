@@ -81,6 +81,38 @@ def get_ICs(cfg):
         return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N, seed=nbody.lhid)
+    
+    
+def save_white_noise_grafic(filename, array, seed):
+    """
+    Save a NumPy array to a file in the grafic noise format, as required for FastPM
+
+    Args:
+        :param filename: The name of the file to save the array to.
+        :param array: The NumPy array to save. It should be 3-dimensional.
+        :param seed: The seed value to include in the header.
+    """
+    assert array.ndim == 3, "Array must be 3-dimensional"
+    n = array.shape
+    
+    header = np.array([16, n[2], n[1], n[0], seed, 16], dtype=np.int32)
+
+    with open(filename, 'wb') as f:
+        f.write(header.tobytes())
+        
+        # Writing the array in the required format
+        for i in range(n[0]):
+            block_size = np.array([4 * n[1] * n[2]], dtype=np.int32)
+            f.write(block_size.tobytes())
+
+            # Extract the 2D slice and write it
+            slice_2d = array[i, :, :]
+            f.write(slice_2d.astype(np.float32).tobytes())
+            
+            # Write block_size again
+            f.write(block_size.tobytes())
+            
+    return
 
 
 @timing_decorator
@@ -305,3 +337,27 @@ def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):
         k, sigma8, omega_m, omega_b, h, n_s,
         emulator='fiducial', extrapolate=True
     )
+
+
+@timing_decorator
+def generate_pk_file(cfg, outdir):
+
+    kmin = 2 * np.pi / cfg.nbody.L
+    #  Larger than Nyquist
+    kmax = 2 * np.sqrt(3) * np.pi * cfg.nbody.N / cfg.nbody.L
+    k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
+
+    if cfg.nbody.transfer.upper() == 'CAMB':
+        pk = get_camb_pk(k, *cfg.nbody.cosmo)
+    elif cfg.nbody.transfer.upper() == 'CLASS':
+        pk = get_class_pk(k, *cfg.nbody.cosmo)
+    elif cfg.nbody.transfer.upper() == 'SYREN':
+        pk = get_syren_pk(k, *cfg.nbody.cosmo)
+    else:
+        raise NotImplementedError(
+            f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
+
+    np.savetxt(join(outdir, "input_power_spectrum.txt"),
+               np.transpose(np.array([k, pk])))
+
+    return
