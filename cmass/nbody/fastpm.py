@@ -5,8 +5,9 @@ import logging
 import os
 import bigfile
 from omegaconf import DictConfig, OmegaConf
-import glob
+import shutil
 import subprocess
+import h5py
 
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
@@ -24,20 +25,21 @@ def save_ICs(cfg, outdir):
     save_white_noise_grafic(filename, ic, cfg.nbody.lhid)
 
 
-def generate_param_file(cfg, outdir):
+def generate_param_file(
+    L, N, supersampling, B, N_steps, zi, zf, asave, cosmo,
+    outdir
+):
 
-    output_redshifts = np.array(cfg.nbody.asave, dtype=float)
-    if len(output_redshifts) == 0:
-        output_redshifts = [cfg.nbody.zf]
-    else:
-        output_redshifts = 1 / output_redshifts - 1
+    output_redshifts = -1 + 1./np.array(asave, dtype=float)
+    if zf not in output_redshifts:
+        output_redshifts += [zf]
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
 
     lua_content = f"""
-boxsize = {cfg.nbody.L}
-nc = {cfg.nbody.N*cfg.nbody.supersampling}
-B = {cfg.nbody.B}
-T = {cfg.nbody.N_steps}
+boxsize = {L}
+nc = {N*supersampling}
+B = {B}
+T = {N_steps}
 prefix = "{outdir}"
 read_grafic = "{join(outdir, 'WhiteNoise_grafic')}"
 
@@ -50,14 +52,14 @@ read_grafic = "{join(outdir, 'WhiteNoise_grafic')}"
 -- time_step = linspace(0.025, 1.0, 39)
 -- logspace: Uniform time steps in loga
 
-time_step = linspace({1 / (1 + cfg.nbody.zi)}, {1 / (1 + cfg.nbody.zf)}, T)
+time_step = linspace({1 / (1 + zi)}, {1 / (1 + zf)}, T)
 output_redshifts= {output_redshifts_lua}  -- redshifts of output
 
 
 ----------------------------------------
 -------- Cosmology --------
-Omega_m   = {cfg.nbody.cosmo[0]}
-h         = {cfg.nbody.cosmo[2]}
+Omega_m   = {cosmo[0]}
+h         = {cosmo[2]}
 
 -- Start with a power spectrum file
 -- Initial power spectrum: k P(k) in Mpc/h units
@@ -73,14 +75,15 @@ linear_density_redshift = 0.0 -- the redshift of the linear density field.
 
 force_mode = "fastpm"
 pm_nc_factor = B            -- Particle Mesh grid pm_nc_factor*nc per dimension in the beginning
-np_alloc_factor= 2.2      -- Amount of memory allocated for particle
+np_alloc_factor= 2.2        -- Amount of memory allocated for particle
+loglevel = 0                   -- 0: only info, 1: additional timing information, 2: debugging
 
 
 ----------------------------------------
 -------- Output --------
 
 -- Dark matter particle outputs (all particles)
-write_snapshot= prefix .. "/fastpm_B{cfg.nbody.B}"
+write_snapshot= prefix .. "/fastpm_B{B}"
 particle_fraction = 1.00
 """
 
@@ -109,22 +112,41 @@ def run_density(cfg, outdir):
     command = f'mpirun -n {max_divisible_cores} {cfg.nbody.fastpm_exec} {param_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
-    process = subprocess.run(command, shell=True, check=True, env=env)
+    _ = subprocess.run(command, shell=True, check=True, env=env)
 
-    # Obtain scale factor closest to af
-    all_a = glob.glob(join(outdir, f'fastpm_B{cfg.nbody.B}_*'))
-    all_a = [a[-a[::-1].index('_'):] for a in all_a]
-    af = 1 / (1 + cfg.nbody.zf)
-    i = np.argmin(np.abs(af - np.array(all_a, dtype=float)))
-    a = all_a[i]
 
-    # Extract particle positions and velocities for this af
-    f = bigfile.File(join(outdir, f'fastpm_B{cfg.nbody.B}_{a}'))
-    ds = bigfile.Dataset(f['1/'], ['Position', 'Velocity', 'ID'])
-    pos = np.array(ds[:]['Position'])
-    vel = np.array(ds[:]['Velocity'])
+@timing_decorator
+def process_outputs(cfg, outdir, delete_files=True):
+    with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
+        for a in sorted(cfg.nbody.asave):
+            logging.info(f"Processing snapshot at a={a}...")
+            # Extract positions and velocities at a given scale factor
+            snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+            infile = bigfile.File(snapdir)
+            ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
+            pos = np.array(ds[:]['Position'])
+            vel = np.array(ds[:]['Velocity'])
 
-    return pos, vel
+            # Measure density and velocity field
+            rho, fvel = rho_and_vfield(
+                pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+                omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+            # Convert from comoving -> physical velocities
+            fvel *= 1/a
+
+            # Save to file
+            key = f'{a:.6f}'
+            group = outfile.create_group(key)
+            group.create_dataset('rho', data=rho)
+            group.create_dataset('fvel', data=fvel)
+
+            # Clean up
+            if delete_files:
+                infile.close()
+                shutil.rmtree(snapdir)
+
+    return rho, fvel, pos, vel  # return the last snapshot
 
 
 @timing_decorator
@@ -155,24 +177,28 @@ def main(cfg: DictConfig) -> None:
     save_ICs(cfg, outdir)
 
     # Generate parameter file
-    generate_param_file(cfg, outdir)
+    generate_param_file(
+        L=cfg.nbody.L, N=cfg.nbody.N, supersampling=cfg.nbody.supersampling,
+        B=cfg.nbody.B, N_steps=cfg.nbody.N_steps,
+        zi=cfg.nbody.zi, zf=cfg.nbody.zf, asave=cfg.nbody.asave,
+        cosmo=cfg.nbody.cosmo, outdir=outdir
+    )
 
     # Run
-    pos, vel = run_density(cfg, outdir)
+    logging.info("Running FastPM...")
+    run_density(cfg, outdir)
 
-    # Calculate velocity field
-    rho, fvel = rho_and_vfield(
-        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+    # Process outputs
+    logging.info("Processing outputs...")
+    rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+    os.remove(join(outdir, 'WhiteNoise_grafic'))
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None
 
-    # Convert from comoving -> physical velocities
-    fvel *= (1 + cfg.nbody.zf)
-
     # Save nbody-type outputs
-    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
+    # save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
+    # TODO: add a way to append particles to the existing nbody.h5 file
     save_cfg(outdir, cfg)
 
     logging.info("Done!")
