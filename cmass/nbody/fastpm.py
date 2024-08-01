@@ -10,37 +10,18 @@ import subprocess
 
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
-    parse_nbody_config, gen_white_noise, load_white_noise,
+    parse_nbody_config, get_ICs,
     save_white_noise_grafic, generate_pk_file, rho_and_vfield,
     save_nbody
 )
 
 
-@timing_decorator
-def get_ICs(cfg, outdir):
-
-    nbody = cfg.nbody
-    N = nbody.N*nbody.supersampling
-
-    # Load the ics in Fourier space
-    if nbody.matchIC:
-        path_to_ic = f'wn/N{N}/wn_{nbody.lhid}.dat'
-        if nbody.quijote:
-            path_to_ic = join(cfg.meta.wdir, 'quijote', path_to_ic)
-        else:
-            path_to_ic = join(cfg.meta.wdir, path_to_ic)
-        ic = load_white_noise(path_to_ic, N, quijote=nbody.quijote)
-    else:
-        ic = gen_white_noise(N, seed=nbody.lhid)
-
-    # Convert to real space
+def save_ICs(cfg, outdir):
+    ic = get_ICs(cfg)
     ic = np.fft.irfftn(ic, norm="ortho")
 
-    # Save to file
     filename = join(outdir, "WhiteNoise_grafic")
-    save_white_noise_grafic(filename, ic, nbody.lhid)
-
-    return
+    save_white_noise_grafic(filename, ic, cfg.nbody.lhid)
 
 
 def generate_param_file(cfg, outdir):
@@ -64,7 +45,7 @@ read_grafic = "{join(outdir, 'WhiteNoise_grafic')}"
 ----------------------------------------
 --- This file needs to be concatenated with parameters from run.py ---
 ----------------------------------------
--------- Time Sequence -------- 
+-------- Time Sequence --------
 -- linspace: Uniform time steps in a
 -- time_step = linspace(0.025, 1.0, 39)
 -- logspace: Uniform time steps in loga
@@ -74,7 +55,7 @@ output_redshifts= {output_redshifts_lua}  -- redshifts of output
 
 
 ----------------------------------------
--------- Cosmology -------- 
+-------- Cosmology --------
 Omega_m   = {cfg.nbody.cosmo[0]}
 h         = {cfg.nbody.cosmo[2]}
 
@@ -88,7 +69,7 @@ linear_density_redshift = 0.0 -- the redshift of the linear density field.
 
 
 ----------------------------------------
--------- Approximation Method -------- 
+-------- Approximation Method --------
 
 force_mode = "fastpm"
 pm_nc_factor = B            -- Particle Mesh grid pm_nc_factor*nc per dimension in the beginning
@@ -96,18 +77,11 @@ np_alloc_factor= 2.2      -- Amount of memory allocated for particle
 
 
 ----------------------------------------
--------- Output -------- 
+-------- Output --------
 
 -- Dark matter particle outputs (all particles)
 write_snapshot= prefix .. "/fastpm_B{cfg.nbody.B}"
 particle_fraction = 1.00
-
-write_fof     = prefix .. "/fof_B{cfg.nbody.B}"
-fof_linkinglength = 0.200
-fof_nmin = 16
-
--- 1d power spectrum (raw), without shotnoise correction
-write_powerspectrum = prefix .. '/powerspec'
 """
 
     output_file = join(outdir, "parameter_file.lua")
@@ -178,7 +152,7 @@ def main(cfg: DictConfig) -> None:
     generate_pk_file(cfg, outdir)
 
     # Convert ICs to correct format
-    get_ICs(cfg, outdir)
+    save_ICs(cfg, outdir)
 
     # Generate parameter file
     generate_param_file(cfg, outdir)
