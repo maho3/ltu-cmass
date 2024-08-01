@@ -79,11 +79,11 @@ def generate_pk_file(cfg, outdir):
     k = np.logspace(np.log10(kmin), np.log10(kmax), 2*cfg.nbody.N)
 
     if cfg.nbody.transfer.upper() == 'CAMB':
-        pk = get_camb_pk(k, *cfg.nbody.cosmo)
+        k, pk = get_camb_pk(k, *cfg.nbody.cosmo)
     elif cfg.nbody.transfer.upper() == 'CLASS':
-        pk = get_class_pk(k, *cfg.nbody.cosmo)
+        k, pk = get_class_pk(k, *cfg.nbody.cosmo)
     elif cfg.nbody.transfer.upper() == 'SYREN':
-        pk = get_syren_pk(k, *cfg.nbody.cosmo)
+        k, pk = get_syren_pk(k, *cfg.nbody.cosmo)
     else:
         raise NotImplementedError(
             f"Unknown power spectrum method: {cfg.nbody.power_spectrum}")
