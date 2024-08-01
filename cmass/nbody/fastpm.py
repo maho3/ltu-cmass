@@ -19,7 +19,7 @@ from .tools import (
 def get_ICs(cfg, outdir):
 
     nbody = cfg.nbody
-    N = nbody.N
+    N = nbody.N*nbody.supersampling
 
     # Load the ics in Fourier space
     if nbody.matchIC:
@@ -53,7 +53,7 @@ def generate_param_file(cfg, outdir):
     
     lua_content = f"""
 boxsize = {cfg.nbody.L}
-nc = {cfg.nbody.N}
+nc = {cfg.nbody.N*cfg.nbody.supersampling}
 B = {cfg.nbody.B}
 T = {cfg.nbody.N_steps}
 prefix = "{outdir}"
