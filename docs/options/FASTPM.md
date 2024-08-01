@@ -30,6 +30,6 @@ make
 
 Then, change your `nbody` configuration to the path of your FastPM executable:
 ```yaml
-fastpm_exec: /home/mattho/git/fastpm/src/fastpm
+fastpm_exec: /path/to/git/fastpm/src/fastpm
 ```
 An example of this is in [fastpm.yaml](../../cmass/conf/nbody/fastpm.yaml).
