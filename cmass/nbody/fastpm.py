@@ -10,10 +10,11 @@ import subprocess
 
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
-    parse_nbody_config, gen_white_noise, load_white_noise, 
+    parse_nbody_config, gen_white_noise, load_white_noise,
     save_white_noise_grafic, generate_pk_file, rho_and_vfield,
     save_nbody
 )
+
 
 @timing_decorator
 def get_ICs(cfg, outdir):
@@ -34,23 +35,23 @@ def get_ICs(cfg, outdir):
 
     # Convert to real space
     ic = np.fft.irfftn(ic, norm="ortho")
-    
+
     # Save to file
     filename = join(outdir, "WhiteNoise_grafic")
     save_white_noise_grafic(filename, ic, nbody.lhid)
-    
+
     return
 
 
 def generate_param_file(cfg, outdir):
-    
+
     output_redshifts = np.array(cfg.nbody.asave, dtype=float)
     if len(output_redshifts) == 0:
         output_redshifts = [cfg.nbody.zf]
     else:
         output_redshifts = 1 / output_redshifts - 1
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
-    
+
     lua_content = f"""
 boxsize = {cfg.nbody.L}
 nc = {cfg.nbody.N*cfg.nbody.supersampling}
@@ -108,34 +109,34 @@ fof_nmin = 16
 -- 1d power spectrum (raw), without shotnoise correction
 write_powerspectrum = prefix .. '/powerspec'
 """
-    
+
     output_file = join(outdir, "parameter_file.lua")
     with open(output_file, 'w') as file:
         file.write(lua_content)
-        
+
     return
 
 
 @timing_decorator
 def run_density(cfg, outdir):
-    
+
     # Work out how many cpus to use
-    # Need this to exactly divide N * B
-    max_cores = os.cpu_count()
+    #  Need this to exactly divide N * B
+    max_cores = 1  # os.cpu_count()
     max_divisible_cores = None
     product = cfg.nbody.N * cfg.nbody.B
     for cores in range(max_cores, 0, -1):
         if product % cores == 0:
             max_divisible_cores = cores
             break
-    
-    # Run FastPM
+
+    #  Run FastPM
     param_file = join(outdir, "parameter_file.lua")
     command = f'mpirun -n {max_divisible_cores} {cfg.nbody.fastpm_exec} {param_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     process = subprocess.run(command, shell=True, check=True, env=env)
-    
+
     # Obtain scale factor closest to af
     all_a = glob.glob(join(outdir, f'fastpm_B{cfg.nbody.B}_*'))
     all_a = [a[-a[::-1].index('_'):] for a in all_a]
@@ -148,7 +149,7 @@ def run_density(cfg, outdir):
     ds = bigfile.Dataset(f['1/'], ['Position', 'Velocity', 'ID'])
     pos = np.array(ds[:]['Position'])
     vel = np.array(ds[:]['Velocity'])
-    
+
     return pos, vel
 
 
@@ -170,7 +171,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, "fastpm",
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
-        
+
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed
@@ -181,10 +182,10 @@ def main(cfg: DictConfig) -> None:
 
     # Generate parameter file
     generate_param_file(cfg, outdir)
-    
+
     # Run
     pos, vel = run_density(cfg, outdir)
-    
+
     # Calculate velocity field
     rho, fvel = rho_and_vfield(
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
@@ -205,4 +206,3 @@ def main(cfg: DictConfig) -> None:
 
 if __name__ == '__main__':
     main()
-

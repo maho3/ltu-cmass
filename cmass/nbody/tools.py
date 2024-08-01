@@ -81,8 +81,8 @@ def get_ICs(cfg):
         return load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
         return gen_white_noise(N, seed=nbody.lhid)
-    
-    
+
+
 def save_white_noise_grafic(filename, array, seed):
     """
     Save a NumPy array to a file in the grafic noise format, as required for FastPM
@@ -94,12 +94,12 @@ def save_white_noise_grafic(filename, array, seed):
     """
     assert array.ndim == 3, "Array must be 3-dimensional"
     n = array.shape
-    
+
     header = np.array([16, n[2], n[1], n[0], seed, 16], dtype=np.int32)
 
     with open(filename, 'wb') as f:
         f.write(header.tobytes())
-        
+
         # Writing the array in the required format
         for i in range(n[0]):
             block_size = np.array([4 * n[1] * n[2]], dtype=np.int32)
@@ -108,10 +108,10 @@ def save_white_noise_grafic(filename, array, seed):
             # Extract the 2D slice and write it
             slice_2d = array[i, :, :]
             f.write(slice_2d.astype(np.float32).tobytes())
-            
+
             # Write block_size again
             f.write(block_size.tobytes())
-            
+
     return
 
 
