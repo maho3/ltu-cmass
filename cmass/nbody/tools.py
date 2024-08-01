@@ -207,18 +207,19 @@ def get_camb_pk(k, omega_m, omega_b, h, n_s, sigma8, z=0.):
     )
     As_fid = 2.0e-9
     pars.InitPower.set_params(As=As_fid, ns=n_s, r=0)
-    pars.set_matter_power(redshifts=[z], kmax=k[-1])
+    pars.set_matter_power(redshifts=[0.0], kmax=k[-1])
     pars.NonLinear = camb.model.NonLinear_none
     results = camb.get_results(pars)
     sigma8_camb = results.get_sigma8()[0]
     As_new = (sigma8 / sigma8_camb) ** 2 * As_fid
     pars.InitPower.set_params(As=As_new, ns=n_s, r=0)
+    pars.set_matter_power(redshifts=[z], kmax=k[-1])
     results = camb.get_results(pars)
-    _, _, pk_camb = results.get_matter_power_spectrum(
-        minkh=k.min(), maxkh=k.max(), npoints=len(k))
+    kh, _, pk_camb = results.get_matter_power_spectrum(
+        minkh=k.min(), maxkh=k.max(), npoints=len(k))  # returns log-spaced k's
     pk_camb = pk_camb[0, :]
 
-    return pk_camb
+    return kh, pk_camb
 
 
 def class_compute(class_params):
@@ -292,7 +293,7 @@ def get_class_pk(k, omega_m, omega_b, h, n_s, sigma8):
     cosmo.struct_cleanup()
     cosmo.empty()
 
-    return plin_class
+    return k, plin_class
 
 
 def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):
@@ -301,7 +302,7 @@ def get_syren_pk(k, omega_m, omega_b, h, n_s, sigma8):
             "syren transfer function requested, but syren not installed. "
             "See ltu-cmass installation instructions."
         )
-    return symbolic_pofk.linear.plin_emulated(
+    return k, symbolic_pofk.linear.plin_emulated(
         k, sigma8, omega_m, omega_b, h, n_s,
         emulator='fiducial', extrapolate=True
     )
