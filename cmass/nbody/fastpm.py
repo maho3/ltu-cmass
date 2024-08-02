@@ -26,13 +26,16 @@ def save_ICs(cfg, outdir):
 
 
 def generate_param_file(
-    L, N, supersampling, B, N_steps, zi, zf, asave, cosmo,
-    outdir
+    L, N, supersampling, B, N_steps,
+    zf, asave, save_transfer,
+    cosmo, outdir
 ):
 
     output_redshifts = -1 + 1./np.array(asave, dtype=float)
     if zf not in output_redshifts:
         output_redshifts += [zf]
+    if save_transfer and (99. not in output_redshifts):
+        output_redshifts = np.append(output_redshifts, 99.)
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
 
     lua_content = f"""
@@ -52,8 +55,8 @@ read_grafic = "{join(outdir, 'WhiteNoise_grafic')}"
 -- time_step = linspace(0.025, 1.0, 39)
 -- logspace: Uniform time steps in loga
 
-time_step = linspace({1 / (1 + zi)}, {1 / (1 + zf)}, T)
-output_redshifts= {output_redshifts_lua}  -- redshifts of output
+time_step = linspace({0.01}, {1 / (1 + zf)}, T)
+output_redshifts= {output_redshifts_lua}  -- redshifts to output
 
 
 ----------------------------------------
@@ -76,7 +79,7 @@ linear_density_redshift = 0.0 -- the redshift of the linear density field.
 force_mode = "fastpm"
 pm_nc_factor = B            -- Particle Mesh grid pm_nc_factor*nc per dimension in the beginning
 np_alloc_factor= 2.2        -- Amount of memory allocated for particle
-loglevel = 0                   -- 0: only info, 1: additional timing information, 2: debugging
+loglevel = 2
 
 
 ----------------------------------------
@@ -99,7 +102,7 @@ def run_density(cfg, outdir):
 
     # Work out how many cpus to use
     #  Need this to exactly divide N * B
-    max_cores = 1  # os.cpu_count()
+    max_cores = os.cpu_count()
     max_divisible_cores = None
     product = cfg.nbody.N * cfg.nbody.B
     for cores in range(max_cores, 0, -1):
@@ -113,6 +116,28 @@ def run_density(cfg, outdir):
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     _ = subprocess.run(command, shell=True, check=True, env=env)
+
+
+@timing_decorator
+def process_transfer(cfg, outdir, delete_files=True):
+    with h5py.File(join(outdir, 'transfer.h5'), 'w') as outfile:
+        a = 1/(1+99.)  # hardcoded for now, from CHARM training
+        logging.info(f"Processing transfer function at a={a}...")
+        snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+        infile = bigfile.File(snapdir)
+        ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
+        pos = np.array(ds[:]['Position'])
+        vel = np.array(ds[:]['Velocity'])
+
+        rho, _ = rho_and_vfield(
+            pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+            omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+        outfile.create_dataset('rho', data=rho)
+
+    if delete_files:
+        infile.close()
+        shutil.rmtree(snapdir)
 
 
 @timing_decorator
@@ -163,11 +188,11 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
+    # Create output directory
     outdir = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, "fastpm",
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
-
     os.makedirs(outdir, exist_ok=True)
 
     # Setup power spectrum file if needed
@@ -180,7 +205,8 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(
         L=cfg.nbody.L, N=cfg.nbody.N, supersampling=cfg.nbody.supersampling,
         B=cfg.nbody.B, N_steps=cfg.nbody.N_steps,
-        zi=cfg.nbody.zi, zf=cfg.nbody.zf, asave=cfg.nbody.asave,
+        zf=cfg.nbody.zf, asave=cfg.nbody.asave,
+        save_transfer=cfg.nbody.save_transfer,
         cosmo=cfg.nbody.cosmo, outdir=outdir
     )
 
@@ -190,8 +216,10 @@ def main(cfg: DictConfig) -> None:
 
     # Process outputs
     logging.info("Processing outputs...")
+    if cfg.nbody.save_transfer:
+        process_transfer(cfg, outdir, delete_files=True)
     rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
-    os.remove(join(outdir, 'WhiteNoise_grafic'))
+    os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None
