@@ -139,9 +139,14 @@ def process_transfer(cfg, outdir, delete_files=True):
         pos = np.array(ds[:]['Position'])
         vel = np.array(ds[:]['Velocity'])
 
+        # Measure density field
         rho, _ = rho_and_vfield(
             pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
             omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+        # Convert to overdensity field
+        rho /= np.mean(rho)
+        rho -= 1
 
         outfile.create_dataset('rho', data=rho)
 
@@ -166,6 +171,10 @@ def process_outputs(cfg, outdir, delete_files=True):
             rho, fvel = rho_and_vfield(
                 pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
                 omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+
+            # Convert to overdensity field
+            rho /= np.mean(rho)
+            rho -= 1
 
             # Convert from comoving -> physical velocities
             fvel *= 1/a
