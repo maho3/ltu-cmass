@@ -144,6 +144,7 @@ You can see other default configurations in [`cmass/conf`](../cmass/conf).
 We include various additional functionality beyond the minimal working example above. These are provided in separate documentation, including:
 - [Installing `pmesh` and running pypower](./options/PMESH.md)
 - [Running with Quijote initial conditions and fitting bias models](./options/QUIJOTE.md)
+- [Installing and running FASTPM nbody simulators](./options/FASTPM.md)
 - [Installing and running BORG nbody simulators](./options/BORG.md)
 - [Building and running lightcone extrapolation](./options/LIGHTCONE.md)
 - [Building and running the PINOCCHIO simulator](./options/PINOCCHIO.md)
