@@ -99,20 +99,30 @@ particle_fraction = 1.00
 
 @timing_decorator
 def run_density(cfg, outdir):
+    if 'PBS_NODEFILE' in os.environ:  # assume PBS job
+        with open(os.environ['PBS_NODEFILE'], 'r') as f:
+            max_cores = len(f.readlines())
+        mpi_args = '--hostfile $PBS_NODEFILE'
+    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume SLURM job
+        raise NotImplementedError("SLURM not implemented yet")  # TODO: do this
+    else:  # assume local machine
+        max_cores = os.cpu_count()
+        mpi_args = ''
 
     # Work out how many cpus to use
-    #  Need this to exactly divide N * B
-    max_cores = os.cpu_count()
+    # Need this to exactly divide N * B
     max_divisible_cores = None
     product = cfg.nbody.N * cfg.nbody.B
     for cores in range(max_cores, 0, -1):
         if product % cores == 0:
             max_divisible_cores = cores
             break
+    logging.info(f"Using {max_divisible_cores} cores for FastPM")
 
     #  Run FastPM
     param_file = join(outdir, "parameter_file.lua")
-    command = f'mpirun -n {max_divisible_cores} {cfg.nbody.fastpm_exec} {param_file}'
+    command = f'mpirun -n {max_divisible_cores} {mpi_args} '
+    command += f'{cfg.nbody.fastpm_exec} {param_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     _ = subprocess.run(command, shell=True, check=True, env=env)
