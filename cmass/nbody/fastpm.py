@@ -122,7 +122,7 @@ def run_density(cfg, outdir):
 def process_transfer(cfg, outdir, delete_files=True):
     with h5py.File(join(outdir, 'transfer.h5'), 'w') as outfile:
         a = 1/(1+99.)  # hardcoded for now, from CHARM training
-        logging.info(f"Processing transfer function at a={a}...")
+        logging.info(f"Processing transfer function at a={a:.4f}...")
         snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
         infile = bigfile.File(snapdir)
         ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
@@ -144,7 +144,7 @@ def process_transfer(cfg, outdir, delete_files=True):
 def process_outputs(cfg, outdir, delete_files=True):
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
         for a in sorted(cfg.nbody.asave):
-            logging.info(f"Processing snapshot at a={a}...")
+            logging.info(f"Processing snapshot at a={a:.4f}...")
             # Extract positions and velocities at a given scale factor
             snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
             infile = bigfile.File(snapdir)

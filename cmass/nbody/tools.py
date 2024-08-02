@@ -34,7 +34,7 @@ def parse_nbody_config(cfg, lightcone=False):
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
         # default asave
-        if not lightcone:
+        if (not lightcone) or ('asave' not in nbody) or (len(nbody.asave) == 0):
             nbody.asave = [nbody.af]
 
         # load cosmology
