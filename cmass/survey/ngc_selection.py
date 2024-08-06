@@ -27,7 +27,6 @@ os.environ['OPENBLAS_NUM_THREADS'] = '4'  # noqa, must be set before jax
 
 import numpy as np
 import logging
-import h5py
 from os.path import join
 import jax
 from cuboid_remap import Cuboid, remap_Lbox
@@ -123,12 +122,13 @@ def custom_cuts(rdz, cfg):
 
 
 @timing_decorator
-def reweight(rdz, wdir='./data'):
-    # load observed n(z)
-    n_z = np.load(
-        join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
-        allow_pickle=True).item()
-    be, hobs = n_z['be'], n_z['h']
+def reweight(rdz, wdir='./data', be=None, hobs=None):
+    if (be is None) or (hobs is None):
+        # load observed n(z)
+        n_z = np.load(
+            join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+            allow_pickle=True).item()
+        be, hobs = n_z['be'], n_z['h']
 
     # load simulated n(z)
     hsim, _ = np.histogram(rdz[:, -1], bins=be)
@@ -138,7 +138,7 @@ def reweight(rdz, wdir='./data'):
             logging.warning(
                 f'hsim ({hsim[i]}) < hobs ({hobs[i]}) in bin: '
                 f'{be[i]:.5f}<z<{be[i+1]:.5f},\n'
-                'More simulated galaxies than observed. '
+                'More observed galaxies than simulated. '
                 'Reweighting may not be accurate.')
 
     # sample at most as many as observed
