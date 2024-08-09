@@ -270,7 +270,7 @@ def gen_randoms(wdir='./data'):
 
 
 def load_galaxies(source_dir, a, seed):
-    filepath = join(source_dir, 'galaxies', f'hod{seed:03}.h5')
+    filepath = join(source_dir, 'galaxies', f'hod{seed:05}.h5')
     with h5py.File(filepath, 'r') as f:
         key = f'{a:.6f}'
         if key not in f:
@@ -286,7 +286,7 @@ def load_galaxies(source_dir, a, seed):
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, aug_seed=0, suffix=''):
-    outfile = join(outdir, f'hod{hod_seed:03}_aug{aug_seed:03}{suffix}.h5')
+    outfile = join(outdir, f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
         f.create_dataset('ra', data=ra)                # Right ascension [deg]

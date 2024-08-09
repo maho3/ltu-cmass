@@ -99,13 +99,13 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
 def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
              from_scratch=True):
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:03}.h5')
+    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
 
     # check for file keys
-    filename = join(source_path, 'galaxies', f'hod{hod_seed:03}.h5')
+    filename = join(source_path, 'galaxies', f'hod{hod_seed:05}.h5')
     if not os.path.isfile(filename):
         logging.error(f'gal file not found: {filename}')
         return False

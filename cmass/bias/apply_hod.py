@@ -142,7 +142,7 @@ def main(cfg: DictConfig) -> None:
     )
     save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = join(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    save_file = join(save_path, f'hod{cfg.bias.hod.seed:05}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs
