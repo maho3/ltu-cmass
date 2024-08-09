@@ -165,7 +165,7 @@ def main(cfg: DictConfig) -> None:
         gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
 
         # Save snapshot
-        save_snapshot(save_file, a, gpos, gvel, **meta)
+        save_snapshot(save_file, a, gpos, gvel, hod=cfg.bias.hod.theta, **meta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
