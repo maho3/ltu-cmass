@@ -36,7 +36,13 @@ from ..nbody.tools import parse_nbody_config
 def parse_hod(cfg):
     with open_dict(cfg):
         # HOD parameters
-        cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
+        if (not hasattr(cfg.bias.hod, 'seed')) or (cfg.bias.hod.seed is None):
+            cfg.bias.hod.theta = [
+                cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
+                cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
+            ]
+        else:
+            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
         # Cosmology
         cfg.nbody.cosmo = load_params(
