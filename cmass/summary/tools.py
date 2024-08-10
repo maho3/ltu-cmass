@@ -50,11 +50,11 @@ def load_lightcone(source_dir, hod_seed=0, aug_seed=0, filter_name=None):
     if filter_name is None:
         infile = join(
             source_dir, 'lightcone',
-            f'hod{hod_seed:03}_aug{aug_seed:03}.h5')
+            f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     else:
         infile = join(
             source_dir, 'filter',
-            f'hod{hod_seed:03}_aug{aug_seed:03}_{filter_name}.h5')
+            f'hod{hod_seed:05}_aug{aug_seed:05}_{filter_name}.h5')
 
     with h5py.File(infile, 'r') as f:
         ra = f['ra'][...]

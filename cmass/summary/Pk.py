@@ -109,7 +109,7 @@ def main(cfg: DictConfig) -> None:
     # save results
     outpath = join(source_path, 'summary')
     os.makedirs(outpath, exist_ok=True)
-    outname = f'hod{cfg.bias.hod.seed:03}_aug{cfg.survey.aug_seed:03}'
+    outname = f'hod{cfg.bias.hod.seed:05}_aug{cfg.survey.aug_seed:05}'
     if use_filter:
         outname += f'_{cfg.filter.filter_name}'
     outname += '.h5'

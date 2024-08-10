@@ -36,7 +36,14 @@ from ..nbody.tools import parse_nbody_config
 def parse_hod(cfg):
     with open_dict(cfg):
         # HOD parameters
-        cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
+        if (not hasattr(cfg.bias.hod, 'seed')) or (cfg.bias.hod.seed is None):
+            cfg.bias.hod.theta = [
+                cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
+                cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
+            ]
+            cfg.bias.hod.seed = 0
+        else:
+            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
         # Cosmology
         cfg.nbody.cosmo = load_params(
@@ -142,7 +149,7 @@ def main(cfg: DictConfig) -> None:
     )
     save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = join(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    save_file = join(save_path, f'hod{cfg.bias.hod.seed:05}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs
@@ -159,7 +166,7 @@ def main(cfg: DictConfig) -> None:
         gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
 
         # Save snapshot
-        save_snapshot(save_file, a, gpos, gvel, **meta)
+        save_snapshot(save_file, a, gpos, gvel, hod=cfg.bias.hod.theta, **meta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
