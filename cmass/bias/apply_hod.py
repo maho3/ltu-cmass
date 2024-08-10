@@ -41,6 +41,7 @@ def parse_hod(cfg):
                 cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
                 cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
             ]
+            cfg.bias.hod.seed = 0
         else:
             cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
