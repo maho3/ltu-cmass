@@ -39,6 +39,36 @@ to enable pinnochio to access the fftw3_mpi library. Then you should be able to 
 python -m cmass.nbody.pinocchio nbody=pinocchio
 ```
 
+## Compiling Pinocchio on anvil
+To build pinnochio on anvil, first load the appropriate modules
+```bash
+module purge
+module load gcc/11.2.0
+module load openmpi/4.1.6
+module load gsl/2.4
+module load fftw/3.3.8
+```
+After cloning pinnochio from https://github.com/pigimonaco/Pinocchio, edit the Makefile to be compatible with anvil:
+```bash
+ifeq ($(SYSTYPE),"anvil")
+CC          =  mpicc
+CDEBUG      = -ggdb3 -Wall
+COPTIMIZED  = -O3 -Wno-unused-result
+FFTW_LIBR   = -L$(HOME)/lib -lfftw3_mpi -lfftw3
+FFTW_INCL   = -I/usr/local/include -I$(HOME)/include
+MPI_LIBR    = -lmpi
+MPI_INCL    =
+GSL_LIBR    = -lgsl -lgslcblas -lm
+GSL_INCL    = -I/usr/include
+endif
+```
+Also change the `SYSTYPE` argument to be `"anvil"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work.
+
+Unlike infinity, you do not need to export the path. Running the default configuration should now work
+```bash
+python -m cmass.nbody.pinocchio nbody=pinocchio
+```
+
 ## Installing camb, CLASS, or syren
 Pinocchio then requires you to generate a linear power spectrum on your own. We provide integration with [camb](https://github.com/cmbant/CAMB), [CLASS](https://github.com/lesgourg/class_public), or [syren](https://github.com/DeaglanBartlett/symbolic_pofk).
 ```bash
