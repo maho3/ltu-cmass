@@ -18,6 +18,7 @@ Output:
 
 import os
 from os.path import join
+import subprocess
 import numpy as np
 import logging
 import hydra
@@ -190,10 +191,42 @@ PLCAperture            30           % cone aperture for the past light cone
 @timing_decorator
 def run_density(cfg, outdir):
 
-    # Run pinoccio
+    # Run from output dir
     cwd = os.getcwd()
     os.chdir(outdir)
-    os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
+
+    # Get MPI information
+    if 'PBS_NODEFILE' in os.environ:  # assume PBS job
+        with open(os.environ['PBS_NODEFILE'], 'r') as f:
+            max_cores = len(f.readlines())
+        mpi_args = '--hostfile $PBS_NODEFILE'
+    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
+        # Use scontrol to get the expanded list of nodes
+        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = node_list.decode('utf-8').splitlines()
+
+        # Calculate max_cores (total cores allocated)
+        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
+        max_cores = len(node_list) * cores_per_node
+
+        # Write to a hostfile (optional, if required by your MPI setup)
+        hostfile = 'slurm_hostfile'
+        with open(hostfile, 'w') as f:
+            for node in node_list:
+                f.write(f"{node}\n")
+
+        # Set MPI args
+        mpi_args = f'--hostfile {hostfile}'
+    else:
+        max_cores = os.cpu_count()
+        mpi_args = ''
+
+    # Run pinoccio
+    command = f'mpirun -n {max_cores} {mpi_args} '
+    command += f'{cfg.nbody.pinocchio_exec} parameter_file'
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    _ = subprocess.run(command, shell=True, check=True, env=env)
     os.chdir(cwd)
 
     # Load the data
