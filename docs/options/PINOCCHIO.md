@@ -23,7 +23,13 @@ GSL_LIBR    = -lgsl -lgslcblas -lm
 GSL_INCL    = -I/usr/include
 endif
 ```
-Also change the `SYSTYPE` argument to be `"infinity"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work. 
+Also change the `SYSTYPE` argument to be `"infinity"` and ensure the "-DWHITENOISE" option is enabled. Building with 
+```bash
+make clean
+make
+make memorytest
+```
+should then work. 
 
 Lastly, in [your nbody configuration file](../../cmass/conf/nbody/pinocchio.yaml) you need to specify the absolute path to your Pinocchio executable. This is the `pinnochio.x` file in the `src` directory of Pinocchio, generated during the `make`. For example, mine is:
 ```yaml
@@ -62,7 +68,13 @@ GSL_LIBR    = -lgsl -lgslcblas -lm
 GSL_INCL    = -I/usr/include
 endif
 ```
-Also change the `SYSTYPE` argument to be `"anvil"` and ensure the "-DWHITENOISE" option is enabled. Building with `make clean; make` should then work.
+Also change the `SYSTYPE` argument to be `"anvil"` and ensure the "-DWHITENOISE" option is enabled. Building with
+```bash
+make clean
+make
+make memorytest
+```
+should then work.
 
 Unlike infinity, you do not need to export the path. Running the default configuration should now work
 ```bash
