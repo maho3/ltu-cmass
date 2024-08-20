@@ -22,6 +22,7 @@ import subprocess
 import numpy as np
 import logging
 import hydra
+import re
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
@@ -65,6 +66,36 @@ def get_ICs(cfg, outdir):
             file.write(np.array([planesize], dtype=np.int32).tobytes())
 
     return
+
+
+def get_mpi_info():
+
+    if 'PBS_NODEFILE' in os.environ:  # assume PBS job
+        with open(os.environ['PBS_NODEFILE'], 'r') as f:
+            max_cores = len(f.readlines())
+        mpi_args = '--hostfile $PBS_NODEFILE'
+    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
+        # Use scontrol to get the expanded list of nodes
+        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = node_list.decode('utf-8').splitlines()
+
+        # Calculate max_cores (total cores allocated)
+        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
+        max_cores = len(node_list) * cores_per_node
+
+        # Write to a hostfile (optional, if required by your MPI setup)
+        hostfile = 'slurm_hostfile'
+        with open(hostfile, 'w') as f:
+            for node in node_list:
+                f.write(f"{node}\n")
+
+        # Set MPI args
+        mpi_args = f'--hostfile {hostfile}'
+    else:
+        max_cores = os.cpu_count()
+        mpi_args = ''
+
+    return max_cores, mpi_args
 
 
 def generate_param_file(cfg, outdir):
@@ -122,7 +153,9 @@ def generate_param_file(cfg, outdir):
 
     # Make paramater file
 
-    content = f"""# This is a parameter file for the Pinocchio 4.0 code
+    def make_content(MaxMem, MaxMemPerParticle):
+
+        content = f"""# This is a parameter file for the Pinocchio 4.0 code
 
 # run properties
 RunFlag                {run_flag}      % name of the run
@@ -151,8 +184,8 @@ WDM_PartMass_in_kev    0.0          % WDM cut following Bode, Ostriker & Turok (
 
 # control of memory requirements
 BoundaryLayerFactor    1.0          % width of the boundary layer for fragmentation
-MaxMem                 3600         % max available memory to an MPI task in Mbyte
-MaxMemPerParticle      300          % max available memory in bytes per particle
+MaxMem                 {MaxMem}     % max available memory to an MPI task in Mbyte
+MaxMemPerParticle      {MaxMemPerParticle} % max available memory in bytes per particle
 
 # output
 CatalogInAscii                      % catalogs are written in ascii and not in binary format
@@ -180,10 +213,64 @@ PLCAperture            30           % cone aperture for the past light cone
 % PLCCenter 0. 0. 0.                % cone vertex in the same coordinates as the BoxSize
 % PLCAxis   1. 1. 0.                % un-normalized direction of the cone axis
 """
+        return content
+
+    # Initial guess at memory requirements
+    MaxMem = 3600
+    MaxMemPerParticle = 300
+    content = make_content(MaxMem, MaxMemPerParticle)
 
     # Write the content to a file
     with open(filename, 'w') as file:
         file.write(content)
+
+    max_cores, mpi_args = get_mpi_info()
+
+    # Run memory checking
+    log_file = join(outdir, 'memory_log')
+    memory_exec = join(os.path.dirname(cfg.nbody.pinocchio_exec), 'memorytest')
+    command = f'mpirun -np 1 {memory_exec} {filename} {max_cores} > {log_file}'
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    cwd = os.getcwd()
+    os.chdir(outdir)
+    _ = subprocess.run(command, shell=True, check=False, env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.chdir(cwd)
+
+    # Check memory requirements within limits
+    with open(log_file, 'r') as f:
+        text = f.read()
+    bytes_per_particle_pattern = r"bytes per particle:\s+([0-9]*\.?[0-9]+)"
+    required_memory_pattern = r"Required memory per task:\s+([0-9]*\.?[0-9]+)Mb"
+    total_required_memory_pattern = r"Total required memory:\s+([0-9]*\.?[0-9]+)Gb"
+    bytes_per_particle_match = re.search(bytes_per_particle_pattern, text)
+    required_memory_match = re.search(required_memory_pattern, text)
+    total_required_memory_match = re.search(total_required_memory_pattern, text)
+    if bytes_per_particle_match:
+        bytes_per_particle = float(bytes_per_particle_match.group(1))
+        logging.info(f"Bytes per particle: {bytes_per_particle}")
+    else:
+        raise ValueError(f"Bytes per particle not found in {log_file}")
+    if required_memory_match:
+        required_memory_per_task = float(required_memory_match.group(1))
+        logging.info(f"Required memory per task (in Mb): {required_memory_per_task}")
+    else:
+        raise ValueError(f"Required memory per task not found in {log_file}")
+    if total_required_memory_match:
+        total_required_memory = float(total_required_memory_match.group(1))
+        logging.info(f"Total required memory (in Gb): {total_required_memory}")
+    else:
+        raise ValueError(f"Total required memory not found in {log_file}")
+
+    # Change memory requirements if not acceptable (less than 10% buffer)
+    if (bytes_per_particle > 0.9 * MaxMemPerParticle) or (required_memory_per_task > 0.9 * MaxMem):
+        logging.info('Maximum memory requirements too stringent. Updating file.')
+        MaxMem = max(required_memory_per_task/0.9, MaxMem)
+        MaxMemPerParticle = max(bytes_per_particle/0.9, MaxMemPerParticle)
+        content = make_content(MaxMem, MaxMemPerParticle)
+        with open(filename, 'w') as file:
+            file.write(content)
 
     return
 
@@ -195,31 +282,7 @@ def run_density(cfg, outdir):
     cwd = os.getcwd()
     os.chdir(outdir)
 
-    # Get MPI information
-    if 'PBS_NODEFILE' in os.environ:  # assume PBS job
-        with open(os.environ['PBS_NODEFILE'], 'r') as f:
-            max_cores = len(f.readlines())
-        mpi_args = '--hostfile $PBS_NODEFILE'
-    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
-        # Use scontrol to get the expanded list of nodes
-        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
-        node_list = node_list.decode('utf-8').splitlines()
-
-        # Calculate max_cores (total cores allocated)
-        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
-        max_cores = len(node_list) * cores_per_node
-
-        # Write to a hostfile (optional, if required by your MPI setup)
-        hostfile = 'slurm_hostfile'
-        with open(hostfile, 'w') as f:
-            for node in node_list:
-                f.write(f"{node}\n")
-
-        # Set MPI args
-        mpi_args = f'--hostfile {hostfile}'
-    else:
-        max_cores = os.cpu_count()
-        mpi_args = ''
+    max_cores, mpi_args = get_mpi_info()
 
     # Run pinoccio
     command = f'mpirun -n {max_cores} {mpi_args} '
