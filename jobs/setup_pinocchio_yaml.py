@@ -36,6 +36,9 @@ def make_run_script(all_suites):
 
     bash_script = """#!/bin/sh
 
+# Cancel job if error raised
+set -e
+
 # Modules
 module purge
 module load gcc/11.2.0

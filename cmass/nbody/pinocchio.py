@@ -272,6 +272,47 @@ PLCAperture            30           % cone aperture for the past light cone
         with open(filename, 'w') as file:
             file.write(content)
 
+    # Check job has the required resources if SLURM job
+    if 'SLURM_JOB_NODELIST' in os.environ:
+        
+        slurm_job_id = os.getenv("SLURM_JOBID")
+        if slurm_job_id is None:
+            raise ValueError("Error: SLURM_JOBID environment variable is not set.")
+
+        result = subprocess.run(
+            ["scontrol", "show", "job", slurm_job_id],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        output = result.stdout
+        match = re.search(r"AllocTRES=([^ ]+)", output)
+        if not match:
+            raise ValueError("TRES information not found in SLURM job details.")
+        # Extract the TRES details
+        tres_info = match.group(1)
+
+        # Parse the TRES details
+        tres_dict = {}
+        for resource in tres_info.split(","):
+            key, value = resource.split("=")
+            tres_dict[key] = value
+
+        # Compute total memory and memory per core
+        total_memory = int(tres_dict.get("mem", "0M").rstrip("M")) / 1000  # Total memory in GB
+        total_cpus = int(tres_dict.get("cpu", "1"))  # Total CPUs allocated
+        memory_per_core = total_memory * 1000 / total_cpus if total_cpus > 0 else 0
+
+        # Print results
+        logging.info(f"Allocated total memory (in Gb): {total_memory}")
+        logging.info(f"Allocated memory per task (in Mb): {memory_per_core:.2f}")
+
+        # Check we have the resources
+        if total_memory < total_required_memory:
+            raise ValueError('Insufficient total memory for job to run')
+        if memory_per_core < required_memory_per_task:
+            raise ValueError('Insufficient memory per core for job to run')
+
     return
 
 
