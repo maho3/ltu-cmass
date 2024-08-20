@@ -160,16 +160,19 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                 for summ in summaries:
                     binning = get_binning(summary, L, N, threads, rsd=False,)
                     summary = getattr(summarizer, summ)(**binning)(box_catalogue)
-                    for key, value in summary.items():
+                    #TODO: check this is storing both coordinates and values
+                    for key, value in summary.coords.items():
                         group.create_dataset(f'{summ}_{key}', data=value)
+                    group.create_dataset(f'{summ}', data=summary.values)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue(pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
                     binning = get_binning(summary, L, N, threads, rsd=True,)
                     summary = getattr(summarizer, summ)(**binning)(zbox_catalogue)
-                    for key, value in summary.items():
-                        group.create_dataset(f'{summ}_{key}', data=value)
+                    for key, value in summary.coords.items():
+                        group.create_dataset(f'z{summ}_{key}', data=value)
+                    group.create_dataset(f'z{summ}', data=summary.values)
 
                 # measure halo mass function
                 be = np.linspace(13, 16, 100)
