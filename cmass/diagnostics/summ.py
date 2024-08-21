@@ -57,7 +57,7 @@ def get_box_catalogue(pos, z, L, N):
     )
 
 def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
-    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L, N=N,)
+    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
     return BoxCatalogue(
         galaxies_pos=pos,
         redshift=z,
@@ -66,23 +66,23 @@ def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
     )
 
 def get_binning(summary, L, N, threads, rsd=False,):
-    #TODO: make sure using gpu if available
     ells = [0,] if not rsd else [0,2,4]
     if summary == 'Pk':
         return {
+            'k_edges': np.linspace(0, 1., 31),
             'n_mesh': N,
             'los': 'z',
-            'compensation': 'nsc',
+            'compensations': 'ngp',
             'ells': ells,
-            'n_threads': threads,
         }
     if summary == 'Bk':
-        k_min = 2 * np.pi / L
-        k_max = np.pi * N / L 
-        num_bins = 30
+        k_min = 1.05*2* np.pi / L
+        n_mesh = 64
+        k_max = 0.95 * np.pi * n_mesh / L 
+        num_bins = 15
         return {
             'k_bins': np.logspace(np.log10(k_min), np.log10(k_max), num_bins),
-            'n_mesh': N,
+            'n_mesh': n_mesh,
             'lmax': 2,
             'ells': ells,
         }
@@ -113,10 +113,8 @@ def get_binning(summary, L, N, threads, rsd=False,):
             'smoothing_radius': 10.0,
             'ells': ells,
             'n_threads': threads,
-            'los': 'z',
-            'n_mesh': N,
         }
-    if summary == 'kNN':
+    if summary == 'KNN':
         num_bins = 60
         return {
             'r_bins': np.logspace(-2, np.log10(30.), num_bins),
@@ -126,9 +124,22 @@ def get_binning(summary, L, N, threads, rsd=False,):
     else:
         raise NotImplementedError(f'{summary} not implemented')
 
+def store_summary(catalog, group, summary_name, box_size, num_bins, num_threads, use_rsd=False):
+    binning_config = get_binning(summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
+    
+    logging.info(f'Computing Summary: {summary_name}, with binning:')
+    logging.info(binning_config)
+    
+    summary_function = getattr(summarizer, summary_name)(**binning_config)
+    summary_data = summary_function(catalog)
+    summary_dataset = summary_function.to_dataset(summary_data)
+    for coord_name, coord_value in summary_dataset.coords.items():
+        dataset_key = f'{summary_name}_{coord_name}' if not use_rsd else f'z{summary_name}_{coord_name}'
+        group.create_dataset(dataset_key, data=coord_value.values)
+    summary_key = summary_name if not use_rsd else f'z{summary_name}'
+    group.create_dataset(summary_key, data=summary_dataset.values)
 
-
-def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=['Pk', 'Bk', 'TwoPCF', 'WST', 'DensitySplit', 'KNN']):
+def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=['Pk','TwoPCF','KNN','WST']): #['Bk', 'DensitySplit']
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'halos.h5')
     if (not from_scratch) and os.path.isfile(outpath):
@@ -158,22 +169,12 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
                 for summ in summaries:
-                    binning = get_binning(summary, L, N, threads, rsd=False,)
-                    summary = getattr(summarizer, summ)(**binning)(box_catalogue)
-                    #TODO: check this is storing both coordinates and values
-                    for key, value in summary.coords.items():
-                        group.create_dataset(f'{summ}_{key}', data=value)
-                    group.create_dataset(f'{summ}', data=summary.values)
+                    store_summary(box_catalogue, group, summ, L, N, threads, rsd=False,)
 
                 # Get summaries in redshift space
-                zbox_catalogue = get_box_catalogue(pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
+                zbox_catalogue = get_box_catalogue_rsd(pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
-                    binning = get_binning(summary, L, N, threads, rsd=True,)
-                    summary = getattr(summarizer, summ)(**binning)(zbox_catalogue)
-                    for key, value in summary.coords.items():
-                        group.create_dataset(f'z{summ}_{key}', data=value)
-                    group.create_dataset(f'z{summ}', data=summary.values)
-
+                    store_summary(zbox_catalogue, group, summ, L, N, threads, rsd=True,)
                 # measure halo mass function
                 be = np.linspace(13, 16, 100)
                 hist, _ = np.histogram(hmass, bins=be)
@@ -185,7 +186,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
 
 
 def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
-             from_scratch=True):
+             from_scratch=True,  summaries=['Pk','TwoPCF','KNN','WST']):
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
@@ -212,20 +213,17 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
                 gpos = f[a]['pos'][...]
                 gvel = f[a]['vel'][...]
 
-                # measure gal Pk
-                delta = MA(gpos, L, N, MAS='NGP')
-                k, Pk = calcPk(delta, L, MAS='NGP', threads=threads)
-
-                # measure gal zPk
-                delta = MAz(gpos, gvel, L, N, h, z, MAS='NGP')
-                kz, Pkz = calcPk(delta, L, MAS='NGP', threads=threads)
-
-                # Save
+                # Get summaries in comoving space
                 group = o.create_group(a)
-                group.create_dataset('Pk_k', data=k)
-                group.create_dataset('Pk', data=Pk)
-                group.create_dataset('zPk_k', data=kz)
-                group.create_dataset('zPk', data=Pkz)
+                box_catalogue = get_box_catalogue(pos=gpos, z=z, L=L, N=N)
+                for summ in summaries:
+                    store_summary(box_catalogue, group, summ, L, N, threads, rsd=False,)
+
+                # Get summaries in redshift space
+                zbox_catalogue = get_box_catalogue_rsd(pos=gpos, vel=gvel, h=h, z=z, axis=2, L=L, N=N)
+                for summ in summaries:
+                    store_summary(zbox_catalogue, group, summ, L, N, threads, rsd=True,)
+
     return True
 
 
