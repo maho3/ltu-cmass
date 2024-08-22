@@ -12,7 +12,7 @@ def make_yaml(lhid, N,):
         'L': 1000,  # Mpc/h
         'N': N,  # meshgrid resolution
         'lhid': lhid,  # latin hypercube id
-        'matchIC': 2,  # whether to match ICs to file (0 no, 1 yes, 2 quijote)
+        'matchIC': 0,  # whether to match ICs to file (0 no, 1 yes, 2 quijote)
         'save_particles': False,  # whether to save particle data
         'save_transfer': True,  # whether to save transfer fn densities (for CHARM)
         'zi': 20,  # initial redshift
@@ -72,7 +72,8 @@ exit 0
 
 def main():
 
-    all_N = [128, 256, 384]
+    all_N = [128, 256, 384,]
+    all_N = [512]
     lhid = 3
 
     all_suites = []
