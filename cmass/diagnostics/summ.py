@@ -16,9 +16,12 @@ from ..nbody.tools import parse_nbody_config
 from .tools import MA, MAz, calcPk
 
 
-def rho_summ(source_path, L, threads=16, from_scratch=True):
+def rho_summ(source_path, L, threads=16, from_scratch=True, out_dir=None):
+    if out_dir is None:
+        out_dir = source_path
+
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'rho.h5')
+    outpath = join(out_dir, 'diag', 'rho.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Rho diagnostics already computed')
         return True
@@ -32,7 +35,7 @@ def rho_summ(source_path, L, threads=16, from_scratch=True):
         alist = list(f.keys())
 
     logging.info(f'Saving rho diagnostics to {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    os.makedirs(join(out_dir, 'diag'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
@@ -46,9 +49,12 @@ def rho_summ(source_path, L, threads=16, from_scratch=True):
     return True
 
 
-def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
+def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, out_dir=None):
+    if out_dir is None:
+        out_dir = source_path
+
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'halos.h5')
+    outpath = join(out_dir, 'diag', 'halos.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Halo diagnostics already computed')
         return True
@@ -62,7 +68,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
         alist = list(f.keys())
 
     logging.info(f'Saving halo diagnostics to {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    os.makedirs(join(out_dir, 'diag'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
@@ -96,10 +102,12 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
     return True
 
 
-def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
-             from_scratch=True):
+def gal_summ(source_path, hod_seed, L, N, h, z, threads=16, from_scratch=True, out_dir=None):
+    if out_dir is None:
+        out_dir = source_path
+
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
+    outpath = join(out_dir, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
@@ -113,8 +121,8 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
         alist = list(f.keys())
 
     logging.info(f'Saving gal diagnostics to {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
-    os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
+    os.makedirs(join(out_dir, 'diag'), exist_ok=True)
+    os.makedirs(join(out_dir, 'diag', 'galaxies'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
@@ -154,6 +162,12 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
 
+    out_dir = get_source_path(
+        cfg.meta.odir, cfg.nbody.suite, cfg.sim,
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
+        mkdir=True
+    )
+
     threads = cfg.diag.threads
     from_scratch = cfg.diag.from_scratch
 
@@ -162,20 +176,20 @@ def main(cfg: DictConfig) -> None:
     # measure rho diagnostics
     done = rho_summ(
         source_path, cfg.nbody.L, threads=threads,
-        from_scratch=from_scratch)
+        from_scratch=from_scratch, out_dir=out_dir)
     all_done &= done
 
     # measure halo diagnostics
     done = halo_summ(
         source_path, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
-        cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
+        cfg.nbody.zf, threads=threads, from_scratch=from_scratch, out_dir=out_dir)
     all_done &= done
 
     # measure gal diagnostics
     done = gal_summ(
         source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N,
         cfg.nbody.cosmo[2], cfg.nbody.zf,
-        threads=threads, from_scratch=from_scratch)
+        threads=threads, from_scratch=from_scratch, out_dir=out_dir)
     all_done &= done
 
     if all_done:
