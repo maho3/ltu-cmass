@@ -53,7 +53,8 @@ def plot_halo_sum(source_path, L, N, h, z, from_scratch=True, out_dir=None):
             fig, axs = plt.subplots(1, 3)
             axs[0].loglog(k, Pk)
             axs[1].loglog(kz, Pkz)
-            axs[2].loglog(mass_bins, mass_hist/L**3)
+            centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
+            axs[2].loglog(centered_bins, mass_hist/L**3)
 
             fig.savefig(out_file)
     return True
