@@ -41,7 +41,7 @@ def plot_halo_sum(source_path, L, N, h, z, from_scratch=True, out_dir=None):
     # compute diagnostics and save
     with h5py.File(source_file, 'r') as f:
         for a in alist:
-            out_file = join(outpath, f'halo_summ_group{a}')
+            out_file = join(outpath, f'halo_summ_group{a}.svg')
             # Load
             k = f[a]['Pk_k'][...]
             Pk = f[a]['Pk'][...]
@@ -56,7 +56,7 @@ def plot_halo_sum(source_path, L, N, h, z, from_scratch=True, out_dir=None):
             centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
             axs[2].loglog(centered_bins, mass_hist/L**3)
 
-            fig.savefig(out_file)
+            fig.savefig(out_file, format='svg')
     return True
 
 @timing_decorator
