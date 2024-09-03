@@ -24,7 +24,7 @@ def plot_halo_sum(source_path, L, N, h, z, from_scratch=True, out_dir=None):
 
     # check if diagnostics is computed
     source_file = join(source_path, 'diag', 'halos.h5')
-    if os.path.isfile(source_path):
+    if os.path.isfile(source_file):
         logging.info('Halo diagnostics already computed. Proceeding with visualisation.')
     else:
         logging.error(f'{source_file} with halo diagnostics not found.')
