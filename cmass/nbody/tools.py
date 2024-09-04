@@ -143,7 +143,7 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
             group.create_dataset('pvel', data=pvel)
 
 
-def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):
+def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False, chunk_size=-1):
     """ Assign particle positions to a grid.
     Note:
         For overdensity and density contrast, divide by the mean and
@@ -156,17 +156,33 @@ def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False):
         MAS (str): mass assignment scheme (NGP, CIC, TSC, PCS)
         value (np.array, optional): (N,) array of values to assign
         verbose (bool, optional): print information on progress
+        chunk_size (int, optional): if applying assignment to full array, use chunk_size=-1.
+            Otherwise, can apply to chunk_size particles at once. Important if pos is a
+            h5 dataset.
     """
+
     # define 3D density field
     delta = np.zeros((Ngrid, Ngrid, Ngrid), dtype=np.float32)
 
+    num_particles = pos.shape[0]
+
     # construct 3D density field
-    MASL.MA(pos, delta, BoxSize, MAS, W=value, verbose=verbose)
+    if (chunk_size == -1) or (chunk_size > num_particles):
+        MASL.MA(pos, delta, BoxSize, MAS, W=value, verbose=verbose)
+    else:
+        for start in range(0, num_particles, chunk_size):
+            end = min(start + chunk_size, num_particles)
+            chunk = pos[start:end]
+            if value is None:
+                v = None
+            else:
+                v = value[start:end]
+            MASL.MA(chunk, delta, BoxSize, MAS, W=v, verbose=verbose)
 
     return delta
 
 
-def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
+def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False, chunk_size=-1):
     """
     Measure the 3D density and velocity field from particles.
 
@@ -179,21 +195,40 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False):
         omega_m (float): matter density
         h (float): Hubble constant
         verbose (bool, optional): print information on progress
+        chunk_size (int, optional): if applying assignment to full array, use chunk_size=-1.
+            Otherwise, can apply to chunk_size particles at once. Important if pos is a
+            h5 dataset.
     """
-    ppos, pvel = ppos.astype(np.float32), pvel.astype(np.float32)
+    if ppos.dtype != np.float32:
+        ppos = ppos.astype(np.float32)
+    if isinstance(pvel, np.ndarray) and (pvel.dtype != np.float32):
+        pvel = pvel.astype(np.float32)
 
     Npart = len(ppos)
 
     # Get particle count field
+    logging.info('Computing density field...')
     count = assign_field(ppos, BoxSize, Ngrid, MAS,
-                         value=None, verbose=verbose)
-
+                         value=None, verbose=verbose,
+                         chunk_size=chunk_size)
+    
     # Sum velocity field
-    vel = np.stack([
-        assign_field(ppos, BoxSize, Ngrid, MAS,
-                     value=pvel[:, i], verbose=verbose)
-        for i in range(3)
-    ], axis=-1)
+    if isinstance(pvel, np.ndarray):
+        logging.info('Computing velocity field...')
+        vel = np.stack([
+            assign_field(ppos, BoxSize, Ngrid, MAS,
+                         value=pvel[:, i], verbose=verbose,
+                         chunk_size=chunk_size)
+            for i in range(3)
+            ], axis=-1)
+    else:
+        vel = [None] * 3
+        for i, com in enumerate(['x', 'y', 'z']):
+            logging.info(f'Computing {com} component of velocity field...')
+            vel[i] = assign_field(ppos, BoxSize, Ngrid, MAS,
+                     value=pvel[i], verbose=verbose,
+                     chunk_size=chunk_size)
+        vel = np.stack(vel, axis=-1)
 
     # Normalize
     m_particle = get_particle_mass(Npart, BoxSize, omega_m, h)

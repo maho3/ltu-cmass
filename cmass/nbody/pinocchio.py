@@ -23,6 +23,7 @@ import numpy as np
 import logging
 import hydra
 import re
+import h5py
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
@@ -162,7 +163,7 @@ RunFlag                {run_flag}      % name of the run
 OutputList             {output_list}      % name of file with required output redshifts
 BoxSize                {cfg.nbody.L}        % physical size of the box in Mpc
 BoxInH100                           % specify that the box is in Mpc/h
-GridSize               {cfg.nbody.N}          % number of grid points per side
+GridSize               {cfg.nbody.N} % number of grid points per side
 RandomSeed             {random_seed}       % random seed for initial conditions
 
 # cosmology
@@ -359,6 +360,83 @@ def run_density(cfg, outdir):
                 f, dtype=np.int32, count=1)[0]  # not used
             return data_block
 
+
+        # Function to read a large block
+        def read_large_block(expected_name, dummy_dtype, data_dtype, num_particles, chunk_size = 900000):
+
+            # Save to file to prevent storing too much in memory
+            out_filename = join(
+                outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
+                f'N{cfg.nbody.N}-{cfg.nbody.lhid}.particle_{expected_name}.h5')
+
+            def write_initial_chunk(data_chunk):
+                with h5py.File(out_filename, 'w') as fout:
+                    if expected_name == 'VEL':
+                        for i, suffix in enumerate(['X', 'Y', 'Z']):
+                            dset = fout.create_dataset(
+                                expected_name + suffix,
+                                data=data_chunk[:,i],
+                                maxshape=(None,),
+                                chunks=True)
+                    else:
+                        dset = fout.create_dataset(
+                            expected_name, 
+                            data=data_chunk, 
+                            maxshape=(None,)+data_chunk.shape[1:], 
+                            chunks=True)
+
+            def append_chunk(new_chunk):
+                with h5py.File(out_filename, 'a') as fout:
+                    if expected_name == 'VEL':
+                        for i, suffix in enumerate(['X', 'Y', 'Z']):
+                            dset = fout[expected_name+suffix]
+                            dset.resize(dset.shape[0] + new_chunk.shape[0], axis=0)
+                            dset[-new_chunk.shape[0]:] = new_chunk[:,0]
+                    else:
+                        dset = fout[expected_name]
+                        dset.resize(dset.shape[0] + new_chunk.shape[0], axis=0)
+                        dset[-new_chunk.shape[0]:] = new_chunk
+
+            initial_block_size = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
+            block_name = np.fromfile(f, dtype='S4', count=1)[
+                0].decode().strip()
+            block_size_with_name = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
+            if block_name != expected_name:
+                raise ValueError(
+                    f"Expected block name '{expected_name}', "
+                    f"but got '{block_name}'")
+
+            _ = np.fromfile(f, dtype=dummy_dtype, count=1)[0]
+
+            assert chunk_size % 3 == 0, f"{chunk_size} is not divisible by 3"
+            total_read = 0
+
+            while total_read < num_particles:
+                count = min(chunk_size, num_particles - total_read)
+                data = np.fromfile(f, dtype=data_dtype, count=count)
+                
+                if expected_name in ['POS', 'VEL']:
+                    data = data.reshape(-1,3)
+                    data[:, [0, 1, 2]] = data[:, [2, 1, 0]]
+
+                # Periodic boundary conditions
+                if expected_name == 'POS':
+                    data = np.mod(data, cfg.nbody.L)
+
+                if total_read == 0:
+                    write_initial_chunk(data)
+                else:
+                    append_chunk(data)
+                total_read += count
+
+            trailing_block_size = np.fromfile(
+                f, dtype=np.int32, count=1)[0]  # not used
+
+            return out_filename
+
+
         # Read the HEADER block
         header_dtype = np.dtype([
             ('dummy', np.int64),
@@ -404,33 +482,17 @@ def run_density(cfg, outdir):
         rmax_dtype = np.dtype([('dummy', np.int64), ('rmax', np.int64)])
         read_block('RMAX', rmax_dtype, 2)
 
-        # Read ID block
-        id_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('ids', np.uint32, num_particles)
-        ])
-        ids = read_block('ID', id_dtype, 1)
-        data['ids'] = ids['ids'][0]
+        # Read ID block in chunks (otherwise can be too much memory)
+        logging.info("Reading particle IDs...")
+        ids_fname = read_large_block('ID', np.int64, np.uint32, num_particles,)
 
-        # Read POS block
-        pos_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('pos', np.float32, num_particles * 3)
-        ])
-        positions = read_block('POS', pos_dtype, 1)
-        data['positions'] = positions['pos'].reshape(-1, 3)
+        # Read POS block and save to file to reduce memory allocated
+        logging.info("Reading particle positions...")
+        pos_fname = read_large_block('POS', np.int64, np.float32, num_particles*3)
 
-        # Read VEL block
-        vel_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('vel', np.float32, num_particles * 3)
-        ])
-        positions = read_block('VEL', vel_dtype, 1)
-        data['velocities'] = positions['vel'].reshape(-1, 3)
-
-    # Align axes
-    data['positions'][:, [0, 1, 2]] = data['positions'][:, [2, 1, 0]]
-    data['velocities'][:, [0, 1, 2]] = data['velocities'][:, [2, 1, 0]]
+        # Read VEL block and save to file to reduce memory allocated
+        logging.info("Reading particle velocities...")
+        vel_fname  = read_large_block('VEL', np.int64, np.float32, num_particles*3)
 
     # Load halo data
     #    0) group ID
@@ -446,7 +508,7 @@ def run_density(cfg, outdir):
     hpos = np.loadtxt(filename, unpack=False, usecols=(7, 6, 5))
     hvel = np.loadtxt(filename, unpack=False, usecols=(10, 9, 8))
 
-    return data['positions'], data['velocities'], hpos, hvel, hmass
+    return pos_fname, vel_fname, hpos, hvel, hmass
 
 
 @timing_decorator
@@ -480,12 +542,24 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(cfg, outdir)
 
     # Run
-    pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
+    pos_fname, vel_fname, hpos, hvel, hmass = run_density(cfg, outdir)
+
+    # Acces pos and vel with memory mapping
+    posfile = h5py.File(pos_fname, 'r')
+    velfile = h5py.File(vel_fname, 'r')
+    pos = posfile['POS']
+    vel = [velfile['VELX'], velfile['VELY'], velfile['VELZ']]
 
     # Calculate velocity field
+    if hasattr(cfg.nbody, 'supersampling'):
+        Ngrid = cfg.nbody.N // cfg.nbody.supersampling
+    else:
+        Ngrid = cfg.nbody.N
+    logging.info(f'Running field construction on grid {Ngrid}...')
     rho, fvel = rho_and_vfield(
-        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+        pos, vel, cfg.nbody.L, Ngrid, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2],
+        chunk_size = 512**3)
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None
@@ -496,6 +570,13 @@ def main(cfg: DictConfig) -> None:
     # Save nbody-type outputs
     save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
     save_cfg(outdir, cfg)
+
+    posfile.close()
+    velfile.close()
+
+    # Delete temporary position and velocity files
+    for fname in [pos_fname, vel_fname]:
+        os.remove(fname)
 
     # Save bias-type outputs
     outpath = join(outdir, 'halos.h5')
