@@ -1,6 +1,6 @@
 sim_settings:
   # number of simulations to train
-  nsims : 1024
+  nsims : 1800
   nsubvol_per_ji : 16
   nsubvol_fid : 512
   num_cosmo_params : 5
@@ -13,31 +13,28 @@ sim_settings:
   # nfilters
   nf : 3
   # convolution layers types:
-  # layers_types : ['res', 'res', 'res', 'res', 'res', 'res']
   layers_types : ['res', 'res']
-  # layers_types : ['res', 'res']
-  # layers_types : ['res', 'res']
   # conditioning of simulations:
-  # z_all : [0, 127]
-  # z_all : [0.5, 127, 'z_0.5_diff_sig_1', 'z_0.5_diff_sig_3']  
   z_all : [0.5]    
   # conditioning of the fastpm simulations:
   # z_all_FP : [0, 99, 'M0_cond', 'M1_cond']
   # z_all_FP : [0, 99, 'z_0_diff_sig_1', 'z_0_diff_sig_3']  
   # z_all_FP : [0, 'z_0_diff_sig_1', 'z_0_diff_sig_3']    
-  # z_all_FP : [0.5, 99, 'z_0.5_diff_sig_1']      
-  # z_all_FP : [0.5, 99, 'z_0.5_diff_sig_1', 'v_0.5']      
-  z_all_FP : [0.5, 99, 'z_0.5_diff_sig_1']        
-  # z_all_FP : [0, 99]    
+  # z_all_FP : [0.5, 'z_0.5_diff_sig_1', 'v_0.5']      
+  z_all_FP : [0.5, 'v_0.5']      
   # condition on which simulation:
   cond_sim : 'fastpm'
   # cond_sim : 'quijote'  
   # resolution of the halo catalog:
   ns_h : 128
   # nsims per batch when training
-  nsims_per_batch : 1056
+  nsims_per_batch : 275
   # nbatches to use to train
-  nbatches_train : 16
+  nbatches_train : 40
+
+
+
+
   # what type of smoothing to use for density:
   # stype : 'uniform_cic'
   stype : 'cic'  
@@ -47,33 +44,33 @@ sim_settings:
   # mass cut of halo catalog:
   # lgMmincutstr : '5e13'
   # lgMmin : 13.6989
-  lgMmincutstr : '1e13'
-  lgMmin : 13.0
+  lgMmincutstr : '5e12'
+  lgMmin : 12.7
   lgMmax : 15.5
   rescale_sub : -0.5
-  Nmax : 6
-  # subsel_highM1 : False
-  # nsubsel : 512
+  Nmax : 12
   is_HR : True
 
 network_settings:
   hidden_dim_MAF : 5
   learning_rate : 0.001
-  K_M1 : 8
-  B_M1 : [-0.515,0.45]
-  nflows_M1_NSF : 5
+  # K_M1 : 8
+  # B_M1 : [-0.515,0.45]
+  # nflows_M1_NSF : 5
 
-  K_Mdiff : 5
+  K_vel : 5
   # B_Mdiff : [[0,0.75], [0,0.55], [0,0.45], [0,0.3], [0,0.25], [0,0.25], [0,0.15], [0,0.03]]
-  B_Mdiff : [[0,0.75], [0,0.55], [0,0.45], [0,0.3], [0,0.25], [0,0.25]]  
-  nflows_Mdiff_NSF : 2
+  # B_Mdiff : [[0,0.8], [0,0.6], [0,0.5], [0,0.35], [0,0.3], [0,0.25], [0,0.225], [0,0.2], [0,0.175], [0,0.15], [0,0.1], [0,0.08]]  
+  B_vel : [-1.0, 2.01]
+  nflows_vel_NSF : 2
 
   # base_dist_Ntot : 'normal'
-  base_dist_Ntot : 'pl_exp'  
-  base_dist_M1 : 'physical_hmf'
-  base_dist_Mdiff : 'gumbel'
-  # base_dist_Mdiff : 'halfgauss'
-  ngauss_M1 : 5
+  # base_dist_Ntot : 'pl_exp'  
+  # base_dist_M1 : 'physical_hmf'
+  base_dist_vel : 'gauss'
+
+  cond_Mass_for_vel : False
+  # ngauss_M1 : 5
 
   changelr : True
   nfeature_cnn : 5
@@ -89,4 +86,4 @@ train_settings:
   L2norm_Ntothist : False
   L2norm_M1hist : False
   nflows_train : 20
-  save_string : '_COND_FPM_Mmin1e13_nLHsims1024_nsubvolji16_nsubvolfid512_nsubselrand_Mdiffgumbel'
+  save_string : '_COND_FPM_Mmin5e12_subvolji16_nsubvolfid512'

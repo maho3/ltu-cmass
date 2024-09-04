@@ -11,17 +11,11 @@ Note from Matt, the only things I changed in this code were:
 TODO: Clean up and simplify
 """
 
-
 import pathlib
-# from scipy.interpolate import InterpolatedUnivariateSpline as IUS
-# from scipy.integrate import quad
-# from os.path import join
 from omegaconf import DictConfig, OmegaConf, open_dict
 from copy import deepcopy
 import hydra
 import logging
-# import matplotlib.pyplot as pl
-# import matplotlib
 import pickle as pk
 import yaml
 from tqdm import tqdm
@@ -29,21 +23,21 @@ from colossus.lss import mass_function
 import sys
 import os
 import numpy as np
+import scipy as sp
 import torch
-# dev = torch.device("cuda")
 if torch.cuda.is_available():
     dev = torch.device("cuda")
 else:
     dev = torch.device("cpu")
 import torch.optim as optim
-# root_dir = '/mnt/home/spandey/ceph/ltu-cmass/cmass/bias/charm/'
-# os.chdir(root_dir)
 import sys
 import os
-# sys.path.append(root_dir)
-from .combined_models import COMBINED_Model
-from .all_models import *
-from .utils_data_prep_cosmo import *
+import pickle as pk
+from scipy.interpolate import RegularGridInterpolator
+
+from charm.combined_models import *
+from charm.all_models import *
+from charm.utils_data_prep_cosmo_vel import *
 from colossus.cosmology import cosmology
 params = {'flat': True, 'H0': 67.11, 'Om0': 0.3175,
           'Ob0': 0.049, 'sigma8': 0.834, 'ns': 0.9624}
@@ -53,15 +47,8 @@ cosmo = cosmology.setCosmology('myCosmo', **params)
 # autoreload modules
 import os  # noqa
 
-# from .tools.halo_models import TruncatedPowerLaw
-# from .tools.halo_sampling import (pad_3d, sample_3d,
-#                                   sample_velocities_density,
-#                                   sample_velocities_kNN,
-#                                   sample_velocities_CIC)
-# sys.path.append("../../../utils/")
 curr_path = pathlib.Path(__file__).parent.resolve()
-print(curr_path)
-# from utils import get_source_path, timing_decorator, load_params
+# print(curr_path)
 
 
 def parse_config(cfg):
@@ -72,17 +59,20 @@ def parse_config(cfg):
 
 class get_model_interface:
 
-    def __init__(self, run_config_name='config_v0.yaml'):
-        with open(f"{curr_path}/configs/{run_config_name}", "r") as file_object:
+    def __init__(self, run_config_massNtot_name='train_massNtot_config.yaml', run_config_vel_name='train_vel_config.yaml'):
+        with open(f"{curr_path}/configs/{run_config_massNtot_name}", "r") as file_object:
             config = yaml.load(file_object, Loader=yaml.SafeLoader)
 
         config_sims = config['sim_settings']
         ji_array = np.arange(int(config_sims['nsims']))
+        nsubvol_per_ji = int(config_sims['nsubvol_per_ji'])
+        nsubvol_fid = int(config_sims['nsubvol_fid'])
+        subsel_criteria = config_sims['subsel_criteria']
         num_cosmo_params = int(config_sims['num_cosmo_params'])
         ns_d = config_sims['ns_d']
         nb = config_sims['nb']
-        nf = config_sims['nf']
-        self.nf = nf
+        nax_d =  ns_d // nb
+        self.nf = config_sims['nf']
         layers_types = config_sims['layers_types']
         z_inference = config_sims['z_inference']
         nc = 0
@@ -96,21 +86,21 @@ class get_model_interface:
         self.nc = nc
 
         z_all = config_sims['z_all']
-        z_all_FP = config_sims['z_all_FP']
-        self.z_all_FP = z_all_FP
-        ns_h = config_sims['ns_h']
-        self.ns_h = ns_h
-        nax_h = ns_h // nb
-        self.nax_h = nax_h
+        self.z_all_FP = config_sims['z_all_FP']
+        self.ns_h = config_sims['ns_h']
+        self.nax_h = self.ns_h // nb
         cond_sim = config_sims['cond_sim']
 
+        nsims_per_batch = config_sims['nsims_per_batch']
+        nbatches_train = config_sims['nbatches_train']
+
         mass_type = config_sims['mass_type']
-        lgMmin = config_sims['lgMmin']
-        lgMmax = config_sims['lgMmax']
-        self.lgMmin = lgMmin
-        self.lgMmax = lgMmax
+        self.lgMmin = config_sims['lgMmin']
+        self.lgMmax = config_sims['lgMmax']
         stype = config_sims['stype']
         rescale_sub = config_sims['rescale_sub']
+        lgMmincutstr = config_sims['lgMmincutstr']
+        is_HR = config_sims['is_HR']
 
         try:
             Nmax = config_sims['Nmax']
@@ -135,11 +125,16 @@ class get_model_interface:
         base_dist_Mdiff = config_net['base_dist_Mdiff']
         ngauss_M1 = config_net['ngauss_M1']
 
-        ksize = nf
+        changelr = config_net['changelr']
+        ksize = self.nf
         nfeature_cnn = config_net['nfeature_cnn']
         nout_cnn = 4 * nfeature_cnn
         if cond_sim == 'fastpm':
-            ninp = len(z_all_FP)
+            if any('v' in str(string) for string in self.z_all_FP):
+                ninp = len(self.z_all_FP) + 2
+            else:
+                ninp = len(self.z_all_FP)
+
         elif cond_sim == 'quijote':
             ninp = len(z_all)
         else:
@@ -147,18 +142,18 @@ class get_model_interface:
 
         num_cond = nout_cnn + ninp + num_cosmo_params
 
-        lgM_array = np.linspace(lgMmin, lgMmax, 1000)
+
+        self.ndim_diff = Nmax - 1
+
+        lgM_array = np.linspace(self.lgMmin, self.lgMmax, 1000)
         M_array = 10**lgM_array
         if '200c' in mass_type:
-            hmf = mass_function.massFunction(M_array, float(
-                z_inference), mdef='200c', model='tinker08', q_out='dndlnM')
+            hmf = mass_function.massFunction(M_array, float(z_inference), mdef = '200c', model = 'tinker08', q_out = 'dndlnM')
         if 'vir' in mass_type:
-            hmf = mass_function.massFunction(M_array, float(
-                z_inference), mdef='vir', model='tinker08', q_out='dndlnM')
+            hmf = mass_function.massFunction(M_array, float(z_inference), mdef = 'vir', model = 'tinker08', q_out = 'dndlnM')    
         if 'fof' in mass_type:
-            hmf = mass_function.massFunction(M_array, float(
-                z_inference), mdef='fof', model='bhattacharya11', q_out='dndlnM')
-        lgM_rescaled = rescale_sub + (lgM_array - lgMmin)/(lgMmax-lgMmin)
+            hmf = mass_function.massFunction(M_array, float(z_inference), mdef = 'fof', model = 'bhattacharya11', q_out = 'dndlnM')
+        lgM_rescaled = rescale_sub + (lgM_array - self.lgMmin)/(self.lgMmax-self.lgMmin)
 
         int_val = sp.integrate.simps(hmf, lgM_rescaled)
         hmf_pdf = hmf/int_val
@@ -167,33 +162,14 @@ class get_model_interface:
         for i in range(len(hmf_cdf)):
             hmf_cdf[i] = sp.integrate.simps(hmf_pdf[:i+1], lgM_rescaled[:i+1])
 
-        ndim_diff = Nmax - 1
-        self.ndim_diff = ndim_diff
-
-        # with open("/mnt/home/spandey/ceph/AR_NPE/run_configs/CMASS_test/" + run_config_name,"r") as file_object:
-        # config=yaml.load(file_object,Loader=yaml.SafeLoader)
-
-        # config_train = config['train_settings']
-        # save_string = config_train['save_string']
-
-        # save_bestfit_model_dir = '/mnt/home/spandey/ceph/AR_NPE/' + \
-        #                         'TEST_VARY_COSMO/HRES_SUMGAUSS_subsel_random_MULT_GPU_NO_VELOCITY_ns_' + \
-        #                             str(len(ji_array)) + \
-        #                             '_cond_sim_' + cond_sim  + '_ns_' + str(ns_h) \
-        #                             + '_nc' + str(nc) + '_mass_' + mass_type + \
-        #                             '_KM1_' + str(K_M1) + \
-        #                             '_stype_' + stype + \
-        #                             '_Nmax' + str(Nmax) + save_string
-
-        if 'sigv' in config_net:
-            sigv = config_net['sigv']
+        if 'sigv' in config:
+            sigv = config['sigv']
         else:
             sigv = 0.05
+        num_cond_Ntot = num_cond
         mu_all = np.arange(Nmax + 1) + 1
         sig_all = sigv * np.ones_like(mu_all)
         ngauss_Nhalo = Nmax + 1
-
-        num_cond_Ntot = num_cond
 
         model_BinaryMask = SumGaussModel(
             hidden_dim=hidden_dim_MAF,
@@ -201,10 +177,10 @@ class get_model_interface:
             ngauss=2,
             mu_all=mu_all[:2],
             sig_all=sig_all[:2],
-            base_dist=base_dist_Ntot
-        )
+            base_dist=base_dist_Ntot,
+            device=dev
+            )
 
-        model_BinaryMask.to(dev)
 
         model_multiclass = SumGaussModel(
             hidden_dim=hidden_dim_MAF,
@@ -212,14 +188,13 @@ class get_model_interface:
             ngauss=ngauss_Nhalo - 1,
             mu_all=mu_all[1:] - 1,
             sig_all=sig_all[1:],
-            base_dist=base_dist_Ntot
-        )
-
-        model_multiclass.to(dev)
+            base_dist=base_dist_Ntot,
+            device=dev
+            )
 
         num_cond_M1 = num_cond + 1
 
-        model_M1 = NSF_M1_CNNcond(
+        model_M1 = NSF_1var_CNNcond(
             K=K_M1,
             B=B_M1,
             hidden_dim=hidden_dim_MAF,
@@ -229,12 +204,13 @@ class get_model_interface:
             ngauss=ngauss_M1,
             lgM_rs_tointerp=lgM_rescaled,
             hmf_pdf_tointerp=hmf_pdf,
-            hmf_cdf_tointerp=hmf_cdf
-        )
+            hmf_cdf_tointerp=hmf_cdf,
+            device=dev 
+            )
 
         num_cond_Mdiff = num_cond + 2
-        model_Mdiff = NSF_Mdiff_CNNcond(
-            dim=ndim_diff,
+        model_Mdiff = NSF_Autoreg_CNNcond(
+            dim=self.ndim_diff,
             K=K_Mdiff,
             B=B_Mdiff,
             hidden_dim=hidden_dim_MAF,
@@ -242,9 +218,10 @@ class get_model_interface:
             nflows=nflows_Mdiff_NSF,
             base_dist=base_dist_Mdiff,
             mu_pos=True
-        )
+            )
 
-        ndim = ndim_diff + 1
+
+        ndim = self.ndim_diff + 1
         model = COMBINED_Model(
             None,
             model_Mdiff,
@@ -254,7 +231,7 @@ class get_model_interface:
             ndim,
             ksize,
             ns_d,
-            ns_h,
+            self.ns_h,
             1,
             ninp,
             nfeature_cnn,
@@ -266,45 +243,90 @@ class get_model_interface:
             sep_MultiClass_cond=True,
             sep_M1_cond=True,
             sep_Mdiff_cond=True,
-            num_cond_Binary=num_cond_Ntot,
-            num_cond_MultiClass=num_cond_Ntot,
-            num_cond_M1=num_cond_M1,
-            num_cond_Mdiff=num_cond_Mdiff
-        )
+            num_cond_Binary = num_cond_Ntot,
+            num_cond_MultiClass = num_cond_Ntot,
+            num_cond_M1 = num_cond_M1,
+            num_cond_Mdiff = num_cond_Mdiff
+            ).to(dev)
+
 
         model = torch.nn.DataParallel(model)
-        model.to(dev)
-        print()
 
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        save_bestfit_model_name = f'{curr_path}/trained_models/charm_model_massNtot_bestfit_v2.pth'
 
-        loss_min = 1e20
-        epoch_tot_counter = 0
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, 'min', factor=0.25, patience=1000, verbose=True, cooldown=1000, min_lr=1e-5)
+        checkpoint = torch.load(save_bestfit_model_name, map_location=dev)
+        # print(iter)
+        model.load_state_dict(checkpoint['state_dict'])
+        model.eval()
+        self.model_mass = model
 
-        jf = 1
-        save_bestfit_model_name = f'{curr_path}/trained_models/flow_{jf}'
 
-        print('loading bestfit model')
-        bestfit_model = torch.load(
-            save_bestfit_model_name, map_location=device)
-        model.load_state_dict(bestfit_model['state_dict'])
-        optimizer.load_state_dict(bestfit_model['optimizer'])
-        scheduler.load_state_dict(bestfit_model['scheduler'])
-        loss_min = bestfit_model['loss_min']
-        loss = bestfit_model['loss']
-        # lr = bestfit_model['lr']
-        epoch_tot_counter = bestfit_model['epoch_tot_counter']
-        self.model = model
-        print(loss_min, epoch_tot_counter)
+        with open(f"{curr_path}/configs/{run_config_vel_name}", "r") as file_object:
+            config_vel = yaml.load(file_object, Loader=yaml.SafeLoader)
 
-    def process_input_density(self, rho_m_zg=None, rho_m_zIC=None,
-                              df_test_pad_zg=None, df_test_pad_zIC=None,
+        config_net_vel = config_vel['network_settings']
+        K_vel = config_net_vel['K_vel']
+        B_vel = config_net_vel['B_vel']
+        nflows_vel_NSF = config_net_vel['nflows_vel_NSF']
+        self.cond_Mass_for_vel = config_net_vel['cond_Mass_for_vel']
+        base_dist_vel = config_net_vel['base_dist_vel']
+
+        ndim_mass = Nmax
+        ndim_vel = 3*Nmax
+            
+        if self.cond_Mass_for_vel:
+            num_cond_vel = num_cond + ndim_mass
+        else:
+            num_cond_vel = num_cond
+            
+        model_vel = NSF_Autoreg_CNNcond(
+            dim=ndim_vel,
+            K=K_vel,
+            B=B_vel,
+            hidden_dim=hidden_dim_MAF,
+            num_cond=num_cond_vel,
+            nflows=nflows_vel_NSF,
+            base_dist=base_dist_vel,
+            mu_pos=False
+            )
+
+
+        model_vel = COMBINED_Model_vel_only(
+            None,
+            model_vel,
+            ndim_vel,
+            ksize,
+            ns_d,
+            self.ns_h,
+            1,
+            ninp,
+            nfeature_cnn,
+            nout_cnn,
+            layers_types=layers_types,
+            act='tanh',
+            padding='valid',
+            ).to(dev)
+
+        model_vel = torch.nn.DataParallel(model_vel)
+
+        save_bestfit_model_name = f'{curr_path}/trained_models/charm_model_vel_bestfit_v2.pth'
+
+        checkpoint = torch.load(save_bestfit_model_name, map_location=dev)
+        model_vel.load_state_dict(checkpoint['state_dict'])
+        model_vel.eval()
+        self.model_vel = model_vel
+
+
+
+
+
+
+    def process_input_density(self, rho_m_zg=None, rho_m_vel_zg=None,
+                              rho_m_pad_zg=None, rho_m_vel_pad_zg=None,
                               cosmology_array=None, BoxSize=1000, test_LH_id=None,
                               load_test_LH_dir='/mnt/ceph/users/spandey/Quijote/data_NGP_self_fastpm_LH',
                               LH_cosmo_val_file='/mnt/home/spandey/ceph/Quijote/latin_hypercube_params.txt',
-                              verbose=False):
+                              verbose=False, fac_norm_vel=1.):
         '''
         cosmology_array: array of cosmological parameters, should be in the order [Omega_m, Omega_b, h, n_s, sigma_8]
         rho_m_zg: density field at galaxy redshift (here z=0.5 for CMASS)
@@ -315,47 +337,38 @@ class get_model_interface:
         n_dim_red = (self.nf - 1) // 2
         n_pad = n_dim_red * self.nc
 
+        z_REDSHIFT = float(self.z_all_FP[-1].split('_')[1])
+        if z_REDSHIFT == 0.0:
+            z_REDSHIFT = 0
+
+
         if rho_m_zg is None:
             # load the z=0.5 density, if unspecified
             df_zg = pk.load(open(
-                f'{load_test_LH_dir}/{test_LH_id}/density_HR_full_m_res_128_z=0.5_nbatch_8_nfilter_3_ncnn_0.pk', 'rb'))
-            df_test_zg = df_zg['density_cic_unpad_combined']
-        else:
-            df_test_zg = rho_m_zg
-        if df_test_pad_zg is None:
-            df_test_pad_zg = np.pad(df_test_zg, n_pad, 'wrap')
+                f'{load_test_LH_dir}/{test_LH_id}/density_HR_full_m_res_128_z={z_REDSHIFT}_nbatch_8_nfilter_3_ncnn_0.pk', 'rb'))
+            rho_m_zg = df_zg['density_cic_unpad_combined']
+
+        if rho_m_pad_zg is None:
+            rho_m_pad_zg = np.pad(rho_m_zg, n_pad, 'wrap')
+
+
+        if rho_m_vel_zg is None:
+            df_load = pk.load(open(
+                f'{load_test_LH_dir}/{test_LH_id}/velocity_HR_full_m_res_128_z={z_REDSHIFT}_nbatch_8_nfilter_3_ncnn_0.pk', 'rb')
+                )
+
+            rho_m_vel_zg = df_load['velocity_cic_unpad_combined']/fac_norm_vel
+            
+        if rho_m_vel_pad_zg is None:
+            rho_m_vel_pad_zg = np.stack([np.pad(rho_m_vel_zg[j,...], n_pad, 'wrap') for j in range(3)], axis=0)
+
+
         if verbose:
             print(
-                f"loaded density at zg=0.5 with shape {df_test_pad_zg.shape}")
+                f"loaded density at zg=0.5 with shape {rho_m_vel_pad_zg.shape}")
 
-        if rho_m_zIC is None:
-            # load the z=99 density, if unspecified
-            df_zIC = pk.load(open(
-                f'{load_test_LH_dir}/{test_LH_id}/density_HR_full_m_res_128_z=99_nbatch_8_nfilter_3_ncnn_0.pk', 'rb'))
-            df_test_zIC = df_zIC['density_cic_unpad_combined']
-        else:
-            df_test_zIC = rho_m_zIC
-        if df_test_pad_zIC is None:
-            df_test_pad_zIC = np.pad(df_test_zIC, n_pad, 'wrap')
-        if verbose:
-            print(
-                f"loaded density at IC zIC=99 with shape {df_test_pad_zIC.shape}")
-
-        z_REDSHIFT_diff_sig_VALUE = self.z_all_FP[-1]
-
-        # smooth density field for input
-        VALUE_SIG = float(z_REDSHIFT_diff_sig_VALUE.split('_')[4])
-        density_smoothed = gaussian_filter(df_test_pad_zg, sigma=VALUE_SIG)
-        df_test_pad_constrast_zg = density_smoothed - df_test_pad_zg
-
-        df_test_all_pad = np.stack([np.log(1 + df_test_pad_zg + 1e-10), np.log(
-            1 + df_test_pad_zIC + 1e-10), df_test_pad_constrast_zg], axis=0)[None, None, :]
-
-        density_smoothed = gaussian_filter(df_test_zg, sigma=VALUE_SIG)
-        df_test_constrast_zg = density_smoothed - df_test_zg
-
-        df_test_all_unpad = np.stack([np.log(1 + df_test_zg + 1e-10), np.log(
-            1 + df_test_zIC + 1e-10), df_test_constrast_zg], axis=0)[None, None, :]
+        df_test_all_pad = np.concatenate([np.log(1 + rho_m_pad_zg + 1e-10)[None,...], rho_m_vel_pad_zg], axis=0)[None, None,:]
+        df_test_all_unpad = np.concatenate([np.log(1 + rho_m_zg + 1e-10)[None,...], rho_m_vel_zg], axis=0)[None, None,:]        
 
         cond_nsh_test = np.moveaxis(df_test_all_unpad, 2, 5)
         nsims_test = cond_nsh_test.shape[1]
@@ -384,7 +397,7 @@ class get_model_interface:
             print(f"Running the model")
 
         # run the model
-        Ntot_samp_test, M1_samp_test, M_diff_samp_test, mask_tensor_M1_samp_test, mask_tensor_Mdiff_samp_test, _ = self.model.module.inverse(
+        Ntot_samp_test, M1_samp_test, M_diff_samp_test, mask_tensor_M1_samp_test, mask_tensor_Mdiff_samp_test, _ = self.model_mass.module.inverse(
             cond_x=df_test_all_pad,
             cond_x_nsh=df_test_all_unpad,
             cond_cosmo=cosmo_val_test,
@@ -401,6 +414,7 @@ class get_model_interface:
             train_M1=train_M1,
             train_Mdiff=train_Mdiff,
         )
+
         if verbose:
             print("Ran the model")
 
@@ -470,53 +484,72 @@ class get_model_interface:
         pos_h_mock = pos_h_mock.astype('float32')
         lgMass_mock = lgMass_mock.astype('float32')
 
-        return pos_h_mock, lgMass_mock
+
+        Nhalos_truth_recomb_tensor = torch.Tensor(Ntot_samp_test[None,...]).cuda(dev)
+        if self.cond_Mass_for_vel:
+            Mhalos_truth_recomb_tensor = torch.Tensor(M_halos_sort_norm_condvel[None,...]).cuda(dev)
+        else:
+            Mhalos_truth_recomb_tensor = None
+
+        vel_samp_out = self.model_vel.module.inverse(cond_x=df_test_all_pad,
+                                    cond_x_nsh=df_test_all_unpad,
+                                    cond_cosmo=cosmo_val_test,
+                                    mask_vel_truth=None,
+                                    Nhalos_truth=Nhalos_truth_recomb_tensor,
+                                    Mhalos_truth=Mhalos_truth_recomb_tensor,
+                                    # Mhalos_truth=None,                            
+                                    vel_truth=None)
+
+        vx_mesh_load = (1000./fac_norm_vel)*rho_m_vel_zg[0,...]
+        vy_mesh_load = (1000./fac_norm_vel)*rho_m_vel_zg[1,...]
+        vz_mesh_load = (1000./fac_norm_vel)*rho_m_vel_zg[2,...]
+
+        vx_all_3D_interp_l = RegularGridInterpolator((xarray, yarray, zarray), vx_mesh_load, bounds_error=False, fill_value=None)
+        vy_all_3D_interp_l = RegularGridInterpolator((xarray, yarray, zarray), vy_mesh_load, bounds_error=False, fill_value=None)
+        vz_all_3D_interp_l = RegularGridInterpolator((xarray, yarray, zarray), vz_mesh_load, bounds_error=False, fill_value=None)
+
+        vx_eval_interp_l = vx_all_3D_interp_l(pos_h_mock)
+        vy_eval_interp_l = vy_all_3D_interp_l(pos_h_mock)
+        vz_eval_interp_l = vz_all_3D_interp_l(pos_h_mock)
 
 
-# @timing_decorator
-# @hydra.main(version_base=None, config_path="../conf", config_name="config")
-# def main(cfg: DictConfig) -> None:
-#     # Filtering for necessary configs
-#     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+        vmax = 1000
+        vmin = -1000
+        v_halos_diff_recomb = np.reshape(vel_samp_out, (1, 128, 128, 128, (self.ndim_diff + 1)*3))[0,...]
+        v_halos_diff_recomb = np.reshape(v_halos_diff_recomb, (128, 128, 128, (self.ndim_diff + 1), 3))
 
-#     # Build run config
-#     cfg = parse_config(cfg)
-#     logging.info(f"Working directory: {os.getcwd()}")
-#     logging.info(
-#         "Logging directory: " +
-#         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
-#     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+        vx_diff_mock = []
+        vy_diff_mock = []
+        vz_diff_mock = []
 
-#     run_config_name = 'MULTGPU_cond_fastpm_ns128_run_Ntot_M1_Mdiff_subselrand_gumbel.yaml'
-#     charm_interface = get_model_interface(run_config_name)
+        Nhalos_pred_recomb = Ntot_samp_test[...,0].reshape(self.ns_h, self.ns_h, self.ns_h)
+        for jx in range(self.ns_h):
+            for jy in range(self.ns_h):
+                for jz in range(self.ns_h):
+                        Nh_vox = int(Nhalos_pred_recomb[jx, jy, jz])
+                        if Nh_vox > 0:
+                            vx_diff_mock.append(((v_halos_diff_recomb[jx, jy, jz, :Nh_vox, 0])*((vmax - vmin)) + vmin))
 
-#     test_LH_id = 0
-#     pos_h_mock, lgMass_mock = charm_interface.process_input_density(test_LH_id)
+                            vy_diff_mock.append(((v_halos_diff_recomb[jx, jy, jz, :Nh_vox, 1])*((vmax - vmin)) + vmin))
 
-#     # Setup
-#     # pmconf, pmcosmo = configure_pmwd(cfg)
+                            vz_diff_mock.append(((v_halos_diff_recomb[jx, jy, jz, :Nh_vox, 2])*((vmax - vmin)) + vmin))
 
-#     # # Get ICs
-#     # wn = get_ICs(cfg)
+        vx_total_mock = vx_eval_interp_l - np.concatenate(vx_diff_mock)
 
-#     # # Run
-#     # rho, pos, vel = run_density(wn, pmconf, pmcosmo, cfg)
+        vy_total_mock = vy_eval_interp_l - np.concatenate(vy_diff_mock)
 
-#     # # Calculate velocity field
-#     # fvel = None
-#     # if cfg.nbody.save_velocities:
-#     #     fvel = vfield_CIC(pos, vel, cfg)
-#     #     # convert from comoving -> peculiar velocities
-#     #     fvel *= (1 + cfg.nbody.zf)
+        vz_total_mock = vz_eval_interp_l - np.concatenate(vz_diff_mock)
 
-#     # # Save
-#     # outdir = get_source_path(cfg, "pmwd", check=False)
-#     # save_nbody(outdir, rho, fvel, pos, vel,
-#     #            cfg.nbody.save_particles, cfg.nbody.save_velocities)
-#     # with open(join(outdir, 'config.yaml'), 'w') as f:
-#     #     OmegaConf.save(cfg, f)
-#     logging.info("Done!")
+
+
+        vel_h_mock = np.vstack((vx_total_mock, vy_total_mock, vz_total_mock)).T
+        vel_h_mock = vel_h_mock.astype('float32')
+
+        return pos_h_mock, lgMass_mock, vel_h_mock
+
 
 
 # if __name__ == '__main__':
-#     main()
+#     model_interface = get_model_interface()
+#     pos_h_mock, lgMass_mock, vel_h_mock = model_interface.process_input_density(test_LH_id = 1, verbose=True)
+#     import pdb; pdb.set_trace()
