@@ -35,9 +35,19 @@ from .tools import (
     rho_and_vfield)
 
 
+def compute_As(cosmo):
+    # As needs to be computed with a_stop=1 (Issue #30)
+    pmconf = Configuration(125, (8,)*3)
+    pmcosmo = Cosmology.from_sigma8(
+        pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
+        Omega_b=cosmo[1], h=cosmo[2])
+    return pmcosmo.A_s_1e9
+
+
 def configure_pmwd(
     N, L, supersampling, B, ai, af, N_steps, cosmo
 ):
+    # Configure simulation
     N = N*supersampling
     ptcl_spacing = L/N
     ptcl_grid_shape = (N,)*3
@@ -46,9 +56,15 @@ def configure_pmwd(
         a_start=ai, a_stop=af,
         a_nbody_maxstep=(af-ai)/N_steps,
         mesh_shape=B)
-    pmcosmo = Cosmology.from_sigma8(
-        pmconf, sigma8=cosmo[4], n_s=cosmo[3], Omega_m=cosmo[0],
+
+    # Configure cosmology
+    A_s_1e9 = compute_As(cosmo)
+    pmcosmo = Cosmology(
+        pmconf, A_s_1e9=A_s_1e9,
+        n_s=cosmo[3], Omega_m=cosmo[0],
         Omega_b=cosmo[1], h=cosmo[2])
+
+    # Boltzmann
     pmcosmo = boltzmann(pmcosmo, pmconf)
     return pmconf, pmcosmo
 
