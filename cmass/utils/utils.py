@@ -8,7 +8,7 @@ from colossus.cosmology import cosmology as csm
 from omegaconf import OmegaConf
 
 
-def get_source_path(wdir, suite, sim, L, N, lhid, check=True, mkdir=False):
+def get_source_path(wdir, suite, sim, L, N, lhid, check=True, mkdir=False, get_cfg_dir=False):
     # get the path to the source directory, and check at each level
     sim_dir = join(wdir, suite, sim)
     cfg_dir = join(sim_dir, f'L{L}-N{N}')
@@ -17,6 +17,9 @@ def get_source_path(wdir, suite, sim, L, N, lhid, check=True, mkdir=False):
     if mkdir:
         os.makedirs(sim_dir, exist_ok=True)
         os.makedirs(cfg_dir, exist_ok=True)
+        if get_cfg_dir:
+            return cfg_dir
+
         os.makedirs(lh_dir, exist_ok=True)
         return lh_dir
 
@@ -27,9 +30,13 @@ def get_source_path(wdir, suite, sim, L, N, lhid, check=True, mkdir=False):
         if not os.path.isdir(cfg_dir):
             raise ValueError(
                 f"Configuration directory {cfg_dir} does not exist.")
-        if not os.path.isdir(lh_dir):
-            raise ValueError(
-                f"Latin hypercube directory {lh_dir} does not exist.")
+        if not get_cfg_dir:
+            if not os.path.isdir(lh_dir):
+                raise ValueError(
+                    f"Latin hypercube directory {lh_dir} does not exist.")
+
+    if get_cfg_dir:
+        return cfg_dir
 
     return lh_dir
 
