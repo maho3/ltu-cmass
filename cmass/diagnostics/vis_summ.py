@@ -20,7 +20,7 @@ from ..nbody.tools import parse_nbody_config
 
 
 def check_diagnostics_exist(path, diag_dir, diag_file):
-    source_file = join(path, 'diag', 'halos.h5')
+    source_file = join(path, diag_dir, diag_file)
     if os.path.isfile(source_file):
         logging.info('Halo diagnostics already computed. Proceeding with visualisation.')
         return True
@@ -45,10 +45,6 @@ def extract_halo_diagnostics(file_path, group):
 def plot_halo_sum(source_path, L, N, out_dir, lhids):
     # TODO: Implement use of mpl style files
     # plt.style.use('/home/sding/PhD/codes/ltu-cmass/cmass/conf/diag/aa_one_column.mplstyle')
-
-    if len(source_path) == 1:
-        source_path = [source_path]
-        lhids = [lhids]
 
     # check if diagnostics is computed
     all_diagnostics_exist = np.all([check_diagnostics_exist(path, 'diag', 'halos.h5')
@@ -149,6 +145,8 @@ def main(cfg: DictConfig) -> None:
             L, N, lhids,
             mkdir=True
         )
+        source_path = [source_path]
+        lhids = [lhids]
     else:
         lhids = range(cfg.diag.lhid_start, n_lhid_seeds)
         source_path = [get_source_path(
