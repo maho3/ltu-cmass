@@ -75,9 +75,9 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, out_dir=No
         with h5py.File(outpath, 'w') as o:
             for a in alist:
                 # Load
-                hpos = f[a]['pos'][...]
-                hvel = f[a]['vel'][...]
-                hmass = f[a]['mass'][...]
+                hpos = f[a]['pos'][...].astype(np.float32)
+                hvel = f[a]['vel'][...].astype(np.float32)
+                hmass = f[a]['mass'][...].astype(np.float32)
 
                 # measure halo Pk in comoving space
                 delta = MA(hpos, L, N, MAS='NGP')
