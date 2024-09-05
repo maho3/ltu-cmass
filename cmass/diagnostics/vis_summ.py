@@ -260,7 +260,7 @@ def main(cfg: DictConfig) -> None:
         source_path = [source_path]
         lhids = [lhids]
     else:
-        lhids = range(cfg.diag.lhid_start, cfg.diag.lhid_start + n_lhid_seeds)
+        lhids = range(cfg.nbody.lhid, cfg.nbody.lhid + n_lhid_seeds)
         source_path = [get_source_path(
             wdir, suite, sim,
             L, N, lhid=lhid

@@ -6,4 +6,3 @@ threads: 16
 
 # number of lhid to include for the visualization
 n_seeds: 1
-lhid_start: 0
