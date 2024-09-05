@@ -75,9 +75,15 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, out_dir=No
         with h5py.File(outpath, 'w') as o:
             for a in alist:
                 # Load
+                # FIXME: Add mass cut 10**13 for pinocchio
                 hpos = f[a]['pos'][...].astype(np.float32)
                 hvel = f[a]['vel'][...].astype(np.float32)
                 hmass = f[a]['mass'][...].astype(np.float32)
+
+                mask = np.where(hmass >= 13.)
+                hpos = hpos[mask]
+                hvel = hvel[mask]
+                hmass = hmass[mask]
 
                 # measure halo Pk in comoving space
                 delta = MA(hpos, L, N, MAS='NGP')
