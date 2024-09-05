@@ -273,7 +273,7 @@ def main(cfg: DictConfig) -> None:
 
         # FIXME: integrate this into the hydra configuration
         compare_paths = [get_source_path(
-            wdir, 'quijotelike', 'fastpm',
+            wdir, 'quijote', 'nbody',
             L, N, lhid=lhid
         ) for lhid in lhids]
 
