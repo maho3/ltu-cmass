@@ -253,8 +253,8 @@ def main(cfg: DictConfig) -> None:
         )
 
         compare_paths = [get_source_path(
-            wdir, 'quijotelike', 'fastpm',
-            L, N, lhid=lhids
+            wdir, 'quijote', 'nbody',
+            L, 128, lhid=lhids
         )]
 
         source_path = [source_path]
