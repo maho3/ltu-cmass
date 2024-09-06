@@ -227,7 +227,7 @@ PLCAperture            30           % cone aperture for the past light cone
 
     # Run memory checking
     log_file = join(outdir, 'memory_log')
-    memory_exec = join(os.path.dirname(cfg.nbody.pinocchio_exec), 'memorytest')
+    memory_exec = join(os.path.dirname(cfg.meta.pinocchio_exec), 'memorytest')
     command = f'mpirun -np 1 {memory_exec} {filename} {max_cores} > {log_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
@@ -299,7 +299,11 @@ PLCAperture            30           % cone aperture for the past light cone
             tres_dict[key] = value
 
         # Compute total memory and memory per core
-        total_memory = int(tres_dict.get("mem", "0M").rstrip("M")) / 1000  # Total memory in GB
+        mem = tres_dict.get("mem", "0M")
+        if mem[-1] == "M":
+            total_memory = float(mem.rstrip("M")) / 1000
+        elif mem[-1] == "G":
+            total_memory = float(mem.rstrip("G"))  # Total memory in GB
         total_cpus = int(tres_dict.get("cpu", "1"))  # Total CPUs allocated
         memory_per_core = total_memory * 1000 / total_cpus if total_cpus > 0 else 0
 
