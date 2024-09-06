@@ -5,7 +5,7 @@
 #SBATCH -p wholenode # the default queue is "shared" queue
 #SBATCH --nodes=2
 #SBATCH --ntasks=256 
-#SBATCH --time=1:00:00
+#SBATCH --time=0:30:00
 #SBATCH --job-name pinocchio_2gpch
 #SBATCH --output=/anvil/scratch/x-dbartlett/cmass/abacuslike/pinocchio/pinocchio_log_%j.out
 #SBATCH --error=/anvil/scratch/x-dbartlett/cmass/abacuslike/pinocchio/pinocchio_log_%j.err

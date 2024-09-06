@@ -69,8 +69,12 @@ def copy_specific_files(old_dir, new_dir, filenames):
             if file_name in filenames:
                 old_file_path = os.path.join(root, file_name)
                 new_file_path = os.path.join(new_root, file_name)
-                shutil.copy2(old_file_path, new_file_path)
-                print(f'Copied: {old_file_path} to {new_file_path}')
+                if os.path.isfile(new_file_path):
+                    print(f'Already exists: {new_file_path}')
+                else:
+                    shutil.copy2(old_file_path, new_file_path)
+                    print(f'Copied: {old_file_path} to {new_file_path}')
+
 
 def check_files_exist(old_dir, filenames):
     """
@@ -81,15 +85,27 @@ def check_files_exist(old_dir, filenames):
     - filenames (set): A set of filenames to search for and copy.
     """
 
+    all_relpath = []
+    all_found = True
+
     # Walk through the old directory
     for root, dirs, files in os.walk(old_dir):
         # Calculate the relative path from the old directory
         relative_path = os.path.relpath(root, old_dir)
 
-        # Copy specific files
-        for file_name in files:
-            if file_name not in filenames:
-                print('Missing file {file_name} for sim {old_file_path}')
+        if relative_path.isdigit():
+
+            all_relpath.append(relative_path)
+
+            # Copy specific files
+            for file_name in filenames:
+                if file_name not in files:
+                    all_found = False
+                    print(f'Missing file {file_name} for sim {relative_path}')
+
+    if all_found:
+        print('All files found')
+    print(f'Number of directories checked: {len(all_relpath)}')
 
 # Example usage
 old_directory = '/home/x-dbartlett/scratch_dir/cmass/quijotelike/pinocchio/L1000-N512'

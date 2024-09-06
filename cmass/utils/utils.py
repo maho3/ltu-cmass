@@ -2,6 +2,8 @@
 import logging
 import datetime
 import os
+import fcntl
+import time
 from os.path import join
 from astropy.cosmology import Cosmology, FlatLambdaCDM
 from colossus.cosmology import cosmology as csm
@@ -103,3 +105,43 @@ def cosmo_to_colossus(cpars):
     csm.addCosmology('myCosmo', **params)
     cosmo = csm.setCosmology('myCosmo')
     return cosmo
+
+
+
+def acquire_lock(lock_file):
+    """
+    Acquires an exclusive lock on the specified lock file.
+
+    This function will attempt to open or create a lock file and
+    acquire an exclusive lock on it. If another process has already
+    locked the file, the function will keep retrying until the lock
+    is available.
+
+    Parameters:
+    - lock_file (str): The path to the lock file.
+
+    Returns:
+    - fd (int): The file descriptor of the opened lock file.
+    """
+    fd = os.open(lock_file, os.O_CREAT | os.O_RDWR)
+    while True:
+        try:
+            # Try to acquire an exclusive lock, non-blocking mode
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            # If another process has the lock, wait and retry
+            time.sleep(0.1)
+
+def release_lock(fd):
+    """
+    Releases the exclusive lock on the specified file descriptor and closes the file.
+
+    This function releases the lock obtained on a file and closes the file descriptor.
+
+    Parameters:
+    - fd (int): The file descriptor of the lock file.
+    """
+    fcntl.flock(fd, fcntl.LOCK_UN)
+    os.close(fd)
+

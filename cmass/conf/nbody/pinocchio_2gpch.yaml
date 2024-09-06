@@ -9,5 +9,7 @@ save_particles: false
 save_transfer: true
 suite: abacuslike
 transfer: CAMB
-zf: 0.5
+zf: 0.2
 zi: 20
+# increasing snapshot scale factors to save
+asave: [0.76721, 0.74710, 0.72699, 0.70688, 0.68677, 0.66666, 0.64655, 0.62644, 0.60633, 0.58622]

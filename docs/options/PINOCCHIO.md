@@ -68,7 +68,17 @@ GSL_LIBR    = -lgsl -lgslcblas -lm
 GSL_INCL    = -I/usr/include
 endif
 ```
-Also change the `SYSTYPE` argument to be `"anvil"` and ensure the "-DWHITENOISE" option is enabled. Building with
+
+Also change the `SYSTYPE` argument to be `"anvil"` and ensure the "-DWHITENOISE" option is enabled. 
+
+For efficiency of processing, if we save multiple snapshots then `mpi4py` is used to process the outputs of each
+snapshot separately. As such, this must be installed as follows
+```bash
+env MPICC=$(which mpicc) pip3 install mpi4py
+```
+where we are careful to ensure we use the correct version of `mpicc`.
+
+Building with
 ```bash
 make clean
 make

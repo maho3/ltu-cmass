@@ -3,10 +3,24 @@ from os.path import join
 import logging
 import numpy as np
 import h5py
-from ..utils import load_params, timing_decorator, get_particle_mass
+from ..utils import (
+        load_params, timing_decorator, get_particle_mass,
+        acquire_lock, release_lock)
 import warnings
 import MAS_library as MASL
 from omegaconf import open_dict
+
+class FlushHandler(logging.StreamHandler):
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s-%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S',
+    handlers=[FlushHandler()]
+)
 
 # Optional imports
 try:
@@ -130,6 +144,10 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
     os.makedirs(savedir, exist_ok=True)
     savefile = join(savedir, 'nbody.h5')
 
+    # Acquire lock before accessing the HDF5 file
+    lock_file = join(savedir, 'halos.lock')
+    fd = acquire_lock(lock_file)
+
     logging.info(f'Saving to {savefile}...')
     with h5py.File(savefile, 'w') as f:
         key = f'{a:.6f}'
@@ -141,6 +159,9 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
             group.create_dataset('ppos', data=ppos)
             # particle physical velocities [km/s]
             group.create_dataset('pvel', data=pvel)
+
+    # Release the lock after writing to the file
+    release_lock(fd)
 
 
 def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False, chunk_size=-1):
@@ -168,7 +189,10 @@ def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False, chunk_size
 
     # construct 3D density field
     if (chunk_size == -1) or (chunk_size > num_particles):
-        MASL.MA(pos, delta, BoxSize, MAS, W=value, verbose=verbose)
+        if value is None:
+            MASL.MA(pos[:], delta, BoxSize, MAS, W=value, verbose=verbose)
+        else:
+            MASL.MA(pos[:], delta, BoxSize, MAS, W=value[:], verbose=verbose)
     else:
         for start in range(0, num_particles, chunk_size):
             end = min(start + chunk_size, num_particles)
@@ -233,7 +257,11 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False, c
     # Normalize
     m_particle = get_particle_mass(Npart, BoxSize, omega_m, h)
     rho = count*m_particle
-    vel /= count[..., None]
+    mask = count > 0
+    vel[mask] /= count[mask][..., np.newaxis]
+    mask = (count == 0)
+    if mask.sum() > 0:
+        print('BAD PIXELS:', mask.sum() / np.prod(mask.shape), vel[mask].min(), vel[mask].max())
 
     return rho, vel
 
