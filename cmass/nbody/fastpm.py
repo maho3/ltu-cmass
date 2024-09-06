@@ -144,7 +144,7 @@ def run_density(cfg, outdir):
     #  Run FastPM
     param_file = join(outdir, "parameter_file.lua")
     command = f'mpirun -n {max_divisible_cores} {mpi_args} '
-    command += f'{cfg.nbody.fastpm_exec} {param_file}'
+    command += f'{cfg.meta.fastpm_exec} {param_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     _ = subprocess.run(command, shell=True, check=True, env=env)
