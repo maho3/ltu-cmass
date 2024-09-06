@@ -193,7 +193,7 @@ def run_density(cfg, outdir):
     # Run pinoccio
     cwd = os.getcwd()
     os.chdir(outdir)
-    os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
+    os.system(f'{cfg.meta.pinocchio_exec} parameter_file')
     os.chdir(cwd)
 
     # Load the data
