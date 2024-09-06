@@ -270,6 +270,10 @@ def main(cfg: DictConfig) -> None:
     # TODO: add a way to append particles to the existing nbody.h5 file
     save_cfg(outdir, cfg)
 
+    # clean up slurm hostfile if it exists
+    if os.path.isfile('slurm_hostfile'):
+        os.remove('slurm_hostfile')
+
     logging.info("Done!")
 
 
