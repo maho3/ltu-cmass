@@ -97,17 +97,39 @@ particle_fraction = 1.00
     return
 
 
-@timing_decorator
-def run_density(cfg, outdir):
+def get_mpi_info():
+    # copied from Deaglan's pinnochio implementation TODO: merge!!
+
     if 'PBS_NODEFILE' in os.environ:  # assume PBS job
         with open(os.environ['PBS_NODEFILE'], 'r') as f:
             max_cores = len(f.readlines())
         mpi_args = '--hostfile $PBS_NODEFILE'
-    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume SLURM job
-        raise NotImplementedError("SLURM not implemented yet")  # TODO: do this
-    else:  # assume local machine
+    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
+        # Use scontrol to get the expanded list of nodes
+        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = node_list.decode('utf-8').splitlines()
+
+        # Calculate max_cores (total cores allocated)
+        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
+        max_cores = len(node_list) * cores_per_node
+
+        # Write to a hostfile (optional, if required by your MPI setup)
+        hostfile = 'slurm_hostfile'
+        with open(hostfile, 'w') as f:
+            for node in node_list:
+                f.write(f"{node}\n")
+
+        # Set MPI args
+        mpi_args = f'--hostfile {hostfile}'
+    else:
         max_cores = os.cpu_count()
         mpi_args = ''
+
+    return max_cores, mpi_args
+
+@timing_decorator
+def run_density(cfg, outdir):
+    max_cores, mpi_args = get_mpi_info()
 
     # Work out how many cpus to use
     # Need this to exactly divide N * B
@@ -244,7 +266,7 @@ def main(cfg: DictConfig) -> None:
         pos, vel = None, None
 
     # Save nbody-type outputs
-    # save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
+    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
     # TODO: add a way to append particles to the existing nbody.h5 file
     save_cfg(outdir, cfg)
 
