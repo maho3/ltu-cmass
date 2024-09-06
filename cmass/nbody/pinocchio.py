@@ -344,7 +344,7 @@ def run_density(cfg, outdir):
 
     # Run pinoccio
     command = f'mpirun -n {max_cores} {mpi_args} '
-    command += f'{cfg.nbody.pinocchio_exec} parameter_file'
+    command += f'{cfg.meta.pinocchio_exec} parameter_file'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     _ = subprocess.run(command, shell=True, check=True, env=env)
