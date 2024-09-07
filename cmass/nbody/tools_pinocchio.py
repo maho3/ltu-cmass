@@ -85,13 +85,23 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None):
                 f'N{N}-{lhid}.particle_{expected_name}.h5')
 
             def write_initial_chunk(data_chunk):
+                if expected_name == 'ID':
+                    shape=(num_particles,)
+                    maxshape=(num_particles,)
+                elif expected_name == 'VEL':
+                    shape=(num_particles//3,)
+                    maxshape=(num_particles//3,)
+                else:
+                    shape=(num_particles//3,)+data_chunk.shape[1:]
+                    maxshape=(num_particles//3,)+data_chunk.shape[1:]
+
                 with h5py.File(out_filename, 'w') as fout:
                     if expected_name == 'VEL':
                         for i, suffix in enumerate(['X', 'Y', 'Z']):
                             dset = fout.create_dataset(
                                 expected_name + suffix,
-                                shape=(num_particles,),
-                                maxshape=(num_particles,),  # Preallocate space for the number of particles
+                                shape=shape,
+                                maxshape=maxshape,  # Preallocate space for the number of particles
                                 chunks=True,
                                 dtype=data_chunk.dtype
                             )
@@ -99,8 +109,8 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None):
                     else:
                         dset = fout.create_dataset(
                             expected_name,
-                            shape=(num_particles,)+data_chunk.shape[1:],
-                            maxshape=(num_particles,)+data_chunk.shape[1:],  # Preallocate space for the number of particles
+                            shape=shape,
+                            maxshape=maxshape,  # Preallocate space for the number of particles
                             chunks=True,
                             dtype=data_chunk.dtype
                         )
@@ -112,10 +122,13 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None):
                     if expected_name == 'VEL':
                         for i, suffix in enumerate(['X', 'Y', 'Z']):
                             dset = fout[expected_name+suffix]
-                            dset[total_read:total_read+new_chunk.shape[0]] = new_chunk[:,i]
-                    else:
+                            dset[total_read//3:total_read//3+new_chunk.shape[0]] = new_chunk[:,i]
+                    elif expected_name == 'ID':
                         dset = fout[expected_name]
                         dset[total_read:total_read+new_chunk.shape[0]] = new_chunk
+                    else:
+                        dset = fout[expected_name]
+                        dset[total_read//3:total_read//3+new_chunk.shape[0]] = new_chunk
 
             _ = np.fromfile(
                 f, dtype=np.int32, count=1)[0]  # not used
@@ -149,6 +162,7 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None):
                     write_initial_chunk(data)
                 else:
                     append_chunk(data)
+
                 total_read += count
 
             _ = np.fromfile(
