@@ -40,9 +40,7 @@ from .tools.halo_sampling import (
     sample_velocities_density,
     sample_velocities_kNN,
     sample_velocities_CIC)
-from ..utils import (
-        get_source_path, timing_decorator, save_cfg,
-        acquire_lock, release_lock)
+from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 
 
@@ -321,18 +319,11 @@ def delete_outputs(outdir):
 
 def save_snapshot(outdir, a, hpos, hvel, hmass):
 
-    # Acquire lock before accessing the HDF5 file
-    lock_file = join(outdir, 'halos.lock')
-    fd = acquire_lock(lock_file)
-
     with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
         group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
         group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
-
-    #  Release the lock after writing to the file
-    release_lock(fd)
 
 
 @timing_decorator

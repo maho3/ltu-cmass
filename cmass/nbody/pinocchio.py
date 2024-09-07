@@ -23,11 +23,13 @@ import numpy as np
 import logging
 import hydra
 import re
+import h5py
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise, generate_pk_file)
-from .tools_pinocchio import process_snapshot, process_halos, save_cfg_data
+from .tools_pinocchio import (
+    process_snapshot, save_pinocchio_nbody, process_halos, save_cfg_data)
 
 
 @timing_decorator
@@ -320,13 +322,25 @@ PLCAperture            30           % cone aperture for the past light cone
     return
 
 
-def delete_files(outdir):
+def delete_files(cfg, outdir):
 
     all_files = os.listdir(outdir)
 
+    # Check files we need exist
     if ('nbody.h5' not in all_files) or ('halos.h5' not in all_files):
-        logging.info('Not deleting Pinocchio file as nbody.h5 and/or halos.h5 does not exist')
+        logging.info('Not deleting Pinocchio files as nbody.h5 and/or halos.h5 does not exist')
         return
+
+    # Check we have saved the relevant scale factors
+    for fname in ['nbody.h5', 'halos.h5']:
+        with h5py.File(join(outdir, fname)) as f:
+            keys = list(f.keys())
+            asave = [f'{a:.6f}' for a in cfg.nbody.asave]
+            keys.sort()
+            asave.sort()
+            if not (asave == keys):
+                logging.info(f'Not deleting Pinocchio files as {fname} does not have all redshifts saved')
+                return
 
     files_to_keep = ['input_power_spectrum.txt', 'halos.h5', 'nbody.h5', 'parameter_file', 'config.yaml']
 
@@ -364,9 +378,13 @@ def run_density(cfg, outdir):
             supersampling = cfg.nbody.supersampling
         else:
             supersampling = None
-        process_snapshot(outdir, cfg.nbody.zf, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
-                cfg.nbody.cosmo[0], cfg.nbody.cosmo[2], supersampling=supersampling,
-                save_particles=cfg.nbody.save_particles)
+        z = 1 / cfg.nbody.asave[0] - 1
+        rho, fvel, pos_fname, vel_fname =  process_snapshot(
+                outdir, z, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, 
+                cfg.nbody.cosmo[0], cfg.nbody.cosmo[2],
+                supersampling=supersampling)
+        save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z,
+                    save_particles=cfg.nbody.save_particles)
         process_halos(outdir, cfg.nbody.zf, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid)
     else:
         ncore = min(max_cores, len(cfg.nbody.asave))
@@ -417,7 +435,7 @@ def main(cfg: DictConfig) -> None:
     run_density(cfg, outdir)
     save_cfg(outdir, cfg)
 
-    delete_files(outdir)
+    delete_files(cfg, outdir)
     
     logging.info("Done!")
 

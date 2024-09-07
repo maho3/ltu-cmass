@@ -3,9 +3,7 @@ from os.path import join
 import logging
 import numpy as np
 import h5py
-from ..utils import (
-        load_params, timing_decorator, get_particle_mass,
-        acquire_lock, release_lock)
+from ..utils import load_params, timing_decorator, get_particle_mass
 import warnings
 import MAS_library as MASL
 from omegaconf import open_dict
@@ -144,12 +142,8 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
     os.makedirs(savedir, exist_ok=True)
     savefile = join(savedir, 'nbody.h5')
 
-    # Acquire lock before accessing the HDF5 file
-    lock_file = join(savedir, 'halos.lock')
-    fd = acquire_lock(lock_file)
-
     logging.info(f'Saving to {savefile}...')
-    with h5py.File(savefile, 'w') as f:
+    with h5py.File(savefile, 'a') as f:
         key = f'{a:.6f}'
         group = f.create_group(key)
         group.create_dataset('rho', data=rho)  # density contrast
@@ -159,9 +153,6 @@ def save_nbody(savedir, a, rho, fvel, ppos, pvel):
             group.create_dataset('ppos', data=ppos)
             # particle physical velocities [km/s]
             group.create_dataset('pvel', data=pvel)
-
-    # Release the lock after writing to the file
-    release_lock(fd)
 
 
 def assign_field(pos, BoxSize, Ngrid, MAS, value=None, verbose=False, chunk_size=-1):

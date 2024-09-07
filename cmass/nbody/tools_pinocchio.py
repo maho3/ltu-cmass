@@ -47,7 +47,7 @@ def save_cfg_data(outdir, cfg):
     return
 
 
-def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None, save_particles=False):
+def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None):
 
     # Load the data
     filename = join(
@@ -230,7 +230,20 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None, save
         omega_m=omega_m, h=h,
         chunk_size = 512**3)
 
-    if not save_particles:
+    posfile.close()
+    velfile.close()
+
+    return rho, fvel, pos_fname, vel_fname
+
+
+def save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z, save_particles=False):
+
+    if save_particles:
+        posfile = h5py.File(pos_fname, 'r')
+        velfile = h5py.File(vel_fname, 'r')
+        pos = posfile['POS']
+        vel = [velfile['VELX'], velfile['VELY'], velfile['VELZ']]
+    else:
         pos, vel = None, None
 
     # Convert from comoving -> physical velocities
@@ -240,8 +253,9 @@ def process_snapshot(outdir, z, L, N, lhid, omega_m, h, supersampling=None, save
     af = 1 / (1 + z)
     save_nbody(outdir, af, rho, fvel, pos, vel)
 
-    posfile.close()
-    velfile.close()
+    if save_particles:
+        posfile.close()
+        velfile.close()
 
     # Delete temporary position and velocity files
     for fname in [pos_fname, vel_fname]:
@@ -271,8 +285,6 @@ def process_halos(outdir, z, L, N, lhid):
     af = 1 / (1 + z)
     outpath = join(outdir, 'halos.h5')
     logging.info('Saving cube to ' + outpath)
-    if os.path.isfile(outpath):
-        os.remove(outpath)
     save_snapshot(outdir, af, hpos, hvel, hmass)
 
     return
@@ -292,8 +304,10 @@ def main():
     with open(filename, 'r') as f:
         data = yaml.safe_load(f)
 
-    # Split redshifts across ranls
-    asave = np.array_split(data['asave'], size)[rank]
+    # Split redshifts across ranks
+    asave = np.array_split(data['asave'], size)
+    nperrank = len(asave[0])
+    asave = asave[rank]
 
     outdir = data['outdir']
     L = data['L']
@@ -304,11 +318,34 @@ def main():
     supersampling = data['supersampling']
     save_particles = data['save_particles']
 
-    for a in asave:
-        z = 1 / a - 1
-        process_snapshot(outdir, z, L, N, lhid, omega_m, h, 
-                supersampling=supersampling, save_particles=save_particles)
-        process_halos(outdir, z, L, N, lhid)
+    # Delete output files if they already exists
+    for fname in ['halos.h5', 'nbody.h5']:
+        outpath = join(outdir, fname)
+        if os.path.isfile(outpath):
+            os.remove(outpath)
+
+    for i in range(nperrank):
+
+        # Process particles
+        if i < len(asave):
+            a = asave[i]
+            z = 1 / a - 1
+            rho, fvel, pos_fname, vel_fname =  process_snapshot(
+                outdir, z, L, N, lhid, omega_m, h, 
+                supersampling=supersampling)
+        comm.Barrier()
+
+        # Print results rank-by-rank to avoid simultaneous
+        # writing to the same file
+        # Also process halos
+        for r in range(size):
+            if (r == rank) and (i < len(asave)):
+                logging.info(f'Outputting results for a = {a:.6f}')
+                save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z, 
+                    save_particles=save_particles)
+                process_halos(outdir, z, L, N, lhid)
+            comm.Barrier()
+
         logging.info(f'Completed a = {a}')
 
     comm.Barrier()
