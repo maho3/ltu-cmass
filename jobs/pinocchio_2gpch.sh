@@ -22,6 +22,6 @@ hostname
 cd /home/x-dbartlett/ltu-cmass
 pwd
 
-python -m cmass.nbody.pinocchio nbody=pinocchio_2gpch 
+python -m cmass.nbody.pinocchio nbody=pinocchio_2gpch nbody.lhid=0 
 
 exit 0
