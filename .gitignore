@@ -140,5 +140,4 @@ sbi-logs
 matts_tests
 .vscode
 
-cmass/conf/nbody/pin_1gpch*.yaml
 *slurm_hostfile*
