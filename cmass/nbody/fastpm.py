@@ -121,6 +121,7 @@ def get_mpi_info():
 
         # Set MPI args
         mpi_args = f'--hostfile {hostfile}'
+        mpi_args = ''
     else:
         max_cores = os.cpu_count()
         mpi_args = ''
