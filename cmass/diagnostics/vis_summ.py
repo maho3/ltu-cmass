@@ -253,8 +253,9 @@ def main(cfg: DictConfig) -> None:
         )
 
         compare_paths = [get_source_path(
-            wdir, 'quijote', 'nbody',
-            L, 128, lhid=lhids
+            # TODO: remove hard-coded comparison path
+            wdir, 'quijote', 'nbody_mvir',
+            L, N, lhid=lhids
         )]
 
         source_path = [source_path]
@@ -273,7 +274,8 @@ def main(cfg: DictConfig) -> None:
 
         # FIXME: integrate this into the hydra configuration
         compare_paths = [get_source_path(
-            wdir, 'quijote', 'nbody',
+            # TODO: remove hard-coded comparison path
+            wdir, 'quijote', 'nbody_mvir',
             L, N, lhid=lhid
         ) for lhid in lhids]
 
