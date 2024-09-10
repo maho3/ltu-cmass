@@ -60,7 +60,9 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
         return False
 
     source_files = [join(path, 'diag', 'halos.h5') for path in source_path]
+    logging.info(f'Loaded diagnostics from {source_path}')
     compare_files = [join(path, 'diag', 'halos.h5') for path in compare_paths]
+    logging.info(f'Loaded diagnostics from {compare_paths}')
     # check for file keys
     with h5py.File(source_files[0], 'r') as f:
         alist = list(f.keys())
