@@ -8,6 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 import shutil
 import subprocess
 import h5py
+import multiprocessing as mp
 
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
@@ -33,7 +34,7 @@ def generate_param_file(
 
     output_redshifts = -1 + 1./np.array(asave, dtype=float)
     if zf not in output_redshifts:
-        output_redshifts += [zf]
+        output_redshifts = np.append(output_redshifts, zf)
     if save_transfer and (99. not in output_redshifts):
         output_redshifts = np.append(output_redshifts, 99.)
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
@@ -56,7 +57,7 @@ read_grafic = "{join(outdir, 'WhiteNoise_grafic')}"
 -- logspace: Uniform time steps in loga
 
 time_step = linspace({0.01}, {1 / (1 + zf)}, T)
-output_redshifts= {output_redshifts_lua}  -- redshifts to output
+output_redshifts = {output_redshifts_lua}  -- redshifts to output
 
 
 ----------------------------------------
@@ -109,9 +110,8 @@ def get_mpi_info():
         node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
         node_list = node_list.decode('utf-8').splitlines()
 
-        # Calculate max_cores (total cores allocated)
-        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
-        max_cores = len(node_list) * cores_per_node
+        # Calculate number of tasks
+        max_cores = int(os.environ.get('SLURM_NTASKS', 1))
 
         # Write to a hostfile (optional, if required by your MPI setup)
         hostfile = 'slurm_hostfile'
@@ -177,42 +177,57 @@ def process_transfer(cfg, outdir, delete_files=True):
         shutil.rmtree(snapdir)
 
 
+def process_single_snapshot(cfg, outdir, a, delete_files=True):
+    logging.info(f"Processing snapshot at a={a:.4f}...")
+
+    snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+    infile = bigfile.File(snapdir)
+    ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
+    pos = np.array(ds[:]['Position'])
+    vel = np.array(ds[:]['Velocity'])
+
+    # Measure density and velocity field
+    rho, fvel = rho_and_vfield(
+        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
+        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+    
+    # Delete pos, vel
+    del pos, vel  # TODO: save these?
+
+    # Convert to overdensity field
+    rho /= np.mean(rho)
+    rho -= 1
+
+    # Convert from comoving -> physical velocities
+    fvel *= 1/a
+
+    if delete_files:
+        infile.close()
+        shutil.rmtree(snapdir)
+
+    return a, rho, fvel
+
 @timing_decorator
 def process_outputs(cfg, outdir, delete_files=True):
+    asave = sorted(cfg.nbody.asave)
+
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
-        for a in sorted(cfg.nbody.asave):
-            logging.info(f"Processing snapshot at a={a:.4f}...")
-            # Extract positions and velocities at a given scale factor
-            snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
-            infile = bigfile.File(snapdir)
-            ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
-            pos = np.array(ds[:]['Position'])
-            vel = np.array(ds[:]['Velocity'])
+        with mp.Pool(6) as pool:
+            results = [
+                pool.apply_async(process_single_snapshot, (cfg, outdir, a, delete_files)) 
+                for a in asave
+            ]
 
-            # Measure density and velocity field
-            rho, fvel = rho_and_vfield(
-                pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-                omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
+            for result in results:
+                a, rho, fvel = result.get()
 
-            # Convert to overdensity field
-            rho /= np.mean(rho)
-            rho -= 1
+                # Save to file
+                key = f'{a:.6f}'
+                group = outfile.create_group(key)
+                group.create_dataset('rho', data=rho)
+                group.create_dataset('fvel', data=fvel)
 
-            # Convert from comoving -> physical velocities
-            fvel *= 1/a
-
-            # Save to file
-            key = f'{a:.6f}'
-            group = outfile.create_group(key)
-            group.create_dataset('rho', data=rho)
-            group.create_dataset('fvel', data=fvel)
-
-            # Clean up
-            if delete_files:
-                infile.close()
-                shutil.rmtree(snapdir)
-
-    return rho, fvel, pos, vel  # return the last snapshot
+    return rho, fvel, None, None  # return the last snapshot
 
 
 @timing_decorator
@@ -265,8 +280,8 @@ def main(cfg: DictConfig) -> None:
     if not cfg.nbody.save_particles:
         pos, vel = None, None
 
-    # Save nbody-type outputs
-    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
+    # Save nbody-type outputs (unnecessary because of process_outputs)
+    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel, 'a')
     # TODO: add a way to append particles to the existing nbody.h5 file
     save_cfg(outdir, cfg)
 
