@@ -138,12 +138,12 @@ def save_transfer(savedir, rho):
 
 
 @ timing_decorator
-def save_nbody(savedir, a, rho, fvel, ppos, pvel):
+def save_nbody(savedir, a, rho, fvel, ppos, pvel, mode='w'):
     os.makedirs(savedir, exist_ok=True)
     savefile = join(savedir, 'nbody.h5')
 
     logging.info(f'Saving to {savefile}...')
-    with h5py.File(savefile, 'a') as f:
+    with h5py.File(savefile, mode) as f:
         key = f'{a:.6f}'
         group = f.create_group(key)
         group.create_dataset('rho', data=rho)  # density contrast

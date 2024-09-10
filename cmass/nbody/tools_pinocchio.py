@@ -265,7 +265,7 @@ def save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z, save_partic
 
     # Save nbody-type outputs
     af = 1 / (1 + z)
-    save_nbody(outdir, af, rho, fvel, pos, vel)
+    save_nbody(outdir, af, rho, fvel, pos, vel, mode='a')
 
     if save_particles:
         posfile.close()
