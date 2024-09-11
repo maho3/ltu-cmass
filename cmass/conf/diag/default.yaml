@@ -6,3 +6,8 @@ threads: 16
 
 # number of lhid to include for the visualization
 n_seeds: 1
+
+# where to find the diag files for a comparison
+make_comparison: false
+compare_suite: quijote
+compare_sim: nbody

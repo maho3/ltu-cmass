@@ -5,6 +5,7 @@ Can be also used to compare between different runs.
 """
 
 import os
+from typing import TypedDict
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -17,6 +18,15 @@ import h5py
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
+
+
+class HalosStdSummary(TypedDict):
+    Pk_k: np.ndarray
+    Pk: np.ndarray
+    zPk_k: np.ndarray
+    zPk: np.ndarray
+    mass_bins: np.ndarray
+    mass_hist: np.ndarray
 
 
 def check_diagnostics_exist(path, diag_dir, diag_file):
@@ -32,14 +42,11 @@ def check_diagnostics_exist(path, diag_dir, diag_file):
 def extract_halo_diagnostics(file_path, group):
     with h5py.File(file_path, 'r') as f:
         # Load
-        k = f[group]['Pk_k'][...]
-        Pk = f[group]['Pk'][...]
-        kz = f[group]['zPk_k'][...]
-        Pkz = f[group]['zPk'][...]
-        mass_bins = f[group]['mass_bins'][...]
-        mass_hist = f[group]['mass_hist'][...]
+        halo_summ = {}
+        for key in HalosStdSummary.__required_keys__:
+            halo_summ[key] = f[group][key][...]
 
-        return k, Pk, kz, Pkz, mass_bins, mass_hist
+        return halo_summ
 
 
 def check_gen_comparison(config):
@@ -47,6 +54,17 @@ def check_gen_comparison(config):
     same_nbody = config.nbody == config.diag.compare.nbody
     same_sim = config.sim == config.diag.compare.sim
     return same_wdir and same_nbody and same_sim
+
+
+def plot_std_halo_summ(axs, halo_summ: HalosStdSummary, L, lhid, color):
+    k, Pk = halo_summ['Pk_k'], halo_summ['Pk']
+    axs[0].loglog(k, Pk[:, 0], color=color, label=f'lhid = {lhid}')
+    kz, Pkz = halo_summ['zPk_k'], halo_summ['zPk']
+    axs[1].loglog(kz, Pkz[:, 0], color=color, label=f'lhid = {lhid}')
+    mass_bins, mass_hist = halo_summ['mass_bins'], halo_summ['mass_hist']
+    centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
+    axs[2].loglog(10 ** centered_bins, mass_hist / L ** 3 / np.diff(mass_bins),
+                  color=color, label=f'lhid = {lhid}')
 
 
 def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
@@ -60,9 +78,6 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
         return False
 
     source_files = [join(path, 'diag', 'halos.h5') for path in source_path]
-    logging.info(f'Loaded diagnostics from {source_path}')
-    compare_files = [join(path, 'diag', 'halos.h5') for path in compare_paths]
-    logging.info(f'Loaded diagnostics from {compare_paths}')
     # check for file keys
     with h5py.File(source_files[0], 'r') as f:
         alist = list(f.keys())
@@ -73,19 +88,7 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
 
     # extract diagnostics and plot them
     for a in alist:
-        all_k = []
-        all_Pk = []
-        all_kz = []
-        all_Pkz = []
-        all_mass_bins = []
-        all_mass_hist = []
-
-        all_k_comp = []
-        all_Pk_comp = []
-        all_kz_comp = []
-        all_Pkz_comp = []
-        all_mass_bins_comp = []
-        all_mass_hist_comp = []
+        halo_summs = []
 
         fig, axs = plt.subplots(1, 3, figsize=(9, 3), layout="constrained")
         cmap = mpl.colormaps['winter']
@@ -95,27 +98,84 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
         cmap = (mpl.colors.ListedColormap(colors))
 
         for i, source_file in enumerate(source_files):
-            Pk, Pkz, k, kz, mass_bins, mass_hist = append_halo_summs(a, all_Pk, all_Pkz, all_k, all_kz, all_mass_bins,
-                                                                     all_mass_hist, source_file)
+            halo_summ = extract_halo_diagnostics(source_file, a)
+            halo_summs.append(halo_summ)
+            plot_std_halo_summ(axs, halo_summ, L, lhids[i], colors[i])
 
-            append_halo_summs(a, all_Pk_comp, all_Pkz_comp, all_k_comp,
-                              all_kz_comp, all_mass_bins_comp,
-                              all_mass_hist_comp, compare_files[i])
+        finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix='halo_summ')
 
-            axs[0].loglog(k, Pk[:, 0], color=colors[i], label=f'lhid = {lhids[i]}')
-            axs[1].loglog(kz, Pkz[:, 0], color=colors[i], label=f'lhid = {lhids[i]}')
+        if compare_paths is not None:
+            compare_files = [join(path, 'diag', 'halos.h5') for path in compare_paths]
+
+            # Plot individual ratios compared to another suite of simulations
+            fig_comp, axs_comp = plt.subplots(1, 3, figsize=(9, 3), layout="constrained")
+            fig_comp_ensemble, axs_comp_ensemble = plt.subplots(1, 3, figsize=(9, 3), layout="constrained")
+            Pk_ratios = []
+            Pkz_ratios = []
+            hmf_ratios = []
+
+            for i, compare_file in enumerate(compare_files):
+                halo_summ_compare = extract_halo_diagnostics(compare_file, a)
+
+                ratio_Pk_i = halo_summs[i]['Pk'][:, 0] / halo_summ_compare['Pk'][:, 0]
+                axs_comp[0].semilogx(halo_summs[i]['Pk_k'], ratio_Pk_i, color=colors[i])
+
+                ratio_Pkz_i = halo_summs[i]['zPk'][:, 0] / halo_summ_compare['zPk'][:, 0]
+                axs_comp[1].semilogx(halo_summs[i]['zPk_k'], ratio_Pkz_i, color=colors[i])
+
+                mass_bins = halo_summs[i]['mass_bins']
+                centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
+
+                hmf = halo_summs[i]['mass_hist'] / L ** 3 / np.diff(mass_bins)
+                hmf_comp = halo_summ_compare['mass_hist'] / L ** 3 / np.diff(mass_bins)
+                ratio_hmf_i = hmf / hmf_comp
+                axs_comp[2].semilogx(10 ** centered_bins, ratio_hmf_i, color=colors[i])
+
+                Pk_ratios.append(ratio_Pk_i)
+                Pkz_ratios.append(ratio_Pkz_i)
+                hmf_ratios.append(ratio_hmf_i)
+
+            finalise_halo_summ_fig(L, N, a, axs_comp, cmap, fig_comp, lhids, outpath, prefix='halo_summ_comparison')
+
+            # Ensemble ratio plot
+            mean_pk = np.mean(Pk_ratios, axis=0)
+            std_pk = np.std(Pk_ratios, axis=0)
+            k = halo_summs[0]['Pk_k']
+            axs_comp_ensemble[0].semilogx(k, mean_pk, color='k')
+            axs_comp_ensemble[0].fill_between(k, mean_pk - std_pk, mean_pk + std_pk, color='k', alpha=0.2)
+
+            mean_pk_z = np.mean(Pkz_ratios, axis=0)
+            std_pk_z = np.std(Pkz_ratios, axis=0)
+            kz = halo_summs[0]['zPk_k']
+            axs_comp_ensemble[1].semilogx(kz, mean_pk_z, color='k')
+            axs_comp_ensemble[1].fill_between(kz, mean_pk_z - std_pk_z, mean_pk_z + std_pk_z, color='k', alpha=0.2)
+
+            mean_hmf = np.mean(hmf_ratios, axis=0)
+            std_hmf = np.std(hmf_ratios, axis=0)
+            mass_bins = halo_summs[0]['mass_bins']
             centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
-            axs[2].loglog(10 ** centered_bins, mass_hist / L ** 3 / np.diff(mass_bins),
-                          color=colors[i], label=f'lhid = {lhids[i]}')
+            axs_comp_ensemble[2].semilogx(10 ** centered_bins, mean_hmf, color='k')
+            axs_comp_ensemble[2].fill_between(10 ** centered_bins, mean_hmf - std_hmf, mean_hmf + std_hmf, color='k',
+                                              alpha=0.2)
 
-            # TOASK: do we want the mean behaviour as well?
+            finalise_halo_summ_fig(L, N, a, axs_comp_ensemble, cmap, fig_comp_ensemble, lhids, outpath,
+                                   prefix='halo_summ_comparison_ensemble')
 
-        out_file = join(outpath, f'halo_summ_group_{a}_lh_id_{lhids[0]}_to_{lhids[-1]}.svg')
+    return True
 
-        k_nyquist = np.pi / (L / N)
-        axs[0].set_xlim(right=k_nyquist * 0.7)
-        axs[1].set_xlim(right=k_nyquist * 0.7)
 
+def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix):
+    if len(lhids) == 1:
+        file_name = f'{prefix}_group_{a}_lhid_{lhids[0]}.png'
+    else:
+        file_name = f'{prefix}_group_{a}_lhid_{lhids[0]}_to_{lhids[-1]}.png'
+
+    out_file = join(outpath, file_name)
+    k_nyquist = np.pi / (L / N)
+    axs[0].set_xlim(right=k_nyquist * 0.7)
+    axs[1].set_xlim(right=k_nyquist * 0.7)
+
+    if len(lhids) > 1:
         bounds = (np.arange(len(lhids) + 1) - 0.5).tolist()
         norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
         fig.colorbar(
@@ -128,91 +188,15 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
             label='latin hypercube ids',
             location='right'
         )
-        fig.savefig(out_file, format='svg')
-
-        fig_comp, axs_comp = plt.subplots(1, 3, figsize=(9, 3), layout="constrained")
-        fig_comp_ensemble, axs_comp_ensemble = plt.subplots(1, 3, figsize=(9, 3), layout="constrained")
-        Pk_ratios = []
-        Pkz_ratios = []
-        hmf_ratios = []
-
-        for i, source_file in enumerate(source_files):
-            ratio_Pk_i = all_Pk[i][:, 0] / all_Pk_comp[i][:, 0]
-            axs_comp[0].semilogx(all_k[i], ratio_Pk_i, color=colors[i])
-            ratio_Pkz_i = all_Pkz[i][:, 0] / all_Pk_comp[i][:, 0]
-            axs_comp[1].semilogx(all_kz[i], ratio_Pkz_i, color=colors[i])
-            centered_bins = 0.5 * (all_mass_bins[i][:-1] + all_mass_bins[i][1:])
-
-            hmf = all_mass_hist[i] / L ** 3 / np.diff(all_mass_bins[i])
-            hmf_comp = all_mass_hist_comp[i] / L ** 3 / np.diff(all_mass_bins[i])
-            ratio_hmf_i = hmf / hmf_comp
-            axs_comp[2].semilogx(10 ** centered_bins, ratio_hmf_i,
-                                 color=colors[i])
-            Pk_ratios.append(ratio_Pk_i)
-            Pkz_ratios.append(ratio_Pkz_i)
-            hmf_ratios.append(ratio_hmf_i)
-
-        out_file = join(outpath, f'halo_comp_group_{a}_lh_id_{lhids[0]}_to_{lhids[-1]}.svg')
-
-        k_nyquist = np.pi / (L / N)
-        axs_comp[0].set_xlim(right=k_nyquist * 0.7)
-        axs_comp[1].set_xlim(right=k_nyquist * 0.7)
-
-        bounds = (np.arange(len(lhids) + 1) - 0.5).tolist()
-        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
-        fig_comp.colorbar(
-            mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
-            ax=axs_comp[:],
-            boundaries=bounds,
-            ticks=[lhids[0], lhids[-1]],
-            spacing='uniform',
-            orientation='vertical',
-            label='latin hypercube ids',
-            location='right'
-        )
-        fig_comp.savefig(out_file, format='svg')
-
-        ## Ensemble plot
-        mean_pk = np.mean(Pk_ratios, axis=0)
-        std_pk = np.std(Pk_ratios, axis=0)
-        axs_comp_ensemble[0].semilogx(all_k[0], mean_pk, color='k')
-        axs_comp_ensemble[0].fill_between(all_k[0], mean_pk - std_pk, mean_pk + std_pk, color='k', alpha=0.2)
-
-        mean_pk_z = np.mean(Pkz_ratios, axis=0)
-        std_pk_z = np.std(Pkz_ratios, axis=0)
-        axs_comp_ensemble[1].semilogx(all_kz[0], mean_pk_z, color='k')
-        axs_comp_ensemble[1].fill_between(all_kz[0], mean_pk_z - std_pk_z, mean_pk_z + std_pk_z, color='k', alpha=0.2)
-        mean_hmf = np.mean(hmf_ratios, axis=0)
-        std_hmf = np.std(hmf_ratios, axis=0)
-        axs_comp_ensemble[2].semilogx(10 ** centered_bins, mean_hmf, color='k')
-        axs_comp_ensemble[2].fill_between(10 ** centered_bins, mean_hmf - std_hmf, mean_hmf + std_hmf, color='k',
-                                          alpha=0.2)
-
-        out_file = join(outpath, f'halo_comp_ensemble_group_{a}_lh_id_{lhids[0]}_to_{lhids[-1]}.svg')
-
-        k_nyquist = np.pi / (L / N)
-        axs_comp_ensemble[0].set_xlim(right=k_nyquist * 0.7)
-        axs_comp_ensemble[1].set_xlim(right=k_nyquist * 0.7)
-
-        bounds = (np.arange(len(lhids) + 1) - 0.5).tolist()
-        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
-        fig_comp_ensemble.colorbar(
-            mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
-            ax=axs_comp[:],
-            boundaries=bounds,
-            ticks=[lhids[0], lhids[-1]],
-            spacing='uniform',
-            orientation='vertical',
-            label='latin hypercube ids',
-            location='right'
-        )
-        fig_comp_ensemble.savefig(out_file, format='svg')
-
-    return True
+    else:
+        fig.suptitle(f'Latin-hypercube id: {lhids[0]}')
+    logging.info(f'Saving figure as {out_file}')
+    fig.savefig(out_file, format='png', dpi=300)
 
 
 def append_halo_summs(a, all_Pk, all_Pkz, all_k, all_kz, all_mass_bins, all_mass_hist, source_file):
     k, Pk, kz, Pkz, mass_bins, mass_hist = extract_halo_diagnostics(source_file, a)
+    # halo_summ = extract_halo_diagnostics(source_file, a)
     all_k.append(k)
     all_Pk.append(Pk)
     all_kz.append(kz)
@@ -237,9 +221,16 @@ def main(cfg: DictConfig) -> None:
     sim = cfg.sim
     L = cfg.nbody.L
     N = cfg.nbody.N
-    n_lhid_seeds = cfg.diag.n_seeds
 
-    # generate_comparison = check_gen_comparison(cfg)
+    n_lhid_seeds = cfg.diag.n_seeds
+    make_comparison = cfg.diag.make_comparison
+
+    # FIXME: Maybe solve this more elegantly
+    if make_comparison:
+        compare_suite = cfg.diag.compare_suite
+        compare_sim = cfg.diag.compare_sim
+    else:
+        compare_paths = None
 
     if n_lhid_seeds == 1:
         lhids = cfg.nbody.lhid
@@ -253,12 +244,11 @@ def main(cfg: DictConfig) -> None:
             L, N, lhids,
             mkdir=True
         )
-
-        compare_paths = [get_source_path(
-            # TODO: remove hard-coded comparison path
-            wdir, 'quijote', 'nbody_mvir',
-            L, N, lhid=lhids
-        )]
+        if make_comparison:
+            compare_paths = [get_source_path(
+                wdir, compare_suite, compare_sim,
+                L, N, lhid=lhids
+            )]
 
         source_path = [source_path]
         lhids = [lhids]
@@ -274,12 +264,11 @@ def main(cfg: DictConfig) -> None:
             L, N, lhid=0, get_cfg_dir=True
         )
 
-        # FIXME: integrate this into the hydra configuration
-        compare_paths = [get_source_path(
-            # TODO: remove hard-coded comparison path
-            wdir, 'quijote', 'nbody_mvir',
-            L, N, lhid=lhid
-        ) for lhid in lhids]
+        if make_comparison:
+            compare_paths = [get_source_path(
+                wdir, compare_suite, compare_sim,
+                L, N, lhid=lhid
+            ) for lhid in lhids]
 
     all_done = True
 
