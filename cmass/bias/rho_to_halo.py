@@ -318,6 +318,7 @@ def delete_outputs(outdir):
 
 
 def save_snapshot(outdir, a, hpos, hvel, hmass):
+
     with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
         group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
