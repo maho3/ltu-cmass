@@ -159,12 +159,12 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
                                               alpha=0.2)
 
             finalise_halo_summ_fig(L, N, a, axs_comp_ensemble, cmap, fig_comp_ensemble, lhids, outpath,
-                                   prefix='halo_summ_comparison_ensemble')
+                                   prefix='halo_summ_comparison_ensemble', no_cmap=True)
 
     return True
 
 
-def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix):
+def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix, no_cmap=False):
     if len(lhids) == 1:
         file_name = f'{prefix}_group_{a}_lhid_{lhids[0]}.png'
     else:
@@ -175,7 +175,7 @@ def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix):
     axs[0].set_xlim(right=k_nyquist * 0.7)
     axs[1].set_xlim(right=k_nyquist * 0.7)
 
-    if len(lhids) > 1:
+    if len(lhids) > 1 or no_cmap:
         bounds = (np.arange(len(lhids) + 1) - 0.5).tolist()
         norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
         fig.colorbar(
@@ -192,18 +192,6 @@ def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix):
         fig.suptitle(f'Latin-hypercube id: {lhids[0]}')
     logging.info(f'Saving figure as {out_file}')
     fig.savefig(out_file, format='png', dpi=300)
-
-
-def append_halo_summs(a, all_Pk, all_Pkz, all_k, all_kz, all_mass_bins, all_mass_hist, source_file):
-    k, Pk, kz, Pkz, mass_bins, mass_hist = extract_halo_diagnostics(source_file, a)
-    # halo_summ = extract_halo_diagnostics(source_file, a)
-    all_k.append(k)
-    all_Pk.append(Pk)
-    all_kz.append(kz)
-    all_Pkz.append(Pkz)
-    all_mass_bins.append(mass_bins)
-    all_mass_hist.append(mass_hist)
-    return Pk, Pkz, k, kz, mass_bins, mass_hist
 
 
 @timing_decorator
