@@ -149,10 +149,12 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
             axs_comp[0].hlines(1, 0, 2, colors='k', lw=0.4)
             axs_comp[0].set_title(r'Comoving $P(k)$')
             axs_comp[0].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp[0].set_ylim(0, 2)
             axs_comp[0].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
             axs_comp[1].hlines(1, 0, 2, colors='k', lw=0.4)
             axs_comp[1].set_title(r'Redshift space $P(k)$')
             axs_comp[1].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp[1].set_ylim(0, 2)
             axs_comp[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
             # axs_comp[2].hlines(1, 10**13, 10**16, colors='k', lw=0.4)
 
@@ -182,10 +184,12 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
             axs_comp_ensemble[0].hlines(1, 0, 2, colors='k', lw=0.4)
             axs_comp_ensemble[0].set_title(r'Comoving $P(k)$')
             axs_comp_ensemble[0].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp_ensemble[0].set_ylim(0, 2)
             axs_comp_ensemble[0].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
             axs_comp_ensemble[1].hlines(1, 0, 2, colors='k', lw=0.4)
             axs_comp_ensemble[1].set_title(r'Redshift space $P(k)$')
             axs_comp_ensemble[1].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp_ensemble[1].set_ylim(0, 2)
             axs_comp_ensemble[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
 
             finalise_halo_summ_fig(L, N, a, axs_comp_ensemble, cmap, fig_comp_ensemble, lhids, outpath,
