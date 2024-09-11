@@ -193,12 +193,12 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
             axs_comp_ensemble[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
 
             finalise_halo_summ_fig(L, N, a, axs_comp_ensemble, cmap, fig_comp_ensemble, lhids, outpath,
-                                   prefix='halo_summ_comparison_ensemble', no_cmap=True)
+                                   prefix='halo_summ_comparison_ensemble', include_cmap=False)
 
     return True
 
 
-def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix, no_cmap=False):
+def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix, include_cmap=True):
     if len(lhids) == 1:
         file_name = f'{prefix}_group_{a}_lhid_{lhids[0]}.png'
     else:
@@ -209,7 +209,7 @@ def finalise_halo_summ_fig(L, N, a, axs, cmap, fig, lhids, outpath, prefix, no_c
     axs[0].set_xlim(right=k_nyquist * 0.7)
     axs[1].set_xlim(right=k_nyquist * 0.7)
 
-    if len(lhids) > 1 or no_cmap:
+    if len(lhids) > 1 and include_cmap:
         bounds = (np.arange(len(lhids) + 1) - 0.5).tolist()
         norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
         fig.colorbar(
