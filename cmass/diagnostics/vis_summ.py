@@ -59,12 +59,23 @@ def check_gen_comparison(config):
 def plot_std_halo_summ(axs, halo_summ: HalosStdSummary, L, lhid, color):
     k, Pk = halo_summ['Pk_k'], halo_summ['Pk']
     axs[0].loglog(k, Pk[:, 0], color=color, label=f'lhid = {lhid}')
+    axs[0].set_title(r'Comoving $P(k)$')
+    axs[0].set_ylabel(r"$P(k)$ [$h^{-3}\,\mathrm{Mpc}^3$]")
+    axs[0].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
+
     kz, Pkz = halo_summ['zPk_k'], halo_summ['zPk']
     axs[1].loglog(kz, Pkz[:, 0], color=color, label=f'lhid = {lhid}')
+    axs[1].set_title(r'Redshift space $P(k)$')
+    axs[1].set_ylabel(r"$P(k)$ [$h^{-3}\,\mathrm{Mpc}^3$]")
+    axs[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
+
     mass_bins, mass_hist = halo_summ['mass_bins'], halo_summ['mass_hist']
     centered_bins = 0.5 * (mass_bins[:-1] + mass_bins[1:])
     axs[2].loglog(10 ** centered_bins, mass_hist / L ** 3 / np.diff(mass_bins),
                   color=color, label=f'lhid = {lhid}')
+    axs[2].set_title(r'Halo mass function')
+    axs[2].set_ylabel("$n(M)\ [h^{3}\\mathrm{Mpc}^{-3}]$")
+    axs[2].set_xlabel(r"$M [M_\odot]$")
 
 
 def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
@@ -135,6 +146,16 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
                 Pkz_ratios.append(ratio_Pkz_i)
                 hmf_ratios.append(ratio_hmf_i)
 
+            axs_comp[0].hlines(1, 0, 2, colors='k', lw=0.4)
+            axs_comp[0].set_title(r'Comoving $P(k)$')
+            axs_comp[0].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp[0].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
+            axs_comp[1].hlines(1, 0, 2, colors='k', lw=0.4)
+            axs_comp[1].set_title(r'Redshift space $P(k)$')
+            axs_comp[1].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
+            # axs_comp[2].hlines(1, 10**13, 10**16, colors='k', lw=0.4)
+
             finalise_halo_summ_fig(L, N, a, axs_comp, cmap, fig_comp, lhids, outpath, prefix='halo_summ_comparison')
 
             # Ensemble ratio plot
@@ -157,6 +178,15 @@ def plot_halo_sum(source_path, L, N, out_dir, lhids, compare_paths):
             axs_comp_ensemble[2].semilogx(10 ** centered_bins, mean_hmf, color='k')
             axs_comp_ensemble[2].fill_between(10 ** centered_bins, mean_hmf - std_hmf, mean_hmf + std_hmf, color='k',
                                               alpha=0.2)
+
+            axs_comp_ensemble[0].hlines(1, 0, 2, colors='k', lw=0.4)
+            axs_comp_ensemble[0].set_title(r'Comoving $P(k)$')
+            axs_comp_ensemble[0].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp_ensemble[0].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
+            axs_comp_ensemble[1].hlines(1, 0, 2, colors='k', lw=0.4)
+            axs_comp_ensemble[1].set_title(r'Redshift space $P(k)$')
+            axs_comp_ensemble[1].set_ylabel(r"$P(k) / P_{\mathrm{ref}}(k)$")
+            axs_comp_ensemble[1].set_xlabel(r"$k$ [$h\,\mathrm{Mpc}^{-1}$]")
 
             finalise_halo_summ_fig(L, N, a, axs_comp_ensemble, cmap, fig_comp_ensemble, lhids, outpath,
                                    prefix='halo_summ_comparison_ensemble', no_cmap=True)
