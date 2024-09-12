@@ -161,13 +161,13 @@ def batch_cube(x, Nsub, width, stride):
     return np.stack(batches, axis=0)
 
 
-def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
+def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     """Apply CHARM, accounting for the pre-trained resolution."""
 
     # Load CHARM
-    from .charm.integrate_ltu_cmass import get_model_interface
+    from .charm_files.integrate_ltu_cmass import get_model_interface
     run_config_name = charm_cfg
-    charm_interface = get_model_interface(run_config_name)
+    charm_interface = get_model_interface()
 
     # Hard-code the pre-trained CHARM configuration
     Npix = 128  # pre-trained resolution
@@ -182,29 +182,33 @@ def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
 
     # Pad the input density field
     rho_pad = np.pad(rho, pad, mode='wrap')
-    rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
+    fvel_pad = np.pad(fvel, [(pad,pad)]*3+[(0,0)], mode='wrap')
+    # rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
 
     # Split the inputs into batches
     batch_rho = batch_cube(rho, Nsub, Npix, Npix)
     batch_rho_pad = batch_cube(rho_pad, Nsub, Npad, Npix)
-    batch_rho_IC = batch_cube(rho_IC, Nsub, Npix, Npix)
-    batch_rho_IC_pad = batch_cube(rho_IC_pad, Nsub, Npad, Npix)
+    batch_fvel = batch_cube(fvel, Nsub, Npix, Npix)
+    batch_fvel_pad = batch_cube(fvel_pad, Nsub, Npad, Npix)
+    # batch_rho_IC = batch_cube(rho_IC, Nsub, Npix, Npix)
+    # batch_rho_IC_pad = batch_cube(rho_IC_pad, Nsub, Npad, Npix)
 
     # Run CHARM on each batch and append outputs
-    hposs, hmasss = [], []
+    hposs, hmasss, hvels = [], [], []
     for i in range(len(batch_rho)):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
-        hpos, hmass = charm_interface.process_input_density(
+        hpos, hmass, hvel = charm_interface.process_input_density(
             rho_m_zg=batch_rho[i],
-            rho_m_zIC=batch_rho_IC[i],
-            df_test_pad_zg=batch_rho_pad[i],
-            df_test_pad_zIC=batch_rho_IC_pad[i],
+            rho_m_vel_zg=batch_fvel[i].T,
+            rho_m_pad_zg=batch_rho_pad[i],
+            rho_m_vel_pad_zg=batch_fvel_pad[i].T,
             cosmology_array=np.array(cosmo),
             BoxSize=Lcharm
         )
-        mask = hmass > 13
+        mask = hmass > np.log10(5e12)
         hposs.append(hpos[mask])
         hmasss.append(hmass[mask])
+        hvels.append(hvel[mask])
 
     # Shift the positions to the original box
     l = 0
@@ -215,7 +219,7 @@ def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
                 l += 1
 
     # Combine the outputs
-    hposs, hmasss = np.concatenate(hposs), np.concatenate(hmasss)
+    hposs, hmasss, hvels = map(np.concatenate, [hposs, hmasss, hvels])
 
     # halos are initially put on a grid, perturb their positions
     voxL = L/N
@@ -228,14 +232,10 @@ def apply_charm(rho, rho_IC, charm_cfg, L, cosmo):
     # ensure periodicity
     hposs = hposs % L
 
-    # Limit to M>1e13
-    mask = hmasss > 13
-    hposs, hmasss = hposs[mask], hmasss[mask]
-
     # conform to mass-bin format of other bias models TODO: refactor?
-    hposs, hmasss = [hposs], [hmasss]
+    hposs, hmasss, hvels = [hposs], [hmasss], [hvels]
 
-    return hposs, hmasss
+    return hposs, hmasss, hvels
 
 
 def apply_limd(rho, cfg):
@@ -268,25 +268,26 @@ def apply_limd(rho, cfg):
 
 
 @timing_decorator
-def run_snapshot(rho, fvel, cfg, rho_transfer=None, ppos=None, pvel=None):
+def run_snapshot(rho, fvel, cfg, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
 
         # apply CHARM model
-        hpos, hmass = apply_charm(
-            rho, rho_transfer,
+        hpos, hmass, hvel = apply_charm(
+            rho, fvel,
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')
         hpos, hmass = apply_limd(rho, cfg)
+
+        logging.info('Calculating velocities...')
+        hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
     else:
         raise NotImplementedError(
             f'Model {cfg.bias.halo.model} not implemented.')
 
-    logging.info('Calculating velocities...')
-    hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
 
     logging.info('Combine...')
 
@@ -343,18 +344,13 @@ def main(cfg: DictConfig) -> None:
     # Delete existing outputs
     delete_outputs(source_path)
 
-    # Load transfer fn density (for CHARM)
-    rho_transfer = None
-    if cfg.bias.halo.model == 'CHARM':
-        rho_transfer = load_transfer(source_path)
-
     for i, a in enumerate(cfg.nbody.asave):
         logging.info(f'Running snapshot {i} at a={a:.6f}...')
         rho, fvel, ppos, pvel = load_snapshot(source_path, a)
 
         # Apply bias model
         hpos, hvel, hmass = run_snapshot(
-            rho, fvel, cfg, rho_transfer, ppos, pvel)
+            rho, fvel, cfg, ppos, pvel)
 
         logging.info(f'Saving halo catalog to {source_path}')
         save_snapshot(source_path, a, hpos, hvel, hmass)

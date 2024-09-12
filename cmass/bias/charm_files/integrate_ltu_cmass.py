@@ -485,9 +485,9 @@ class get_model_interface:
         lgMass_mock = lgMass_mock.astype('float32')
 
 
-        Nhalos_truth_recomb_tensor = torch.Tensor(Ntot_samp_test[None,...]).cuda(dev)
+        Nhalos_truth_recomb_tensor = torch.Tensor(Ntot_samp_test[None,...]).to(dev)
         if self.cond_Mass_for_vel:
-            Mhalos_truth_recomb_tensor = torch.Tensor(M_halos_sort_norm_condvel[None,...]).cuda(dev)
+            Mhalos_truth_recomb_tensor = torch.Tensor(M_halos_sort_norm_condvel[None,...]).to(dev)
         else:
             Mhalos_truth_recomb_tensor = None
 
