@@ -3,10 +3,10 @@
 
 N=$1
 lhid=$2
-wdir=/home/mattho/git/ltu-cmass
-wdir=/home/x-mho1/git/ltu-cmass
-datadir=${wdir}/data/quijote/wn/N${N}
-basedir=${wdir}/quijote_wn
+prefix=/home/mattho/git/ltu-cmass
+# prefix=/home/x-mho1/git/ltu-cmass
+datadir=$prefix/data/quijote/wn/N${N}
+basedir=$prefix/quijote_wn
 
 # Make datadir if it doesn't exist
 mkdir -p $datadir

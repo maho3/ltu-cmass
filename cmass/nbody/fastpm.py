@@ -282,7 +282,7 @@ def main(cfg: DictConfig) -> None:
         pos, vel = None, None
 
     # Save nbody-type outputs (unnecessary because of process_outputs)
-    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel, 'a')
+    # save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel, 'a')
     # TODO: add a way to append particles to the existing nbody.h5 file
     save_cfg(outdir, cfg)
 
