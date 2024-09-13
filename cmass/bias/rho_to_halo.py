@@ -165,8 +165,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     """Apply CHARM, accounting for the pre-trained resolution."""
 
     # Load CHARM
-    from .charm_files.integrate_ltu_cmass import get_model_interface
-    run_config_name = charm_cfg
+    from charm.infer_halos_from_PM import get_model_interface
     charm_interface = get_model_interface()
 
     # Hard-code the pre-trained CHARM configuration
@@ -199,9 +198,9 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
         hpos, hmass, hvel = charm_interface.process_input_density(
             rho_m_zg=batch_rho[i],
-            rho_m_vel_zg=batch_fvel[i].T,
+            rho_m_vel_zg=np.stack([batch_fvel[i,...,j] for j in range(3)], axis=0),
             rho_m_pad_zg=batch_rho_pad[i],
-            rho_m_vel_pad_zg=batch_fvel_pad[i].T,
+            rho_m_vel_pad_zg=np.stack([batch_fvel_pad[i,...,j] for j in range(3)], axis=0),
             cosmology_array=np.array(cosmo),
             BoxSize=Lcharm
         )
@@ -220,14 +219,6 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
 
     # Combine the outputs
     hposs, hmasss, hvels = map(np.concatenate, [hposs, hmasss, hvels])
-
-    # halos are initially put on a grid, perturb their positions
-    voxL = L/N
-    hposs += np.random.uniform(
-        low=-voxL/2,
-        high=voxL/2,
-        size=hposs.shape
-    )  # TODO: Should this use `sample_3d`?
 
     # ensure periodicity
     hposs = hposs % L
@@ -268,13 +259,13 @@ def apply_limd(rho, cfg):
 
 
 @timing_decorator
-def run_snapshot(rho, fvel, cfg, ppos=None, pvel=None):
+def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
 
         # apply CHARM model
         hpos, hmass, hvel = apply_charm(
-            rho, fvel,
+            rho, fvel*a/1e3,  # CHARM velocity normalization
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
@@ -350,7 +341,9 @@ def main(cfg: DictConfig) -> None:
 
         # Apply bias model
         hpos, hvel, hmass = run_snapshot(
-            rho, fvel, cfg, ppos, pvel)
+            rho, fvel, a,
+            cfg, ppos, pvel
+        )
 
         logging.info(f'Saving halo catalog to {source_path}')
         save_snapshot(source_path, a, hpos, hvel, hmass)
