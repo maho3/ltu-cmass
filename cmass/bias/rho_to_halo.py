@@ -182,15 +182,12 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     # Pad the input density field
     rho_pad = np.pad(rho, pad, mode='wrap')
     fvel_pad = np.pad(fvel, [(pad,pad)]*3+[(0,0)], mode='wrap')
-    # rho_IC_pad = np.pad(rho_IC, pad, mode='wrap')
 
     # Split the inputs into batches
     batch_rho = batch_cube(rho, Nsub, Npix, Npix)
     batch_rho_pad = batch_cube(rho_pad, Nsub, Npad, Npix)
     batch_fvel = batch_cube(fvel, Nsub, Npix, Npix)
     batch_fvel_pad = batch_cube(fvel_pad, Nsub, Npad, Npix)
-    # batch_rho_IC = batch_cube(rho_IC, Nsub, Npix, Npix)
-    # batch_rho_IC_pad = batch_cube(rho_IC_pad, Nsub, Npad, Npix)
 
     # Run CHARM on each batch and append outputs
     hposs, hmasss, hvels = [], [], []
@@ -204,7 +201,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
             cosmology_array=np.array(cosmo),
             BoxSize=Lcharm
         )
-        mask = hmass > np.log10(5e12)
+        mask = hmass > np.log10(5e12)  # charm minimum mass threshold
         hposs.append(hpos[mask])
         hmasss.append(hmass[mask])
         hvels.append(hvel[mask])
