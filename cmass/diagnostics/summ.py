@@ -165,16 +165,21 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                 hpos = f[a]['pos'][...]
                 hvel = f[a]['vel'][...]
                 hmass = f[a]['mass'][...]
+                # Ensure all halos inside box
+                m = np.all((hpos >= 0) & (hpos < L), axis=1)
+                hpos = hpos[m]
+                hvel = hvel[m]
+                hmass = hmass[m]
                 # Get summaries in comoving space
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
                 for summ in summaries:
-                    store_summary(box_catalogue, group, summ, L, N, threads, rsd=False,)
+                    store_summary(box_catalogue, group, summ, L, N, threads, use_rsd=False,)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue_rsd(pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
-                    store_summary(zbox_catalogue, group, summ, L, N, threads, rsd=True,)
+                    store_summary(zbox_catalogue, group, summ, L, N, threads, use_rsd=True,)
                 # measure halo mass function
                 be = np.linspace(13, 16, 100)
                 hist, _ = np.histogram(hmass, bins=be)
@@ -217,12 +222,12 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=gpos, z=z, L=L, N=N)
                 for summ in summaries:
-                    store_summary(box_catalogue, group, summ, L, N, threads, rsd=False,)
+                    store_summary(box_catalogue, group, summ, L, N, threads, use_rsd=False,)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue_rsd(pos=gpos, vel=gvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
-                    store_summary(zbox_catalogue, group, summ, L, N, threads, rsd=True,)
+                    store_summary(zbox_catalogue, group, summ, L, N, threads, use_rsd=True,)
 
     return True
 
