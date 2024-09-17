@@ -178,8 +178,7 @@ def process_transfer(cfg, outdir, delete_files=True):
 
 
 def process_single_snapshot(cfg, outdir, a, delete_files=True):
-    logging.info(f"Processing snapshot at a={a:.4f}...")
-
+    logging.info(f"Reading snapshot at a={a:.4f}...")
     snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
     infile = bigfile.File(snapdir)
     ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
@@ -187,6 +186,7 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     vel = np.array(ds[:]['Velocity'])
 
     # Measure density and velocity field
+    logging.info(f"Processing snapshot at a={a:.4f}...")
     rho, fvel = rho_and_vfield(
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
@@ -210,22 +210,21 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
 @timing_decorator
 def process_outputs(cfg, outdir, delete_files=True):
     asave = sorted(cfg.nbody.asave)
+    rho, fvel = None, None
 
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
-        with mp.Pool(6) as pool:
-            results = [
-                pool.apply_async(process_single_snapshot, (cfg, outdir, a, delete_files)) 
-                for a in asave
-            ]
+        for a in asave:
+            # Process each snapshot serially
+            if not os.path.isdir(join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')):
+                logging.warning(f"Snapshot at a={a:.4f} not found, skipping...")
+                continue
+            a, rho, fvel = process_single_snapshot(cfg, outdir, a, delete_files)
 
-            for result in results:
-                a, rho, fvel = result.get()
-
-                # Save to file
-                key = f'{a:.6f}'
-                group = outfile.create_group(key)
-                group.create_dataset('rho', data=rho)
-                group.create_dataset('fvel', data=fvel)
+            # Save to file
+            key = f'{a:.6f}'
+            group = outfile.create_group(key)
+            group.create_dataset('rho', data=rho)
+            group.create_dataset('fvel', data=fvel)
 
     return rho, fvel, None, None  # return the last snapshot
 
@@ -269,13 +268,13 @@ def main(cfg: DictConfig) -> None:
     # Run
     logging.info("Running FastPM...")
     run_density(cfg, outdir)
+    os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
 
     # Process outputs
     logging.info("Processing outputs...")
     if cfg.nbody.save_transfer:
         process_transfer(cfg, outdir, delete_files=True)
     rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
-    os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None
