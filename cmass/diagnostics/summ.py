@@ -41,6 +41,7 @@ def rho_summ(source_path, L, threads=16, from_scratch=True):
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
                 k, Pk = calcPk(rho, L, threads=threads)
                 group = o.create_group(a)
@@ -161,15 +162,17 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                zi = 1/float(a) - 1
+                logging.info(f'Processing halo catalog a={a}')
                 # Load
-                hpos = f[a]['pos'][...]
-                hvel = f[a]['vel'][...]
-                hmass = f[a]['mass'][...]
+                hpos = f[a]['pos'][...].astype(np.float32)
+                hvel = f[a]['vel'][...].astype(np.float32)
+                hmass = f[a]['mass'][...].astype(np.float32)
                 # Ensure all halos inside box
                 m = np.all((hpos >= 0) & (hpos < L), axis=1)
-                hpos = hpos[m].astype(np.float32)
-                hvel = hvel[m].astype(np.float32)
-                hmass = hmass[m].astype(np.float32)
+                hpos = hpos[m]
+                hvel = hvel[m]
+                hmass = hmass[m]
                 # Get summaries in comoving space
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
@@ -180,6 +183,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                 zbox_catalogue = get_box_catalogue_rsd(pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
                     store_summary(zbox_catalogue, group, summ, L, N, threads, use_rsd=True,)
+                    
                 # measure halo mass function
                 be = np.linspace(13, 16, 100)
                 hist, _ = np.histogram(hmass, bins=be)
@@ -214,14 +218,16 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                zi = 1/float(a) - 1
+                logging.info(f'Processing galaxy catalog a={a}')
                 # Load
-                gpos = f[a]['pos'][...]
-                gvel = f[a]['vel'][...]
+                gpos = f[a]['pos'][...].astype(np.float32)
+                gvel = f[a]['vel'][...].astype(np.float32)
 
                 # Ensure all galaxies inside box
                 m = np.all((gpos >= 0) & (gpos < L), axis=1)
-                gpos = gpos[m].astype(np.float32)
-                gvel = gvel[m].astype(np.float32)
+                gpos = gpos[m]
+                gvel = gvel[m]
 
                 # Get summaries in comoving space
                 group = o.create_group(a)
@@ -262,14 +268,15 @@ def main(cfg: DictConfig) -> None:
     all_done &= done
 
     # measure halo diagnostics
+    N = (cfg.nbody.L//1000)*128  # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
     done = halo_summ(
-        source_path, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
+        source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
         cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
     all_done &= done
 
     # measure gal diagnostics
     done = gal_summ(
-        source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N,
+        source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
         cfg.nbody.cosmo[2], cfg.nbody.zf,
         threads=threads, from_scratch=from_scratch)
     all_done &= done

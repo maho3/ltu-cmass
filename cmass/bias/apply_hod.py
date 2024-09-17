@@ -138,7 +138,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=True)
     cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
