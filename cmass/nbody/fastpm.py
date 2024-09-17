@@ -180,6 +180,11 @@ def process_transfer(cfg, outdir, delete_files=True):
 def process_single_snapshot(cfg, outdir, a, delete_files=True):
     logging.info(f"Reading snapshot at a={a:.4f}...")
     snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+
+    if not os.path.isdir(snapdir):
+        logging.warning(f"Snapshot at a={a:.4f} not found, skipping...")
+        return
+
     infile = bigfile.File(snapdir)
     ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
     pos = np.array(ds[:]['Position'])
@@ -204,27 +209,41 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     if delete_files:
         infile.close()
         shutil.rmtree(snapdir)
-
-    return a, rho, fvel
+    
+    # Save to file
+    with h5py.File(join(outdir, 'nbody_{a:.4f}.h5'), 'w') as outfile:
+        outfile.create_dataset('rho', data=rho)
+        outfile.create_dataset('fvel', data=fvel)
 
 @timing_decorator
 def process_outputs(cfg, outdir, delete_files=True):
     asave = sorted(cfg.nbody.asave)
     rho, fvel = None, None
 
+    with mp.Pool(4) as pool:
+        _ = pool.starmap(
+            process_single_snapshot,
+            [(cfg, outdir, a, delete_files) for a in asave]
+        )
+
+    logging.info("Concatenating snapshots...")
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
         for a in asave:
-            # Process each snapshot serially
-            if not os.path.isdir(join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')):
-                logging.warning(f"Snapshot at a={a:.4f} not found, skipping...")
-                continue
-            a, rho, fvel = process_single_snapshot(cfg, outdir, a, delete_files)
+            # Read snapshot
+            filename = join(outdir, f'nbody_{a:.4f}.h5')
+            with h5py.File(filename, 'r') as infile:
+                rho = infile['rho'][:]
+                fvel = infile['fvel'][:]
 
             # Save to file
             key = f'{a:.6f}'
             group = outfile.create_group(key)
             group.create_dataset('rho', data=rho)
             group.create_dataset('fvel', data=fvel)
+
+            # Delete temporary file
+            if delete_files:
+                os.remove(filename)
 
     return rho, fvel, None, None  # return the last snapshot
 
