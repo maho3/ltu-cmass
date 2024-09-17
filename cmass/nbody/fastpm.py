@@ -33,8 +33,8 @@ def generate_param_file(
 ):
 
     output_redshifts = -1 + 1./np.array(asave, dtype=float)
-    if zf not in output_redshifts:
-        output_redshifts = np.append(output_redshifts, zf)
+    # if zf not in output_redshifts:
+    #     output_redshifts = np.append(output_redshifts, zf)
     if save_transfer and (99. not in output_redshifts):
         output_redshifts = np.append(output_redshifts, 99.)
     output_redshifts_lua = "{" + ", ".join(map(str, output_redshifts)) + "}"
@@ -275,7 +275,7 @@ def main(cfg: DictConfig) -> None:
     logging.info("Processing outputs...")
     if cfg.nbody.save_transfer:
         process_transfer(cfg, outdir, delete_files=True)
-    rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+    # rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
     os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
 
     if not cfg.nbody.save_particles:
