@@ -38,6 +38,7 @@ def rho_summ(source_path, L, threads=16, from_scratch=True):
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
                 k, Pk = calcPk(rho, L, threads=threads)
                 group = o.create_group(a)
@@ -68,17 +69,19 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                zi = 1/float(a) - 1
+                logging.info(f'Processing halo catalog a={a}')
                 # Load
-                hpos = f[a]['pos'][...]
-                hvel = f[a]['vel'][...]
-                hmass = f[a]['mass'][...]
+                hpos = f[a]['pos'][...].astype(np.float32)
+                hvel = f[a]['vel'][...].astype(np.float32)
+                hmass = f[a]['mass'][...].astype(np.float32)
 
                 # measure halo Pk in comoving space
                 delta = MA(hpos, L, N, MAS='NGP')
                 k, Pk = calcPk(delta, L, MAS='NGP', threads=threads)
 
                 # measure halo Pk in redshift space
-                delta = MAz(hpos, hvel, L, N, h, z, MAS='NGP')
+                delta = MAz(hpos, hvel, L, N, h, zi, MAS='NGP')
                 kz, Pkz = calcPk(delta, L, MAS='NGP', threads=threads)
 
                 # measure halo mass function
@@ -120,6 +123,8 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
+                zi = 1/float(a) - 1
+                logging.info(f'Processing galaxy catalog a={a}')
                 # Load
                 gpos = f[a]['pos'][...]
                 gvel = f[a]['vel'][...]
@@ -129,7 +134,7 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
                 k, Pk = calcPk(delta, L, MAS='NGP', threads=threads)
 
                 # measure gal zPk
-                delta = MAz(gpos, gvel, L, N, h, z, MAS='NGP')
+                delta = MAz(gpos, gvel, L, N, h, zi, MAS='NGP')
                 kz, Pkz = calcPk(delta, L, MAS='NGP', threads=threads)
 
                 # Save
@@ -166,14 +171,15 @@ def main(cfg: DictConfig) -> None:
     all_done &= done
 
     # measure halo diagnostics
+    N = (cfg.nbody.L//1000)*128  # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
     done = halo_summ(
-        source_path, cfg.nbody.L, cfg.nbody.N, cfg.nbody.cosmo[2],
+        source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
         cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
     all_done &= done
 
     # measure gal diagnostics
     done = gal_summ(
-        source_path, cfg.bias.hod.seed, cfg.nbody.L, cfg.nbody.N,
+        source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
         cfg.nbody.cosmo[2], cfg.nbody.zf,
         threads=threads, from_scratch=from_scratch)
     all_done &= done
