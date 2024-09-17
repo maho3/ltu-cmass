@@ -4,8 +4,8 @@
 #SBATCH -A phy240043
 #SBATCH -p shared # the default queue is "shared" queue
 #SBATCH --nodes=1
-#SBATCH --ntasks=4
-#SBATCH --time=0:05:00
+#SBATCH --ntasks=8
+#SBATCH --time=0:20:00
 #SBATCH --job-name test_summarizer
 #SBATCH --output=/anvil/scratch/x-dbartlett/cmass/test_summarizer_log_%j.out
 #SBATCH --error=/anvil/scratch/x-dbartlett/cmass/test_summarizer_log_%j.err

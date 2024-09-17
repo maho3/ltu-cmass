@@ -139,7 +139,7 @@ def store_summary(catalog, group, summary_name, box_size, num_bins, num_threads,
     summary_key = summary_name if not use_rsd else f'z{summary_name}'
     group.create_dataset(summary_key, data=summary_dataset.values)
 
-def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=['Pk','TwoPCF','KNN','WST']): #['Bk', 'DensitySplit']
+def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=['Pk','TwoPCF','KNN']): #['WST', 'Bk', 'DensitySplit']
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'halos.h5')
     if (not from_scratch) and os.path.isfile(outpath):
@@ -167,9 +167,9 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                 hmass = f[a]['mass'][...]
                 # Ensure all halos inside box
                 m = np.all((hpos >= 0) & (hpos < L), axis=1)
-                hpos = hpos[m]
-                hvel = hvel[m]
-                hmass = hmass[m]
+                hpos = hpos[m].astype(np.float32)
+                hvel = hvel[m].astype(np.float32)
+                hmass = hmass[m].astype(np.float32)
                 # Get summaries in comoving space
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
@@ -191,7 +191,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
 
 
 def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
-             from_scratch=True,  summaries=['Pk','TwoPCF','KNN','WST']):
+             from_scratch=True,  summaries=['Pk','TwoPCF','KNN']): #WST
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
@@ -217,6 +217,11 @@ def gal_summ(source_path, hod_seed, L, N, h, z, threads=16,
                 # Load
                 gpos = f[a]['pos'][...]
                 gvel = f[a]['vel'][...]
+
+                # Ensure all galaxies inside box
+                m = np.all((gpos >= 0) & (gpos < L), axis=1)
+                gpos = gpos[m].astype(np.float32)
+                gvel = gvel[m].astype(np.float32)
 
                 # Get summaries in comoving space
                 group = o.create_group(a)
