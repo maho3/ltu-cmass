@@ -3,4 +3,4 @@
 from_scratch: true
 
 # number of threads for P(k) computation
-threads: 16
+threads: 24
