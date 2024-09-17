@@ -322,7 +322,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=True)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
