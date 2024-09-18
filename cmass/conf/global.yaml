@@ -9,10 +9,9 @@ hydra:
         datefmt: "%H:%M:%S"
 
 meta:
-  # wdir: "/home/mattho/git/ltu-cmass/data"
+  wdir: "/home/mattho/git/ltu-cmass/data"
   # wdir: "/data101/bartlett/ili/cmass/"
-  # wdir: "/anvil/scratch/x-mho1/cmass-ili"
-  wdir: "/anvil/scratch/x-dbartlett/cmass/"
+  wdir: "/anvil/scratch/x-mho1/cmass-ili"
   logdir: "${meta.wdir}/logs/"
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
@@ -20,6 +19,9 @@ meta:
   # cosmofile: "./params/mtng_cosmologies.txt"        # for mtng-like
 
   # executables
-  fastpm_exec: /home/mattho/git/fastpm/src/fastpm
-  #pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
-  pinocchio_exec: /home/x-dbartlett/Pinocchio/src/pinocchio.x
+  # fastpm_exec: /home/mattho/git/fastpm/src/fastpm
+  # pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
+  # pinocchio_exec: /home/x-dbartlett/Pinocchio/src/pinocchio.x
+  fastpm_exec: /home/x-mho1/git/fastpm/src/fastpm
+  pinocchio_exec: /home/x-mho1/git/Pinocchio/src/pinocchio.x
+
