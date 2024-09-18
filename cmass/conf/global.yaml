@@ -21,14 +21,6 @@ meta:
 
   # executables
   # fastpm_exec: /home/mattho/git/fastpm/src/fastpm
-<<<<<<< HEAD
   fastpm_exec: /home/x-mho1/git/fastpm/src/fastpm
   pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
   # pinocchio_exec: /home/x-mho1/git/Pinocchio/src/pinocchio.x
-=======
-  # pinocchio_exec: /home/mattho/git/Pinocchio/src/pinocchio.x
-  # pinocchio_exec: /home/x-dbartlett/Pinocchio/src/pinocchio.x
-  fastpm_exec: /home/x-mho1/git/fastpm/src/fastpm
-  pinocchio_exec: /home/x-mho1/git/Pinocchio/src/pinocchio.x
-
->>>>>>> 622209e841c40e5d3ee6de38cfa19361ac17eeb1

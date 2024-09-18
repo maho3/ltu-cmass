@@ -5,8 +5,8 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=128            # Number of tasks
-#SBATCH --partition=wholenode      # Partition name
+#SBATCH --ntasks=64            # Number of tasks
+#SBATCH --partition=shared      # Partition name
 
 module restore cmass
 module load openmpi
