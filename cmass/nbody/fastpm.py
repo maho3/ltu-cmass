@@ -212,7 +212,7 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
         shutil.rmtree(snapdir)
     
     # Save to file
-    with h5py.File(join(outdir, 'nbody_{a:.4f}.h5'), 'w') as outfile:
+    with h5py.File(join(outdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
         outfile.create_dataset('rho', data=rho)
         outfile.create_dataset('fvel', data=fvel)
 
@@ -221,7 +221,7 @@ def process_outputs(cfg, outdir, delete_files=True):
     asave = sorted(cfg.nbody.asave)
     rho, fvel = None, None
 
-    with mp.Pool(4) as pool:
+    with mp.Pool(3) as pool:
         _ = pool.starmap(
             process_single_snapshot,
             [(cfg, outdir, a, delete_files) for a in asave]
@@ -294,7 +294,7 @@ def main(cfg: DictConfig) -> None:
     logging.info("Processing outputs...")
     if cfg.nbody.save_transfer:
         process_transfer(cfg, outdir, delete_files=True)
-    # rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+    rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
     os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
 
     if not cfg.nbody.save_particles:
