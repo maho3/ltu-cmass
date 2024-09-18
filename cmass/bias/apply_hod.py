@@ -121,6 +121,10 @@ def delete_outputs(outpath):
     if os.path.isfile(outpath):
         os.remove(outpath)
 
+def save_parameters(outpath, **params):
+    with h5py.File(outpath, 'w') as f:
+        for key, value in params.items():
+            f.attrs[key] = value
 
 def save_snapshot(outpath, a, gpos, gvel, **meta):
     with h5py.File(outpath, 'a') as f:
@@ -154,6 +158,9 @@ def main(cfg: DictConfig) -> None:
 
     # Delete existing outputs
     delete_outputs(save_file)
+
+    # Save parameters
+    save_parameters(save_file, **cfg.bias.hod.theta)
 
     # Run each snapshot
     for i, a in enumerate(cfg.nbody.asave):
