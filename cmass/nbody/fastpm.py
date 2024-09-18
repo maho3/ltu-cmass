@@ -204,31 +204,13 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     if delete_files:
         infile.close()
         shutil.rmtree(snapdir)
-<<<<<<< Updated upstream
 
     return a, rho, fvel
-=======
-    
-    # Save to file
-    with h5py.File(join(outdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
-        outfile.create_dataset('rho', data=rho)
-        outfile.create_dataset('fvel', data=fvel)
->>>>>>> Stashed changes
 
 @timing_decorator
 def process_outputs(cfg, outdir, delete_files=True):
     asave = sorted(cfg.nbody.asave)
 
-<<<<<<< Updated upstream
-=======
-    with mp.Pool(3) as pool:
-        _ = pool.starmap(
-            process_single_snapshot,
-            [(cfg, outdir, a, delete_files) for a in asave]
-        )
-
-    logging.info("Concatenating snapshots...")
->>>>>>> Stashed changes
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
         with mp.Pool(6) as pool:
             results = [
@@ -293,10 +275,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.nbody.save_transfer:
         process_transfer(cfg, outdir, delete_files=True)
     rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
-<<<<<<< Updated upstream
     os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
-=======
->>>>>>> Stashed changes
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None
