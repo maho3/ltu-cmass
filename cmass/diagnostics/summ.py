@@ -76,6 +76,13 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True):
                 hvel = f[a]['vel'][...].astype(np.float32)
                 hmass = f[a]['mass'][...].astype(np.float32)
 
+                # Nmax = int(1e6*(L)**3/(2e3)**3)  # 1e6 particles per 2e3 Mpc/h
+
+                # sortinds = np.argsort(hmass)[::-1]
+                # hpos = hpos[sortinds[:Nmax]]
+                # hvel = hvel[sortinds[:Nmax]]
+                # hmass = hmass[sortinds[:Nmax]]
+
                 # measure halo Pk in comoving space
                 delta = MA(hpos, L, N, MAS='NGP')
                 k, Pk = calcPk(delta, L, MAS='NGP', threads=threads)
@@ -153,7 +160,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias', 'diag'])
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=False)  # for now, only one snapshot
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
@@ -164,11 +171,11 @@ def main(cfg: DictConfig) -> None:
 
     all_done = True
 
-    # measure rho diagnostics
-    done = rho_summ(
-        source_path, cfg.nbody.L, threads=threads,
-        from_scratch=from_scratch)
-    all_done &= done
+    # # measure rho diagnostics
+    # done = rho_summ(
+    #     source_path, cfg.nbody.L, threads=threads,
+    #     from_scratch=from_scratch)
+    # all_done &= done
 
     # measure halo diagnostics
     N = (cfg.nbody.L//1000)*128  # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
@@ -177,12 +184,12 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.zf, threads=threads, from_scratch=from_scratch)
     all_done &= done
 
-    # measure gal diagnostics
-    done = gal_summ(
-        source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
-        cfg.nbody.cosmo[2], cfg.nbody.zf,
-        threads=threads, from_scratch=from_scratch)
-    all_done &= done
+    # # measure gal diagnostics
+    # done = gal_summ(
+    #     source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
+    #     cfg.nbody.cosmo[2], cfg.nbody.zf,
+    #     threads=threads, from_scratch=from_scratch)
+    # all_done &= done
 
     if all_done:
         logging.info('All diagnostics computed successfully')
