@@ -185,7 +185,7 @@ def halo_summ(source_path, L, N, h, z, threads=16, from_scratch=True, summaries=
                     store_summary(zbox_catalogue, group, summ, L, N, threads, use_rsd=True,)
                     
                 # measure halo mass function
-                be = np.linspace(13, 16, 100)
+                be = np.linspace(12.5, 16, 100)
                 hist, _ = np.histogram(hmass, bins=be)
 
                 # Save
