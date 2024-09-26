@@ -18,15 +18,18 @@ Output:
 
 import os
 from os.path import join
+import subprocess
 import numpy as np
 import logging
 import hydra
+import re
+import h5py
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from .tools import (
-    parse_nbody_config, gen_white_noise, load_white_noise,
-    save_nbody, rho_and_vfield, generate_pk_file)
-from ..bias.rho_to_halo import save_snapshot
+    parse_nbody_config, gen_white_noise, load_white_noise, generate_pk_file)
+from .tools_pinocchio import (
+    process_snapshot, save_pinocchio_nbody, process_halos, save_cfg_data)
 
 
 @timing_decorator
@@ -64,6 +67,36 @@ def get_ICs(cfg, outdir):
             file.write(np.array([planesize], dtype=np.int32).tobytes())
 
     return
+
+
+def get_mpi_info():
+
+    if 'PBS_NODEFILE' in os.environ:  # assume PBS job
+        with open(os.environ['PBS_NODEFILE'], 'r') as f:
+            max_cores = len(f.readlines())
+        mpi_args = '--hostfile $PBS_NODEFILE'
+    elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
+        # Use scontrol to get the expanded list of nodes
+        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = node_list.decode('utf-8').splitlines()
+
+        # Calculate max_cores (total cores allocated)
+        cores_per_node = int(os.environ.get('SLURM_CPUS_ON_NODE', 1))
+        max_cores = len(node_list) * cores_per_node
+
+        # Write to a hostfile (optional, if required by your MPI setup)
+        hostfile = 'slurm_hostfile'
+        with open(hostfile, 'w') as f:
+            for node in node_list:
+                f.write(f"{node}\n")
+
+        # Set MPI args
+        mpi_args = f'--hostfile {hostfile}'
+    else:
+        max_cores = os.cpu_count()
+        mpi_args = ''
+
+    return max_cores, mpi_args
 
 
 def generate_param_file(cfg, outdir):
@@ -108,7 +141,7 @@ def generate_param_file(cfg, outdir):
         "# run. The past-light cone is NOT generated using these outputs but\n"
         "# is computed with continuous time sampling.\n\n"
     )
-    output_redshifts = [cfg.nbody.zf]
+    output_redshifts = list(1 / np.array(cfg.nbody.asave) - 1)
     content += "\n".join(map(str, sorted(output_redshifts,
                          reverse=True))) + "\n"
     with open(output_list, 'w') as file:
@@ -121,14 +154,16 @@ def generate_param_file(cfg, outdir):
 
     # Make paramater file
 
-    content = f"""# This is a parameter file for the Pinocchio 4.0 code
+    def make_content(MaxMem, MaxMemPerParticle):
+
+        content = f"""# This is a parameter file for the Pinocchio 4.0 code
 
 # run properties
 RunFlag                {run_flag}      % name of the run
 OutputList             {output_list}      % name of file with required output redshifts
 BoxSize                {cfg.nbody.L}        % physical size of the box in Mpc
 BoxInH100                           % specify that the box is in Mpc/h
-GridSize               {cfg.nbody.N}          % number of grid points per side
+GridSize               {cfg.nbody.N} % number of grid points per side
 RandomSeed             {random_seed}       % random seed for initial conditions
 
 # cosmology
@@ -150,8 +185,8 @@ WDM_PartMass_in_kev    0.0          % WDM cut following Bode, Ostriker & Turok (
 
 # control of memory requirements
 BoundaryLayerFactor    1.0          % width of the boundary layer for fragmentation
-MaxMem                 3600         % max available memory to an MPI task in Mbyte
-MaxMemPerParticle      300          % max available memory in bytes per particle
+MaxMem                 {MaxMem}     % max available memory to an MPI task in Mbyte
+MaxMemPerParticle      {MaxMemPerParticle} % max available memory in bytes per particle
 
 # output
 CatalogInAscii                      % catalogs are written in ascii and not in binary format
@@ -179,10 +214,139 @@ PLCAperture            30           % cone aperture for the past light cone
 % PLCCenter 0. 0. 0.                % cone vertex in the same coordinates as the BoxSize
 % PLCAxis   1. 1. 0.                % un-normalized direction of the cone axis
 """
+        return content
+
+    # Initial guess at memory requirements
+    MaxMem = 3600
+    MaxMemPerParticle = 300
+    content = make_content(MaxMem, MaxMemPerParticle)
 
     # Write the content to a file
     with open(filename, 'w') as file:
         file.write(content)
+
+    max_cores, mpi_args = get_mpi_info()
+
+    # Run memory checking
+    log_file = join(outdir, 'memory_log')
+    memory_exec = join(os.path.dirname(cfg.meta.pinocchio_exec), 'memorytest')
+    command = f'mpirun -np 1 {memory_exec} {filename} {max_cores} > {log_file}'
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    cwd = os.getcwd()
+    os.chdir(outdir)
+    logging.info(command)
+    _ = subprocess.run(command, shell=True, check=False, env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.chdir(cwd)
+
+    # Check memory requirements within limits
+    with open(log_file, 'r') as f:
+        text = f.read()
+    bytes_per_particle_pattern = r"bytes per particle:\s+([0-9]*\.?[0-9]+)"
+    required_memory_pattern = r"Required memory per task:\s+([0-9]*\.?[0-9]+)Mb"
+    total_required_memory_pattern = r"Total required memory:\s+([0-9]*\.?[0-9]+)Gb"
+    bytes_per_particle_match = re.search(bytes_per_particle_pattern, text)
+    required_memory_match = re.search(required_memory_pattern, text)
+    total_required_memory_match = re.search(total_required_memory_pattern, text)
+    if bytes_per_particle_match:
+        bytes_per_particle = float(bytes_per_particle_match.group(1))
+        logging.info(f"Bytes per particle: {bytes_per_particle}")
+    else:
+        raise ValueError(f"Bytes per particle not found in {log_file}")
+    if required_memory_match:
+        required_memory_per_task = float(required_memory_match.group(1))
+        logging.info(f"Required memory per task (in Mb): {required_memory_per_task}")
+    else:
+        raise ValueError(f"Required memory per task not found in {log_file}")
+    if total_required_memory_match:
+        total_required_memory = float(total_required_memory_match.group(1))
+        logging.info(f"Total required memory (in Gb): {total_required_memory}")
+    else:
+        raise ValueError(f"Total required memory not found in {log_file}")
+
+    # Change memory requirements if not acceptable (less than 10% buffer)
+    if (bytes_per_particle > 0.9 * MaxMemPerParticle) or (required_memory_per_task > 0.9 * MaxMem):
+        logging.info('Maximum memory requirements too stringent. Updating file.')
+        MaxMem = max(required_memory_per_task/0.9, MaxMem)
+        MaxMemPerParticle = max(bytes_per_particle/0.9, MaxMemPerParticle)
+        content = make_content(MaxMem, MaxMemPerParticle)
+        with open(filename, 'w') as file:
+            file.write(content)
+
+    # Check job has the required resources if SLURM job
+    if 'SLURM_JOB_NODELIST' in os.environ:
+        
+        slurm_job_id = os.getenv("SLURM_JOBID")
+        if slurm_job_id is None:
+            raise ValueError("Error: SLURM_JOBID environment variable is not set.")
+
+        result = subprocess.run(
+            ["scontrol", "show", "job", slurm_job_id],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        output = result.stdout
+        match = re.search(r"AllocTRES=([^ ]+)", output)
+        if not match:
+            raise ValueError("TRES information not found in SLURM job details.")
+        # Extract the TRES details
+        tres_info = match.group(1)
+
+        # Parse the TRES details
+        tres_dict = {}
+        for resource in tres_info.split(","):
+            key, value = resource.split("=")
+            tres_dict[key] = value
+
+        # Compute total memory and memory per core
+        mem = tres_dict.get("mem", "0M")
+        if mem[-1] == "M":
+            total_memory = float(mem.rstrip("M")) / 1000
+        elif mem[-1] == "G":
+            total_memory = float(mem.rstrip("G"))  # Total memory in GB
+        total_cpus = int(tres_dict.get("cpu", "1"))  # Total CPUs allocated
+        memory_per_core = total_memory * 1000 / total_cpus if total_cpus > 0 else 0
+
+        # Print results
+        logging.info(f"Allocated total memory (in Gb): {total_memory}")
+        logging.info(f"Allocated memory per task (in Mb): {memory_per_core:.2f}")
+
+        # Check we have the resources
+        if total_memory < total_required_memory:
+            raise ValueError('Insufficient total memory for job to run')
+        if memory_per_core < required_memory_per_task:
+            raise ValueError('Insufficient memory per core for job to run')
+
+    return
+
+
+def delete_files(cfg, outdir):
+
+    all_files = os.listdir(outdir)
+
+    # Check files we need exist
+    if ('nbody.h5' not in all_files) or ('halos.h5' not in all_files):
+        logging.info('Not deleting Pinocchio files as nbody.h5 and/or halos.h5 does not exist')
+        return
+
+    # Check we have saved the relevant scale factors
+    for fname in ['nbody.h5', 'halos.h5']:
+        with h5py.File(join(outdir, fname)) as f:
+            keys = list(f.keys())
+            asave = [f'{a:.6f}' for a in cfg.nbody.asave]
+            keys.sort()
+            asave.sort()
+            if not (asave == keys):
+                logging.info(f'Not deleting Pinocchio files as {fname} does not have all redshifts saved')
+                return
+
+    files_to_keep = ['input_power_spectrum.txt', 'halos.h5', 'nbody.h5', 'parameter_file', 'config.yaml']
+
+    for f in all_files:
+        if f not in files_to_keep:
+            os.remove(join(outdir, f))
 
     return
 
@@ -190,126 +354,51 @@ PLCAperture            30           % cone aperture for the past light cone
 @timing_decorator
 def run_density(cfg, outdir):
 
-    # Run pinoccio
+    # Run from output dir
     cwd = os.getcwd()
     os.chdir(outdir)
-    os.system(f'{cfg.nbody.pinocchio_exec} parameter_file')
+
+    max_cores, mpi_args = get_mpi_info()
+
+    # Run pinoccio
+    command = f'mpirun -n {max_cores} {mpi_args} '
+    command += f'{cfg.meta.pinocchio_exec} parameter_file'
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    _ = subprocess.run(command, shell=True, check=True, env=env)
+
+    # Process snapshots
+    for f in ['nbody.h5', 'halos.h5']:
+        if os.path.isfile(join(outdir, f)):
+            os.remove(join(outdir, f))
+
+    if len(cfg.nbody.asave) == 1:
+        logging.info('Processing output on a single core')
+        if hasattr(cfg.nbody, 'supersampling'):
+            supersampling = cfg.nbody.supersampling
+        else:
+            supersampling = None
+        z = 1 / cfg.nbody.asave[0] - 1
+        rho, fvel, pos_fname, vel_fname =  process_snapshot(
+                outdir, z, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, 
+                cfg.nbody.cosmo[0], cfg.nbody.cosmo[2],
+                supersampling=supersampling)
+        save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z,
+                    save_particles=cfg.nbody.save_particles)
+        process_halos(outdir, cfg.nbody.zf, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid)
+    else:
+        ncore = min(max_cores, len(cfg.nbody.asave))
+        save_cfg_data(outdir, cfg)
+        command = f'mpirun -n {ncore} {mpi_args} env PYTHONPATH={cwd} python -u -m cmass.nbody.tools_pinocchio '
+        command +=  join(outdir, 'snapshot_data.yaml')
+        env = os.environ.copy()
+        env["OMP_NUM_THREADS"] = "1"
+        logging.info(f'Launching output processing on {ncore} cores')
+        _ = subprocess.run(command, shell=True, check=True, env=env)
+
     os.chdir(cwd)
 
-    # Load the data
-    filename = join(
-        outdir,
-        f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
-        f'N{cfg.nbody.N}-{cfg.nbody.lhid}.snapshot.out')
-    data = {}
-
-    with open(filename, 'rb') as f:
-
-        # Function to read a block
-        def read_block(expected_name, dtype, count):
-            initial_block_size = np.fromfile(
-                f, dtype=np.int32, count=1)[0]  # not used
-            block_name = np.fromfile(f, dtype='S4', count=1)[
-                0].decode().strip()
-            block_size_with_name = np.fromfile(
-                f, dtype=np.int32, count=1)[0]  # not used
-            if block_name != expected_name:
-                raise ValueError(
-                    f"Expected block name '{expected_name}', "
-                    f"but got '{block_name}'")
-            data_block = np.fromfile(f, dtype=dtype, count=count)
-            trailing_block_size = np.fromfile(
-                f, dtype=np.int32, count=1)[0]  # not used
-            return data_block
-
-        # Read the HEADER block
-        header_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('NPart', np.uint32, 6),
-            ('Mass', np.float64, 6),
-            ('Time', np.float64),
-            ('RedShift', np.float64),
-            ('flag_sfr', np.int32),
-            ('flag_feedback', np.int32),
-            ('NPartTotal', np.uint32, 6),
-            ('flag_cooling', np.int32),
-            ('num_files', np.int32),
-            ('BoxSize', np.float64),
-            ('Omega0', np.float64),
-            ('OmegaLambda', np.float64),
-            ('HubbleParam', np.float64),
-            ('flag_stellarage', np.int32),
-            ('flag_metals', np.int32),
-            ('npartTotalHighWord', np.uint32, 6),
-            ('flag_entropy_instead_u', np.int32),
-            ('flag_metalcooling', np.int32),
-            ('flag_stellarevolution', np.int32),
-            ('fill', np.int8, 52)
-        ])
-        header_block = read_block('HEAD', header_dtype, 1)[0]
-        data['header'] = {name: header_block[name]
-                          for name in header_dtype.names}
-
-        # Number of particles
-        num_particles = header_block['NPart'][1]
-
-        # Read INFO block
-        info_dtype = np.dtype(
-            [('name', 'S4'), ('type', 'S8'), ('ndim', np.int32),
-             ('active', np.int32, 6)])
-        read_block('INFO', info_dtype, 4)
-
-        # Read empty FMAX block
-        fmax_dtype = np.dtype([('dummy', np.int64), ('fmax', np.float32)])
-        read_block('FMAX', fmax_dtype, 2)
-
-        # Read empty RMAX block
-        rmax_dtype = np.dtype([('dummy', np.int64), ('rmax', np.int64)])
-        read_block('RMAX', rmax_dtype, 2)
-
-        # Read ID block
-        id_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('ids', np.uint32, num_particles)
-        ])
-        ids = read_block('ID', id_dtype, 1)
-        data['ids'] = ids['ids'][0]
-
-        # Read POS block
-        pos_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('pos', np.float32, num_particles * 3)
-        ])
-        positions = read_block('POS', pos_dtype, 1)
-        data['positions'] = positions['pos'].reshape(-1, 3)
-
-        # Read VEL block
-        vel_dtype = np.dtype([
-            ('dummy', np.int64),
-            ('vel', np.float32, num_particles * 3)
-        ])
-        positions = read_block('VEL', vel_dtype, 1)
-        data['velocities'] = positions['vel'].reshape(-1, 3)
-
-    # Align axes
-    data['positions'][:, [0, 1, 2]] = data['positions'][:, [2, 1, 0]]
-    data['velocities'][:, [0, 1, 2]] = data['velocities'][:, [2, 1, 0]]
-
-    # Load halo data
-    #    0) group ID
-    #    1) group mass (Msun/h)
-    # 2- 4) initial position (Mpc/h)
-    # 5- 7) final position (Mpc/h)
-    # 8-10) velocity (km/s)
-    #   11) number of particles
-    filename = join(
-        outdir, f'pinocchio.{cfg.nbody.zf:.4f}.pinocchio-L{cfg.nbody.L}-'
-                f'N{cfg.nbody.N}-{cfg.nbody.lhid}.catalog.out')
-    hmass = np.log10(np.loadtxt(filename, unpack=False, usecols=(1,)))
-    hpos = np.loadtxt(filename, unpack=False, usecols=(7, 6, 5))
-    hvel = np.loadtxt(filename, unpack=False, usecols=(10, 9, 8))
-
-    return data['positions'], data['velocities'], hpos, hvel, hmass
+    return
 
 
 @timing_decorator
@@ -319,7 +408,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg)
+    cfg = parse_nbody_config(cfg, lightcone=True)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -343,30 +432,11 @@ def main(cfg: DictConfig) -> None:
     generate_param_file(cfg, outdir)
 
     # Run
-    pos, vel, hpos, hvel, hmass = run_density(cfg, outdir)
-
-    # Calculate velocity field
-    rho, fvel = rho_and_vfield(
-        pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
-        omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
-
-    if not cfg.nbody.save_particles:
-        pos, vel = None, None
-
-    # Convert from comoving -> physical velocities
-    fvel *= (1 + cfg.nbody.zf)
-
-    # Save nbody-type outputs
-    save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel)
+    run_density(cfg, outdir)
     save_cfg(outdir, cfg)
 
-    # Save bias-type outputs
-    outpath = join(outdir, 'halos.h5')
-    logging.info('Saving cube to ' + outpath)
-    if os.path.isfile(outpath):
-        os.remove(outpath)
-    save_snapshot(outdir, cfg.nbody.af, hpos, hvel, hmass)
-
+    delete_files(cfg, outdir)
+    
     logging.info("Done!")
 
 

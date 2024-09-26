@@ -28,8 +28,8 @@ make
 ./src/fastpm --help
 ```
 
-Then, change your `nbody` configuration to the path of your FastPM executable:
+Then, change your `global.meta` configuration to the path of your FastPM executable:
 ```yaml
 fastpm_exec: /path/to/git/fastpm/src/fastpm
 ```
-An example of this is in [fastpm.yaml](../../cmass/conf/nbody/fastpm.yaml).
+An example of this is in [global.yaml](../../cmass/conf/global.yaml).

@@ -36,7 +36,17 @@ from ..nbody.tools import parse_nbody_config
 def parse_hod(cfg):
     with open_dict(cfg):
         # HOD parameters
-        cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
+        if (not hasattr(cfg.bias.hod, 'seed')) or (cfg.bias.hod.seed is None):
+            cfg.bias.hod.theta = [
+                cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
+                cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
+            ]
+            cfg.bias.hod.seed = 0
+        elif cfg.bias.hod.seed == -1:
+            cfg.bias.hod.seed = np.random.randint(0, 1e5)
+            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
+        else:
+            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
         # Cosmology
         cfg.nbody.cosmo = load_params(
@@ -142,7 +152,7 @@ def main(cfg: DictConfig) -> None:
     )
     save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = join(save_path, f'hod{cfg.bias.hod.seed:03}.h5')
+    save_file = join(save_path, f'hod{cfg.bias.hod.seed:05}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs
