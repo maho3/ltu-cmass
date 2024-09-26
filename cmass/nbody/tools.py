@@ -37,7 +37,7 @@ except ImportError:
     symbolic_pofk = None
 
 
-def parse_nbody_config(cfg, lightcone=False):
+def parse_nbody_config(cfg):
     with open_dict(cfg):
         nbody = cfg.nbody
         nbody.ai = 1 / (1 + nbody.zi)  # initial scale factor
@@ -46,7 +46,7 @@ def parse_nbody_config(cfg, lightcone=False):
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
         # default asave
-        if (not lightcone) or ('asave' not in nbody) or (len(nbody.asave) == 0):
+        if (not cfg.survey.lightcone) or ('asave' not in nbody) or (len(nbody.asave) == 0):
             nbody.asave = [nbody.af]
 
         # load cosmology
