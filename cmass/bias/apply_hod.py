@@ -42,6 +42,9 @@ def parse_hod(cfg):
                 cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
             ]
             cfg.bias.hod.seed = 0
+        elif cfg.bias.hod.seed == -1:
+            cfg.bias.hod.seed = np.random.randint(0, 1e5)
+            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
         else:
             cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
 
@@ -142,7 +145,7 @@ def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
