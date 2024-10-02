@@ -99,6 +99,26 @@ def thetahod_literature(paper, model='zheng07'):
             }
         else:
             raise NotImplementedError
+    elif model == 'zu_mandelbaum15':
+        # if paper == 'zu_mandelbaum15':
+        """
+        Zu \& Mandelbaum+15, arXiv:1505.02781
+        Table 2, iHOD
+        """
+        p_hod = {
+            'smhm_m0': 10.31,
+            'smhm_m1': 12.10,
+            'smhm_beta': 0.33,
+            'smhm_delta': 0.42,
+            'smhm_gamma': 1.21,
+            'smhm_sigma': 0.50,
+            'smhm_sigma_slope': -0.04,
+            'alphasat': 1.00,
+            'betasat': 0.90,
+            'bsat': 8.98,
+            'betacut': 0.41,
+            'bcut': 0.86,
+        }
     else:
         raise ValueError(
             '`model` not recognised, please provide a supported HOD model:'
