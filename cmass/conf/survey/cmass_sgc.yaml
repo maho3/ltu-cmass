@@ -1,5 +1,5 @@
-# North galactic cap CMASS survey
-is_North: True
+# South galactic cap CMASS survey
+is_North: False
 
 # Data augmentation seed (for random rotations)
 aug_seed: 0
@@ -21,7 +21,7 @@ fibermode: 1  # 0: no collisions, 1: one removed, 2: both removed
 # z_range: [0.4, 0.7]
 
 # Middle ra, dec, z of CMASS sample (See test_remove_cuboid for details)
-mid_rdz: [184.83975076425324, 34.03863916513374, 0.4194598771198273]
+mid_rdz: [2.6749410426432902, 11.867070540112666, 0.48859496106951084]
 
 
 # For lightcone extrapolation

@@ -172,11 +172,14 @@ def random_rotate_translate(xyz, L, vel=None, seed=0):
 
 # mask functions
 
-def BOSS_angular(ra, dec, wdir='./data'):
+def BOSS_angular(ra, dec, wdir='./data', is_North=True):
     ''' Given RA and Dec, check whether the galaxies are within the angular
     mask of BOSS
     '''
-    f_poly = os.path.join(wdir, 'obs', 'mask_DR12v5_CMASS_North.ply')
+    if is_North:
+        f_poly = os.path.join(wdir, 'obs', 'mask_DR12v5_CMASS_North.ply')
+    else:
+        f_poly = os.path.join(wdir, 'obs', 'mask_DR12v5_CMASS_South.ply')
     mask = pymangle.Mangle(f_poly)
 
     w = mask.weight(ra, dec)

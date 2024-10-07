@@ -1,6 +1,6 @@
 """
 Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
-and applies CMASS NGC survey mask and selection effects.
+and applies CMASS NGC/SGC survey mask and selection effects.
 
 Input:
     - galaxies/hod{hod_seed}.h5
@@ -75,14 +75,14 @@ def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
 
 
 @timing_decorator
-def apply_mask(rdz, wdir, fibermode=0):
+def apply_mask(rdz, wdir, is_North, fibermode=0):
     logging.info('Applying redshift cut...')
     mask = BOSS_redshift(rdz[:, -1])
     rdz = rdz[mask]
     logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
 
     logging.info('Applying angular mask...')
-    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir)
+    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir, is_North=is_North)
     rdz = rdz[inpoly]
     logging.info(f'Removed {len(inpoly)-len(rdz)}/{len(inpoly)} galaxies')
 
@@ -122,11 +122,12 @@ def custom_cuts(rdz, cfg):
 
 
 @timing_decorator
-def reweight(rdz, wdir='./data', be=None, hobs=None):
+def reweight(rdz, wdir='./data', is_North=True, be=None, hobs=None):
     if (be is None) or (hobs is None):
         # load observed n(z)
         n_z = np.load(
-            join(wdir, 'obs', 'n-z_DR12v5_CMASS_North.npy'),
+            join(wdir, 'obs',
+                  'n-z_DR12v5_CMASS_North.npy' if is_North else 'n-z_DR12v5_CMASS_South.npy'),
             allow_pickle=True).item()
         be, hobs = n_z['be'], n_z['h']
 
@@ -171,6 +172,7 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
+    is_North = cfg.survey.is_North
 
     # Load galaxies
     pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
@@ -192,13 +194,13 @@ def main(cfg: DictConfig) -> None:
     rdz = xyz_to_sky(pos, vel, cfg.nbody.cosmo)
 
     # Apply mask
-    rdz = apply_mask(rdz, cfg.meta.wdir, cfg.survey.fibermode)
+    rdz = apply_mask(rdz, cfg.meta.wdir, is_North, cfg.survey.fibermode)
 
     # Custom cuts
     rdz = custom_cuts(rdz, cfg)
 
     # Reweight (Todo: fiber collisions should iterate with this?)
-    rdz = reweight(rdz, cfg.meta.wdir)
+    rdz = reweight(rdz, cfg.meta.wdir, is_North)
 
     # Save
     outdir = join(source_path, 'lightcone')
