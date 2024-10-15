@@ -1,6 +1,15 @@
 """
 Tools for initilaising and implementing Halo Occupation 
-Distribution (HOD) models. 
+Distribution (HOD) models.
+
+Currently implemented models:
+- Zheng+07
+- Leauthaud+11
+- Zu & Mandelbaum+15
+
+Each model derives from the `Hod_model` parent class,
+which additionally uses the `Hod_parameter` helper class
+for each parameter.
 """
 
 import numpy as np

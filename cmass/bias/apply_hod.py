@@ -1,5 +1,6 @@
 """
-Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
+Sample an HOD realization from the halo catalog.
+HOD model and parameters defined in the bias configuration file.
 
 Input:
     - halos.h5
@@ -46,17 +47,8 @@ def populate_hod(
         mdef=mdef
     )
 
-    # hod_params = cfg.bias.hod.theta
-
-    hod = build_HOD_model(
-        # cosmo, cfg.nbody.zf, hod_model='zheng07', mdef=mdef,
-        # cosmo, cfg.nbody.zf, mdef=mdef,
-        cosmo, cfg, mdef=mdef,
-        # **hod_params
-    )
-
+    hod = build_HOD_model(cosmo, cfg, mdef=mdef)
     hod.populate_mock(catalog, seed=seed)
-
     galcat = hod.mock.galaxy_table.as_array()
 
     return galcat
