@@ -190,10 +190,10 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     batch_fvel_pad = batch_cube(fvel_pad, Nsub, Npad, Npix)
 
     # Run CHARM on each batch and append outputs
-    hposs, hmasss, hvels = [], [], []
+    hposs, hmasss, hvels, hconcs = [], [], [], []
     for i in range(len(batch_rho)):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
-        hpos, hmass, hvel = charm_interface.process_input_density(
+        hpos, hmass, hvel, hconc = charm_interface.process_input_density(
             rho_m_zg=batch_rho[i],
             rho_m_vel_zg=np.stack([batch_fvel[i,...,j] for j in range(3)], axis=0),
             rho_m_pad_zg=batch_rho_pad[i],
@@ -205,6 +205,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
         hposs.append(hpos[mask])
         hmasss.append(hmass[mask])
         hvels.append(hvel[mask])
+        hconcs.append(hconc[mask])
 
     # Shift the positions to the original box
     l = 0
@@ -215,13 +216,13 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
                 l += 1
 
     # Combine the outputs
-    hposs, hmasss, hvels = map(np.concatenate, [hposs, hmasss, hvels])
+    hposs, hmasss, hvels, hconcs = map(np.concatenate, [hposs, hmasss, hvels, hconcs])
 
     # ensure periodicity
     hposs = hposs % L
 
     # conform to mass-bin format of other bias models TODO: refactor?
-    hposs, hmasss, hvels = [hposs], [hmasss], [hvels]
+    hposs, hmasss, hvels, hconcs = [hposs], [hmasss], [hvels], [hconcs]
 
     return hposs, hmasss, hvels
 
