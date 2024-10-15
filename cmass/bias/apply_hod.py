@@ -27,45 +27,10 @@ import hydra
 import h5py
 from omegaconf import DictConfig, OmegaConf, open_dict
 from .tools.hod import (
-    thetahod_literature, build_halo_catalog, build_HOD_model)
+    build_halo_catalog, build_HOD_model, parse_hod)
 from ..utils import (
     get_source_path, timing_decorator, load_params, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
-
-
-def parse_hod(cfg):
-    with open_dict(cfg):
-        # HOD parameters
-        if (not hasattr(cfg.bias.hod, 'seed')) or (cfg.bias.hod.seed is None):
-            cfg.bias.hod.theta = [
-                cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
-                cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
-            ]
-            cfg.bias.hod.seed = 0
-        elif cfg.bias.hod.seed == -1:
-            cfg.bias.hod.seed = np.random.randint(0, 1e5)
-            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
-        else:
-            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
-
-        # Cosmology
-        cfg.nbody.cosmo = load_params(
-            cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
-
-
-def get_hod_params(seed=0):
-    theta = thetahod_literature('reid2014_cmass')
-    # sample theta based on priors set by Reid+(2014)
-    if seed != 0:
-        np.random.seed(seed)
-        hod_lower_bound = np.array([12.0, 0.1, 13.0, 13.0, 0.])
-        hod_upper_bound = np.array([14.0, 0.6, 15.0, 15.0, 1.5])
-        keys = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
-        theta = np.random.uniform(hod_lower_bound, hod_upper_bound, size=(5))
-        theta = [float(x) for x in theta]
-        theta = dict(zip(keys, theta))
-    return theta
 
 
 @ timing_decorator
@@ -81,11 +46,13 @@ def populate_hod(
         mdef=mdef
     )
 
-    hod_params = cfg.bias.hod.theta
+    # hod_params = cfg.bias.hod.theta
 
     hod = build_HOD_model(
-        cosmo, cfg.nbody.zf, hod_model='zheng07', mdef=mdef,
-        **hod_params
+        # cosmo, cfg.nbody.zf, hod_model='zheng07', mdef=mdef,
+        # cosmo, cfg.nbody.zf, mdef=mdef,
+        cosmo, cfg, mdef=mdef,
+        # **hod_params
     )
 
     hod.populate_mock(catalog, seed=seed)
