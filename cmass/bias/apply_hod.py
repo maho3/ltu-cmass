@@ -142,7 +142,7 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
