@@ -11,15 +11,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import h5py
 
-from summarizer.data import BoxCatalogue
-import summarizer
-
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import MA, MAz, calcPk, get_redshift_space_pos
 
 
 def get_box_catalogue(pos, z, L, N):
+    from summarizer.data import BoxCatalogue  # only import if needed
+
     return BoxCatalogue(
         galaxies_pos=pos,
         redshift=z,
@@ -30,12 +29,7 @@ def get_box_catalogue(pos, z, L, N):
 
 def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
     pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
-    return BoxCatalogue(
-        galaxies_pos=pos,
-        redshift=z,
-        boxsize=L,
-        n_mesh=N,
-    )
+    return get_box_catalogue(pos, z, L, N)
 
 
 def get_binning(summary, L, N, threads, rsd=False):
@@ -137,10 +131,10 @@ def store_summary(
     binning_config = get_binning(
         summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
 
-    logging.info(f'Computing Summary: {summary_name}, with binning:')
-    logging.info(binning_config)
+    logging.info(f'Computing Summary: {summary_name}')
 
     # compute summary
+    import summarizer  # only import if needed
     summary_function = getattr(summarizer, summary_name)(**binning_config)
     summary_data = summary_function(catalog)
 
@@ -153,114 +147,68 @@ def store_summary(
     group.create_dataset(summary_key, data=summary_dataset.values)
 
 
-def halo_summ(
+def summarize_tracer(
     source_path, L, N, h,
     threads=16, from_scratch=True,
-    summaries=['Pk', 'TwoPCF', 'KNN']  # ['WST', 'Bk', 'DensitySplit']
+    type='halo', hod_seed=None,
+    summaries=['Pk']
 ):
+    postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
+
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'halos.h5')
+    outpath = join(source_path, 'diag', postfix)
     if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('Halo diagnostics already computed')
+        logging.info('Diagnostics already computed')
         return True
 
     # check for file keys
-    filename = join(source_path, 'halos.h5')
+    filename = join(source_path, postfix)
     if not os.path.isfile(filename):
-        logging.error(f'halo file not found: {filename}')
+        logging.error(f'File not found: {filename}')
         return False
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
-    logging.info(f'Saving halo diagnostics to {outpath}')
+    logging.info(f'Computing diagnostics to save to: {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    if type == 'galaxy':
+        os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
                 z = 1/float(a) - 1
-                logging.info(f'Processing halo catalog a={a}')
+                logging.info(f'Processing catalog a={a}')
+
                 # Load
-                hpos = f[a]['pos'][...].astype(np.float32)
-                hvel = f[a]['vel'][...].astype(np.float32)
-                hmass = f[a]['mass'][...].astype(np.float32)
-                # Ensure all halos inside box
-                hpos %= L
-                # Get summaries in comoving space
-                group = o.create_group(a)
-                box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
-                for summ in summaries:
-                    store_summary(box_catalogue, group, summ,
-                                  L, N, threads, use_rsd=False)
-
-                # Get summaries in redshift space
-                zbox_catalogue = get_box_catalogue_rsd(
-                    pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
-                for summ in summaries:
-                    store_summary(zbox_catalogue, group, summ,
-                                  L, N, threads, use_rsd=True)
-
-                # measure halo mass function
-                be = np.linspace(12.5, 16, 100)
-                hist, _ = np.histogram(hmass, bins=be)
-
-                # Save
-                group.create_dataset('mass_bins', data=be)
-                group.create_dataset('mass_hist', data=hist)
-    return True
-
-
-def gal_summ(
-    source_path, hod_seed, L, N, h,
-    threads=16, from_scratch=True,
-    summaries=['Pk', 'TwoPCF', 'KNN']  # WST
-):
-    # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'galaxies', f'hod{hod_seed:05}.h5')
-    if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('Gal diagnostics already computed')
-        return True
-
-    # check for file keys
-    filename = join(source_path, 'galaxies', f'hod{hod_seed:05}.h5')
-    if not os.path.isfile(filename):
-        logging.error(f'gal file not found: {filename}')
-        return False
-    with h5py.File(filename, 'r') as f:
-        alist = list(f.keys())
-
-    logging.info(f'Saving gal diagnostics to {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
-    os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
-
-    # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            for a in alist:
-                z = 1/float(a) - 1
-                logging.info(f'Processing galaxy catalog a={a}')
-                # Load
-                gpos = f[a]['pos'][...].astype(np.float32)
-                gvel = f[a]['vel'][...].astype(np.float32)
-
-                # Ensure all galaxies inside box
-                gpos %= L
+                pos = f[a]['pos'][...].astype(np.float32)
+                vel = f[a]['vel'][...].astype(np.float32)
+                pos %= L  # Ensure all tracers inside box
 
                 # Get summaries in comoving space
                 group = o.create_group(a)
-                box_catalogue = get_box_catalogue(pos=gpos, z=z, L=L, N=N)
+                box_catalogue = get_box_catalogue(pos=pos, z=z, L=L, N=N)
                 for summ in summaries:
-                    store_summary(box_catalogue, group, summ,
-                                  L, N, threads, use_rsd=False)
+                    store_summary(
+                        box_catalogue, group, summ,
+                        L, N, threads, use_rsd=False)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue_rsd(
-                    pos=gpos, vel=gvel, h=h, z=z, axis=2, L=L, N=N)
+                    pos=pos, vel=vel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
-                    store_summary(zbox_catalogue, group, summ,
-                                  L, N, threads, use_rsd=True)
+                    store_summary(
+                        zbox_catalogue, group, summ,
+                        L, N, threads, use_rsd=True)
 
+                if 'mass' in f[a].keys():
+                    mass = f[a]['mass'][...].astype(np.float32)
+                    # measure halo mass function
+                    be = np.linspace(12.5, 16, 100)
+                    hist, _ = np.histogram(mass, bins=be)
+                    group.create_dataset('mass_bins', data=be)
+                    group.create_dataset('mass_hist', data=hist)
     return True
 
 
@@ -278,9 +226,11 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
 
-    threads = cfg.diag.threads
     from_scratch = cfg.diag.from_scratch
     summaries = cfg.diag.summaries
+    threads = cfg.diag.threads
+    if threads == -1:
+        threads = os.cpu_count()
 
     logging.info(f'Computing diagnostics: {summaries}')
 
@@ -296,21 +246,33 @@ def main(cfg: DictConfig) -> None:
     # measure halo diagnostics
     # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
     N = (cfg.nbody.L//1000)*128
-    done = halo_summ(
+    done = summarize_tracer(
         source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
-        cfg.nbody.zf,
         threads=threads, from_scratch=from_scratch,
+        type='halo',
         summaries=summaries
     )
+    # done = halo_summ(
+    #     source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
+    #     cfg.nbody.zf,
+    #     threads=threads, from_scratch=from_scratch,
+    #     summaries=summaries
+    # )
     all_done &= done
 
     # measure gal diagnostics
-    done = gal_summ(
-        source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
-        cfg.nbody.cosmo[2], cfg.nbody.zf,
+    done = summarize_tracer(
+        source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
         threads=threads, from_scratch=from_scratch,
+        type='galaxy', hod_seed=cfg.bias.hod.seed,
         summaries=summaries
     )
+    # done = gal_summ(
+    #     source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
+    #     cfg.nbody.cosmo[2], cfg.nbody.zf,
+    #     threads=threads, from_scratch=from_scratch,
+    #     summaries=summaries
+    # )
     all_done &= done
 
     if all_done:
