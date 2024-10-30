@@ -18,11 +18,6 @@ from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import MA, MAz, calcPk, get_redshift_space_pos
 
-# check if we're running on anvil
-import socket
-if 'anvil' in socket.gethostname():
-    os.environ['LD_PRELOAD'] = '/usr/lib64/libslurm.so'
-
 
 def get_box_catalogue(pos, z, L, N):
     return BoxCatalogue(
@@ -138,14 +133,18 @@ def store_summary(
     catalog, group, summary_name,
     box_size, num_bins, num_threads, use_rsd=False
 ):
+    # get summary binning
     binning_config = get_binning(
         summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
 
     logging.info(f'Computing Summary: {summary_name}, with binning:')
     logging.info(binning_config)
 
+    # compute summary
     summary_function = getattr(summarizer, summary_name)(**binning_config)
     summary_data = summary_function(catalog)
+
+    # store summary
     summary_dataset = summary_function.to_dataset(summary_data)
     for coord_name, coord_value in summary_dataset.coords.items():
         dataset_key = f"{'z' if use_rsd else ''}{summary_name}_{coord_name}"

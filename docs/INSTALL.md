@@ -143,6 +143,7 @@ You can see other default configurations in [`cmass/conf`](../cmass/conf).
 
 We include various additional functionality beyond the minimal working example above. These are provided in separate documentation, including:
 - [Installing `pmesh` and running pypower](./options/PMESH.md)
+- [Installing ili-summarizer](./options/SUMMARIZER.md)
 - [Running with Quijote initial conditions and fitting bias models](./options/QUIJOTE.md)
 - [Installing and running FASTPM nbody simulators](./options/FASTPM.md)
 - [Installing and running BORG nbody simulators](./options/BORG.md)

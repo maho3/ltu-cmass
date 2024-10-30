@@ -1,5 +1,5 @@
 
-# whether to calculate diagnostics from scratch, if already saved
+# whether to calculate diagnostics from scratch, overwriting existing files
 from_scratch: true
 
 # number of threads for P(k) computation
