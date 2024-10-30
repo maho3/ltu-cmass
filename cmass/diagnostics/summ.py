@@ -154,7 +154,7 @@ def store_summary(
 
 
 def halo_summ(
-    source_path, L, N, h, z,
+    source_path, L, N, h,
     threads=16, from_scratch=True,
     summaries=['Pk', 'TwoPCF', 'KNN']  # ['WST', 'Bk', 'DensitySplit']
 ):
@@ -179,30 +179,27 @@ def halo_summ(
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
-                zi = 1/float(a) - 1
+                z = 1/float(a) - 1
                 logging.info(f'Processing halo catalog a={a}')
                 # Load
                 hpos = f[a]['pos'][...].astype(np.float32)
                 hvel = f[a]['vel'][...].astype(np.float32)
                 hmass = f[a]['mass'][...].astype(np.float32)
                 # Ensure all halos inside box
-                m = np.all((hpos >= 0) & (hpos < L), axis=1)
-                hpos = hpos[m]
-                hvel = hvel[m]
-                hmass = hmass[m]
+                hpos %= L
                 # Get summaries in comoving space
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=hpos, z=z, L=L, N=N)
                 for summ in summaries:
                     store_summary(box_catalogue, group, summ,
-                                  L, N, threads, use_rsd=False,)
+                                  L, N, threads, use_rsd=False)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue_rsd(
                     pos=hpos, vel=hvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
                     store_summary(zbox_catalogue, group, summ,
-                                  L, N, threads, use_rsd=True,)
+                                  L, N, threads, use_rsd=True)
 
                 # measure halo mass function
                 be = np.linspace(12.5, 16, 100)
@@ -215,7 +212,7 @@ def halo_summ(
 
 
 def gal_summ(
-    source_path, hod_seed, L, N, h, z,
+    source_path, hod_seed, L, N, h,
     threads=16, from_scratch=True,
     summaries=['Pk', 'TwoPCF', 'KNN']  # WST
 ):
@@ -241,30 +238,28 @@ def gal_summ(
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
-                zi = 1/float(a) - 1
+                z = 1/float(a) - 1
                 logging.info(f'Processing galaxy catalog a={a}')
                 # Load
                 gpos = f[a]['pos'][...].astype(np.float32)
                 gvel = f[a]['vel'][...].astype(np.float32)
 
                 # Ensure all galaxies inside box
-                m = np.all((gpos >= 0) & (gpos < L), axis=1)
-                gpos = gpos[m]
-                gvel = gvel[m]
+                gpos %= L
 
                 # Get summaries in comoving space
                 group = o.create_group(a)
                 box_catalogue = get_box_catalogue(pos=gpos, z=z, L=L, N=N)
                 for summ in summaries:
                     store_summary(box_catalogue, group, summ,
-                                  L, N, threads, use_rsd=False,)
+                                  L, N, threads, use_rsd=False)
 
                 # Get summaries in redshift space
                 zbox_catalogue = get_box_catalogue_rsd(
                     pos=gpos, vel=gvel, h=h, z=z, axis=2, L=L, N=N)
                 for summ in summaries:
                     store_summary(zbox_catalogue, group, summ,
-                                  L, N, threads, use_rsd=True,)
+                                  L, N, threads, use_rsd=True)
 
     return True
 
@@ -273,7 +268,8 @@ def gal_summ(
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias', 'diag'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'nbody', 'bias', 'diag', 'survey'])
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
@@ -293,8 +289,7 @@ def main(cfg: DictConfig) -> None:
     # measure rho diagnostics
     done = rho_summ(
         source_path, cfg.nbody.L,
-        threads=threads, from_scratch=from_scratch,
-        summaries=summaries
+        threads=threads, from_scratch=from_scratch
     )
     all_done &= done
 
