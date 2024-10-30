@@ -19,36 +19,6 @@ from ..nbody.tools import parse_nbody_config
 from .tools import MA, MAz, calcPk, get_redshift_space_pos
 
 
-def rho_summ(source_path, L, threads=16, from_scratch=True):
-    # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'rho.h5')
-    if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('Rho diagnostics already computed')
-        return True
-
-    # check for file keys
-    filename = join(source_path, 'nbody.h5')
-    if not os.path.isfile(filename):
-        logging.error(f'rho file {filename} not found')
-        return False
-    with h5py.File(filename, 'r') as f:
-        alist = list(f.keys())
-
-    logging.info(f'Saving rho diagnostics to {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
-
-    # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            for a in alist:
-                logging.info(f'Processing density field a={a}')
-                rho = f[a]['rho'][...].astype(np.float32)
-                k, Pk = calcPk(rho, L, threads=threads)
-                group = o.create_group(a)
-                group.create_dataset('k', data=k)
-                group.create_dataset('Pk', data=Pk)
-    return True
-
 def get_box_catalogue(pos, z, L, N):
     return BoxCatalogue(
         galaxies_pos=pos,
@@ -124,6 +94,37 @@ def get_binning(summary, L, N, threads, rsd=False,):
         }
     else:
         raise NotImplementedError(f'{summary} not implemented')
+
+def rho_summ(source_path, L, threads=16, from_scratch=True):
+    # check if diagnostics already computed
+    outpath = join(source_path, 'diag', 'rho.h5')
+    if (not from_scratch) and os.path.isfile(outpath):
+        logging.info('Rho diagnostics already computed')
+        return True
+
+    # check for file keys
+    filename = join(source_path, 'nbody.h5')
+    if not os.path.isfile(filename):
+        logging.error(f'rho file {filename} not found')
+        return False
+    with h5py.File(filename, 'r') as f:
+        alist = list(f.keys())
+
+    logging.info(f'Saving rho diagnostics to {outpath}')
+    os.makedirs(join(source_path, 'diag'), exist_ok=True)
+
+    # compute diagnostics and save
+    with h5py.File(filename, 'r') as f:
+        with h5py.File(outpath, 'w') as o:
+            for a in alist:
+                logging.info(f'Processing density field a={a}')
+                rho = f[a]['rho'][...].astype(np.float32)
+                k, Pk = calcPk(rho, L, threads=threads)
+                group = o.create_group(a)
+                group.create_dataset('k', data=k)
+                group.create_dataset('Pk', data=Pk)
+    return True
+
 
 def store_summary(catalog, group, summary_name, box_size, num_bins, num_threads, use_rsd=False):
     binning_config = get_binning(summary_name, box_size, num_bins, num_threads, rsd=use_rsd)

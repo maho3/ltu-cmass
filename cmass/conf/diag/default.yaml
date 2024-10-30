@@ -4,3 +4,10 @@ from_scratch: true
 
 # number of threads for P(k) computation
 threads: 16
+
+# whether to use abundance matching to affix number density
+halo_density: 1e-3  # number density in h^3/Mpc^3, None for no abundance matching
+halo_proxy: M200c  # property for abundance matching
+
+galaxy_density: 1e-4  # number density in h^3/Mpc^3, None for no abundance matching
+galaxy_proxy: mstar  # property for abundance matching
