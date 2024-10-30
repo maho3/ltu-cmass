@@ -30,3 +30,17 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
     k = Pk.k3D
     Pk = Pk.Pk
     return k, Pk
+
+def get_box_catalogue(pos, z, L, N):
+    from summarizer.data import BoxCatalogue  # only import if needed
+
+    return BoxCatalogue(
+        galaxies_pos=pos,
+        redshift=z,
+        boxsize=L,
+        n_mesh=N,
+    )
+
+def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
+    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
+    return get_box_catalogue(pos, z, L, N)

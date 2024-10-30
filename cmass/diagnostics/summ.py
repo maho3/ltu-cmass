@@ -13,23 +13,8 @@ import h5py
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from .tools import MA, MAz, calcPk, get_redshift_space_pos
-
-
-def get_box_catalogue(pos, z, L, N):
-    from summarizer.data import BoxCatalogue  # only import if needed
-
-    return BoxCatalogue(
-        galaxies_pos=pos,
-        redshift=z,
-        boxsize=L,
-        n_mesh=N,
-    )
-
-
-def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
-    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
-    return get_box_catalogue(pos, z, L, N)
+from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
+from .tools import calcPk
 
 
 def get_binning(summary, L, N, threads, rsd=False):
@@ -92,7 +77,72 @@ def get_binning(summary, L, N, threads, rsd=False):
         raise NotImplementedError(f'{summary} not implemented')
 
 
-def rho_summ(source_path, L, threads=16, from_scratch=True):
+def store_summary(
+    catalog, group, summary_name,
+    box_size, num_bins, num_threads, use_rsd=False
+):
+    # get summary binning
+    binning_config = get_binning(
+        summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
+
+    logging.info(f'Computing Summary: {summary_name}')
+
+    # compute summary
+    import summarizer  # only import if needed
+    summary_function = getattr(summarizer, summary_name)(**binning_config)
+    summary_data = summary_function(catalog)
+
+    # store summary
+    summary_dataset = summary_function.to_dataset(summary_data)
+    for coord_name, coord_value in summary_dataset.coords.items():
+        dataset_key = f"{'z' if use_rsd else ''}{summary_name}_{coord_name}"
+        group.create_dataset(dataset_key, data=coord_value.values)
+    summary_key = summary_name if not use_rsd else f'z{summary_name}'
+    group.create_dataset(summary_key, data=summary_dataset.values)
+
+
+def run_pylians(
+    field, group, summaries,
+    box_size, axis, num_threads, use_rsd
+):
+    # Only for power spectrum
+    accept_summaries = ['Pk']
+
+    for summary_name in summaries:
+        if summary_name == 'Pk':
+            k, Pk = calcPk(field, box_size, axis=axis, MAS='CIC', threads=num_threads)
+            key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
+            group.create_dataset(key, data=k)
+            key = f"{'z' if use_rsd else ''}{summary_name}"
+            group.create_dataset(key, data=Pk)
+        elif summary_name not in accept_summaries:
+            logging.error(f'{summary_name} not yet implemented in Pylians')
+            continue
+
+
+def run_summarizer(
+    pos, vel, h, redshift, box_size, grid_size,
+    group, summaries, threads
+):
+    # For two-point correlation, bispectrum, wavelets, density split, and k-nearest neighbors
+    
+    # Get summaries in comoving space
+    box_catalogue = get_box_catalogue(pos=pos, z=redshift, L=box_size, N=grid_size)
+    for summ in summaries:
+        store_summary(
+            box_catalogue, group, summ,
+            box_size, grid_size, threads, use_rsd=False)
+
+    # Get summaries in redshift space
+    zbox_catalogue = get_box_catalogue_rsd(
+        pos=pos, vel=vel, h=h, z=redshift, axis=2, L=box_size, N=grid_size)
+    for summ in summaries:
+        store_summary(
+            zbox_catalogue, group, summ,
+            box_size, grid_size, threads, use_rsd=True)
+
+
+def summarize_rho(source_path, L, threads=16, from_scratch=True):
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'rho.h5')
     if (not from_scratch) and os.path.isfile(outpath):
@@ -116,35 +166,12 @@ def rho_summ(source_path, L, threads=16, from_scratch=True):
             for a in alist:
                 logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
-                k, Pk = calcPk(rho, L, threads=threads)
                 group = o.create_group(a)
-                group.create_dataset('k', data=k)
-                group.create_dataset('Pk', data=Pk)
+                run_pylians(
+                    rho, group, ['Pk'],
+                    L, axis=0, num_threads=threads, use_rsd=False
+                )
     return True
-
-
-def store_summary(
-    catalog, group, summary_name,
-    box_size, num_bins, num_threads, use_rsd=False
-):
-    # get summary binning
-    binning_config = get_binning(
-        summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
-
-    logging.info(f'Computing Summary: {summary_name}')
-
-    # compute summary
-    import summarizer  # only import if needed
-    summary_function = getattr(summarizer, summary_name)(**binning_config)
-    summary_data = summary_function(catalog)
-
-    # store summary
-    summary_dataset = summary_function.to_dataset(summary_data)
-    for coord_name, coord_value in summary_dataset.coords.items():
-        dataset_key = f"{'z' if use_rsd else ''}{summary_name}_{coord_name}"
-        group.create_dataset(dataset_key, data=coord_value.values)
-    summary_key = summary_name if not use_rsd else f'z{summary_name}'
-    group.create_dataset(summary_key, data=summary_dataset.values)
 
 
 def summarize_tracer(
@@ -186,21 +213,33 @@ def summarize_tracer(
                 vel = f[a]['vel'][...].astype(np.float32)
                 pos %= L  # Ensure all tracers inside box
 
-                # Get summaries in comoving space
+                # Create output group
                 group = o.create_group(a)
-                box_catalogue = get_box_catalogue(pos=pos, z=z, L=L, N=N)
-                for summ in summaries:
-                    store_summary(
-                        box_catalogue, group, summ,
-                        L, N, threads, use_rsd=False)
 
-                # Get summaries in redshift space
-                zbox_catalogue = get_box_catalogue_rsd(
-                    pos=pos, vel=vel, h=h, z=z, axis=2, L=L, N=N)
-                for summ in summaries:
-                    store_summary(
-                        zbox_catalogue, group, summ,
-                        L, N, threads, use_rsd=True)
+                # Compute P(k)
+                if 'Pk' in summaries:
+                    # real space
+                    field = MA(pos, L, N, MAS='CIC')
+                    run_pylians(
+                        field, group, ['Pk'],
+                        L, axis=0, num_threads=threads, use_rsd=False
+                    )
+
+                    # redshift space
+                    field = MAz(pos, vel, L, N, h, z, MAS='CIC', axis=0)
+                    run_pylians(
+                        field, group, ['Pk'],
+                        L, axis=0, num_threads=threads, use_rsd=True
+                    )
+                
+                # Compute other summaries
+                others = [s for s in summaries if s != 'Pk']
+                if len(others) > 0:
+                    run_summarizer(
+                        pos, vel, h, z, L, N,
+                        group, others,
+                        threads
+                    )
 
                 if 'mass' in f[a].keys():
                     mass = f[a]['mass'][...].astype(np.float32)
@@ -237,27 +276,20 @@ def main(cfg: DictConfig) -> None:
     all_done = True
 
     # measure rho diagnostics
-    done = rho_summ(
+    done = summarize_rho(
         source_path, cfg.nbody.L,
         threads=threads, from_scratch=from_scratch
     )
     all_done &= done
 
     # measure halo diagnostics
-    # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
-    N = (cfg.nbody.L//1000)*128
+    N = (cfg.nbody.L//1000)*128  # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
     done = summarize_tracer(
         source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
         threads=threads, from_scratch=from_scratch,
         type='halo',
         summaries=summaries
     )
-    # done = halo_summ(
-    #     source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
-    #     cfg.nbody.zf,
-    #     threads=threads, from_scratch=from_scratch,
-    #     summaries=summaries
-    # )
     all_done &= done
 
     # measure gal diagnostics
@@ -267,12 +299,6 @@ def main(cfg: DictConfig) -> None:
         type='galaxy', hod_seed=cfg.bias.hod.seed,
         summaries=summaries
     )
-    # done = gal_summ(
-    #     source_path, cfg.bias.hod.seed, cfg.nbody.L, N,
-    #     cfg.nbody.cosmo[2], cfg.nbody.zf,
-    #     threads=threads, from_scratch=from_scratch,
-    #     summaries=summaries
-    # )
     all_done &= done
 
     if all_done:
