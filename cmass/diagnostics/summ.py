@@ -217,6 +217,9 @@ def summarize_tracer(
                 vel = f[a]['vel'][...].astype(np.float32)
                 pos %= L  # Ensure all tracers inside box
 
+                # Create output group
+                group = o.create_group(a)
+
                 # Mask out low mass tracers (to match number density)
                 mass = None
                 if density is not None:
@@ -224,16 +227,16 @@ def summarize_tracer(
                         logging.error(f'{proxy} not found in {type} file at a={a}')
                     if len(pos) <= Ncut:
                         logging.warning(f'Not enough {type} tracers in {a}')
-                    logging.warning(f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
+                    logging.info(f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
                     mass = f[a][proxy][...].astype(np.float32)
                     mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
                     pos = pos[mask]
                     vel = vel[mask]
                     mass = mass[mask]
 
-                # Create output group
-                group = o.create_group(a)
-                group.attrs['density'] = density
+                    group.attrs['density'] = float(density)
+                else:
+                    group.attrs['density'] = np.nan
 
                 # Compute P(k)
                 if 'Pk' in summaries:
