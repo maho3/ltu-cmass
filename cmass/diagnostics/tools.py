@@ -3,6 +3,7 @@ import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
 
+
 def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
     pos, vel = map(np.ascontiguousarray, (pos, vel))
     RSL.pos_redshift_space(pos, vel, L, h*100, z, axis)
@@ -29,3 +30,17 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
     k = Pk.k3D
     Pk = Pk.Pk
     return k, Pk
+
+def get_box_catalogue(pos, z, L, N):
+    from summarizer.data import BoxCatalogue  # only import if needed
+
+    return BoxCatalogue(
+        galaxies_pos=pos,
+        redshift=z,
+        boxsize=L,
+        n_mesh=N,
+    )
+
+def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
+    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
+    return get_box_catalogue(pos, z, L, N)
