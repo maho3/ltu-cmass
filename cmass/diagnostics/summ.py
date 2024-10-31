@@ -176,6 +176,7 @@ def summarize_rho(source_path, L, threads=16, from_scratch=True):
 
 def summarize_tracer(
     source_path, L, N, h,
+    density=None, proxy='mass',
     threads=16, from_scratch=True,
     type='halo', hod_seed=None,
     summaries=['Pk']
@@ -201,20 +202,38 @@ def summarize_tracer(
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
 
+    # compute overdensity cut
+    Ncut = None if density is None else int(density * L**3)
+
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             for a in alist:
                 z = 1/float(a) - 1
-                logging.info(f'Processing catalog a={a}')
+                logging.info(f'Processing {type} catalog a={a}')
 
                 # Load
                 pos = f[a]['pos'][...].astype(np.float32)
                 vel = f[a]['vel'][...].astype(np.float32)
                 pos %= L  # Ensure all tracers inside box
 
+                # Mask out low mass tracers (to match number density)
+                mass = None
+                if density is not None:
+                    if proxy not in f[a].keys():
+                        logging.error(f'{proxy} not found in {type} file at a={a}')
+                    if len(pos) <= Ncut:
+                        logging.warning(f'Not enough {type} tracers in {a}')
+                    logging.warning(f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
+                    mass = f[a][proxy][...].astype(np.float32)
+                    mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
+                    pos = pos[mask]
+                    vel = vel[mask]
+                    mass = mass[mask]
+
                 # Create output group
                 group = o.create_group(a)
+                group.attrs['density'] = density
 
                 # Compute P(k)
                 if 'Pk' in summaries:
@@ -241,8 +260,7 @@ def summarize_tracer(
                         threads
                     )
 
-                if 'mass' in f[a].keys():
-                    mass = f[a]['mass'][...].astype(np.float32)
+                if mass is not None:
                     # measure halo mass function
                     be = np.linspace(12.5, 16, 100)
                     hist, _ = np.histogram(mass, bins=be)
@@ -283,9 +301,11 @@ def main(cfg: DictConfig) -> None:
     all_done &= done
 
     # measure halo diagnostics
-    N = (cfg.nbody.L//1000)*128  # 128 cells per 1000 Mpc/h  TODO: should this stay fixed?
+    N = (cfg.nbody.L//1000)*128  # Set fixed diagnostics resolution. 128 cells per 1000 Mpc/h
     done = summarize_tracer(
-        source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
+        source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
+        density=cfg.diag.halo_density,
+        proxy=cfg.diag.halo_proxy,
         threads=threads, from_scratch=from_scratch,
         type='halo',
         summaries=summaries
@@ -295,6 +315,8 @@ def main(cfg: DictConfig) -> None:
     # measure gal diagnostics
     done = summarize_tracer(
         source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
+        density=cfg.diag.galaxy_density,
+        proxy=cfg.diag.galaxy_proxy,
         threads=threads, from_scratch=from_scratch,
         type='galaxy', hod_seed=cfg.bias.hod.seed,
         summaries=summaries
