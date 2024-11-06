@@ -9,4 +9,8 @@ defaults:
   - diag: default
   - _self_
 
+# What base sim to use
 sim: pmwd
+
+# whether to use lightcone snapshot extrapolation (if available)
+lightcone: True
