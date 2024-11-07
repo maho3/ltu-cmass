@@ -181,7 +181,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
 
     # Pad the input density field
     rho_pad = np.pad(rho, pad, mode='wrap')
-    fvel_pad = np.pad(fvel, [(pad,pad)]*3+[(0,0)], mode='wrap')
+    fvel_pad = np.pad(fvel, [(pad, pad)]*3+[(0, 0)], mode='wrap')
 
     # Split the inputs into batches
     batch_rho = batch_cube(rho, Nsub, Npix, Npix)
@@ -195,9 +195,11 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
         hpos, hmass, hvel = charm_interface.process_input_density(
             rho_m_zg=batch_rho[i],
-            rho_m_vel_zg=np.stack([batch_fvel[i,...,j] for j in range(3)], axis=0),
+            rho_m_vel_zg=np.stack([batch_fvel[i, ..., j]
+                                  for j in range(3)], axis=0),
             rho_m_pad_zg=batch_rho_pad[i],
-            rho_m_vel_pad_zg=np.stack([batch_fvel_pad[i,...,j] for j in range(3)], axis=0),
+            rho_m_vel_pad_zg=np.stack(
+                [batch_fvel_pad[i, ..., j] for j in range(3)], axis=0),
             cosmology_array=np.array(cosmo),
             BoxSize=Lcharm
         )
@@ -276,7 +278,6 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         raise NotImplementedError(
             f'Model {cfg.bias.halo.model} not implemented.')
 
-
     logging.info('Combine...')
 
     def combine(x):
@@ -319,10 +320,11 @@ def save_snapshot(outdir, a, hpos, hvel, hmass):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
