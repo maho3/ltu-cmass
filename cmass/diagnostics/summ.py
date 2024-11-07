@@ -110,7 +110,8 @@ def run_pylians(
 
     for summary_name in summaries:
         if summary_name == 'Pk':
-            k, Pk = calcPk(field, box_size, axis=axis, MAS='CIC', threads=num_threads)
+            k, Pk = calcPk(field, box_size, axis=axis,
+                           MAS='CIC', threads=num_threads)
             key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
             group.create_dataset(key, data=k)
             key = f"{'z' if use_rsd else ''}{summary_name}"
@@ -124,10 +125,12 @@ def run_summarizer(
     pos, vel, h, redshift, box_size, grid_size,
     group, summaries, threads
 ):
-    # For two-point correlation, bispectrum, wavelets, density split, and k-nearest neighbors
-    
+    # For two-point correlation, bispectrum, wavelets, density split, and
+    # k-nearest neighbors
+
     # Get summaries in comoving space
-    box_catalogue = get_box_catalogue(pos=pos, z=redshift, L=box_size, N=grid_size)
+    box_catalogue = get_box_catalogue(
+        pos=pos, z=redshift, L=box_size, N=grid_size)
     for summ in summaries:
         store_summary(
             box_catalogue, group, summ,
@@ -224,10 +227,12 @@ def summarize_tracer(
                 mass = None
                 if density is not None:
                     if proxy not in f[a].keys():
-                        logging.error(f'{proxy} not found in {type} file at a={a}')
+                        logging.error(
+                            f'{proxy} not found in {type} file at a={a}')
                     if len(pos) <= Ncut:
                         logging.warning(f'Not enough {type} tracers in {a}')
-                    logging.info(f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
+                    logging.info(
+                        f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
                     mass = f[a][proxy][...].astype(np.float32)
                     mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
                     pos = pos[mask]
@@ -253,7 +258,7 @@ def summarize_tracer(
                         field, group, ['Pk'],
                         L, axis=0, num_threads=threads, use_rsd=True
                     )
-                
+
                 # Compute other summaries
                 others = [s for s in summaries if s != 'Pk']
                 if len(others) > 0:
@@ -277,7 +282,7 @@ def summarize_tracer(
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'nbody', 'bias', 'diag', 'survey'])
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'diag'])
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
@@ -304,7 +309,7 @@ def main(cfg: DictConfig) -> None:
     all_done &= done
 
     # measure halo diagnostics
-    N = (cfg.nbody.L//1000)*128  # Set fixed diagnostics resolution. 128 cells per 1000 Mpc/h
+    N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
     done = summarize_tracer(
         source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
         density=cfg.diag.halo_density,
@@ -315,7 +320,7 @@ def main(cfg: DictConfig) -> None:
     )
     all_done &= done
 
-    # measure gal diagnostics
+    # measure galaxy diagnostics
     done = summarize_tracer(
         source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
         density=cfg.diag.galaxy_density,
