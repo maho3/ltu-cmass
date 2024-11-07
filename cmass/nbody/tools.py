@@ -8,10 +8,12 @@ import warnings
 import MAS_library as MASL
 from omegaconf import open_dict
 
+
 class FlushHandler(logging.StreamHandler):
     def emit(self, record):
         super().emit(record)
         self.flush()
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,8 +48,9 @@ def parse_nbody_config(cfg):
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
         # default asave
-        if (not cfg.survey.lightcone) or ('asave' not in nbody) or (len(nbody.asave) == 0):
-            nbody.asave = [nbody.af]
+        if not cfg.multisnapshot:
+            if (('asave' not in nbody) or (len(nbody.asave) == 0)):
+                nbody.asave = [nbody.af]
 
         # load cosmology
         nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
@@ -97,7 +100,7 @@ def get_ICs(cfg):
 
 def save_white_noise_grafic(filename, array, seed):
     """
-    Save a NumPy array to a file in the grafic noise format, as required for FastPM
+    Save a NumPy array to a file in the grafic noise format, required for FastPM
 
     Args:
         :param filename: The name of the file to save the array to.
@@ -226,7 +229,7 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False, c
     count = assign_field(ppos, BoxSize, Ngrid, MAS,
                          value=None, verbose=verbose,
                          chunk_size=chunk_size)
-    
+
     # Sum velocity field
     if isinstance(pvel, np.ndarray):
         logging.info('Computing velocity field...')
@@ -235,14 +238,14 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False, c
                          value=pvel[:, i], verbose=verbose,
                          chunk_size=chunk_size)
             for i in range(3)
-            ], axis=-1)
+        ], axis=-1)
     else:
         vel = [None] * 3
         for i, com in enumerate(['x', 'y', 'z']):
             logging.info(f'Computing {com} component of velocity field...')
             vel[i] = assign_field(ppos, BoxSize, Ngrid, MAS,
-                     value=pvel[i], verbose=verbose,
-                     chunk_size=chunk_size)
+                                  value=pvel[i], verbose=verbose,
+                                  chunk_size=chunk_size)
         vel = np.stack(vel, axis=-1)
 
     # Normalize
@@ -252,7 +255,8 @@ def rho_and_vfield(ppos, pvel, BoxSize, Ngrid, MAS, omega_m, h, verbose=False, c
     vel[mask] /= count[mask][..., np.newaxis]
     mask = (count == 0)
     if mask.sum() > 0:
-        print('BAD PIXELS:', mask.sum() / np.prod(mask.shape), vel[mask].min(), vel[mask].max())
+        print('BAD PIXELS:', mask.sum() / np.prod(mask.shape),
+              vel[mask].min(), vel[mask].max())
 
     return rho, vel
 

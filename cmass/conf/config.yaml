@@ -12,5 +12,6 @@ defaults:
 # What base sim to use
 sim: pmwd
 
-# whether to use lightcone snapshot extrapolation (if available)
-lightcone: True
+# whether to run on multiple snapshots and use lightcone snapshot extrapolation
+# (if available)
+multisnapshot: True
