@@ -160,7 +160,7 @@ def reweight(rdz, wdir='./data', be=None, hobs=None):
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'survey'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
