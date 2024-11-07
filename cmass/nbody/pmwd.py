@@ -97,7 +97,7 @@ def run_density(wn, pmconf, pmcosmo):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
