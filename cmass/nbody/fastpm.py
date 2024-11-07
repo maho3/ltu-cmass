@@ -107,7 +107,8 @@ def get_mpi_info():
         mpi_args = '--hostfile $PBS_NODEFILE'
     elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
         # Use scontrol to get the expanded list of nodes
-        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = subprocess.check_output(
+            ['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
         node_list = node_list.decode('utf-8').splitlines()
 
         # Calculate number of tasks
@@ -127,6 +128,7 @@ def get_mpi_info():
         mpi_args = ''
 
     return max_cores, mpi_args
+
 
 @timing_decorator
 def run_density(cfg, outdir):
@@ -196,7 +198,7 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     rho, fvel = rho_and_vfield(
         pos, vel, cfg.nbody.L, cfg.nbody.N, 'CIC',
         omega_m=cfg.nbody.cosmo[0], h=cfg.nbody.cosmo[2])
-    
+
     # Delete pos, vel
     del pos, vel  # TODO: save these?
 
@@ -210,11 +212,12 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     if delete_files:
         infile.close()
         shutil.rmtree(snapdir)
-    
+
     # Save to file
     with h5py.File(join(outdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
         outfile.create_dataset('rho', data=rho)
         outfile.create_dataset('fvel', data=fvel)
+
 
 @timing_decorator
 def process_outputs(cfg, outdir, delete_files=True):
@@ -253,10 +256,10 @@ def process_outputs(cfg, outdir, delete_files=True):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
