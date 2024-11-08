@@ -116,7 +116,8 @@ def save_bias(source_path, a, medges, popt):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'fit'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'fit'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
