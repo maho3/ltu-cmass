@@ -454,7 +454,7 @@ def build_halo_catalog(
 
 
 def build_HOD_model(
-    cosmology, model, theta, mdef='vir',
+    cosmology, model, theta, zf, mdef='vir',
 ):
     '''Build a HOD model from the given HOD parameters.
 
@@ -478,47 +478,53 @@ def build_HOD_model(
 
     # Get HOD parameters
     hod_params = dict(theta)
-    hod_params.update({
-        'cosmology': cosmology,
-        'redshift': cfg.nbody.zf,
-        'mdef': mdef,
-    })
 
     # Occupation functions
     if model == 'zheng07':
-        cenocc = Zheng07Cens(prim_haloprop_key=mkey, **hod_params)
+        cenocc = Zheng07Cens(prim_haloprop_key=mkey)
         satocc = Zheng07Sats(
             prim_haloprop_key=mkey,
             cenocc_model=cenocc,
-            modulate_with_cenocc=True,
-            **hod_params
+            modulate_with_cenocc=True
         )
     elif model == 'leauthaud11':
-        cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, **hod_params)
+        cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, redshift=zf)
         satocc = Leauthaud11Sats(
             prim_haloprop_key=mkey,
-            cenocc_model=cenocc,
-            **hod_params
+            cenocc_model=cenocc,redshift=zf,
         )
     elif model == 'zu_mandelbaum15':
-        cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, **hod_params)
-        satocc = ZuMandelbaum15Sats(
-            prim_haloprop_key=mkey,
-            cenocc_model=cenocc,
-            **hod_params
-        )                
+        cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, redshift=zf)
+        satocc = ZuMandelbaum15Sats(prim_haloprop_key=mkey)
+        satocc.central_occupation_model = cenocc  # need to set this manually
+        # m0 and m1 are desired in real units
+        hod_params['smhm_m0'] = 10**hod_params['smhm_m0']
+        hod_params['smhm_m1'] = 10**hod_params['smhm_m1']
     else:
         raise NotImplementedError
+    
+    # Set HOD parameters
+    cenocc.param_dict.update(hod_params)
+    satocc.param_dict.update(hod_params)
     satocc._suppress_repeated_param_warning = True
 
     # profile functions
-    censprof = TrivialPhaseSpace(**hod_params)
-    satsprof = NFWPhaseSpace(**hod_params)
+    censprof = TrivialPhaseSpace(
+        cosmology=cosmology,
+        redshift=zf,
+        mdef=mdef
+    )
+    satsprof = NFWPhaseSpace(
+        cosmology=cosmology,
+        redshift=zf,
+        mdef=mdef
+    )
 
     # make the model
-    model = {}
-    model['centrals_occupation'] = cenocc
-    model['centrals_profile'] = censprof
-    model['satellites_occupation'] = satocc
-    model['satellites_profile'] = satsprof
+    model = dict(
+        centrals_occupation=cenocc,
+        centrals_profile=censprof,
+        satellites_occupation=satocc,
+        satellites_profile=satsprof
+    )
     return HodModelFactory(**model)

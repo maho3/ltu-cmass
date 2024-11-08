@@ -53,6 +53,7 @@ def populate_hod(
         cosmo,
         model=model,
         theta=theta,
+        zf=zf,
         mdef=mdef
     )
     hod.populate_mock(catalog, seed=seed)
