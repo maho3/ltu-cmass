@@ -54,15 +54,10 @@ def parse_hod(cfg):
             raise NotImplementedError
 
         # Then check if we're using default parameters
-        if hasattr(cfg.bias.hod, 'param_defaults'):
-            if cfg.bias.hod.param_defaults is not None:
+        if hasattr(cfg.bias.hod, 'default_params'):
+            if cfg.bias.hod.default_params is not None:
                 # Assign parameters given this default
-                getattr(model, cfg.bias.hod.param_defaults)()
-
-        # Update any additionally defined parameters
-        for key in model.parameters:
-            param = float(getattr(cfg.bias.hod, key))
-            model.set_parameter(key, param)
+                getattr(model, cfg.bias.hod.default_params)()
 
         # Check if 'seed' set
         if hasattr(cfg.bias.hod, 'seed'):
@@ -71,11 +66,20 @@ def parse_hod(cfg):
                 if cfg.bias.hod.seed == -1:
                     cfg.bias.hod.seed = np.random.randint(0, 1e5)
                 
-                # Set numpy seed
-                np.random.seed(cfg.bias.hod.seed)
-                
-                # Sample parameters from the HOD model
-                model.sample_parameters()
+                # If 0, don't change default values
+                if cfg.bias.hod.seed > 0:
+                    # Set numpy seed
+                    np.random.seed(cfg.bias.hod.seed)
+                    
+                    # Sample parameters from the HOD model
+                    model.sample_parameters()
+
+        # Overwrite any previously defined parameters
+        if hasattr(cfg.bias.hod, 'theta'):
+            for key in model.parameters:
+                if hasattr(cfg.bias.hod.theta, key):
+                    param = float(getattr(cfg.bias.hod.theta, key))
+                    model.set_parameter(key, param)
      
 
         # Get the parameter values
