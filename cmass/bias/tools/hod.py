@@ -44,7 +44,9 @@ def parse_hod(cfg):
     with open_dict(cfg):
        
         # First check model is available
-        if cfg.bias.hod.model == 'zheng07':
+        if not hasattr(cfg.bias.hod, 'model'):
+            model = Zheng07()  # for backwards compatibility
+        elif cfg.bias.hod.model == 'zheng07':
             model = Zheng07()
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
@@ -84,10 +86,12 @@ def parse_hod(cfg):
 
         # Get the parameter values
         cfg.bias.hod.theta = model.get_parameters()
-
-        # Cosmology
-        cfg.nbody.cosmo = load_params(
-            cfg.nbody.lhid, cfg.meta.cosmofile)
+        
+        # Check if any values are None
+        for k, v in cfg.bias.hod.theta.items():
+            if v is None:
+                raise ValueError(f'Parameter {k} is None. Make sure to '
+                                 'set default parameters or hod.seed>0.')
 
     return cfg
 
