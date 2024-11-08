@@ -37,17 +37,24 @@ from ..nbody.tools import parse_nbody_config
 @ timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
-    cosmo, cfg, seed=0, mdef='vir'
+    cosmo, L, zf,
+    model, theta, 
+    seed=0, mdef='vir'
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
-    BoxSize = cfg.nbody.L*np.ones(3)
+    BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
-        hpos, hvel, 10**hmass, cfg.nbody.zf, BoxSize, cosmo,
+        hpos, hvel, 10**hmass, zf, BoxSize, cosmo,
         mdef=mdef
     )
 
-    hod = build_HOD_model(cosmo, cfg, mdef=mdef)
+    hod = build_HOD_model(
+        cosmo,
+        model=model,
+        theta=theta,
+        mdef=mdef
+    )
     hod.populate_mock(catalog, seed=seed)
     galcat = hod.mock.galaxy_table.as_array()
 
@@ -59,7 +66,8 @@ def run_snapshot(pos, vel, mass, cfg):
     logging.info('Populating HOD...')
     hod = populate_hod(
         pos, vel, mass,
-        cfg.nbody.cosmo, cfg,
+        cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
+        cfg.bias.hod.model, cfg.bias.hod.theta,
         seed=cfg.bias.hod.seed
     )
 

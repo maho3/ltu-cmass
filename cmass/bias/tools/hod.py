@@ -450,15 +450,18 @@ def build_halo_catalog(
 
 
 def build_HOD_model(
-    cosmology, cfg, mdef='vir',
+    cosmology, model, theta, mdef='vir',
 ):
     '''Build a HOD model from the given HOD parameters.
 
     Args:
         cosmology (astropy.cosmology.Cosmology):
             The cosmology used for the simulation.
-        cfg (cfg object):
-            Configuration dict object.
+        model (str): The HOD model to use. Options are:
+            - 'zheng07'
+            - 'leauthaud11'
+            - 'zu_mandelbaum15'
+        theta (dict): The HOD parameters.
         mdef (str, optional):
             Halo mass definition. Defaults to 'vir'.
 
@@ -470,7 +473,7 @@ def build_HOD_model(
     mkey = 'halo_m' + mdef
 
     # Get HOD parameters
-    hod_params = dict(cfg.bias.hod.theta)
+    hod_params = dict(theta)
     hod_params.update({
         'cosmology': cosmology,
         'redshift': cfg.nbody.zf,
@@ -478,7 +481,7 @@ def build_HOD_model(
     })
 
     # Occupation functions
-    if cfg.bias.hod.model == 'zheng07':
+    if model == 'zheng07':
         cenocc = Zheng07Cens(prim_haloprop_key=mkey, **hod_params)
         satocc = Zheng07Sats(
             prim_haloprop_key=mkey,
@@ -486,14 +489,14 @@ def build_HOD_model(
             modulate_with_cenocc=True,
             **hod_params
         )
-    elif cfg.bias.hod.model == 'leauthaud11':
+    elif model == 'leauthaud11':
         cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, **hod_params)
         satocc = Leauthaud11Sats(
             prim_haloprop_key=mkey,
             cenocc_model=cenocc,
             **hod_params
         )
-    elif cfg.bias.hod.model == 'zu_mandelbaum15':
+    elif model == 'zu_mandelbaum15':
         cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, **hod_params)
         satocc = ZuMandelbaum15Sats(
             prim_haloprop_key=mkey,
