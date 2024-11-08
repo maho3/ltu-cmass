@@ -101,6 +101,12 @@ python -m cmass.bias.apply_hod nbody=1gpch
 
 # Construct the lightcone and apply the NGC survey mask
 python -m cmass.survey.ngc_selection nbody=1gpch
+
+# Measure summaries in the simulation box (halos, galaxies)
+python -m cmass.diagnostics.summ nbody=1gpch
+
+# Measure summaries in the survey space (galaxies on the lightcone)
+python -m cmass.summary.Pk nbody=1gpch
 ```
 
 After all the above steps are completed, you should see the data results in your working directory as follows:
@@ -114,11 +120,16 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   +-- nbody.h5  # density and velocity fields
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
 |   |   |   |   |   +-- galaxies
-|   |   |   |   |   |   +-- hod000.h5   # galaxy positions/velocities, for HOD seed 0
+|   |   |   |   |   |   +-- hod00000.h5   # galaxy positions/velocities, for HOD seed 0
 |   |   |   |   |   +-- lightcone           
-|   |   |   |   |   |   +-- hod000_aug000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
-|   |   |   |   |   +-- summary
-|   |   |   |   |   |   +-- hod000_aug000.h5        # survey-space power spectrum
+|   |   |   |   |   |   +-- hod00000_aug00000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
+|   |   |   |   |   +-- diag  # simulation box summaries
+|   |   |   |   |   |   +-- rho.h5
+|   |   |   |   |   |   +-- halos.h5
+|   |   |   |   |   |   +-- galaxies
+|   |   |   |   |   |   |   +-- hod00000.h5
+|   |   |   |   |   +-- summary  # survey-space summaries
+|   |   |   |   |   |   +-- hod00000_aug00000.h5        # survey-space power spectrum
 ```
 
 
@@ -136,8 +147,11 @@ We can then define different suites of simulations based on large-scale configur
 ```bash
 python -m cmass.nbody.pmwd nbody=2gpch
 ```
-You can see other default configurations in [`cmass/conf`](../cmass/conf).
-
+You can see various default configurations in [`cmass/conf`](../cmass/conf). However, the two most commonly used are `sim` and `multisnapshot` as described in [`cmass/conf/config.yaml`](../cmass/conf/config.yaml). For example:
+```bash
+python -m cmass.bias.rho_to_halo nbody=1gpch sim=fastpm multisnapshot=True
+```
+`sim` tells the script which base nbody simulator (pmwd, fastpm, borglpt, borgpm, pinocchio) the script should use data products from. `multisnapshot` is a boolean flag that tells the script whether to use all simulation snapshots available, or only the final snapshot. The defaults are `sim=pmwd` and `multisnapshot=True`.
 
 ## Additional Functionality
 

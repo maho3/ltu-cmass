@@ -124,10 +124,12 @@ def delete_outputs(outpath):
     if os.path.isfile(outpath):
         os.remove(outpath)
 
+
 def save_parameters(outpath, **params):
     with h5py.File(outpath, 'w') as f:
         for key, value in params.items():
             f.attrs[key] = value
+
 
 def save_snapshot(outpath, a, gpos, gvel, **meta):
     with h5py.File(outpath, 'a') as f:
@@ -142,7 +144,8 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
