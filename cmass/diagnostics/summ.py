@@ -179,7 +179,7 @@ def summarize_rho(source_path, L, threads=16, from_scratch=True):
 
 def summarize_tracer(
     source_path, L, N, h,
-    density=None, proxy='mass',
+    density=None, proxy=None,
     threads=16, from_scratch=True,
     type='halo', hod_seed=None,
     summaries=['Pk']
@@ -226,14 +226,20 @@ def summarize_tracer(
                 # Mask out low mass tracers (to match number density)
                 mass = None
                 if density is not None:
-                    if proxy not in f[a].keys():
-                        logging.error(
-                            f'{proxy} not found in {type} file at a={a}')
-                    if len(pos) <= Ncut:
-                        logging.warning(f'Not enough {type} tracers in {a}')
-                    logging.info(
-                        f'Cutting top {Ncut} out of {len(pos)} {type} tracers to match number density')
-                    mass = f[a][proxy][...].astype(np.float32)
+                    if proxy is None:
+                        logging.warning('Proxy is set to None. Not rank-ordering.')
+                        mass = np.arange(len(pos))
+                        np.random.shuffle(mass)
+                    else:
+                        if proxy not in f[a].keys():
+                            logging.error(
+                                f'{proxy} not found in {type} file at a={a}')
+                        if len(pos) <= Ncut:
+                            logging.warning(f'Not enough {type} tracers in {a}')
+                        logging.info(
+                            f'Cutting top {Ncut} out of {len(pos)} {type} tracers '
+                            'to match number density')
+                        mass = f[a][proxy][...].astype(np.float32)
                     mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
                     pos = pos[mask]
                     vel = vel[mask]
