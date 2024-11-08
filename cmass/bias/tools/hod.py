@@ -64,7 +64,7 @@ def parse_hod(cfg):
             param = float(getattr(cfg.bias.hod, key))
             model.set_parameter(key, param)
 
-        # Chek if 'seed' set
+        # Check if 'seed' set
         if hasattr(cfg.bias.hod, 'seed'):
             if cfg.bias.hod.seed is not None:
                 # If -1, set to some random value
