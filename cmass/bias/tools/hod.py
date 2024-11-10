@@ -26,8 +26,6 @@ from halotools.empirical_models import (
 )
 from halotools.empirical_models import HodModelFactory
 
-from ...utils import load_params
-
 
 def parse_hod(cfg):
     """

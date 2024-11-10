@@ -16,7 +16,6 @@ Output:
         - hostid: host halo ID
 
 NOTE:
-    - TODO: Implement Zheng+ex 10-parameter model
     - TODO: Allow cosmology-dependent HOD priors
 """
 
