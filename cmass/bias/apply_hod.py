@@ -44,8 +44,10 @@ def populate_hod(
     cosmo = cosmo_to_astropy(cosmo)
 
     if (hmeta is not None) and ('concentration' in hmeta):
+        logging.info('Using saved halo concentration...')
         hconc = hmeta['concentration']
     else:
+        logging.info('Using halo-concentration relation...')
         hconc = None
 
     BoxSize = L*np.ones(3)

@@ -513,6 +513,7 @@ def build_HOD_model(
         mdef=mdef
     )
     satsprof = NFWPhaseSpace(
+        conc_mass_model='direct_from_halo_catalog',
         cosmology=cosmology,
         redshift=zf,
         mdef=mdef
