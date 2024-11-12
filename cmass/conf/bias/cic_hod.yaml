@@ -15,10 +15,33 @@ halo:
   vel: "CIC"
 
 # galaxy biasing
-hod: 
-  seed: 0       # HOD seed (if null, use below parameters)
-  logMmin: 13.0    # log10(Mmin) in Msun/h
-  sigma_logM: 0.2  # scatter in log10(Mmin)
-  logM0: 14.0      # log10(M0) in Msun/h
-  logM1: 14.0      # log10(M1) in Msun/h
-  alpha: 1.0       # slope of the power-law mass function
+hod:
+  # Set HOD model. Can be one of:
+  # - zheng07
+  # - leauthaud11
+  # - zu_mandelbaum15
+  model: 'zheng07'
+
+  # Use halo concentrations (if available)
+  # Otherwise, use the mass-concentration relation
+  use_conc: True
+  
+  # Set default parameters from a given reference. 
+  # Any parameters set explicitly here will overwrite
+  # these defaults. Check cmass/bias/tools/hod.py for 
+  # available defaults for each model.
+  default_params: 'reid2014_cmass' 
+  
+  # HOD seed. If `null` or 0, use default parameters.
+  # If -1, set random seed.
+  # Else, randomly set parameters with the given seed.
+  seed: 0
+
+# Custom parameters for the Zheng+07 model.
+# These will overwrite any defaults set above.
+  theta:
+  #   logMmin: 13.0    # log10(Mmin) in Msun/h
+  #   sigma_logM: 0.2  # scatter in log10(Mmin)
+  #   logM0: 14.0      # log10(M0) in Msun/h
+  #   logM1: 14.0      # log10(M1) in Msun/h
+  #   alpha: 1.0       # slope of the power-law mass function

@@ -1,5 +1,6 @@
 """
-Sample an HOD realization from the halo catalog using the Zheng+(2007) model.
+Sample an HOD realization from the halo catalog.
+HOD model and parameters defined in the bias configuration file.
 
 Input:
     - halos.h5
@@ -15,7 +16,6 @@ Output:
         - hostid: host halo ID
 
 NOTE:
-    - TODO: Implement Zheng+ex 10-parameter model
     - TODO: Allow cosmology-dependent HOD priors
 """
 
@@ -27,81 +27,57 @@ import hydra
 import h5py
 from omegaconf import DictConfig, OmegaConf, open_dict
 from .tools.hod import (
-    thetahod_literature, build_halo_catalog, build_HOD_model)
+    build_halo_catalog, build_HOD_model, parse_hod)
 from ..utils import (
     get_source_path, timing_decorator, load_params, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
 
 
-def parse_hod(cfg):
-    with open_dict(cfg):
-        # HOD parameters
-        if (not hasattr(cfg.bias.hod, 'seed')) or (cfg.bias.hod.seed is None):
-            cfg.bias.hod.theta = [
-                cfg.bias.hod.logMmin, cfg.bias.hod.sigma_logM,
-                cfg.bias.hod.logM0, cfg.bias.hod.logM1, cfg.bias.hod.alpha
-            ]
-            cfg.bias.hod.seed = 0
-        elif cfg.bias.hod.seed == -1:
-            cfg.bias.hod.seed = np.random.randint(0, 1e5)
-            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
-        else:
-            cfg.bias.hod.theta = get_hod_params(cfg.bias.hod.seed)
-
-        # Cosmology
-        cfg.nbody.cosmo = load_params(
-            cfg.nbody.lhid, cfg.meta.cosmofile)
-    return cfg
-
-
-def get_hod_params(seed=0):
-    theta = thetahod_literature('reid2014_cmass')
-    # sample theta based on priors set by Reid+(2014)
-    if seed != 0:
-        np.random.seed(seed)
-        hod_lower_bound = np.array([12.0, 0.1, 13.0, 13.0, 0.])
-        hod_upper_bound = np.array([14.0, 0.6, 15.0, 15.0, 1.5])
-        keys = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
-        theta = np.random.uniform(hod_lower_bound, hod_upper_bound, size=(5))
-        theta = [float(x) for x in theta]
-        theta = dict(zip(keys, theta))
-    return theta
-
-
 @ timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
-    cosmo, cfg, seed=0, mdef='vir'
+    cosmo, L, zf,
+    model, theta, 
+    hmeta=None,
+    seed=0, mdef='vir'
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
-    BoxSize = cfg.nbody.L*np.ones(3)
-    catalog = build_halo_catalog(
-        hpos, hvel, 10**hmass, cfg.nbody.zf, BoxSize, cosmo,
-        mdef=mdef
-    )
+    if (hmeta is not None) and ('concentration' in hmeta):
+        logging.info('Using saved halo concentration...')
+        hconc = hmeta['concentration']
+    else:
+        logging.info('Using halo-concentration relation...')
+        hconc = None
 
-    hod_params = cfg.bias.hod.theta
+    BoxSize = L*np.ones(3)
+    catalog = build_halo_catalog(
+        hpos, hvel, 10**hmass, zf, BoxSize, cosmo,
+        mdef=mdef, conc=hconc
+    )
 
     hod = build_HOD_model(
-        cosmo, cfg.nbody.zf, hod_model='zheng07', mdef=mdef,
-        **hod_params
+        cosmo,
+        model=model,
+        theta=theta,
+        zf=zf,
+        mdef=mdef
     )
-
     hod.populate_mock(catalog, seed=seed)
-
     galcat = hod.mock.galaxy_table.as_array()
 
     return galcat
 
 
-def run_snapshot(pos, vel, mass, cfg):
+def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
     # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
-        pos, vel, mass,
-        cfg.nbody.cosmo, cfg,
-        seed=cfg.bias.hod.seed
+        hpos, hvel, hmass,
+        cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
+        cfg.bias.hod.model, cfg.bias.hod.theta,
+        seed=cfg.bias.hod.seed,
+        hmeta=hmeta if cfg.bias.hod.use_conc else None
     )
 
     # Organize outputs
@@ -117,7 +93,12 @@ def load_snapshot(source_path, a):
         hpos = group['pos'][...]
         hvel = group['vel'][...]
         hmass = group['mass'][...]
-    return hpos, hvel, hmass
+
+        hmeta = {}
+        for key in group.keys():
+            if key not in ['pos', 'vel', 'mass']:
+                hmeta[key] = group[key][...]
+    return hpos, hvel, hmass, hmeta
 
 
 def delete_outputs(outpath):
@@ -138,7 +119,8 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
@@ -163,13 +145,13 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Running snapshot {i} at a={a:.6f}...')
 
         # Load snapshot
-        hpos, hvel, hmass = load_snapshot(source_path, a)
+        hpos, hvel, hmass, hmeta = load_snapshot(source_path, a)
 
         # Populate HOD
-        gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
+        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg, hmeta=hmeta)
 
         # Save snapshot
-        save_snapshot(save_file, a, gpos, gvel, **meta)
+        save_snapshot(save_file, a, gpos, gvel, **gmeta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')

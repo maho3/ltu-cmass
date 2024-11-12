@@ -181,7 +181,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
 
     # Pad the input density field
     rho_pad = np.pad(rho, pad, mode='wrap')
-    fvel_pad = np.pad(fvel, [(pad,pad)]*3+[(0,0)], mode='wrap')
+    fvel_pad = np.pad(fvel, [(pad, pad)]*3+[(0, 0)], mode='wrap')
 
     # Split the inputs into batches
     batch_rho = batch_cube(rho, Nsub, Npix, Npix)
@@ -190,14 +190,16 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     batch_fvel_pad = batch_cube(fvel_pad, Nsub, Npad, Npix)
 
     # Run CHARM on each batch and append outputs
-    hposs, hmasss, hvels = [], [], []
+    hposs, hmasss, hvels, hconcs = [], [], [], []
     for i in range(len(batch_rho)):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
-        hpos, hmass, hvel = charm_interface.process_input_density(
+        hpos, hmass, hvel, hconc = charm_interface.process_input_density(
             rho_m_zg=batch_rho[i],
-            rho_m_vel_zg=np.stack([batch_fvel[i,...,j] for j in range(3)], axis=0),
+            rho_m_vel_zg=np.stack([batch_fvel[i, ..., j]
+                                  for j in range(3)], axis=0),
             rho_m_pad_zg=batch_rho_pad[i],
-            rho_m_vel_pad_zg=np.stack([batch_fvel_pad[i,...,j] for j in range(3)], axis=0),
+            rho_m_vel_pad_zg=np.stack(
+                [batch_fvel_pad[i, ..., j] for j in range(3)], axis=0),
             cosmology_array=np.array(cosmo),
             BoxSize=Lcharm
         )
@@ -205,6 +207,7 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
         hposs.append(hpos[mask])
         hmasss.append(hmass[mask])
         hvels.append(hvel[mask])
+        hconcs.append(hconc[mask])
 
     # Shift the positions to the original box
     l = 0
@@ -215,18 +218,18 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
                 l += 1
 
     # Combine the outputs
-    hposs, hmasss, hvels = map(np.concatenate, [hposs, hmasss, hvels])
+    hposs, hmasss, hvels, hconcs = map(np.concatenate, [hposs, hmasss, hvels, hconcs])
 
     # ensure periodicity
     hposs = hposs % L
 
-    # conform to mass-bin format of other bias models TODO: refactor?
-    hposs, hmasss, hvels = [hposs], [hmasss], [hvels]
+    # save misc halo metadata
+    meta = {'concentration': hconcs}
 
-    return hposs, hmasss, hvels
+    return hposs, hmasss, hvels, meta
 
 
-def apply_limd(rho, cfg):
+def apply_limd(rho, fvel, cfg, ppos=None, pvel=None):
     # Load bias parameters
     bcfg = deepcopy(cfg)
     bcfg.nbody.suite = bcfg.bias.halo.base_suite
@@ -252,7 +255,17 @@ def apply_limd(rho, cfg):
     logging.info('Sampling masses...')
     hmass = sample_masses([len(x) for x in hpos], medges)
 
-    return hpos, hmass
+    # Sample velocities
+    logging.info('Sampling velocities...')
+    hvel = sample_velocities(hpos, cfg, rho, fvel, ppos=ppos, pvel=pvel)
+
+    # Combine the outputs of different mass bins
+    def combine(x):
+        x = [t for t in x if len(t) > 0]
+        return np.concatenate(x, axis=0)
+    hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
+
+    return hpos, hmass, hvel
 
 
 @timing_decorator
@@ -261,30 +274,20 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         logging.info('Using CHARM model...')
 
         # apply CHARM model
-        hpos, hmass, hvel = apply_charm(
+        hpos, hmass, hvel, meta = apply_charm(
             rho, fvel*a/1e3,  # CHARM velocity normalization
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')
-        hpos, hmass = apply_limd(rho, cfg)
-
-        logging.info('Calculating velocities...')
-        hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
+        hpos, hmass, hvel = apply_limd(rho, fvel, cfg, ppos, pvel)
+        meta = {}
     else:
         raise NotImplementedError(
             f'Model {cfg.bias.halo.model} not implemented.')
 
-
-    logging.info('Combine...')
-
-    def combine(x):
-        x = [t for t in x if len(t) > 0]
-        return np.concatenate(x, axis=0)
-    hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
-
-    return hpos, hvel, hmass
+    return hpos, hvel, hmass, meta
 
 
 def load_snapshot(source_path, a):
@@ -306,7 +309,7 @@ def delete_outputs(outdir):
         os.remove(outpath)
 
 
-def save_snapshot(outdir, a, hpos, hvel, hmass):
+def save_snapshot(outdir, a, hpos, hvel, hmass, **meta):
 
     with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
@@ -314,15 +317,20 @@ def save_snapshot(outdir, a, hpos, hvel, hmass):
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
         group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
 
+        # save other halo metadata (e.g. concentration)
+        for key, val in meta.items():
+            group.create_dataset(key, data=val)
+
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -337,13 +345,13 @@ def main(cfg: DictConfig) -> None:
         rho, fvel, ppos, pvel = load_snapshot(source_path, a)
 
         # Apply bias model
-        hpos, hvel, hmass = run_snapshot(
+        hpos, hvel, hmass, meta = run_snapshot(
             rho, fvel, a,
             cfg, ppos, pvel
         )
 
         logging.info(f'Saving halo catalog to {source_path}')
-        save_snapshot(source_path, a, hpos, hvel, hmass)
+        save_snapshot(source_path, a, hpos, hvel, hmass, **meta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')

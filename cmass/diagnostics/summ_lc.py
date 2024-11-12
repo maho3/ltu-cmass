@@ -20,20 +20,20 @@ import astropy
 
 
 def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
-             from_scratch=True, **header_kwargs):
+            from_scratch=True, **header_kwargs):
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'lightcone', f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
+    outpath = join(source_path, 'diag', 'lightcone',
+                   f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
 
     # check for file keys
-    filename = join(source_path, 'lightcone', f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
+    filename = join(source_path, 'lightcone',
+                    f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     if not os.path.isfile(filename):
         logging.error(f'gal file not found: {filename}')
         return False
-    with h5py.File(filename, 'r') as f:
-        alist = list(f.keys())
 
     logging.info(f'Saving lc diagnostics to {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
@@ -42,7 +42,8 @@ def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
-            logging.info(f'Processing lightcone catalog hod{hod_seed:05}_aug{aug_seed:05}')
+            logging.info(
+                f'Processing lightcone catalog hod{hod_seed:05}_aug{aug_seed:05}')
             # Load
             ra = f['ra'][...]
             dec = f['dec'][...]
@@ -56,7 +57,7 @@ def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
             xyz += [1800, 1650, 150]
 
             # # noise positions
-            xyz += np.random.randn(*xyz.shape) # * 20 # 8/np.sqrt(3)
+            xyz += np.random.randn(*xyz.shape)  # * 20 # 8/np.sqrt(3)
 
             # convert to float32
             xyz = xyz.astype(np.float32)
@@ -79,7 +80,8 @@ def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'sim', 'nbody', 'bias', 'diag', 'survey'])
+    cfg = OmegaConf.masked_copy(
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'diag'])
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
@@ -102,7 +104,7 @@ def main(cfg: DictConfig) -> None:
 
     # measure gal diagnostics
     done = lc_summ(
-        source_path, cfg.bias.hod.seed, cfg.survey.aug_seed, 
+        source_path, cfg.bias.hod.seed, cfg.survey.aug_seed,
         L, N, cosmo,
         threads=threads, from_scratch=from_scratch,
         cosmology=cfg.nbody.cosmo, **cfg.bias.hod.theta)

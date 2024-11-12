@@ -103,7 +103,7 @@ def main(cfg: DictConfig) -> None:
     rank = comm.Get_rank()
 
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)

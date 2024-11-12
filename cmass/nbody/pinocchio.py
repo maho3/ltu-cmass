@@ -77,7 +77,8 @@ def get_mpi_info():
         mpi_args = '--hostfile $PBS_NODEFILE'
     elif 'SLURM_JOB_NODELIST' in os.environ:  # assume Slurm job
         # Use scontrol to get the expanded list of nodes
-        node_list = subprocess.check_output(['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
+        node_list = subprocess.check_output(
+            ['scontrol', 'show', 'hostnames', os.environ['SLURM_JOB_NODELIST']])
         node_list = node_list.decode('utf-8').splitlines()
 
         # Calculate max_cores (total cores allocated)
@@ -237,7 +238,7 @@ PLCAperture            30           % cone aperture for the past light cone
     os.chdir(outdir)
     logging.info(command)
     _ = subprocess.run(command, shell=True, check=False, env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(cwd)
 
     # Check memory requirements within limits
@@ -256,7 +257,8 @@ PLCAperture            30           % cone aperture for the past light cone
         raise ValueError(f"Bytes per particle not found in {log_file}")
     if required_memory_match:
         required_memory_per_task = float(required_memory_match.group(1))
-        logging.info(f"Required memory per task (in Mb): {required_memory_per_task}")
+        logging.info(
+            f"Required memory per task (in Mb): {required_memory_per_task}")
     else:
         raise ValueError(f"Required memory per task not found in {log_file}")
     if total_required_memory_match:
@@ -267,7 +269,8 @@ PLCAperture            30           % cone aperture for the past light cone
 
     # Change memory requirements if not acceptable (less than 10% buffer)
     if (bytes_per_particle > 0.9 * MaxMemPerParticle) or (required_memory_per_task > 0.9 * MaxMem):
-        logging.info('Maximum memory requirements too stringent. Updating file.')
+        logging.info(
+            'Maximum memory requirements too stringent. Updating file.')
         MaxMem = max(required_memory_per_task/0.9, MaxMem)
         MaxMemPerParticle = max(bytes_per_particle/0.9, MaxMemPerParticle)
         content = make_content(MaxMem, MaxMemPerParticle)
@@ -276,10 +279,11 @@ PLCAperture            30           % cone aperture for the past light cone
 
     # Check job has the required resources if SLURM job
     if 'SLURM_JOB_NODELIST' in os.environ:
-        
+
         slurm_job_id = os.getenv("SLURM_JOBID")
         if slurm_job_id is None:
-            raise ValueError("Error: SLURM_JOBID environment variable is not set.")
+            raise ValueError(
+                "Error: SLURM_JOBID environment variable is not set.")
 
         result = subprocess.run(
             ["scontrol", "show", "job", slurm_job_id],
@@ -311,7 +315,8 @@ PLCAperture            30           % cone aperture for the past light cone
 
         # Print results
         logging.info(f"Allocated total memory (in Gb): {total_memory}")
-        logging.info(f"Allocated memory per task (in Mb): {memory_per_core:.2f}")
+        logging.info(
+            f"Allocated memory per task (in Mb): {memory_per_core:.2f}")
 
         # Check we have the resources
         if total_memory < total_required_memory:
@@ -328,7 +333,8 @@ def delete_files(cfg, outdir):
 
     # Check files we need exist
     if ('nbody.h5' not in all_files) or ('halos.h5' not in all_files):
-        logging.info('Not deleting Pinocchio files as nbody.h5 and/or halos.h5 does not exist')
+        logging.info(
+            'Not deleting Pinocchio files as nbody.h5 and/or halos.h5 does not exist')
         return
 
     # Check we have saved the relevant scale factors
@@ -339,10 +345,12 @@ def delete_files(cfg, outdir):
             keys.sort()
             asave.sort()
             if not (asave == keys):
-                logging.info(f'Not deleting Pinocchio files as {fname} does not have all redshifts saved')
+                logging.info(
+                    f'Not deleting Pinocchio files as {fname} does not have all redshifts saved')
                 return
 
-    files_to_keep = ['input_power_spectrum.txt', 'halos.h5', 'nbody.h5', 'parameter_file', 'config.yaml']
+    files_to_keep = ['input_power_spectrum.txt', 'halos.h5',
+                     'nbody.h5', 'parameter_file', 'config.yaml']
 
     for f in all_files:
         if f not in files_to_keep:
@@ -379,18 +387,20 @@ def run_density(cfg, outdir):
         else:
             supersampling = None
         z = 1 / cfg.nbody.asave[0] - 1
-        rho, fvel, pos_fname, vel_fname =  process_snapshot(
-                outdir, z, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, 
-                cfg.nbody.cosmo[0], cfg.nbody.cosmo[2],
-                supersampling=supersampling)
+        rho, fvel, pos_fname, vel_fname = process_snapshot(
+            outdir, z, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid,
+            cfg.nbody.cosmo[0], cfg.nbody.cosmo[2],
+            supersampling=supersampling)
         save_pinocchio_nbody(outdir, rho, fvel, pos_fname, vel_fname, z,
-                    save_particles=cfg.nbody.save_particles)
-        process_halos(outdir, cfg.nbody.zf, cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid)
+                             save_particles=cfg.nbody.save_particles)
+        process_halos(outdir, cfg.nbody.zf, cfg.nbody.L,
+                      cfg.nbody.N, cfg.nbody.lhid)
     else:
         ncore = min(max_cores, len(cfg.nbody.asave))
         save_cfg_data(outdir, cfg)
-        command = f'mpirun -n {ncore} {mpi_args} env PYTHONPATH={cwd} python -u -m cmass.nbody.tools_pinocchio '
-        command +=  join(outdir, 'snapshot_data.yaml')
+        command = f'mpirun -n {ncore} {mpi_args} env PYTHONPATH={cwd} '
+        command += 'python -u -m cmass.nbody.tools_pinocchio '
+        command += join(outdir, 'snapshot_data.yaml')
         env = os.environ.copy()
         env["OMP_NUM_THREADS"] = "1"
         logging.info(f'Launching output processing on {ncore} cores')
@@ -405,10 +415,10 @@ def run_density(cfg, outdir):
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
@@ -436,7 +446,7 @@ def main(cfg: DictConfig) -> None:
     save_cfg(outdir, cfg)
 
     delete_files(cfg, outdir)
-    
+
     logging.info("Done!")
 
 

@@ -161,9 +161,12 @@ def reweight(rdz, wdir='./data', is_North=True, be=None, hobs=None):
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'nbody', 'bias', 'survey'])
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'survey'])
 
     # Build run config
+    if cfg.multisnapshot:
+        raise ValueError('This script only works for single-snapshot mode.')
+
     cfg = parse_nbody_config(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
