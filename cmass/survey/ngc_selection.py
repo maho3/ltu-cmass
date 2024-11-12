@@ -175,7 +175,7 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
-    is_North = cfg.survey.is_North
+    is_North = cfg.survey.is_North  # whther to use NGC or SGC mask
 
     # Load galaxies
     pos, vel, _ = load_galaxies(source_path, cfg.nbody.af, hod_seed)
@@ -206,7 +206,10 @@ def main(cfg: DictConfig) -> None:
     rdz = reweight(rdz, cfg.meta.wdir, is_North)
 
     # Save
-    outdir = join(source_path, 'lightcone')
+    if is_North:
+        outdir = join(source_path, 'ngc_lightcone')
+    else:
+        outdir = join(source_path, 'sgc_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,

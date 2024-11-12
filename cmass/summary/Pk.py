@@ -79,6 +79,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
+    is_North = cfg.survey.is_North  # whther to use NGC or SGC mask
 
     # check if we are using a filter
     use_filter = hasattr(cfg, 'filter')
@@ -88,12 +89,14 @@ def main(cfg: DictConfig) -> None:
             source_path,
             hod_seed=cfg.bias.hod.seed,
             aug_seed=cfg.survey.aug_seed,
-            filter_name=cfg.filter.filter_name)
+            filter_name=cfg.filter.filter_name,
+            is_North=is_North)
     else:
         grdz, gweights = load_lightcone(
             source_path,
             hod_seed=cfg.bias.hod.seed,
-            aug_seed=cfg.survey.aug_seed)
+            aug_seed=cfg.survey.aug_seed
+            is_North=is_North)
 
     rrdz = load_randoms(cfg.meta.wdir)
 
