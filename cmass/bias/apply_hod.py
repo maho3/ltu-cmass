@@ -84,7 +84,12 @@ def load_snapshot(source_path, a):
         hpos = group['pos'][...]
         hvel = group['vel'][...]
         hmass = group['mass'][...]
-    return hpos, hvel, hmass
+
+        hmeta = {}
+        for key in group.keys():
+            if key not in ['pos', 'vel', 'mass']:
+                hmeta[key] = group[key][...]
+    return hpos, hvel, hmass, hmeta
 
 
 def delete_outputs(outpath):
@@ -131,13 +136,13 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Running snapshot {i} at a={a:.6f}...')
 
         # Load snapshot
-        hpos, hvel, hmass = load_snapshot(source_path, a)
+        hpos, hvel, hmass, hmeta = load_snapshot(source_path, a)
 
         # Populate HOD
-        gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
+        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg)
 
         # Save snapshot
-        save_snapshot(save_file, a, gpos, gvel, **meta)
+        save_snapshot(save_file, a, gpos, gvel, **gmeta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')

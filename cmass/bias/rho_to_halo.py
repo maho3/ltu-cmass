@@ -226,7 +226,10 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     # conform to mass-bin format of other bias models TODO: refactor?
     hposs, hmasss, hvels, hconcs = [hposs], [hmasss], [hvels], [hconcs]
 
-    return hposs, hmasss, hvels
+    # save misc halo metadata
+    meta = {'concentration': hconcs}
+
+    return hposs, hmasss, hvels, meta
 
 
 def apply_limd(rho, cfg):
@@ -264,7 +267,7 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         logging.info('Using CHARM model...')
 
         # apply CHARM model
-        hpos, hmass, hvel = apply_charm(
+        hpos, hmass, hvel, meta = apply_charm(
             rho, fvel*a/1e3,  # CHARM velocity normalization
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
@@ -286,7 +289,7 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         return np.concatenate(x, axis=0)
     hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
 
-    return hpos, hvel, hmass
+    return hpos, hvel, hmass, meta
 
 
 def load_snapshot(source_path, a):
@@ -308,13 +311,16 @@ def delete_outputs(outdir):
         os.remove(outpath)
 
 
-def save_snapshot(outdir, a, hpos, hvel, hmass):
+def save_snapshot(outdir, a, hpos, hvel, hmass, **meta):
 
     with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
         group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
         group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
+
+        for key, val in meta.items():
+            group.attrs[key] = val  # save other halo metadata (e.g. concentration)
 
 
 @timing_decorator
@@ -340,13 +346,13 @@ def main(cfg: DictConfig) -> None:
         rho, fvel, ppos, pvel = load_snapshot(source_path, a)
 
         # Apply bias model
-        hpos, hvel, hmass = run_snapshot(
+        hpos, hvel, hmass, meta = run_snapshot(
             rho, fvel, a,
             cfg, ppos, pvel
         )
 
         logging.info(f'Saving halo catalog to {source_path}')
-        save_snapshot(source_path, a, hpos, hvel, hmass)
+        save_snapshot(source_path, a, hpos, hvel, hmass, **meta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')
