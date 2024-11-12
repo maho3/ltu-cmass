@@ -223,16 +223,13 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     # ensure periodicity
     hposs = hposs % L
 
-    # conform to mass-bin format of other bias models TODO: refactor?
-    hposs, hmasss, hvels, hconcs = [hposs], [hmasss], [hvels], [hconcs]
-
     # save misc halo metadata
     meta = {'concentration': hconcs}
 
     return hposs, hmasss, hvels, meta
 
 
-def apply_limd(rho, cfg):
+def apply_limd(rho, fvel, cfg, ppos=None, pvel=None):
     # Load bias parameters
     bcfg = deepcopy(cfg)
     bcfg.nbody.suite = bcfg.bias.halo.base_suite
@@ -258,7 +255,17 @@ def apply_limd(rho, cfg):
     logging.info('Sampling masses...')
     hmass = sample_masses([len(x) for x in hpos], medges)
 
-    return hpos, hmass
+    # Sample velocities
+    logging.info('Sampling velocities...')
+    hvel = sample_velocities(hpos, cfg, rho, fvel, ppos=ppos, pvel=pvel)
+
+    # Combine the outputs of different mass bins
+    def combine(x):
+        x = [t for t in x if len(t) > 0]
+        return np.concatenate(x, axis=0)
+    hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
+
+    return hpos, hmass, hvel
 
 
 @timing_decorator
@@ -274,20 +281,11 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')
-        hpos, hmass = apply_limd(rho, cfg)
-
-        logging.info('Calculating velocities...')
-        hvel = sample_velocities(hpos, cfg, rho, fvel, ppos, pvel)
+        hpos, hmass, hvel = apply_limd(rho, fvel, cfg, ppos, pvel)
+        meta = {}
     else:
         raise NotImplementedError(
             f'Model {cfg.bias.halo.model} not implemented.')
-
-    logging.info('Combine...')
-
-    def combine(x):
-        x = [t for t in x if len(t) > 0]
-        return np.concatenate(x, axis=0)
-    hpos, hvel, hmass = map(combine, [hpos, hvel, hmass])
 
     return hpos, hvel, hmass, meta
 
@@ -319,8 +317,9 @@ def save_snapshot(outdir, a, hpos, hvel, hmass, **meta):
         group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
         group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
 
+        # save other halo metadata (e.g. concentration)
         for key, val in meta.items():
-            group.attrs[key] = val  # save other halo metadata (e.g. concentration)
+            group.create_dataset(key, data=val)
 
 
 @timing_decorator
