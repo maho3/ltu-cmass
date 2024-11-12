@@ -38,14 +38,20 @@ def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, zf,
     model, theta, 
+    hmeta=None,
     seed=0, mdef='vir'
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
+    if (hmeta is not None) and ('concentration' in hmeta):
+        hconc = hmeta['concentration']
+    else:
+        hconc = None
+
     BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
         hpos, hvel, 10**hmass, zf, BoxSize, cosmo,
-        mdef=mdef
+        mdef=mdef, conc=hconc
     )
 
     hod = build_HOD_model(
@@ -61,14 +67,15 @@ def populate_hod(
     return galcat
 
 
-def run_snapshot(pos, vel, mass, cfg):
+def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
     # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
-        pos, vel, mass,
+        hpos, hvel, hmass,
         cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
         cfg.bias.hod.model, cfg.bias.hod.theta,
-        seed=cfg.bias.hod.seed
+        seed=cfg.bias.hod.seed,
+        hmeta=hmeta if cfg.bias.hod.use_conc else None
     )
 
     # Organize outputs
@@ -139,7 +146,7 @@ def main(cfg: DictConfig) -> None:
         hpos, hvel, hmass, hmeta = load_snapshot(source_path, a)
 
         # Populate HOD
-        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg)
+        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg, hmeta=hmeta)
 
         # Save snapshot
         save_snapshot(save_file, a, gpos, gvel, **gmeta)
