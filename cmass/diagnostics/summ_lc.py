@@ -19,17 +19,19 @@ from ..bias.apply_hod import parse_hod
 import astropy
 
 
-def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
-            from_scratch=True, **header_kwargs):
+def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, is_North=True,
+            threads=16, from_scratch=True, **header_kwargs):
+    pfx = 'ngc' if is_North else 'sgc'
+
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'lightcone',
+    outpath = join(source_path, 'diag', f'{pfx}_lightcone',
                    f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('Gal diagnostics already computed')
         return True
 
     # check for file keys
-    filename = join(source_path, 'lightcone',
+    filename = join(source_path, f'{pfx}_lightcone',
                     f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     if not os.path.isfile(filename):
         logging.error(f'gal file not found: {filename}')
@@ -37,13 +39,13 @@ def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, threads=16,
 
     logging.info(f'Saving lc diagnostics to {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
-    os.makedirs(join(source_path, 'diag', 'lightcone'), exist_ok=True)
+    os.makedirs(join(source_path, 'diag', f'{pfx}_lightcone'), exist_ok=True)
 
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
             logging.info(
-                f'Processing lightcone catalog hod{hod_seed:05}_aug{aug_seed:05}')
+                f'Processing {pfx} lightcone catalog hod{hod_seed:05}_aug{aug_seed:05}')
             # Load
             ra = f['ra'][...]
             dec = f['dec'][...]
@@ -90,6 +92,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
+    is_North = cfg.survey.is_North
 
     threads = cfg.diag.threads
     from_scratch = cfg.diag.from_scratch
@@ -105,7 +108,7 @@ def main(cfg: DictConfig) -> None:
     # measure gal diagnostics
     done = lc_summ(
         source_path, cfg.bias.hod.seed, cfg.survey.aug_seed,
-        L, N, cosmo,
+        L, N, cosmo, is_North=is_North,
         threads=threads, from_scratch=from_scratch,
         cosmology=cfg.nbody.cosmo, **cfg.bias.hod.theta)
     all_done &= done
