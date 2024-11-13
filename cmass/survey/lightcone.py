@@ -93,6 +93,10 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
+    is_North = cfg.survey.is_North  # whther to use NGC or SGC mask
+    if not is_North:
+        raise NotImplementedError(
+            'SGC mask not implemented yet in multisnapshot mode.')
 
     # Load mask
     logging.info(f'Loading mask from {cfg.survey.boss_dir}')
@@ -121,7 +125,10 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, hod_seed)
 
     # Save
-    outdir = join(source_path, 'lightcone')
+    if is_North:
+        outdir = join(source_path, 'ngc_lightcone')
+    else:
+        outdir = join(source_path, 'sgc_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,

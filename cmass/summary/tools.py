@@ -46,14 +46,17 @@ def get_nofz(z, fsky, cosmo=None):
 
 
 @timing_decorator
-def load_lightcone(source_dir, hod_seed=0, aug_seed=0, filter_name=None):
+def load_lightcone(
+    source_dir, hod_seed=0, aug_seed=0, 
+    filter_name=None, is_North=True):
+    pfx = 'ngc' if is_North else 'sgc'
     if filter_name is None:
         infile = join(
-            source_dir, 'lightcone',
+            source_dir, f'{pfx}_lightcone',
             f'hod{hod_seed:05}_aug{aug_seed:05}.h5')
     else:
         infile = join(
-            source_dir, 'filter',
+            source_dir, f'{pfx}_filtered',
             f'hod{hod_seed:05}_aug{aug_seed:05}_{filter_name}.h5')
 
     with h5py.File(infile, 'r') as f:
