@@ -95,8 +95,9 @@ def main(cfg: DictConfig) -> None:
         grdz, gweights = load_lightcone(
             source_path,
             hod_seed=cfg.bias.hod.seed,
-            aug_seed=cfg.survey.aug_seed
-            is_North=is_North)
+            aug_seed=cfg.survey.aug_seed,
+            is_North=is_North
+        )
 
     rrdz = load_randoms(cfg.meta.wdir)
 
@@ -110,7 +111,10 @@ def main(cfg: DictConfig) -> None:
     )
 
     # save results
-    outpath = join(source_path, 'summary')
+    if is_North:
+        outpath = join(source_path, 'ngc_summary')
+    else:
+        outpath = join(outpath, 'sgc_summary')
     os.makedirs(outpath, exist_ok=True)
     outname = f'hod{cfg.bias.hod.seed:05}_aug{cfg.survey.aug_seed:05}'
     if use_filter:

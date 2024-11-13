@@ -56,10 +56,15 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
+    is_North = cfg.survey.is_North
 
     # load rdz
     rdz, _ = load_lightcone(
-        source_path, cfg.bias.hod.seed, cfg.survey.aug_seed)
+        source_path, 
+        hod_seed=cfg.bias.hod.seed, 
+        aug_seed=cfg.survey.aug_seed,
+        is_North=is_North
+    )
 
     # import the filter function
     filter = get_filter(cfg.filter.filter_name)
@@ -68,7 +73,10 @@ def main(cfg: DictConfig) -> None:
     rdz, weight = filter(rdz, **cfg.filter.filter_args)
 
     # Save
-    outdir = join(source_path, 'filter')
+    if is_North:
+        outdir = join(outdir, 'ngc_filtered')
+    else:
+        outdir = join(outdir, 'sgc_filtered')
     os.makedirs(outdir, exist_ok=True)
     suffix = f'_{cfg.filter.filter_name}'
     save_lightcone(
