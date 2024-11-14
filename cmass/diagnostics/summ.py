@@ -13,6 +13,7 @@ import h5py
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
+from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk
 
@@ -144,12 +145,28 @@ def run_summarizer(
             zbox_catalogue, group, summ,
             box_size, grid_size, threads, use_rsd=True)
 
+def save_configuration(file, config, save_HOD=True):
+    file.attrs['config'] = OmegaConf.to_yaml(config)
+    file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
+    file.attrs['cosmo_params'] = config.nbody.cosmo
 
-def summarize_rho(source_path, L, threads=16, from_scratch=True):
+    if save_HOD:
+        file.attrs['HOD_model'] = config.bias.hod.model
+        file.attrs['HOD_seed'] = config.bias.hod.seed
+
+        keys = sorted(list(config.bias.hod.theta.keys()))
+        file.attrs['HOD_names'] = keys
+        file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
+
+def summarize_rho(
+    source_path, L, 
+    threads=16, from_scratch=True,
+    config=None
+):
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'rho.h5')
     if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('Rho diagnostics already computed')
+        logging.info('rho diagnostics already computed')
         return True
 
     # check for file keys
@@ -166,6 +183,8 @@ def summarize_rho(source_path, L, threads=16, from_scratch=True):
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
+            if config is not None:
+                save_configuration(o, config, save_HOD=False)
             for a in alist:
                 logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
@@ -182,14 +201,15 @@ def summarize_tracer(
     density=None, proxy=None,
     threads=16, from_scratch=True,
     type='halo', hod_seed=None,
-    summaries=['Pk']
+    summaries=['Pk'],
+    config=None
 ):
     postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
 
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', postfix)
     if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('Diagnostics already computed')
+        logging.info(f'{type} diagnostics already computed')
         return True
 
     # check for file keys
@@ -211,6 +231,8 @@ def summarize_tracer(
     # compute diagnostics and save
     with h5py.File(filename, 'r') as f:
         with h5py.File(outpath, 'w') as o:
+            if config is not None:
+                save_configuration(o, config, save_HOD=(type == 'galaxy'))
             for a in alist:
                 z = 1/float(a) - 1
                 logging.info(f'Processing {type} catalog a={a}')
@@ -286,12 +308,11 @@ def summarize_tracer(
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'diag'])
+    
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
+    cfg = parse_hod(cfg)
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
@@ -310,7 +331,8 @@ def main(cfg: DictConfig) -> None:
     # measure rho diagnostics
     done = summarize_rho(
         source_path, cfg.nbody.L,
-        threads=threads, from_scratch=from_scratch
+        threads=threads, from_scratch=from_scratch,
+        config=cfg
     )
     all_done &= done
 
@@ -322,7 +344,8 @@ def main(cfg: DictConfig) -> None:
         proxy=cfg.diag.halo_proxy,
         threads=threads, from_scratch=from_scratch,
         type='halo',
-        summaries=summaries
+        summaries=summaries,
+        config=cfg
     )
     all_done &= done
 
@@ -333,7 +356,8 @@ def main(cfg: DictConfig) -> None:
         proxy=cfg.diag.galaxy_proxy,
         threads=threads, from_scratch=from_scratch,
         type='galaxy', hod_seed=cfg.bias.hod.seed,
-        summaries=summaries
+        summaries=summaries,
+        config=cfg
     )
     all_done &= done
 
