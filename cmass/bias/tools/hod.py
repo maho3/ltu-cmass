@@ -12,6 +12,7 @@ which additionally uses the `Hod_parameter` helper class
 for each parameter.
 """
 
+import logging
 import numpy as np
 from omegaconf import open_dict
 
@@ -40,8 +41,25 @@ def parse_hod(cfg):
             modified config object
     """
     with open_dict(cfg):
+        # Check the chosen mass definition
+        if cfg.sim in ['borg1lpt', 'borg2lpt', 'borgpm', 'fastpm', 'pmwd']:
+            if cfg.bias.hod.mdef != '200c':
+                logging.warning(
+                    f'Configuration specified a {cfg.bias.hod.mdef} mass '
+                    f'definition, but the {cfg.sim} simulation is a 200c '
+                    'simulation. So, changing mass definition configuration to '
+                    '200c.')
+                cfg.bias.hod.mdef = '200c'
+        elif cfg.sim=='pinocchio':
+            if cfg.bias.hod.mdef != 'vir':
+                logging.warning(
+                    f'Configuration specified a {cfg.bias.hod.mdef} mass '
+                    f'definition, but the {cfg.sim} simulation is a vir '
+                    'simulation. So, changing mass definition configuration to '
+                    'vir.')
+                cfg.bias.hod.mdef = 'vir'
        
-        # First check model is available
+        # Check model is available
         if not hasattr(cfg.bias.hod, 'model'):
             model = Zheng07()  # for backwards compatibility
         elif cfg.bias.hod.model == 'zheng07':
@@ -53,7 +71,7 @@ def parse_hod(cfg):
         else:
             raise NotImplementedError
 
-        # Then check if we're using default parameters
+        # Check if we're using default parameters
         if hasattr(cfg.bias.hod, 'default_params'):
             if cfg.bias.hod.default_params is not None:
                 # Assign parameters given this default

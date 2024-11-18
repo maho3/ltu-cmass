@@ -77,7 +77,8 @@ def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
         cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
         cfg.bias.hod.model, cfg.bias.hod.theta,
         seed=cfg.bias.hod.seed,
-        hmeta=hmeta if cfg.bias.hod.use_conc else None
+        hmeta=hmeta if cfg.bias.hod.use_conc else None,
+        mdef=cfg.bias.hod.mdef
     )
 
     # Organize outputs
