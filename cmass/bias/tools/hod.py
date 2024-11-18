@@ -464,6 +464,10 @@ def build_halo_catalog(
         'Lbox': BoxSize,
         'mdef': mdef,
     }
+    if mdef != 'vir':
+        # these are necessary to satisfy default halo properties, but not used
+        kws['halo_mvir'] = np.full(len(mass), np.nan)
+        kws['halo_rvir'] = np.full(len(mass), np.nan)
 
     # convert to Halotools format
     return UserSuppliedHaloCatalog(**kws)

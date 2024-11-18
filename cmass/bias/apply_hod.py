@@ -63,7 +63,7 @@ def populate_hod(
         zf=zf,
         mdef=mdef
     )
-    hod.populate_mock(catalog, seed=seed)
+    hod.populate_mock(catalog, seed=seed, halo_mass_column_key=f'halo_m{mdef}')
     galcat = hod.mock.galaxy_table.as_array()
 
     return galcat
