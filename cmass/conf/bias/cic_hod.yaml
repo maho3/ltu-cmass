@@ -21,6 +21,13 @@ hod:
   # - leauthaud11
   # - zu_mandelbaum15
   model: 'zheng07'
+
+  # Configure halo mass definition as stored in halo catalogs (e.g. vir, 200c)
+  mdef: '200c'
+
+  # Use halo concentrations in HOD model (if available)
+  # Otherwise, use the mass-concentration relation
+  use_conc: True
   
   # Set default parameters from a given reference. 
   # Any parameters set explicitly here will overwrite

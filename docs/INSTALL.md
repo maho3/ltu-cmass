@@ -100,7 +100,7 @@ python -m cmass.bias.rho_to_halo nbody=1gpch
 python -m cmass.bias.apply_hod nbody=1gpch
 
 # Construct the lightcone and apply the NGC survey mask
-python -m cmass.survey.ngc_selection nbody=1gpch
+python -m cmass.survey.selection nbody=1gpch
 
 # Measure summaries in the simulation box (halos, galaxies)
 python -m cmass.diagnostics.summ nbody=1gpch
@@ -121,14 +121,14 @@ After all the above steps are completed, you should see the data results in your
 |   |   |   |   |   +-- halos.h5      # halo positions, velocity and masses
 |   |   |   |   |   +-- galaxies
 |   |   |   |   |   |   +-- hod00000.h5   # galaxy positions/velocities, for HOD seed 0
-|   |   |   |   |   +-- lightcone           
+|   |   |   |   |   +-- ngc_lightcone           
 |   |   |   |   |   |   +-- hod00000_aug00000.h5  # ra (deg), dec (deg), redshift of galaxies after survey mask
 |   |   |   |   |   +-- diag  # simulation box summaries
 |   |   |   |   |   |   +-- rho.h5
 |   |   |   |   |   |   +-- halos.h5
 |   |   |   |   |   |   +-- galaxies
 |   |   |   |   |   |   |   +-- hod00000.h5
-|   |   |   |   |   +-- summary  # survey-space summaries
+|   |   |   |   |   +-- ngc_summary  # survey-space summaries
 |   |   |   |   |   |   +-- hod00000_aug00000.h5        # survey-space power spectrum
 ```
 

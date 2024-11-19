@@ -38,14 +38,22 @@ def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, zf,
     model, theta, 
+    hmeta=None,
     seed=0, mdef='vir'
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
+    if (hmeta is not None) and ('concentration' in hmeta):
+        logging.info('Using saved halo concentration...')
+        hconc = hmeta['concentration']
+    else:
+        logging.info('Using halo-concentration relation...')
+        hconc = None
+
     BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
         hpos, hvel, 10**hmass, zf, BoxSize, cosmo,
-        mdef=mdef
+        mdef=mdef, conc=hconc
     )
 
     hod = build_HOD_model(
@@ -55,20 +63,22 @@ def populate_hod(
         zf=zf,
         mdef=mdef
     )
-    hod.populate_mock(catalog, seed=seed)
+    hod.populate_mock(catalog, seed=seed, halo_mass_column_key=f'halo_m{mdef}')
     galcat = hod.mock.galaxy_table.as_array()
 
     return galcat
 
 
-def run_snapshot(pos, vel, mass, cfg):
+def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
     # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
-        pos, vel, mass,
+        hpos, hvel, hmass,
         cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
         cfg.bias.hod.model, cfg.bias.hod.theta,
-        seed=cfg.bias.hod.seed
+        seed=cfg.bias.hod.seed,
+        hmeta=hmeta if cfg.bias.hod.use_conc else None,
+        mdef=cfg.bias.hod.mdef
     )
 
     # Organize outputs
@@ -84,7 +94,12 @@ def load_snapshot(source_path, a):
         hpos = group['pos'][...]
         hvel = group['vel'][...]
         hmass = group['mass'][...]
-    return hpos, hvel, hmass
+
+        hmeta = {}
+        for key in group.keys():
+            if key not in ['pos', 'vel', 'mass']:
+                hmeta[key] = group[key][...]
+    return hpos, hvel, hmass, hmeta
 
 
 def delete_outputs(outpath):
@@ -140,13 +155,13 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Running snapshot {i} at a={a:.6f}...')
 
         # Load snapshot
-        hpos, hvel, hmass = load_snapshot(source_path, a)
+        hpos, hvel, hmass, hmeta = load_snapshot(source_path, a)
 
         # Populate HOD
-        gpos, gvel, meta = run_snapshot(hpos, hvel, hmass, cfg)
+        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg, hmeta=hmeta)
 
         # Save snapshot
-        save_snapshot(save_file, a, gpos, gvel, **meta)
+        save_snapshot(save_file, a, gpos, gvel, **gmeta)
 
     save_cfg(source_path, cfg, field='bias')
     logging.info('Done!')

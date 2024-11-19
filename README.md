@@ -16,7 +16,7 @@ python -m cmass.bias.rho_to_halo nbody=3gpch
 python -m cmass.bias.apply_hod nbody=3gpch
 
 # Construct the lightcone and apply the NGC survey mask
-python -m cmass.survey.ngc_selection nbody=3gpch
+python -m cmass.survey.selection nbody=3gpch
 
 # Measure the power spectrum of the galaxy catalog
 python -m cmass.summary.Pk nbody=3gpch
@@ -53,8 +53,8 @@ This folder contains [`hydra`](https://hydra.cc/docs/tutorials/basic/your_first_
 - `apply_hod` - Sample an HOD realization from the halo catalog using the Zheng+(2007) model. 
 
 ### cmass.survey
-- `ngc_selection` - Applies CMASS NGC survey mask to a lightcone-shaped volume of galaxies. 
-- `ngc_lightcone` - Stitches multiple snapshots together to create an extrapolated lightcone, following the method of [nuvoid_production](https://github.com/leanderthiele/nuvoid_production). Then applies the CMASS NGC survey mask.
+- `selection` - Applies CMASS NGC survey mask to a lightcone-shaped volume of galaxies. 
+- `lightcone` - Stitches multiple snapshots together to create an extrapolated lightcone, following the method of [nuvoid_production](https://github.com/leanderthiele/nuvoid_production). Then applies the CMASS NGC survey mask.
 
 ### cmass.summary
 - `Pk` - Measure the power spectrum of a galaxy catalog.
