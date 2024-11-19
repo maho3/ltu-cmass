@@ -63,7 +63,7 @@ def populate_hod(
         zf=zf,
         mdef=mdef
     )
-    hod.populate_mock(catalog, seed=seed)
+    hod.populate_mock(catalog, seed=seed, halo_mass_column_key=f'halo_m{mdef}')
     galcat = hod.mock.galaxy_table.as_array()
 
     return galcat
@@ -77,7 +77,8 @@ def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
         cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
         cfg.bias.hod.model, cfg.bias.hod.theta,
         seed=cfg.bias.hod.seed,
-        hmeta=hmeta if cfg.bias.hod.use_conc else None
+        hmeta=hmeta if cfg.bias.hod.use_conc else None,
+        mdef=cfg.bias.hod.mdef
     )
 
     # Organize outputs
