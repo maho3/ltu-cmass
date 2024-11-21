@@ -217,22 +217,43 @@ def BOSS_redshift(z):
 
 
 def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
+    """Fiber collision mask for BOSS galaxies as described in arXiv:2211.00723"""
+    
     c = SkyCoord(ra=ra, dec=dec, unit=u.degree)
     seplimit = sep*u.degree
-    idx1, idx2, _, _ = search_around_sky(c, c, seplimit)
+    m1, m2, _, _ = search_around_sky(c, c, seplimit)
+
+    # remove self-matches
+    notitself = m1 != m2
+    m1 = m1[notitself]
+    m2 = m2[notitself]
 
     if mode == 1:
-        iddrop = idx1[idx1 != idx2]
+
+        # pairs are double counted by search_around_sky. This selects the unique pairs
+        _, ipair = np.unique(np.min(np.array([m1, m2]), axis=0), return_index=True)
+
+        # only ~60% of galaxies within the angular scale are fiber collided
+        # since 40% are in overlapping regions with substantially lower
+        # fiber collision rates
+        ncollid = int(0.6 * len(ipair))
+
+        icollid = np.random.choice(ipair, size=ncollid, replace=False)
+
+        mask = np.ones(len(ra)).astype(bool)
+        mask[m1[icollid[:int(0.5*ncollid)]]] = False
+        mask[m2[icollid[int(0.5*ncollid):]]] = False
+
     elif mode == 2:
-        iddrop = np.array(
-            list(set(idx1[idx1 != idx2]).union(idx2[idx1 != idx2])),
-            dtype=int)
+
+        mask = np.ones(len(ra)).astype(bool)
+        mask[m1] = False
+
     else:
         raise ValueError(f'Fiber collision type {mode} is not valid.')
-
-    mask = np.ones(len(ra), dtype=bool)
-    mask[iddrop] = False
+    
     return mask
+
 
 
 def BOSS_area(wdir='./data'):
