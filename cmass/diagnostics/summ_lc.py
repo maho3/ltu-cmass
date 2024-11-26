@@ -81,9 +81,6 @@ def lc_summ(source_path, hod_seed, aug_seed, L, N, cosmo, is_North=True,
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'diag'])
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
