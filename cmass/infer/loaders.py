@@ -11,6 +11,12 @@ def get_cosmo(source_path):
     return np.array(cfg.nbody.cosmo)
 
 
+def get_hod(diagfile):
+    with h5py.File(diagfile, 'r') as f:
+        hod_params = f.attrs['HOD_params'][:]
+    return hod_params
+
+
 def load_Pk(diag_file, a):
     a = f'{a:.6f}'
     if not os.path.exists(diag_file):
@@ -24,7 +30,7 @@ def load_Pk(diag_file, a):
                         'k': f[a][stat+'_k3D'][:],
                         'value': f[a][stat][:],
                     }
-    except OSError:
+    except (OSError, KeyError):
         return {}
     return summ
 

@@ -14,8 +14,7 @@ from copy import deepcopy
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from ..bias.apply_hod import parse_hod
-from .loaders import get_cosmo, load_Pk, preprocess_Pk
+from .loaders import get_cosmo, get_hod, load_Pk, preprocess_Pk
 
 import ili
 from ili.dataloaders import NumpyLoader
@@ -51,6 +50,43 @@ def load_halo_summaries(suitepath, a, Nmax):
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {len(simpaths)} {key}'
+            ' summaries')
+    return summaries, parameters
+
+
+def load_galaxy_summaries(suitepath, a, Nmax):
+    logging.info(f'Looking for galaxy summaries at {suitepath}')
+    simpaths = os.listdir(suitepath)
+    simpaths.sort(key=lambda x: int(x))  # sort by lhid
+    if Nmax >= 0:
+        simpaths = simpaths[:Nmax]
+
+    summlist, paramlist = [], []
+    Ntot = 0
+    for lhid in tqdm(simpaths):
+        sourcepath = join(suitepath, lhid)
+        filelist = os.listdir(join(sourcepath, 'diag', 'galaxies'))
+        Ntot += len(filelist)
+        for f in filelist:
+            diagfile = join(sourcepath, 'diag', 'galaxies', f)
+            summ = load_Pk(diagfile, a)
+            if len(summ) > 0:
+                try:
+                    paramlist.append(np.concatenate(
+                        [get_cosmo(sourcepath), get_hod(diagfile)], axis=0))
+                except (OSError, KeyError):
+                    continue
+                summlist.append(summ)
+
+    summaries, parameters = defaultdict(list), defaultdict(list)
+    for summ, param in zip(summlist, paramlist):
+        for key in summ:
+            summaries[key].append(summ[key])
+            parameters[key].append(param)
+
+    for key in summaries:
+        logging.info(
+            f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
             ' summaries')
     return summaries, parameters
 
@@ -122,7 +158,7 @@ def run_inference(x, theta, cfg, out_dir):
     return posterior, histories
 
 
-def run_validation(posterior, history, x, theta, out_dir):
+def run_validation(posterior, history, x, theta, out_dir, names=None):
     logging.info('Running validation...')
 
     # Plot training history
@@ -137,21 +173,21 @@ def run_validation(posterior, history, x, theta, out_dir):
     xobs, thetaobs = x[0], theta[0]
     metric = PlotSinglePosterior(
         num_samples=1000, sample_method='direct',
-        labels=['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
+        labels=names
     )
     metric(posterior, x_obs=xobs, theta_fid=thetaobs)
 
     # Posterior coverage
     metric = PosteriorCoverage(
         num_samples=1000, sample_method='direct',
-        labels=['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8'],
+        labels=names,
         plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
         out_dir=out_dir
     )
     metric(posterior, x, theta)
 
 
-def Pk_pipeline(x, theta, cfg, model_path):
+def Pk_pipeline(x, theta, cfg, model_path, names=None):
     for kmax in cfg.infer.Pk.kmax:
         xi, thetai = deepcopy(x), deepcopy(theta)
         logging.info(f'Running inference for Pk with kmax={kmax}')
@@ -162,7 +198,8 @@ def Pk_pipeline(x, theta, cfg, model_path):
 
         posterior, history = run_inference(x_train, theta_train, cfg, out_dir)
 
-        run_validation(posterior, history, x_test, theta_test, out_dir)
+        run_validation(posterior, history, x_test,
+                       theta_test, out_dir, names=names)
 
 
 @timing_decorator
@@ -176,24 +213,39 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
-    model_path = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
+    model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
+
+    cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
+    hodnames = [r'$\alpha$', r'$\log M_0$', r'$\log M_1$',
+                r'$\log M_{\min}$', r'$\sigma_{\log M}$']  # TODO: load these from file?
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
+        save_path = join(model_dir, 'halo')
         summaries, parameters = load_halo_summaries(
             suite_path, cfg.nbody.af, cfg.infer.Nmax)
         for key in summaries:
             if 'Pk' in key:
                 x, theta = summaries[key], parameters[key]
-                Pk_pipeline(x, theta, cfg, model_path)
+                Pk_pipeline(x, theta, cfg, save_path, names=cosmonames)
             else:
                 raise NotImplementedError  # TODO: implement other summaries+combos
     else:
         logging.info('Skipping halo inference...')
 
-    if cfg.infer.galaxies:
+    if cfg.infer.galaxy:
         logging.info('Running galaxies inference...')
-        pass
+        save_path = join(model_dir, 'galaxy')
+        summaries, parameters = load_galaxy_summaries(
+            suite_path, cfg.nbody.af, cfg.infer.Nmax)
+        for key in summaries:
+            if 'Pk' in key:
+                x, theta = summaries[key], parameters[key]
+                Pk_pipeline(x, theta, cfg, save_path, names=cosmonames+hodnames)
+            else:
+                raise NotImplementedError  # TODO: implement other summaries+combos
+    else:
+        logging.info('Skipping galaxy inference...')
 
 
 if __name__ == "__main__":

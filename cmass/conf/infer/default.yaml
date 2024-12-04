@@ -3,7 +3,7 @@ halo: True      # whether to train on halo summaries
 galaxy: True    # whether to train on galaxy summaries
 lightcone: False # whether to train on lightcone summaries
 
-Nmax: 500  # maximum number of simulations to use for training (-1 for all)
+Nmax: 1000  # maximum number of simulations to use for training (-1 for all)
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 
@@ -12,7 +12,7 @@ prior: Uniform  # prior to use for training (only uniform)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 nets:
-  - model: maf
+  - model: nsf
     hidden_features: 32
     num_transforms: 4
 
@@ -25,4 +25,4 @@ device: cpu  # cpu or cuda
 # filters
 Pk:
   kmax: [0.1, 0.2, 0.3, 0.4]  # kmax values to use for training
-  poles: [0]         # Pk poles to use for training (0 = monopole, 1 = quadrupole, 2 = hexadecapole)
+  poles: [0,1,2]         # Pk poles to use for training (0 = monopole, 1 = quadrupole, 2 = hexadecapole)
