@@ -50,11 +50,13 @@ def get_halo_Pk(source_path, a):
     summ['cosmo'] = get_cosmo(source_path)
     return summ
 
-def load_halo_summaries(suitepath, a):
+def load_halo_summaries(suitepath, a, Nmax):
     logging.info(f'Looking for halo summaries at {suitepath}')
 
     simpaths = os.listdir(suitepath)
-    # simpaths = simpaths[:100]  # for testing
+    simpaths.sort(key=lambda x: int(x))  # sort by lhid
+    if Nmax >= 0:
+        simpaths = simpaths[:Nmax]
     summaries, parameters, meta = defaultdict(list), defaultdict(list), defaultdict(list)
     for lhid in tqdm(simpaths):
         summ = get_halo_Pk(join(suitepath, lhid), a)
@@ -207,7 +209,9 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
-        summaries, parameters, meta = load_halo_summaries(suite_path, cfg.nbody.af)
+        summaries, parameters, meta = load_halo_summaries(
+            suite_path, cfg.nbody.af, cfg.infer.Nmax
+        )
         for key in summaries:
             for kmax in cfg.infer.kmax:
                 logging.info(f'Running inference for {key} with kmax={kmax}')
