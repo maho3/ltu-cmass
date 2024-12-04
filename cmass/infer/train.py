@@ -29,19 +29,21 @@ def get_cosmo(source_path):
     cfg = OmegaConf.load(join(source_path, 'config.yaml'))
     return np.array(cfg.nbody.cosmo)
 
+
 def get_halo_Pk(source_path, a):
     diag_file = join(source_path, 'diag', 'halos.h5')
     a = f'{a:.6f}'
     if not os.path.exists(diag_file):
         return {}
-    
+
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
                     summ[stat] = f[a][stat][:]
-                    if stat+'_k' in f[a]:  # backwards compatibility  (todo: remove)
+                    # backwards compatibility  (todo: remove)
+                    if stat+'_k' in f[a]:
                         summ[stat+'_k'] = f[a][stat+'_k'][:]
                     elif stat+'_k3D' in f[a]:
                         summ[stat+'_k'] = f[a][stat+'_k3D'][:]
@@ -50,6 +52,7 @@ def get_halo_Pk(source_path, a):
     summ['cosmo'] = get_cosmo(source_path)
     return summ
 
+
 def load_halo_summaries(suitepath, a, Nmax):
     logging.info(f'Looking for halo summaries at {suitepath}')
 
@@ -57,7 +60,8 @@ def load_halo_summaries(suitepath, a, Nmax):
     simpaths.sort(key=lambda x: int(x))  # sort by lhid
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
-    summaries, parameters, meta = defaultdict(list), defaultdict(list), defaultdict(list)
+    summaries, parameters, meta = defaultdict(
+        list), defaultdict(list), defaultdict(list)
     for lhid in tqdm(simpaths):
         summ = get_halo_Pk(join(suitepath, lhid), a)
         for key in ['Pk', 'zPk']:
@@ -72,7 +76,7 @@ def load_halo_summaries(suitepath, a, Nmax):
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {len(simpaths)} {key}'
-            ' summaries')  
+            ' summaries')
     return summaries, parameters, meta
 
 
@@ -100,11 +104,13 @@ def preprocess(x, Pk_poles):
 
     return x
 
+
 def split_train_test(x, theta, test_frac):
     cutoff = int(len(x) * (1 - test_frac))
     x_train, x_test = x[:cutoff], x[cutoff:]
     theta_train, theta_test = theta[:cutoff], theta[cutoff:]
     return x_train, x_test, theta_train, theta_test
+
 
 def run_inference(x, theta, cfg, out_dir):
     loader = NumpyLoader(x=x, theta=theta)
@@ -119,7 +125,7 @@ def run_inference(x, theta, cfg, out_dir):
         raise NotImplementedError
 
     embedding = FCN(
-        n_hidden=cfg.infer.fcn_hidden, 
+        n_hidden=cfg.infer.fcn_hidden,
         act_fn='ReLU'
     )
 
@@ -164,6 +170,7 @@ def run_inference(x, theta, cfg, out_dir):
 
     return posterior, histories
 
+
 def run_validation(posterior, history, x, theta, out_dir):
     logging.info('Running validation...')
 
@@ -175,7 +182,6 @@ def run_validation(posterior, history, x, theta, out_dir):
     ax.legend()
     f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
 
-
     # Plotting single posterior
     xobs, thetaobs = x[0], theta[0]
     metric = PlotSinglePosterior(
@@ -186,9 +192,9 @@ def run_validation(posterior, history, x, theta, out_dir):
 
     # Posterior coverage
     metric = PosteriorCoverage(
-        num_samples=1000, sample_method='direct', 
+        num_samples=1000, sample_method='direct',
         labels=['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8'],
-        plot_list = ["coverage", "histogram", "predictions", "tarp", "logprob"],
+        plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
         out_dir=out_dir
     )
     metric(posterior, x, theta)
@@ -197,7 +203,7 @@ def run_validation(posterior, history, x, theta, out_dir):
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
@@ -222,7 +228,8 @@ def main(cfg: DictConfig) -> None:
                 x_train, x_test, theta_train, theta_test = \
                     split_train_test(x, theta, cfg.infer.test_frac)
 
-                posterior, history = run_inference(x_train, theta_train, cfg, out_dir)
+                posterior, history = run_inference(
+                    x_train, theta_train, cfg, out_dir)
 
                 run_validation(posterior, history, x_test, theta_test, out_dir)
     else:
