@@ -8,13 +8,14 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import h5py
 from collections import defaultdict
 from tqdm import tqdm
+from copy import deepcopy
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
+from .loaders import get_cosmo, load_Pk, preprocess_Pk
 
 import ili
 from ili.dataloaders import NumpyLoader
@@ -25,87 +26,37 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def get_cosmo(source_path):
-    cfg = OmegaConf.load(join(source_path, 'config.yaml'))
-    return np.array(cfg.nbody.cosmo)
-
-
-def get_halo_Pk(source_path, a):
-    diag_file = join(source_path, 'diag', 'halos.h5')
-    a = f'{a:.6f}'
-    if not os.path.exists(diag_file):
-        return {}
-
-    summ = {}
-    try:
-        with h5py.File(diag_file, 'r') as f:
-            for stat in ['Pk', 'zPk']:
-                if stat in f[a]:
-                    summ[stat] = f[a][stat][:]
-                    # backwards compatibility  (todo: remove)
-                    if stat+'_k' in f[a]:
-                        summ[stat+'_k'] = f[a][stat+'_k'][:]
-                    elif stat+'_k3D' in f[a]:
-                        summ[stat+'_k'] = f[a][stat+'_k3D'][:]
-    except OSError:
-        return {}
-    summ['cosmo'] = get_cosmo(source_path)
-    return summ
-
-
 def load_halo_summaries(suitepath, a, Nmax):
     logging.info(f'Looking for halo summaries at {suitepath}')
-
     simpaths = os.listdir(suitepath)
     simpaths.sort(key=lambda x: int(x))  # sort by lhid
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
-    summaries, parameters, meta = defaultdict(
-        list), defaultdict(list), defaultdict(list)
+
+    summlist, paramlist = [], []
     for lhid in tqdm(simpaths):
-        summ = get_halo_Pk(join(suitepath, lhid), a)
-        for key in ['Pk', 'zPk']:
-            if key in summ:
-                summaries[key].append(summ[key])
-                parameters[key].append(summ['cosmo'])
-                meta[key].append(summ[key+'_k'])
-    summaries = {key: np.array(val) for key, val in summaries.items()}
-    parameters = {key: np.array(val) for key, val in parameters.items()}
-    meta = {key: np.array(val) for key, val in meta.items()}
+        sourcepath = join(suitepath, lhid)
+        diagfile = join(sourcepath, 'diag', 'halos.h5')
+        summ = load_Pk(diagfile, a)  # TODO: load other summaries
+        if len(summ) > 0:
+            summlist.append(summ)
+            paramlist.append(get_cosmo(sourcepath))
+
+    summaries, parameters = defaultdict(list), defaultdict(list)
+    for summ, param in zip(summlist, paramlist):
+        for key in summ:
+            summaries[key].append(summ[key])
+            parameters[key].append(param)
 
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {len(simpaths)} {key}'
             ' summaries')
-    return summaries, parameters, meta
-
-
-def cut_kmax(x, k, kmax):
-    if kmax is None:
-        return x
-    if len(k.shape) > 1:
-        k = k[0]
-    mask = k < kmax
-    return x[:, mask, ...]
-
-
-def preprocess(x, Pk_poles):
-    # only use desired poles
-    x = x[..., Pk_poles]
-
-    # log transform
-    x = np.log(x + 1e-5)
-
-    # impute nans
-    x = np.nan_to_num(x, nan=0.0)
-
-    # flatten
-    x = x.reshape(len(x), -1)
-
-    return x
+    return summaries, parameters
 
 
 def split_train_test(x, theta, test_frac):
+    x, theta = np.array(x), np.array(theta)
     cutoff = int(len(x) * (1 - test_frac))
     x_train, x_test = x[:cutoff], x[cutoff:]
     theta_train, theta_test = theta[:cutoff], theta[cutoff:]
@@ -200,6 +151,20 @@ def run_validation(posterior, history, x, theta, out_dir):
     metric(posterior, x, theta)
 
 
+def Pk_pipeline(x, theta, cfg, model_path):
+    for kmax in cfg.infer.Pk.kmax:
+        xi, thetai = deepcopy(x), deepcopy(theta)
+        logging.info(f'Running inference for Pk with kmax={kmax}')
+        out_dir = join(model_path, 'Pk', f'kmax={kmax}')
+        xi = preprocess_Pk(xi, kmax, cfg.infer.Pk.poles)
+        x_train, x_test, theta_train, theta_test = \
+            split_train_test(xi, thetai, cfg.infer.test_frac)
+
+        posterior, history = run_inference(x_train, theta_train, cfg, out_dir)
+
+        run_validation(posterior, history, x_test, theta_test, out_dir)
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -215,25 +180,20 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
-        summaries, parameters, meta = load_halo_summaries(
-            suite_path, cfg.nbody.af, cfg.infer.Nmax
-        )
+        summaries, parameters = load_halo_summaries(
+            suite_path, cfg.nbody.af, cfg.infer.Nmax)
         for key in summaries:
-            for kmax in cfg.infer.kmax:
-                logging.info(f'Running inference for {key} with kmax={kmax}')
-                out_dir = join(model_path, 'halos', f'{key}', f'kmax-{kmax}')
+            if 'Pk' in key:
                 x, theta = summaries[key], parameters[key]
-                x = cut_kmax(x, meta[key], kmax)
-                x = preprocess(x, cfg.infer.Pk_poles)
-                x_train, x_test, theta_train, theta_test = \
-                    split_train_test(x, theta, cfg.infer.test_frac)
-
-                posterior, history = run_inference(
-                    x_train, theta_train, cfg, out_dir)
-
-                run_validation(posterior, history, x_test, theta_test, out_dir)
+                Pk_pipeline(x, theta, cfg, model_path)
+            else:
+                raise NotImplementedError  # TODO: implement other summaries+combos
     else:
         logging.info('Skipping halo inference...')
+
+    if cfg.infer.galaxies:
+        logging.info('Running galaxies inference...')
+        pass
 
 
 if __name__ == "__main__":
