@@ -7,6 +7,7 @@ defaults:
   - survey: cmass_ngc
   # - filter: random  # not default
   - diag: default
+  - infer: default
   - _self_
 
 # What base sim to use

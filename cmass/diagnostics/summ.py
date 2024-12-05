@@ -145,6 +145,7 @@ def run_summarizer(
             zbox_catalogue, group, summ,
             box_size, grid_size, threads, use_rsd=True)
 
+
 def save_configuration(file, config, save_HOD=True):
     file.attrs['config'] = OmegaConf.to_yaml(config)
     file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
@@ -158,8 +159,9 @@ def save_configuration(file, config, save_HOD=True):
         file.attrs['HOD_names'] = keys
         file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
 
+
 def summarize_rho(
-    source_path, L, 
+    source_path, L,
     threads=16, from_scratch=True,
     config=None
 ):
@@ -249,7 +251,8 @@ def summarize_tracer(
                 mass = None
                 if density is not None:
                     if proxy is None:
-                        logging.warning('Proxy is set to None. Not rank-ordering.')
+                        logging.warning(
+                            'Proxy is set to None. Not rank-ordering.')
                         mass = np.arange(len(pos))
                         np.random.shuffle(mass)
                     else:
@@ -308,7 +311,7 @@ def summarize_tracer(
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
