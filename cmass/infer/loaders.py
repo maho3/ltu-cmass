@@ -17,6 +17,15 @@ def get_hod(diagfile):
     return hod_params
 
 
+def get_hod_legacy(diagfile):
+    with h5py.File(diagfile, 'r') as f:
+        hod_params = [
+            f.attrs['alpha'], f.attrs['logM0'], f.attrs['logM1'],
+            f.attrs['logMmin'], f.attrs['sigma_logM']
+        ]
+    return hod_params
+
+
 def load_Pk(diag_file, a):
     a = f'{a:.6f}'
     if not os.path.exists(diag_file):
@@ -26,23 +35,22 @@ def load_Pk(diag_file, a):
         with h5py.File(diag_file, 'r') as f:
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
-                    summ[stat] = {
-                        'k': f[a][stat+'_k3D'][:],
-                        'value': f[a][stat][:],
-                    }
+                    for i in range(3):  # monopole, quadrupole, hexadecapole
+                        summ[stat+str(2*i)] = {
+                            'k': f[a][stat+'_k3D'][:],
+                            'value': f[a][stat][:, i],
+                        }
     except (OSError, KeyError):
         return {}
     return summ
 
 
-def preprocess_Pk(X, kmax, poles=[0]):
+def preprocess_Pk(X, kmax):
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
-        # only use desired poles
-        value = value[..., poles]
         # cut k
-        value = value[k < kmax, ...]
+        value = value[k <= kmax]
         Xout.append(value)
     Xout = np.array(Xout)
 
