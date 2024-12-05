@@ -10,7 +10,6 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
-from copy import deepcopy
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
@@ -237,6 +236,7 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
     name = '+'.join(exp.summary)
     for kmax in exp.kmax:
         logging.info(f'Running inference for {name} with kmax={kmax}')
+        exp_path = join(model_path, f'kmax-{kmax}')
         xs = []
         for summ in exp.summary:
             x, theta = summaries[summ], parameters[summ]
@@ -257,11 +257,11 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
 
         # run inference
         posterior, history = run_inference(
-            x_train, theta_train, cfg, model_path)
+            x_train, theta_train, cfg, exp_path)
 
         # run validation
         run_validation(posterior, history, x_test, theta_test,
-                       model_path, names=names)
+                       exp_path, names=names)
 
 
 @timing_decorator

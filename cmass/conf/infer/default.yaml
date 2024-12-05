@@ -6,7 +6,7 @@ galaxy: True    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
 
-Nmax: -1  # maximum number of simulations to use for training (-1 for all)
+Nmax: 1000  # maximum number of simulations to use for training (-1 for all)
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 
@@ -21,13 +21,13 @@ nets:
 
 fcn_hidden: [64, 32, 16]  # hidden layer sizes for the FCN
 batch_size: 64  # batch size
-learning_rate: 1e-4  # learning rate
+learning_rate: 1e-3  # learning rate
 
 device: cpu  # cpu or cuda
 
 experiments:
-  # - summary: [Pk0]   # monopole
-  #   kmax: [0.1, 0.2, 0.3, 0.4]
+  - summary: [Pk0]   # monopole
+    kmax: [0.1, 0.2, 0.3, 0.4]
   - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
     kmax: [0.1, 0.2, 0.3, 0.4]
   - summary: [zPk0, zPk2, zPk4]  # redshift-space monopole, quadrupole, hexadecapole
