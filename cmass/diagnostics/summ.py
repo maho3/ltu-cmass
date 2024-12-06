@@ -332,37 +332,48 @@ def main(cfg: DictConfig) -> None:
     all_done = True
 
     # measure rho diagnostics
-    done = summarize_rho(
-        source_path, cfg.nbody.L,
-        threads=threads, from_scratch=from_scratch,
-        config=cfg
-    )
-    all_done &= done
+    if cfg.diag.rho:
+        done = summarize_rho(
+            source_path, cfg.nbody.L,
+            threads=threads, from_scratch=from_scratch,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping rho diagnostics')
+
+    # set mesh resolution
+    N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
 
     # measure halo diagnostics
-    N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
-    done = summarize_tracer(
-        source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
-        density=cfg.diag.halo_density,
-        proxy=cfg.diag.halo_proxy,
-        threads=threads, from_scratch=from_scratch,
-        type='halo',
-        summaries=summaries,
-        config=cfg
-    )
-    all_done &= done
+    if cfg.diag.halo:
+        done = summarize_tracer(
+            source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
+            density=cfg.diag.halo_density,
+            proxy=cfg.diag.halo_proxy,
+            threads=threads, from_scratch=from_scratch,
+            type='halo',
+            summaries=summaries,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping halo diagnostics')
 
     # measure galaxy diagnostics
-    done = summarize_tracer(
-        source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
-        density=cfg.diag.galaxy_density,
-        proxy=cfg.diag.galaxy_proxy,
-        threads=threads, from_scratch=from_scratch,
-        type='galaxy', hod_seed=cfg.bias.hod.seed,
-        summaries=summaries,
-        config=cfg
-    )
-    all_done &= done
+    if cfg.diag.galaxy:
+        done = summarize_tracer(
+            source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
+            density=cfg.diag.galaxy_density,
+            proxy=cfg.diag.galaxy_proxy,
+            threads=threads, from_scratch=from_scratch,
+            type='galaxy', hod_seed=cfg.bias.hod.seed,
+            summaries=summaries,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping galaxy diagnostics')
 
     if all_done:
         logging.info('All diagnostics computed successfully')
