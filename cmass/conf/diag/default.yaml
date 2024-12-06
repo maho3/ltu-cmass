@@ -6,6 +6,8 @@ from_scratch: true
 density: true
 halo: true
 galaxy: true
+ngc_lightcone: false
+sgc_lightcone: false
 
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
