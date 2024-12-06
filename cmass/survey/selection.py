@@ -127,7 +127,7 @@ def reweight(rdz, wdir='./data', is_North=True, be=None, hobs=None):
         # load observed n(z)
         n_z = np.load(
             join(wdir, 'obs',
-                  'n-z_DR12v5_CMASS_North.npy' if is_North else 'n-z_DR12v5_CMASS_South.npy'),
+                 'n-z_DR12v5_CMASS_North.npy' if is_North else 'n-z_DR12v5_CMASS_South.npy'),
             allow_pickle=True).item()
         be, hobs = n_z['be'], n_z['h']
 
