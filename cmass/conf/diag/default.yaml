@@ -2,6 +2,11 @@
 # whether to calculate diagnostics from scratch, overwriting existing files
 from_scratch: true
 
+# whether to compute for each tracer
+density: true
+halo: true
+galaxy: true
+
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
 
