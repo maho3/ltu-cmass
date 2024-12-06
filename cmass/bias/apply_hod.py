@@ -25,11 +25,11 @@ import os
 from os.path import join
 import hydra
 import h5py
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf
 from .tools.hod import (
     build_halo_catalog, build_HOD_model, parse_hod)
 from ..utils import (
-    get_source_path, timing_decorator, load_params, cosmo_to_astropy, save_cfg)
+    get_source_path, timing_decorator, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
 
 
@@ -37,7 +37,7 @@ from ..nbody.tools import parse_nbody_config
 def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, zf,
-    model, theta, 
+    model, theta,
     hmeta=None,
     seed=0, mdef='vir'
 ):
