@@ -324,6 +324,7 @@ def summarize_lightcone(
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info(f'{cap}_lightcone diagnostics already computed')
         return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # check for file keys
     filename = join(source_path, postfix)
@@ -361,15 +362,21 @@ def summarize_lightcone(
                 pos += [2000, 1800, 250]
                 # set length scale of grid (range is about 1750, 3350, 1900)
                 L = 3500
-                N = int(L/1000*128)
-
-                if np.any(pos < 0) or np.any(pos > L):
-                    logging.error('Error! Some tracers outside of box!')
-                    return False
             elif cap == 'sgc':
-                raise NotImplementedError
+                # offset to center (min is about 800, -1275, -375)
+                pos += [-600, 1400, 400]
+                # set length scale of grid (range is about 1750, 3350, 1900)
+                L = 2750
             else:
                 raise ValueError
+
+            # Check if all tracers are inside the box
+            if np.any(pos < 0) or np.any(pos > L):
+                logging.error('Error! Some tracers outside of box!')
+                return False
+
+            # Set mesh resolution
+            N = int(L/1000*128)
 
             # Compute P(k)
             if 'Pk' in summaries:
@@ -458,7 +465,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping galaxy diagnostics')
 
     # measure lightcone diagnostics
-    if cfg.diag.ngc_lightcone:
+    if cfg.diag.ngc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
             cap='ngc',
@@ -470,7 +477,7 @@ def main(cfg: DictConfig) -> None:
         all_done &= done
     else:
         logging.info('Skipping ngc_lightcone diagnostics')
-    if cfg.diag.sgc_lightcone:
+    if cfg.diag.sgc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
             cap='sgc',

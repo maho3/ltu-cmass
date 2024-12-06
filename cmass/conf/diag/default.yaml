@@ -3,11 +3,11 @@
 from_scratch: true
 
 # whether to compute for each tracer
-density: true
-halo: true
-galaxy: true
-ngc_lightcone: false
-sgc_lightcone: false
+density: false
+halo: false
+galaxy: false
+ngc: false
+sgc: false
 
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
