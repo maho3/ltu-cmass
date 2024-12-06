@@ -218,7 +218,7 @@ def BOSS_redshift(z):
 
 def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
     """Fiber collision mask for BOSS galaxies as described in arXiv:2211.00723"""
-    
+
     c = SkyCoord(ra=ra, dec=dec, unit=u.degree)
     seplimit = sep*u.degree
     m1, m2, _, _ = search_around_sky(c, c, seplimit)
@@ -231,7 +231,8 @@ def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
     if mode == 1:
 
         # pairs are double counted by search_around_sky. This selects the unique pairs
-        _, ipair = np.unique(np.min(np.array([m1, m2]), axis=0), return_index=True)
+        _, ipair = np.unique(
+            np.min(np.array([m1, m2]), axis=0), return_index=True)
 
         # only ~60% of galaxies within the angular scale are fiber collided
         # since 40% are in overlapping regions with substantially lower
@@ -251,9 +252,8 @@ def BOSS_fiber(ra, dec, sep=0.01722, mode=1):
 
     else:
         raise ValueError(f'Fiber collision type {mode} is not valid.')
-    
-    return mask
 
+    return mask
 
 
 def BOSS_area(wdir='./data'):

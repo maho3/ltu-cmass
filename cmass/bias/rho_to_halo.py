@@ -218,7 +218,8 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
                 l += 1
 
     # Combine the outputs
-    hposs, hmasss, hvels, hconcs = map(np.concatenate, [hposs, hmasss, hvels, hconcs])
+    hposs, hmasss, hvels, hconcs = map(
+        np.concatenate, [hposs, hmasss, hvels, hconcs])
 
     # ensure periodicity
     hposs = hposs % L

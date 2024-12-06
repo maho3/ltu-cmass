@@ -50,7 +50,7 @@ def parse_hod(cfg):
                     'simulation. So, changing mass definition configuration to '
                     '200c.')
                 cfg.bias.hod.mdef = '200c'
-        elif cfg.sim=='pinocchio':
+        elif cfg.sim == 'pinocchio':
             if cfg.bias.hod.mdef != 'vir':
                 logging.warning(
                     f'Configuration specified a {cfg.bias.hod.mdef} mass '
@@ -58,7 +58,7 @@ def parse_hod(cfg):
                     'simulation. So, changing mass definition configuration to '
                     'vir.')
                 cfg.bias.hod.mdef = 'vir'
-       
+
         # Check model is available
         if not hasattr(cfg.bias.hod, 'model'):
             model = Zheng07()  # for backwards compatibility
@@ -83,12 +83,12 @@ def parse_hod(cfg):
                 # If -1, set to some random value
                 if cfg.bias.hod.seed == -1:
                     cfg.bias.hod.seed = np.random.randint(0, 1e5)
-                
+
                 # If 0, don't change default values
                 if cfg.bias.hod.seed > 0:
                     # Set numpy seed
                     np.random.seed(cfg.bias.hod.seed)
-                    
+
                     # Sample parameters from the HOD model
                     model.sample_parameters()
 
@@ -98,11 +98,10 @@ def parse_hod(cfg):
                 if hasattr(cfg.bias.hod.theta, key):
                     param = float(getattr(cfg.bias.hod.theta, key))
                     model.set_parameter(key, param)
-     
 
         # Get the parameter values
         cfg.bias.hod.theta = model.get_parameters()
-        
+
         # Check if any values are None
         for k, v in cfg.bias.hod.theta.items():
             if v is None:
@@ -117,6 +116,7 @@ class Hod_parameter:
     Helper class defining a HOD parameter, including the value
     and upper and lower bounds (for a flat prior)
     """
+
     def __init__(self, key, value=None, upper=None, lower=None):
         self.key = key
         self.value = value
@@ -129,6 +129,7 @@ class Hod_model:
     Parent class defining a HOD model.
     Includes methods for setting, getting and sampling parameters.
     """
+
     def __init__(self, parameters, lower_bound, upper_bound):
         self.parameters = parameters
 
@@ -188,11 +189,12 @@ class Zheng07(Hod_model):
     """
     Zheng+07 HOD model
     """
+
     def __init__(
         self,
-        parameters = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
-        lower_bound = np.array([12.0, 0.1, 13.0, 13.0, 0.]),
-        upper_bound = np.array([14.0, 0.6, 15.0, 15.0, 1.5]),
+        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
+        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.]),
+        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5]),
         param_defaults=None
     ):
         super().__init__(parameters, lower_bound, upper_bound)
@@ -210,7 +212,6 @@ class Zheng07(Hod_model):
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
-
 
     def parejko2013_lowz(self):
         """
@@ -274,9 +275,10 @@ class Leauthaud11(Hod_model):
     """
     Leauthaud+11 HOD model
     """
+
     def __init__(
         self,
-        parameters = [
+        parameters=[
             'smhm_m0_0',
             'smhm_m0_a',
             'smhm_m1_0',
@@ -294,10 +296,11 @@ class Leauthaud11(Hod_model):
             'betacut',
             'bcut'
         ],
-        lower_bound = np.array([
-            10.0, -1.0, 12.0, -0.5, 0.3, -0.1, 0.5, -0.4, 1.0, 0.5, 0.1, 0, 0.5, 10.0, -0.2, 1.0,
+        lower_bound=np.array([
+            10.0, -1.0, 12.0, -0.5, 0.3, -0.1, 0.5, -
+            0.4, 1.0, 0.5, 0.1, 0, 0.5, 10.0, -0.2, 1.0,
         ]),
-        upper_bound = np.array([
+        upper_bound=np.array([
             11.0, 1.0, 13.0, 0.8, 0.6, 0.4, 0.8, 0.6, 1.8, 3.0, 0.2, 1.5, 1.3, 11.0, 0.1, 2.0,
         ]),
         param_defaults=None
@@ -326,8 +329,8 @@ class Leauthaud11(Hod_model):
             'smhm_beta_0': 0.44,
             'smhm_beta_a': 0.18,
             'smhm_delta_0': 0.57,
-            'smhm_delta_a': 0.17, 
-            'smhm_gamma_0': 1.56, 
+            'smhm_delta_a': 0.17,
+            'smhm_gamma_0': 1.56,
             'smhm_gamma_a': 2.51,
             'scatter_model_param1': 0.15,
             'alphasat': 1,
@@ -337,14 +340,16 @@ class Leauthaud11(Hod_model):
             'bcut': 1.47,
         }
         self.set_parameters(p_hod)
-    
+
+
 class Zu_mandelbaum15(Hod_model):
     """
     Zu & Mandelbaum+15 HOD model
     """
+
     def __init__(
         self,
-        parameters = [
+        parameters=[
             'smhm_m0',
             'smhm_m1',
             'smhm_beta',
@@ -358,11 +363,11 @@ class Zu_mandelbaum15(Hod_model):
             'betacut',
             'bcut',
         ],
-        lower_bound = np.array([
+        lower_bound=np.array([
             9.0, 9.5, 0.0, 0.0, -0.1, 0.01, -0.4, 0.5, 0.1, 0.01, -0.05, 0.0,
         ]),
-        upper_bound = np.array([
-            13.0, 14.0, 2.0, 1.5, 4.9, 3.0, 0.4, 1.5, 1.8, 25.0, 1.50, 6.0, 
+        upper_bound=np.array([
+            13.0, 14.0, 2.0, 1.5, 4.9, 3.0, 0.4, 1.5, 1.8, 25.0, 1.50, 6.0,
         ]),
         param_defaults=None
     ):
@@ -376,7 +381,6 @@ class Zu_mandelbaum15(Hod_model):
             else:
                 raise NotImplementedError
 
-    
     def zu_mandelbaum15(self):
         """
         Zu \& Mandelbaum+15, arXiv:1505.02781
@@ -511,7 +515,7 @@ def build_HOD_model(
         cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, redshift=zf)
         satocc = Leauthaud11Sats(
             prim_haloprop_key=mkey,
-            cenocc_model=cenocc,redshift=zf,
+            cenocc_model=cenocc, redshift=zf,
         )
     elif model == 'zu_mandelbaum15':
         cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, redshift=zf)
@@ -522,7 +526,7 @@ def build_HOD_model(
         hod_params['smhm_m1'] = 10**hod_params['smhm_m1']
     else:
         raise NotImplementedError
-    
+
     # Set HOD parameters
     cenocc.param_dict.update(hod_params)
     satocc.param_dict.update(hod_params)
