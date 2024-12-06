@@ -171,6 +171,7 @@ def summarize_rho(
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('rho diagnostics already computed')
         return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # check for file keys
     filename = join(source_path, 'nbody.h5')
@@ -214,6 +215,7 @@ def summarize_tracer(
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info(f'{type} diagnostics already computed')
         return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # check for file keys
     filename = join(source_path, postfix)
