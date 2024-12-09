@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=mtnglike_bias   # Job name
+#SBATCH --job-name=abacuslike_bias   # Job name
 #SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
@@ -22,14 +22,14 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=mtnglike
+nbody=abacuslike
 sim=fastpm
 multisnapshot=False
 diag_from_scratch=False
-rm_galaxies=True
+rm_galaxies=False
 extras="nbody.zf=0.500015"
-L=3000
-N=384
+L=2000
+N=256
 
 outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
@@ -70,14 +70,14 @@ for offset in 0 1000; do
         for aug_seed in $(seq 0 $(($Naug-1))); do
             printf -v aug_str "%05d" $aug_seed
             # lightcone
-            file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
             if [ -f $file ]; then
                 echo "File $file exists."
             else
                 echo "File $file does not exist."
-                python -m cmass.survey.lightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+                python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
             fi
-            python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
         # Trash collection
@@ -88,7 +88,7 @@ for offset in 0 1000; do
 
             # lightcone
             echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/ngc_lightcone/hod${hod_str}_aug*.h5
+            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done
