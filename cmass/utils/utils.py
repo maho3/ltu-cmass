@@ -103,4 +103,3 @@ def cosmo_to_colossus(cpars):
     csm.addCosmology('myCosmo', **params)
     cosmo = csm.setCosmology('myCosmo')
     return cosmo
-

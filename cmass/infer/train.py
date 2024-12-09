@@ -109,7 +109,7 @@ def load_lightcone_summaries(suitepath, cap, a, Nmax):
             if len(summ) > 0:
                 try:
                     paramlist.append(np.concatenate(
-                        [get_cosmo(sourcepath), get_hod_legacy(diagfile)], axis=0))
+                        [get_cosmo(sourcepath), get_hod(diagfile)], axis=0))
                 except (OSError, KeyError):
                     continue
                 summlist.append(summ)

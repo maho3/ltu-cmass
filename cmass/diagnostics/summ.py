@@ -16,6 +16,7 @@ from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk
+from ..survey.tools import sky_to_xyz
 
 
 def get_binning(summary, L, N, threads, rsd=False):
@@ -170,6 +171,7 @@ def summarize_rho(
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info('rho diagnostics already computed')
         return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # check for file keys
     filename = join(source_path, 'nbody.h5')
@@ -213,6 +215,7 @@ def summarize_tracer(
     if (not from_scratch) and os.path.isfile(outpath):
         logging.info(f'{type} diagnostics already computed')
         return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # check for file keys
     filename = join(source_path, postfix)
@@ -308,14 +311,100 @@ def summarize_tracer(
     return True
 
 
-@timing_decorator
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def summarize_lightcone(
+    source_path, L, N, cosmo,
+    cap='ngc',
+    threads=16, from_scratch=True,
+    hod_seed=None, aug_seed=None,
+    summaries=['Pk'],
+    config=None
+):
+    postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
+
+    # check if diagnostics already computed
+    outpath = join(source_path, 'diag', postfix)
+    if (not from_scratch) and os.path.isfile(outpath):
+        logging.info(f'{cap}_lightcone diagnostics already computed')
+        return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
+
+    # check for file keys
+    filename = join(source_path, postfix)
+    if not os.path.isfile(filename):
+        logging.error(f'File not found: {filename}')
+        return False
+
+    os.makedirs(join(source_path, 'diag'), exist_ok=True)
+    os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+
+    # compute diagnostics and save
+    with h5py.File(filename, 'r') as f:
+        with h5py.File(outpath, 'w') as o:
+            if config is not None:
+                save_configuration(o, config, save_HOD=True)
+
+            # Load
+            ra = f['ra'][...]
+            dec = f['dec'][...]
+            z = f['z'][...]
+            rdz = np.vstack([ra, dec, z]).T
+
+            # convert to comoving
+            pos = sky_to_xyz(rdz, cosmo)
+
+            # noise positions (for CHARM)
+            pos += np.random.randn(*pos.shape) * 8/np.sqrt(3)
+
+            # convert to float32
+            pos = pos.astype(np.float32)
+
+            if cap == 'ngc':
+                # offset to center (min is about -1870, -1750, -120)
+                pos += [2000, 1800, 250]
+                # set length scale of grid (range is about 1750, 3350, 1900)
+                L = 3500
+            elif cap == 'sgc':
+                # offset to center (min is about 800, -1275, -375)
+                pos += [-600, 1400, 400]
+                # set length scale of grid (range is about 1750, 3350, 1900)
+                L = 2750
+            else:
+                raise ValueError
+
+            # Check if all tracers are inside the box
+            if np.any(pos < 0) or np.any(pos > L):
+                logging.error('Error! Some tracers outside of box!')
+                return False
+
+            # Set mesh resolution
+            N = int(L/1000*128)
+
+            # Compute P(k)
+            if 'Pk' in summaries:
+                field = MA(pos, L, N, MAS='NGP')
+                run_pylians(
+                    field, o, ['Pk'],
+                    L, axis=0, num_threads=threads, use_rsd=False
+                )
+
+            # Compute other summaries
+            others = [s for s in summaries if s != 'Pk']
+            if len(others) > 0:
+                run_summarizer(
+                    pos, np.zeros_like(pos), cosmo[2], z, L, N,
+                    o, others,
+                    threads
+                )
+    return True
+
+
+@ timing_decorator
+@ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
@@ -332,7 +421,7 @@ def main(cfg: DictConfig) -> None:
     all_done = True
 
     # measure rho diagnostics
-    if cfg.diag.rho:
+    if cfg.diag.all or cfg.diag.density:
         done = summarize_rho(
             source_path, cfg.nbody.L,
             threads=threads, from_scratch=from_scratch,
@@ -346,7 +435,7 @@ def main(cfg: DictConfig) -> None:
     N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
 
     # measure halo diagnostics
-    if cfg.diag.halo:
+    if cfg.diag.all or cfg.diag.halo:
         done = summarize_tracer(
             source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
             density=cfg.diag.halo_density,
@@ -361,7 +450,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping halo diagnostics')
 
     # measure galaxy diagnostics
-    if cfg.diag.galaxy:
+    if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
             density=cfg.diag.galaxy_density,
@@ -374,6 +463,32 @@ def main(cfg: DictConfig) -> None:
         all_done &= done
     else:
         logging.info('Skipping galaxy diagnostics')
+
+    # measure lightcone diagnostics
+    if cfg.diag.all or cfg.diag.ngc:
+        done = summarize_lightcone(
+            source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
+            cap='ngc',
+            threads=threads, from_scratch=from_scratch,
+            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+            summaries=summaries,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping ngc_lightcone diagnostics')
+    if cfg.diag.all or cfg.diag.sgc:
+        done = summarize_lightcone(
+            source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
+            cap='sgc',
+            threads=threads, from_scratch=from_scratch,
+            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+            summaries=summaries,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping sgc_lightcone diagnostics')
 
     if all_done:
         logging.info('All diagnostics computed successfully')
