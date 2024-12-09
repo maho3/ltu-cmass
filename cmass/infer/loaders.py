@@ -17,15 +17,6 @@ def get_hod(diagfile):
     return hod_params
 
 
-def get_hod_legacy(diagfile):
-    with h5py.File(diagfile, 'r') as f:
-        hod_params = [
-            f.attrs['alpha'], f.attrs['logM0'], f.attrs['logM1'],
-            f.attrs['logMmin'], f.attrs['sigma_logM']
-        ]
-    return hod_params
-
-
 def load_Pk(diag_file, a):
     a = f'{a:.6f}'
     if not os.path.exists(diag_file):
