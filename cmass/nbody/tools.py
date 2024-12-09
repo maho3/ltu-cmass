@@ -48,7 +48,8 @@ def parse_nbody_config(cfg):
         nbody.matchIC = nbody.matchIC > 0  # whether to match ICs to file
 
         # default asave
-        if ((not cfg.multisnapshot) or ('asave' not in nbody) or (len(nbody.asave) == 0)):
+        if ((not cfg.multisnapshot) or ('asave' not in nbody) or
+                (len(nbody.asave) == 0)):
             nbody.asave = [nbody.af]
 
         # load cosmology

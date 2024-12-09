@@ -3,6 +3,7 @@
 from_scratch: true
 
 # whether to compute for each tracer
+all: false
 density: false
 halo: false
 galaxy: false

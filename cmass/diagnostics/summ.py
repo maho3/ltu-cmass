@@ -334,7 +334,6 @@ def summarize_lightcone(
         logging.error(f'File not found: {filename}')
         return False
 
-    logging.info(f'Computing diagnostics to save to: {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
 
@@ -402,11 +401,10 @@ def summarize_lightcone(
 @ timing_decorator
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
@@ -423,7 +421,7 @@ def main(cfg: DictConfig) -> None:
     all_done = True
 
     # measure rho diagnostics
-    if cfg.diag.density:
+    if cfg.diag.all or cfg.diag.density:
         done = summarize_rho(
             source_path, cfg.nbody.L,
             threads=threads, from_scratch=from_scratch,
@@ -437,7 +435,7 @@ def main(cfg: DictConfig) -> None:
     N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
 
     # measure halo diagnostics
-    if cfg.diag.halo:
+    if cfg.diag.all or cfg.diag.halo:
         done = summarize_tracer(
             source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
             density=cfg.diag.halo_density,
@@ -452,7 +450,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping halo diagnostics')
 
     # measure galaxy diagnostics
-    if cfg.diag.galaxy:
+    if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
             density=cfg.diag.galaxy_density,
@@ -467,7 +465,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping galaxy diagnostics')
 
     # measure lightcone diagnostics
-    if cfg.diag.ngc:
+    if cfg.diag.all or cfg.diag.ngc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
             cap='ngc',
@@ -479,7 +477,7 @@ def main(cfg: DictConfig) -> None:
         all_done &= done
     else:
         logging.info('Skipping ngc_lightcone diagnostics')
-    if cfg.diag.sgc:
+    if cfg.diag.all or cfg.diag.sgc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
             cap='sgc',
