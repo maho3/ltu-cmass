@@ -170,15 +170,6 @@ def run_inference(x, theta, cfg, out_dir):
             **extra_kwargs,
             embedding_net=embedding)
             )
-    """
-    nets = [
-        net_loader(
-            model=net.model, hidden_features=net.hidden_features,
-            num_transforms=net.num_transforms,
-            embedding_net=embedding)
-        for net in cfg.infer.nets
-    ]
-    """
 
     # define training arguments
     train_args = {
