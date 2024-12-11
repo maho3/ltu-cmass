@@ -146,3 +146,4 @@ jobs/infer_quijote.sh
 jobs/test_infer.sh
 jobs/make_npe_yaml.py
 cmass/conf/infer/quijotelike.yaml
+cmaxx/conf/infer/quijotelike_pin.yaml

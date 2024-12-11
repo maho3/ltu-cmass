@@ -1,0 +1,141 @@
+Nmax: 2000
+backend: sbi
+batch_size: 64
+device: cpu
+engine: NPE
+experiments:
+- kmax:
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  summary:
+  - Pk0
+- kmax:
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  summary:
+  - Pk0
+  - Pk2
+  - Pk4
+- kmax:
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  summary:
+  - zPk0
+  - zPk2
+  - zPk4
+fcn_hidden:
+- 64
+- 32
+- 16
+galaxy: false
+halo: true
+learning_rate: 0.001
+nets:
+- hidden_features: 30
+  model: nsf
+  num_transforms: 2
+- hidden_features: 51
+  model: nsf
+  num_transforms: 3
+- hidden_features: 110
+  model: mdn
+  num_components: 4
+- hidden_features: 27
+  model: mdn
+  num_components: 10
+- hidden_features: 70
+  model: nsf
+  num_transforms: 2
+- hidden_features: 43
+  model: mdn
+  num_components: 3
+- hidden_features: 93
+  model: mdn
+  num_components: 10
+- hidden_features: 41
+  model: mdn
+  num_components: 10
+- hidden_features: 99
+  model: nsf
+  num_transforms: 6
+- hidden_features: 44
+  model: maf
+  num_transforms: 5
+- hidden_features: 51
+  model: nsf
+  num_transforms: 2
+- hidden_features: 59
+  model: mdn
+  num_components: 8
+- hidden_features: 35
+  model: maf
+  num_transforms: 3
+- hidden_features: 29
+  model: maf
+  num_transforms: 2
+- hidden_features: 28
+  model: maf
+  num_transforms: 4
+- hidden_features: 93
+  model: maf
+  num_transforms: 4
+- hidden_features: 84
+  model: mdn
+  num_components: 9
+- hidden_features: 26
+  model: mdn
+  num_components: 8
+- hidden_features: 53
+  model: nsf
+  num_transforms: 6
+- hidden_features: 89
+  model: maf
+  num_transforms: 3
+- hidden_features: 24
+  model: nsf
+  num_transforms: 2
+- hidden_features: 45
+  model: nsf
+  num_transforms: 4
+- hidden_features: 126
+  model: mdn
+  num_components: 5
+- hidden_features: 51
+  model: mdn
+  num_components: 8
+- hidden_features: 97
+  model: maf
+  num_transforms: 4
+- hidden_features: 61
+  model: mdn
+  num_components: 7
+- hidden_features: 105
+  model: mdn
+  num_components: 6
+- hidden_features: 98
+  model: nsf
+  num_transforms: 2
+- hidden_features: 97
+  model: nsf
+  num_transforms: 3
+- hidden_features: 109
+  model: nsf
+  num_transforms: 3
+- hidden_features: 64
+  model: mdn
+  num_components: 9
+- hidden_features: 97
+  model: maf
+  num_transforms: 6
+ngc_lightcone: false
+prior: Uniform
+save_dir: /anvil/scratch/x-dbartlett/cmass/quijotelike/pinocchio/models_nets32_sims2000
+sgc_lightcone: false
+test_frac: 0.1
+val_frac: 0.1
