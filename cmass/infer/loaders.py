@@ -36,6 +36,23 @@ def load_Pk(diag_file, a):
     return summ
 
 
+def load_lc_Pk(diag_file):
+    if not os.path.exists(diag_file):
+        return {}
+    summ = {}
+    try:
+        with h5py.File(diag_file, 'r') as f:
+            stat = 'Pk'
+            for i in range(3):  # monopole, quadrupole, hexadecapole
+                summ[stat+str(2*i)] = {
+                    'k': f[stat+'_k3D'][:],
+                    'value': f[stat][:, i],
+                }
+    except (OSError, KeyError):
+        return {}
+    return summ
+
+
 def preprocess_Pk(X, kmax):
     Xout = []
     for x in X:

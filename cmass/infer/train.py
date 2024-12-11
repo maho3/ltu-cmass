@@ -10,10 +10,11 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
+import torch
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from .loaders import get_cosmo, get_hod, load_Pk, preprocess_Pk
+from .loaders import get_cosmo, get_hod, load_Pk, load_lc_Pk, preprocess_Pk
 
 import ili
 from ili.dataloaders import NumpyLoader
@@ -34,7 +35,10 @@ def load_halo_summaries(suitepath, a, Nmax):
     summlist, paramlist = [], []
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        diagfile = join(sourcepath, 'diag', 'halos.h5')
+        diagpath = join(sourcepath, 'diag')
+        if not os.path.isdir(diagpath):
+            continue
+        diagfile = join(diagpath, 'halos.h5')
         summ = load_Pk(diagfile, a)  # TODO: load other summaries
         if len(summ) > 0:
             summlist.append(summ)
@@ -64,7 +68,10 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        filelist = os.listdir(join(sourcepath, 'diag', 'galaxies'))
+        diagpath = join(sourcepath, 'diag', 'galaxies')
+        if not os.path.isdir(diagpath):
+            continue
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', 'galaxies', f)
@@ -90,7 +97,7 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     return summaries, parameters
 
 
-def load_lightcone_summaries(suitepath, cap, a, Nmax):
+def load_lightcone_summaries(suitepath, cap, Nmax):
     logging.info(f'Looking for {cap}_lightcone summaries at {suitepath}')
     simpaths = os.listdir(suitepath)
     simpaths.sort(key=lambda x: int(x))  # sort by lhid
@@ -101,11 +108,14 @@ def load_lightcone_summaries(suitepath, cap, a, Nmax):
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        filelist = os.listdir(join(sourcepath, 'diag', f'{cap}_lightcone'))
+        diagpath = join(sourcepath, 'diag', f'{cap}_lightcone')
+        if not os.path.isdir(diagpath):
+            continue
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', f'{cap}_lightcone', f)
-            summ = load_Pk(diagfile, a)
+            summ = load_lc_Pk(diagfile)
             if len(summ) > 0:
                 try:
                     paramlist.append(np.concatenate(
@@ -155,17 +165,20 @@ def run_inference(x, theta, cfg, out_dir):
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe
+        extra_kwargs = {}
     elif cfg.infer.backend == 'sbi':
         net_loader = ili.utils.load_nde_sbi
+        extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
-    nets = [
-        net_loader(
-            model=net.model, hidden_features=net.hidden_features,
-            num_transforms=net.num_transforms,
+    nets = []
+    for net in cfg.infer.nets:
+        logging.info(f'Adding {net}')
+        nets.append(net_loader(
+            **net,
+            **extra_kwargs,
             embedding_net=embedding)
-        for net in cfg.infer.nets
-    ]
+        )
 
     # define training arguments
     train_args = {
@@ -213,7 +226,7 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
         num_samples=1000, sample_method='direct',
         labels=names, out_dir=out_dir
     )
-    metric(posterior, x_obs=xobs, theta_fid=thetaobs)
+    metric(posterior, x_obs=xobs, theta_fid=thetaobs.to('cpu'))
 
     # Posterior coverage
     logging.info('Running posterior coverage...')
@@ -224,11 +237,11 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
         out_dir=out_dir,
         save_samples=True
     )
-    metric(posterior, x, theta)
+    metric(posterior, x, theta.to('cpu'))
 
     # save test data
-    np.save(join(out_dir, 'x_test.npy'), x)
-    np.save(join(out_dir, 'theta_test.npy'), theta)
+    np.save(join(out_dir, 'x_test.npy'), x.to('cpu'))
+    np.save(join(out_dir, 'theta_test.npy'), theta.to('cpu'))
 
 
 def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
@@ -260,6 +273,8 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
             x_train, theta_train, cfg, exp_path)
 
         # run validation
+        x_test = torch.Tensor(x_test).to(cfg.infer.device)
+        theta_test = torch.Tensor(theta_test).to(cfg.infer.device)
         run_validation(posterior, history, x_test, theta_test,
                        exp_path, names=names)
 
@@ -308,7 +323,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone inference...')
         summaries, parameters = load_lightcone_summaries(
-            suite_path, 'ngc', cfg.nbody.af, cfg.infer.Nmax)
+            suite_path, 'ngc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, exp, cfg,
@@ -319,7 +334,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.sgc_lightcone:
         logging.info('Running sgc_lightcone inference...')
         summaries, parameters = load_lightcone_summaries(
-            suite_path, 'sgc', cfg.nbody.af, cfg.infer.Nmax)
+            suite_path, 'sgc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, exp, cfg,
