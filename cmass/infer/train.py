@@ -35,7 +35,10 @@ def load_halo_summaries(suitepath, a, Nmax):
     summlist, paramlist = [], []
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        diagfile = join(sourcepath, 'diag', 'halos.h5')
+        diagpath = join(sourcepath, 'diag')
+        if not os.path.isdir(diagpath):
+            continue
+        diagfile = join(diagpath, 'halos.h5')
         summ = load_Pk(diagfile, a)  # TODO: load other summaries
         if len(summ) > 0:
             summlist.append(summ)
@@ -65,10 +68,10 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        diagdir = join(sourcepath, 'diag', 'galaxies')
-        if not os.path.isdir(diagdir):
+        diagpath = join(sourcepath, 'diag', 'galaxies')
+        if not os.path.isdir(diagpath):
             continue
-        filelist = os.listdir(diagdir)
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', 'galaxies', f)
@@ -106,10 +109,9 @@ def load_lightcone_summaries(suitepath, cap, Nmax):
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
         diagpath = join(sourcepath, 'diag', f'{cap}_lightcone')
-        if os.path.isdir(diagpath):
-            filelist = os.listdir(diagpath)
-        else:
-            filelist = []
+        if not os.path.isdir(diagpath):
+            continue
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', f'{cap}_lightcone', f)
