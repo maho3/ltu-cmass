@@ -164,12 +164,12 @@ def run_inference(x, theta, cfg, out_dir):
         raise NotImplementedError
     nets = []
     for net in cfg.infer.nets:
-        print(net)
+        logging.info(f'Adding {net}')
         nets.append(net_loader(
             **net,
             **extra_kwargs,
             embedding_net=embedding)
-            )
+        )
 
     # define training arguments
     train_args = {
