@@ -10,6 +10,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
+import torch
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
@@ -155,17 +156,20 @@ def run_inference(x, theta, cfg, out_dir):
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe
+        extra_kwargs = {}
     elif cfg.infer.backend == 'sbi':
         net_loader = ili.utils.load_nde_sbi
+        extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
-    nets = [
-        net_loader(
-            model=net.model, hidden_features=net.hidden_features,
-            num_transforms=net.num_transforms,
+    nets = []
+    for net in cfg.infer.nets:
+        logging.info(f'Adding {net}')
+        nets.append(net_loader(
+            **net,
+            **extra_kwargs,
             embedding_net=embedding)
-        for net in cfg.infer.nets
-    ]
+        )
 
     # define training arguments
     train_args = {
@@ -213,7 +217,7 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
         num_samples=1000, sample_method='direct',
         labels=names, out_dir=out_dir
     )
-    metric(posterior, x_obs=xobs, theta_fid=thetaobs)
+    metric(posterior, x_obs=xobs, theta_fid=thetaobs.to('cpu'))
 
     # Posterior coverage
     logging.info('Running posterior coverage...')
@@ -224,11 +228,11 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
         out_dir=out_dir,
         save_samples=True
     )
-    metric(posterior, x, theta)
+    metric(posterior, x, theta.to('cpu'))
 
     # save test data
-    np.save(join(out_dir, 'x_test.npy'), x)
-    np.save(join(out_dir, 'theta_test.npy'), theta)
+    np.save(join(out_dir, 'x_test.npy'), x.to('cpu'))
+    np.save(join(out_dir, 'theta_test.npy'), theta.to('cpu'))
 
 
 def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
@@ -260,6 +264,8 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
             x_train, theta_train, cfg, exp_path)
 
         # run validation
+        x_test = torch.Tensor(x_test).to(cfg.infer.device)
+        theta_test = torch.Tensor(theta_test).to(cfg.infer.device)
         run_validation(posterior, history, x_test, theta_test,
                        exp_path, names=names)
 
