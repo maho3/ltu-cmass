@@ -31,7 +31,6 @@ from .tools import (
 from .tools_pinocchio import (
     process_snapshot, save_pinocchio_nbody, process_halos, save_cfg_data)
 
-
 @timing_decorator
 def get_ICs(cfg, outdir):
 
@@ -47,7 +46,18 @@ def get_ICs(cfg, outdir):
             path_to_ic = join(cfg.meta.wdir, path_to_ic)
         ic = load_white_noise(path_to_ic, N, quijote=nbody.quijote)
     else:
-        ic = gen_white_noise(N, seed=nbody.lhid)
+        # ic = gen_white_noise(N, seed=nbody.lhid)
+        seed = np.random.randint(0, 2**32)
+        logging.info(f'Using seed {seed} for simulation {nbody.lhid}')
+        nthread, _ = get_mpi_info()
+        basedir = os.getcwd()
+        path_to_ic = join(cfg.meta.wdir, f'wn/N{N}/')
+        os.makedirs(path_to_ic, exist_ok=True)
+        path_to_ic = join(path_to_ic, f'wn_{seed}.dat')
+        command = f'mpirun -n 1 {basedir}/quijote_wn/NGenicWhiteNoise/ngenic_white_noise {nbody.N} {nbody.N} {seed} {path_to_ic} {nthread}'
+        logging.info(command)
+        os.system(command)
+        ic = load_white_noise(path_to_ic, N, quijote=True)
 
     # Convert to real space
     ic = np.fft.irfftn(ic, norm="ortho").astype(np.float32)
