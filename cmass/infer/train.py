@@ -14,7 +14,7 @@ import torch
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from .loaders import get_cosmo, get_hod, load_Pk, preprocess_Pk
+from .loaders import get_cosmo, get_hod, load_Pk, load_lc_Pk, preprocess_Pk
 
 import ili
 from ili.dataloaders import NumpyLoader
@@ -35,7 +35,10 @@ def load_halo_summaries(suitepath, a, Nmax):
     summlist, paramlist = [], []
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        diagfile = join(sourcepath, 'diag', 'halos.h5')
+        diagpath = join(sourcepath, 'diag')
+        if not os.path.isdir(diagpath):
+            continue
+        diagfile = join(diagpath, 'halos.h5')
         summ = load_Pk(diagfile, a)  # TODO: load other summaries
         if len(summ) > 0:
             summlist.append(summ)
@@ -65,7 +68,10 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        filelist = os.listdir(join(sourcepath, 'diag', 'galaxies'))
+        diagpath = join(sourcepath, 'diag', 'galaxies')
+        if not os.path.isdir(diagpath):
+            continue
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', 'galaxies', f)
@@ -91,7 +97,7 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     return summaries, parameters
 
 
-def load_lightcone_summaries(suitepath, cap, a, Nmax):
+def load_lightcone_summaries(suitepath, cap, Nmax):
     logging.info(f'Looking for {cap}_lightcone summaries at {suitepath}')
     simpaths = os.listdir(suitepath)
     simpaths.sort(key=lambda x: int(x))  # sort by lhid
@@ -102,11 +108,14 @@ def load_lightcone_summaries(suitepath, cap, a, Nmax):
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
-        filelist = os.listdir(join(sourcepath, 'diag', f'{cap}_lightcone'))
+        diagpath = join(sourcepath, 'diag', f'{cap}_lightcone')
+        if not os.path.isdir(diagpath):
+            continue
+        filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
             diagfile = join(sourcepath, 'diag', f'{cap}_lightcone', f)
-            summ = load_Pk(diagfile, a)
+            summ = load_lc_Pk(diagfile)
             if len(summ) > 0:
                 try:
                     paramlist.append(np.concatenate(
@@ -314,7 +323,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone inference...')
         summaries, parameters = load_lightcone_summaries(
-            suite_path, 'ngc', cfg.nbody.af, cfg.infer.Nmax)
+            suite_path, 'ngc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, exp, cfg,
@@ -325,7 +334,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.sgc_lightcone:
         logging.info('Running sgc_lightcone inference...')
         summaries, parameters = load_lightcone_summaries(
-            suite_path, 'sgc', cfg.nbody.af, cfg.infer.Nmax)
+            suite_path, 'sgc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, exp, cfg,
