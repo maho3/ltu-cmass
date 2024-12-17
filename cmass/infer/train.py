@@ -168,10 +168,13 @@ def run_inference(x, theta, cfg, out_dir):
     else:
         raise NotImplementedError
 
-    embedding = FCN(
-        n_hidden=cfg.infer.fcn_hidden,
-        act_fn='ReLU'
-    )
+    if cfg.infer.fcn_hidden is None:
+        embedding = None
+    else:
+        embedding = FCN(
+            n_hidden=cfg.infer.fcn_hidden,
+            act_fn='ReLU'
+        )
 
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':
@@ -305,6 +308,8 @@ def main(cfg: DictConfig) -> None:
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
     if cfg.infer.save_dir is not None:
         model_dir = cfg.infer.save_dir
+    if cfg.infer.exp_index is not None:
+        cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
 
     cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
     hodnames = [r'$\alpha$', r'$\log M_0$', r'$\log M_1$',
