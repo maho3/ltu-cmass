@@ -32,7 +32,7 @@ def load_halo_summaries(suitepath, a, Nmax):
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
 
-    summlist, paramlist = [], []
+    summlist, paramlist, idlist = [], [], []
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
         diagpath = join(sourcepath, 'diag')
@@ -43,18 +43,22 @@ def load_halo_summaries(suitepath, a, Nmax):
         if len(summ) > 0:
             summlist.append(summ)
             paramlist.append(get_cosmo(sourcepath))
+            idlist.append(lhid)
 
-    summaries, parameters = defaultdict(list), defaultdict(list)
-    for summ, param in zip(summlist, paramlist):
+    summaries = defaultdict(list)
+    parameters = defaultdict(list)
+    ids = defaultdict(list)
+    for summ, param, id in zip(summlist, paramlist, idlist):
         for key in summ:
             summaries[key].append(summ[key])
             parameters[key].append(param)
+            ids[key].append(id)
 
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {len(simpaths)} {key}'
             ' summaries')
-    return summaries, parameters
+    return summaries, parameters, ids
 
 
 def load_galaxy_summaries(suitepath, a, Nmax):
@@ -64,7 +68,7 @@ def load_galaxy_summaries(suitepath, a, Nmax):
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
 
-    summlist, paramlist = [], []
+    summlist, paramlist, idlist = [], [], []
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
@@ -83,18 +87,22 @@ def load_galaxy_summaries(suitepath, a, Nmax):
                 except (OSError, KeyError):
                     continue
                 summlist.append(summ)
+                idlist.append(lhid)
 
-    summaries, parameters = defaultdict(list), defaultdict(list)
-    for summ, param in zip(summlist, paramlist):
+    summaries = defaultdict(list)
+    parameters = defaultdict(list)
+    ids = defaultdict(list)
+    for summ, param, id in zip(summlist, paramlist, idlist):
         for key in summ:
             summaries[key].append(summ[key])
             parameters[key].append(param)
+            ids[key].append(id)
 
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
             ' summaries')
-    return summaries, parameters
+    return summaries, parameters, ids
 
 
 def load_lightcone_summaries(suitepath, cap, Nmax):
@@ -104,7 +112,7 @@ def load_lightcone_summaries(suitepath, cap, Nmax):
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
 
-    summlist, paramlist = [], []
+    summlist, paramlist, idlist = [], [], []
     Ntot = 0
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
@@ -123,25 +131,37 @@ def load_lightcone_summaries(suitepath, cap, Nmax):
                 except (OSError, KeyError):
                     continue
                 summlist.append(summ)
+                idlist.append(lhid)
 
-    summaries, parameters = defaultdict(list), defaultdict(list)
-    for summ, param in zip(summlist, paramlist):
+    summaries = defaultdict(list)
+    parameters = defaultdict(list)
+    ids = defaultdict(list)
+    for summ, param, id in zip(summlist, paramlist, idlist):
         for key in summ:
             summaries[key].append(summ[key])
             parameters[key].append(param)
+            ids[key].append(id)
 
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
             ' summaries')
-    return summaries, parameters
+    return summaries, parameters, ids
 
 
-def split_train_test(x, theta, test_frac):
-    x, theta = np.array(x), np.array(theta)
-    cutoff = int(len(x) * (1 - test_frac))
-    x_train, x_test = x[:cutoff], x[cutoff:]
-    theta_train, theta_test = theta[:cutoff], theta[cutoff:]
+def split_train_test(x, theta, ids, test_frac):
+    x, theta, ids = map(np.array, [x, theta, ids])
+    unique_ids = np.unique(ids)
+    np.random.shuffle(unique_ids)
+    cutoff = int(len(unique_ids) * (1 - test_frac))
+    train_ids, test_ids = unique_ids[:cutoff], unique_ids[cutoff:]
+
+    train_mask = np.isin(ids, train_ids)
+    test_mask = np.isin(ids, test_ids)
+
+    x_train, x_test = x[train_mask], x[test_mask]
+    theta_train, theta_test = theta[train_mask], theta[test_mask]
+
     return x_train, x_test, theta_train, theta_test
 
 
@@ -244,7 +264,7 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
     np.save(join(out_dir, 'theta_test.npy'), theta.to('cpu'))
 
 
-def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
+def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
     for kmax in exp.kmax:
@@ -252,7 +272,7 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
         exp_path = join(model_path, f'kmax-{kmax}')
         xs = []
         for summ in exp.summary:
-            x, theta = summaries[summ], parameters[summ]
+            x, theta, id = summaries[summ], parameters[summ], ids[summ]
             if 'Pk' in summ:
                 x = preprocess_Pk(x, kmax)
             else:
@@ -266,7 +286,8 @@ def run_experiment(summaries, parameters, exp, cfg, model_path, names=None):
 
         # split train/test
         x_train, x_test, theta_train, theta_test = \
-            split_train_test(x, theta, cfg.infer.test_frac)
+            split_train_test(x, theta, id, cfg.infer.test_frac)
+        logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
 
         # run inference
         posterior, history = run_inference(
@@ -300,44 +321,44 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
-        summaries, parameters = load_halo_summaries(
+        summaries, parameters, ids = load_halo_summaries(
             suite_path, cfg.nbody.af, cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_experiment(summaries, parameters, exp, cfg,
+            run_experiment(summaries, parameters, ids, exp, cfg,
                            save_path, names=cosmonames)
     else:
         logging.info('Skipping halo inference...')
 
     if cfg.infer.galaxy:
         logging.info('Running galaxies inference...')
-        summaries, parameters = load_galaxy_summaries(
+        summaries, parameters, ids = load_galaxy_summaries(
             suite_path, cfg.nbody.af, cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
-            run_experiment(summaries, parameters, exp, cfg,
+            run_experiment(summaries, parameters, ids, exp, cfg,
                            save_path, names=cosmonames+hodnames)
     else:
         logging.info('Skipping galaxy inference...')
 
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone inference...')
-        summaries, parameters = load_lightcone_summaries(
+        summaries, parameters, ids = load_lightcone_summaries(
             suite_path, 'ngc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(summaries, parameters, exp, cfg,
+            run_experiment(summaries, parameters, ids, exp, cfg,
                            save_path, names=cosmonames+hodnames)
     else:
         logging.info('Skipping ngc_lightcone inference...')
 
     if cfg.infer.sgc_lightcone:
         logging.info('Running sgc_lightcone inference...')
-        summaries, parameters = load_lightcone_summaries(
+        summaries, parameters, ids = load_lightcone_summaries(
             suite_path, 'sgc', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(summaries, parameters, exp, cfg,
+            run_experiment(summaries, parameters, ids, exp, cfg,
                            save_path, names=cosmonames+hodnames)
     else:
         logging.info('Skipping sgc_lightcone inference...')
