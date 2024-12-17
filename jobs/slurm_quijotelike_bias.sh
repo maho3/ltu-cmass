@@ -10,6 +10,7 @@
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
 # SLURM_ARRAY_TASK_ID=145
+globoffset=2000
 
 module restore cmass
 conda activate cmassrun
@@ -22,21 +23,21 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=pinocchio_quijote
-sim=pinocchio
+nbody=quijotelike
+sim=fastpm
 multisnapshot=False
-diag_from_scratch=True
+diag_from_scratch=False
 rm_galaxies=False
-extras="" # "nbody.zf=0.500015"
+extras="meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
-N=512
+N=128
 
 outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
 for offset in 0 1000; do
-    lhid=$(($SLURM_ARRAY_TASK_ID+offset))
+    lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
 

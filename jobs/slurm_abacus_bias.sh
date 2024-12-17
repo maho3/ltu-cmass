@@ -22,16 +22,16 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=abacuslike
-sim=fastpm
+nbody=pinocchio_2gpch
+sim=pinocchio
 multisnapshot=False
-diag_from_scratch=False
+diag_from_scratch=True
 rm_galaxies=False
 extras="nbody.zf=0.500015"
 L=2000
-N=256
+N=1024
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/abacuslike/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
