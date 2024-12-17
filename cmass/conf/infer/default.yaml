@@ -6,7 +6,8 @@ galaxy: True    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
 
-Nmax: 1000  # maximum number of simulations to use for training (-1 for all)
+
+Nmax: 500  # maximum number of simulations to use for training (-1 for all)
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 
@@ -29,27 +30,8 @@ exp_index: null  # index of experiment to run (null for all)
 
 experiments:
   - summary: [Pk0]   # monopole
-    kmax: 0.2
-  - summary: [Pk0]
-    kmax: 0.3
-  - summary: [Pk0]
-    kmax: 0.4
-  - summary: [Pk0]
-    kmax: 0.5
+    kmax: [0.2, 0.3, 0.4, 0.5]
   - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmax: 0.2
-  - summary: [Pk0, Pk2, Pk4]
-    kmax: 0.3
-  - summary: [Pk0, Pk2, Pk4]
-    kmax: 0.4
-  - summary: [Pk0, Pk2, Pk4]
-    kmax: 0.5
+    kmax: [0.2, 0.3, 0.4, 0.5]
   - summary: [zPk0, zPk2, zPk4]  # redshift-space monopole, quadrupole, hexadecapole
-    kmax: 0.2
-  - summary: [zPk0, zPk2, zPk4]
-    kmax: 0.3
-  - summary: [zPk0, zPk2, zPk4]
-    kmax: 0.4
-  - summary: [zPk0, zPk2, zPk4]
-    kmax: 0.5
->>>>>>> Stashed changes
+    kmax: [0.2, 0.3, 0.4, 0.5]
