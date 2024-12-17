@@ -22,8 +22,10 @@ sim=fastpm
 ngc=False
 sgc=True
 extras="nbody.zf=0.500015"
+device=cpu
+exp_index=1 # $SLURM_ARRAY_TASK_ID
 
-postfix="nbody=$nbody sim=$sim infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.device=cuda $extras"
+postfix="nbody=$nbody sim=$sim infer.exp_index=$exp_index infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.device=$device $extras"
 
 echo "Running inference with $postfix"
 python -m cmass.infer.train $postfix
