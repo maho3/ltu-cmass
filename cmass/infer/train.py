@@ -145,10 +145,10 @@ def split_train_test(x, theta, ids, test_frac):
     unique_ids = np.unique(ids)
     np.random.shuffle(unique_ids)
     cutoff = int(len(unique_ids) * (1 - test_frac))
-    train_ids, test_ids = unique_ids[:cutoff], unique_ids[cutoff:]
+    ids_train, ids_test = unique_ids[:cutoff], unique_ids[cutoff:]
 
-    train_mask = np.isin(ids, train_ids)
-    test_mask = np.isin(ids, test_ids)
+    train_mask = np.isin(ids, ids_train)
+    test_mask = np.isin(ids, ids_test)
 
     x_train, x_test = x[train_mask], x[test_mask]
     theta_train, theta_test = theta[train_mask], theta[test_mask]
@@ -271,6 +271,8 @@ def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None)
             x, theta, id = summaries[summ], parameters[summ], ids[summ]
             if 'Pk' in summ:
                 x = preprocess_Pk(x, kmax)
+                # remove first 5 bins (TODO: remove with a smarter fix)
+                x = x[:, 5:]
             else:
                 raise NotImplementedError  # TODO: implement other summaries
             xs.append(x)
@@ -296,6 +298,16 @@ def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None)
                        exp_path, names=names)
 
 
+def split_experiments(exp_cfg):
+    new_exps = []
+    for exp in exp_cfg:
+        for kmax in exp.kmax:
+            new_exp = exp.copy()
+            new_exp.kmax = [kmax]
+            new_exps.append(new_exp)
+    return new_exps
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -311,6 +323,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.save_dir is not None:
         model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
+        cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
 
     cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
