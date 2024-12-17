@@ -18,7 +18,8 @@ conda activate cmass
 cd ..
 
 # Run Pinocchio
-python -m cmass.nbody.pinocchio nbody=pin_1gpch_z0.5_id3_N512
+# python -m cmass.nbody.pinocchio nbody=pin_1gpch_z0.5_id3_N512
+python -m cmass.nbody.pinocchio nbody=pinocchio_quijote nbody.lhid=0 nbody.matchIC=0 nbody.N=256
 
 conda deactivate
 exit 0

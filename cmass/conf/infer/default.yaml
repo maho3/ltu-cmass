@@ -28,10 +28,30 @@ learning_rate: 1e-4  # learning rate
 
 device: cpu  # cpu or cuda
 
+exp_index: null  # index of experiment to run (null for all)
+
 experiments:
-  - summary: [Pk0]   # mono, pole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+  - summary: [Pk0]   # monopole
+    kmax: 0.2
+  - summary: [Pk0]
+    kmax: 0.3
+  - summary: [Pk0]
+    kmax: 0.4
+  - summary: [Pk0]
+    kmax: 0.5
   - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: 0.2
+  - summary: [Pk0, Pk2, Pk4]
+    kmax: 0.3
+  - summary: [Pk0, Pk2, Pk4]
+    kmax: 0.4
+  - summary: [Pk0, Pk2, Pk4]
+    kmax: 0.5
   - summary: [zPk0, zPk2, zPk4]  # redshift-space monopole, quadrupole, hexadecapole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: 0.2
+  - summary: [zPk0, zPk2, zPk4]
+    kmax: 0.3
+  - summary: [zPk0, zPk2, zPk4]
+    kmax: 0.4
+  - summary: [zPk0, zPk2, zPk4]
+    kmax: 0.5
