@@ -25,6 +25,18 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
+def aggregate(summlist, paramlist, idlist):
+    summaries = defaultdict(list)
+    parameters = defaultdict(list)
+    ids = defaultdict(list)
+    for summ, param, id in zip(summlist, paramlist, idlist):
+        for key in summ:
+            summaries[key].append(summ[key])
+            parameters[key].append(param)
+            ids[key].append(id)
+    return summaries, parameters, ids
+
+
 def load_halo_summaries(suitepath, a, Nmax):
     logging.info(f'Looking for halo summaries at {suitepath}')
     simpaths = os.listdir(suitepath)
@@ -45,14 +57,7 @@ def load_halo_summaries(suitepath, a, Nmax):
             paramlist.append(get_cosmo(sourcepath))
             idlist.append(lhid)
 
-    summaries = defaultdict(list)
-    parameters = defaultdict(list)
-    ids = defaultdict(list)
-    for summ, param, id in zip(summlist, paramlist, idlist):
-        for key in summ:
-            summaries[key].append(summ[key])
-            parameters[key].append(param)
-            ids[key].append(id)
+    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
 
     for key in summaries:
         logging.info(
@@ -89,14 +94,7 @@ def load_galaxy_summaries(suitepath, a, Nmax):
                 summlist.append(summ)
                 idlist.append(lhid)
 
-    summaries = defaultdict(list)
-    parameters = defaultdict(list)
-    ids = defaultdict(list)
-    for summ, param, id in zip(summlist, paramlist, idlist):
-        for key in summ:
-            summaries[key].append(summ[key])
-            parameters[key].append(param)
-            ids[key].append(id)
+    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
 
     for key in summaries:
         logging.info(
@@ -133,14 +131,7 @@ def load_lightcone_summaries(suitepath, cap, Nmax):
                 summlist.append(summ)
                 idlist.append(lhid)
 
-    summaries = defaultdict(list)
-    parameters = defaultdict(list)
-    ids = defaultdict(list)
-    for summ, param, id in zip(summlist, paramlist, idlist):
-        for key in summ:
-            summaries[key].append(summ[key])
-            parameters[key].append(param)
-            ids[key].append(id)
+    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
 
     for key in summaries:
         logging.info(
