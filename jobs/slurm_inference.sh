@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=inference  # Job name
+#SBATCH --array=0-12  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
 #SBATCH --gpus-per-node=1     # Number of GPUs
@@ -12,7 +13,9 @@
 
 module restore cmass
 conda activate cmassrun
-# export TQDM_DISABLE=0
+export TQDM_DISABLE=0
+
+exp_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
@@ -22,8 +25,7 @@ sim=fastpm
 ngc=False
 sgc=True
 extras="nbody.zf=0.500015"
-device=cpu
-exp_index=1 # $SLURM_ARRAY_TASK_ID
+device=cuda
 
 postfix="nbody=$nbody sim=$sim infer.exp_index=$exp_index infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.device=$device $extras"
 
