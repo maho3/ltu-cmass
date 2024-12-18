@@ -261,8 +261,6 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
 def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    if not isinstance(exp.kmax, list):
-        exp.kmax = [exp.kmax]
     for kmax in exp.kmax:
         logging.info(f'Running inference for {name} with kmax={kmax}')
         exp_path = join(model_path, f'kmax-{kmax}')
