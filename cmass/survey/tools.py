@@ -302,8 +302,8 @@ def load_galaxies(source_dir, a, seed):
                 f'Snapshot a={key} not found in {filepath}. Ensure you are '
                 'using the appropriate single-snapshot ngc_selection or the '
                 'multi-snapshot ngc_lightcone.')
-        pos = f[key]['pos'][...]
-        vel = f[key]['vel'][...]
+        pos = f[key]['pos'][...]  # comoving positions [Mpc/h]
+        vel = f[key]['vel'][...]  # physical velocities [km/s]
         hostid = f[key]['hostid'][...]
     return pos, vel, hostid
 

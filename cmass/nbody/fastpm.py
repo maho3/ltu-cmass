@@ -190,8 +190,8 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
 
     infile = bigfile.File(snapdir)
     ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
-    pos = np.array(ds[:]['Position'])
-    vel = np.array(ds[:]['Velocity'])
+    pos = np.array(ds[:]['Position'])  # comoving positions [Mpc/h]
+    vel = np.array(ds[:]['Velocity'])  # physical velocities [km/s]
 
     # Measure density and velocity field
     logging.info(f"Processing snapshot at a={a:.4f}...")
@@ -206,7 +206,7 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     rho /= np.mean(rho)
     rho -= 1
 
-    # Convert from comoving -> physical velocities
+    # Convert from physical -> comoving velocities
     fvel *= 1/a
 
     if delete_files:

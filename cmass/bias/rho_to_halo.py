@@ -276,7 +276,8 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
 
         # apply CHARM model
         hpos, hmass, hvel, meta = apply_charm(
-            rho, fvel*a/1e3,  # CHARM velocity normalization
+            rho,
+            fvel*a/1e3,  # CHARM vel normalization (physical velocities Mm/s)
             cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
@@ -314,8 +315,8 @@ def save_snapshot(outdir, a, hpos, hvel, hmass, **meta):
 
     with h5py.File(join(outdir, 'halos.h5'), 'a') as f:
         group = f.create_group(f'{a:.6f}')
-        group.create_dataset('pos', data=hpos)  # halo positions [Mpc/h]
-        group.create_dataset('vel', data=hvel)  # halo velocities [km/s]
+        group.create_dataset('pos', data=hpos)  # comoving positions [Mpc/h]
+        group.create_dataset('vel', data=hvel)  # physical velocities [km/s]
         group.create_dataset('mass', data=hmass)  # halo masses [Msun/h]
 
         # save other halo metadata (e.g. concentration)
