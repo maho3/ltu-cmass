@@ -82,8 +82,10 @@ def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
     )
 
     # Organize outputs
-    gpos = np.array([hod['x'], hod['y'], hod['z']]).T
-    gvel = np.array([hod['vx'], hod['vy'], hod['vz']]).T
+    gpos = np.array(
+        [hod['x'], hod['y'], hod['z']]).T  # comoving positions [Mpc/h]
+    gvel = np.array(
+        [hod['vx'], hod['vy'], hod['vz']]).T  # physical velocities [km/s]
     meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
     return gpos, gvel, meta
 
@@ -91,9 +93,9 @@ def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
 def load_snapshot(source_path, a):
     with h5py.File(join(source_path, 'halos.h5'), 'r') as f:
         group = f[f'{a:.6f}']
-        hpos = group['pos'][...]
-        hvel = group['vel'][...]
-        hmass = group['mass'][...]
+        hpos = group['pos'][...]    # comoving positions [Mpc/h]
+        hvel = group['vel'][...]    # physical velocities [km/s]
+        hmass = group['mass'][...]  # log10(Mass) [Msun/h]
 
         hmeta = {}
         for key in group.keys():

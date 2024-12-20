@@ -269,8 +269,6 @@ def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None)
             x, theta, id = summaries[summ], parameters[summ], ids[summ]
             if 'Pk' in summ:
                 x = preprocess_Pk(x, kmax)
-                # remove first 5 bins (TODO: remove with a smarter fix)
-                x = x[:, 5:]
             else:
                 raise NotImplementedError  # TODO: implement other summaries
             xs.append(x)

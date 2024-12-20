@@ -10,8 +10,9 @@ from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import h5py
+from astropy.cosmology import Planck18
 
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
@@ -105,7 +106,8 @@ def store_summary(
 
 def run_pylians(
     field, group, summaries,
-    box_size, axis, num_threads, use_rsd
+    box_size, axis, num_threads, use_rsd,
+    MAS='CIC'
 ):
     # Only for power spectrum
     accept_summaries = ['Pk']
@@ -113,7 +115,7 @@ def run_pylians(
     for summary_name in summaries:
         if summary_name == 'Pk':
             k, Pk = calcPk(field, box_size, axis=axis,
-                           MAS='CIC', threads=num_threads)
+                           MAS=MAS, threads=num_threads)
             key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
             group.create_dataset(key, data=k)
             key = f"{'z' if use_rsd else ''}{summary_name}"
@@ -194,14 +196,14 @@ def summarize_rho(
                 rho = f[a]['rho'][...].astype(np.float32)
                 group = o.create_group(a)
                 run_pylians(
-                    rho, group, ['Pk'],
-                    L, axis=0, num_threads=threads, use_rsd=False
+                    rho, group, ['Pk'], L, axis=0, MAS='CIC',
+                    num_threads=threads, use_rsd=False
                 )
     return True
 
 
 def summarize_tracer(
-    source_path, L, N, h,
+    source_path, L, N, cosmo,
     density=None, proxy=None,
     threads=16, from_scratch=True,
     type='halo', hod_seed=None,
@@ -265,8 +267,8 @@ def summarize_tracer(
                         if len(pos) <= Ncut:
                             logging.warning(f'Not enough {type} tracers in {a}')
                         logging.info(
-                            f'Cutting top {Ncut} out of {len(pos)} {type} tracers '
-                            'to match number density')
+                            f'Cutting top {Ncut} out of {len(pos)} {type} '
+                            'tracers to match number density')
                         mass = f[a][proxy][...].astype(np.float32)
                     mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
                     pos = pos[mask]
@@ -277,27 +279,32 @@ def summarize_tracer(
                 else:
                     group.attrs['density'] = np.nan
 
+                # Noise out positions (we do not probe less than Lnoise)
+                Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+                pos += np.random.randn(*pos.shape) * Lnoise
+
                 # Compute P(k)
                 if 'Pk' in summaries:
                     # real space
-                    field = MA(pos, L, N, MAS='CIC')
+                    MAS = 'NGP'
+                    field = MA(pos, L, N, MAS=MAS)
                     run_pylians(
-                        field, group, ['Pk'],
-                        L, axis=0, num_threads=threads, use_rsd=False
+                        field, group, ['Pk'], L, axis=0, MAS=MAS,
+                        num_threads=threads, use_rsd=False
                     )
 
                     # redshift space
-                    field = MAz(pos, vel, L, N, h, z, MAS='CIC', axis=0)
+                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
                     run_pylians(
-                        field, group, ['Pk'],
-                        L, axis=0, num_threads=threads, use_rsd=True
+                        field, group, ['Pk'], L, axis=0, MAS=MAS,
+                        num_threads=threads, use_rsd=True
                     )
 
                 # Compute other summaries
                 others = [s for s in summaries if s != 'Pk']
                 if len(others) > 0:
                     run_summarizer(
-                        pos, vel, h, z, L, N,
+                        pos, vel, cosmo.h, z, L, N,
                         group, others,
                         threads
                     )
@@ -352,8 +359,9 @@ def summarize_lightcone(
             # convert to comoving
             pos = sky_to_xyz(rdz, cosmo)
 
-            # noise positions (for CHARM)
-            pos += np.random.randn(*pos.shape) * 8/np.sqrt(3)
+            # Noise out positions (we do not probe less than Lnoise)
+            Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+            pos += np.random.randn(*pos.shape) * Lnoise
 
             # convert to float32
             pos = pos.astype(np.float32)
@@ -381,10 +389,11 @@ def summarize_lightcone(
 
             # Compute P(k)
             if 'Pk' in summaries:
-                field = MA(pos, L, N, MAS='NGP')
+                MAS = 'NGP'
+                field = MA(pos, L, N, MAS=MAS)
                 run_pylians(
-                    field, o, ['Pk'],
-                    L, axis=0, num_threads=threads, use_rsd=False
+                    field, o, ['Pk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=False
                 )
 
             # Compute other summaries
@@ -416,6 +425,8 @@ def main(cfg: DictConfig) -> None:
     if threads == -1:
         threads = os.cpu_count()
 
+    cosmo = cosmo_to_astropy(cfg.nbody.cosmo)
+
     logging.info(f'Computing diagnostics: {summaries}')
 
     all_done = True
@@ -437,7 +448,7 @@ def main(cfg: DictConfig) -> None:
     # measure halo diagnostics
     if cfg.diag.all or cfg.diag.halo:
         done = summarize_tracer(
-            source_path, cfg.nbody.L, N, h=cfg.nbody.cosmo[2],
+            source_path, cfg.nbody.L, N, cosmo,
             density=cfg.diag.halo_density,
             proxy=cfg.diag.halo_proxy,
             threads=threads, from_scratch=from_scratch,
@@ -452,7 +463,7 @@ def main(cfg: DictConfig) -> None:
     # measure galaxy diagnostics
     if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
-            source_path, cfg.nbody.L, N, cfg.nbody.cosmo[2],
+            source_path, cfg.nbody.L, N, cosmo,
             density=cfg.diag.galaxy_density,
             proxy=cfg.diag.galaxy_proxy,
             threads=threads, from_scratch=from_scratch,
@@ -467,7 +478,7 @@ def main(cfg: DictConfig) -> None:
     # measure lightcone diagnostics
     if cfg.diag.all or cfg.diag.ngc:
         done = summarize_lightcone(
-            source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
+            source_path, cfg.nbody.L, N, Planck18,
             cap='ngc',
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
@@ -479,7 +490,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping ngc_lightcone diagnostics')
     if cfg.diag.all or cfg.diag.sgc:
         done = summarize_lightcone(
-            source_path, cfg.nbody.L, N, cfg.nbody.cosmo,
+            source_path, cfg.nbody.L, N, Planck18,
             cap='sgc',
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
