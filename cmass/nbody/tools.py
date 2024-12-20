@@ -53,7 +53,9 @@ def parse_nbody_config(cfg):
             nbody.asave = [nbody.af]
 
         # load cosmology
-        nbody.cosmo = load_params(nbody.lhid, cfg.meta.cosmofile)
+        # load_params(nbody.lhid, cfg.meta.cosmofile)
+        nbody.cosmo = [0.3175, 0.049, 0.6711,
+                       0.9624, 0.834]  # fiducial cosmology
 
     if cfg.nbody.quijote:
         logging.info('Matching ICs to Quijote')
