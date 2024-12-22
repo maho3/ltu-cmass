@@ -420,8 +420,8 @@ def build_halo_catalog(
     '''Build a halo catalog from the given halo properties.
 
     Args:
-        pos (array_like): Halo positions in Mpc/h. Shape (N, 3).
-        vel (array_like): Halo velocities in km/s. Shape (N, 3).
+        pos (array_like): Halo comoving positions in Mpc/h. Shape (N, 3).
+        vel (array_like): Halo physical velocities in km/s. Shape (N, 3).
         mass (array_like): Halo masses in Msun/h. Shape (N,).
         redshift (float): The redshift of the halo catalog.
         BoxSize (float): The size of the simulation box in Mpc/h.

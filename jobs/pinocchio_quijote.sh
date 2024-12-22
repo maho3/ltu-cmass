@@ -29,7 +29,7 @@ end_lhid=499
 # Loop over lhid from start_lhid to end_lhid
 for lhid in $(seq $start_lhid $end_lhid)
 do
-  python -m cmass.nbody.pinocchio nbody=pinocchio_quijote nbody.lhid=$lhid
+  python -m cmass.nbody.pinocchio nbody=pinocchio_quijote nbody.lhid=$lhid 
 done
 
 exit 0

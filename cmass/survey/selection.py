@@ -55,7 +55,8 @@ def remap(ppos, pvel, L, u1, u2, u3):
 
 @timing_decorator
 def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
-    pos, vel = pos.copy(), vel.copy()
+    pos = pos.copy()  # comoving positions [Mpc/h]
+    vel = vel.copy()  # physical velocities [km/s]
 
     # shift to origin
     pos -= pos.mean(axis=0)
