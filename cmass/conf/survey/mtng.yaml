@@ -1,0 +1,29 @@
+# MTNG survey
+
+# is_North: False  (not used)
+
+# Data augmentation seed (for random rotations)
+aug_seed: 0
+
+# # cuboid remap (not used)
+# u1: [1,1,0]
+# u2: [0,0,1]
+# u3: [1,0,0]
+
+# # whether to use lightcone snapshot extrapolation (if available) (not used)
+# lightcone: True
+
+# # Fiber collision method (not used)
+# fibermode: 1  # 0: no collisions, 1: one removed, 2: both removed
+
+# Additional ra, dec, z cuts
+ra_range: [0, 90]
+dec_range: [0, 90]
+z_range: [0.4, 0.7]
+
+# # Middle ra, dec, z of CMASS sample (See test_remove_cuboid for details) (not used)
+# mid_rdz: [2.6749410426432902, 11.867070540112666, 0.48859496106951084]
+
+
+# # For lightcone extrapolation (not used)
+# boss_dir: "${meta.wdir}/obs/"  # path to observational masks

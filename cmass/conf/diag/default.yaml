@@ -9,6 +9,7 @@ halo: false
 galaxy: false
 ngc: false
 sgc: false
+mtng: true
 
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
