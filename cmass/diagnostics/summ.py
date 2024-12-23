@@ -376,6 +376,9 @@ def summarize_lightcone(
                 pos += [-600, 1400, 400]
                 # set length scale of grid (range is about 1750, 3350, 1900)
                 L = 2750
+            elif cap == 'mtng':
+                pos += [100, 100, 100]
+                L = 2000
             else:
                 raise ValueError
 
@@ -500,6 +503,18 @@ def main(cfg: DictConfig) -> None:
         all_done &= done
     else:
         logging.info('Skipping sgc_lightcone diagnostics')
+    if cfg.diag.all or cfg.diag.mtng:
+        done = summarize_lightcone(
+            source_path, cfg.nbody.L, N, Planck18,
+            cap='mtng',
+            threads=threads, from_scratch=from_scratch,
+            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+            summaries=summaries,
+            config=cfg
+        )
+        all_done &= done
+    else:
+        logging.info('Skipping mtng_lightcone diagnostics')
 
     if all_done:
         logging.info('All diagnostics computed successfully')
