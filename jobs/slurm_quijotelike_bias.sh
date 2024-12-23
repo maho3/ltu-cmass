@@ -23,16 +23,16 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=pinocchio_quijote
-sim=pinocchio
+nbody=quijotelike-fid
+sim=fastpm
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=False
 extras="" #"meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
-N=512
+N=128
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
