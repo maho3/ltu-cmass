@@ -5,6 +5,7 @@ halo: True      # whether to train on halo summaries
 galaxy: True    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
+mtng_lightcone: False # whether to train on mtng_lightcone summaries
 
 
 Nmax: 500  # maximum number of simulations to use for training (-1 for all)

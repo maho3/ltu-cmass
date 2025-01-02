@@ -370,6 +370,17 @@ def main(cfg: DictConfig) -> None:
     else:
         logging.info('Skipping sgc_lightcone inference...')
 
+    if cfg.infer.mtng_lightcone:
+        logging.info('Running sgc_lightcone inference...')
+        summaries, parameters, ids = load_lightcone_summaries(
+            suite_path, 'mtng', cfg.infer.Nmax)
+        for exp in cfg.infer.experiments:
+            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
+            run_experiment(summaries, parameters, ids, exp, cfg,
+                           save_path, names=cosmonames+hodnames)
+    else:
+        logging.info('Skipping mtng_lightcone inference...')
+
 
 if __name__ == "__main__":
     main()
