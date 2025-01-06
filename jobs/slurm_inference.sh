@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=inference  # Job name
-#SBATCH --array=0-15  # Array range
+#SBATCH --array=0-11  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
 #SBATCH --gpus-per-node=1     # Number of GPUs
@@ -21,18 +21,22 @@ exp_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
+nbody=mtnglike
 sim=fastpm
-halo=True
-galaxy=True
+infer=lightcone
+
+halo=False
+galaxy=False
 ngc=False
 sgc=False
+mtng=True
+
 extras="" # "nbody.zf=0.500015"
 device=cuda
 
-postfix="nbody=$nbody sim=$sim infer.exp_index=$exp_index"
+postfix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index"
 postfix="$postfix infer.halo=$halo infer.galaxy=$galaxy"
-postfix="$postfix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc"
+postfix="$postfix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
 postfix="$postfix infer.device=$device $extras"
 
 echo "Running inference with $postfix"
