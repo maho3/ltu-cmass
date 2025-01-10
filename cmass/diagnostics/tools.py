@@ -16,7 +16,8 @@ def MA(pos, L, N, MAS='CIC'):
     delta = np.zeros((N, N, N), dtype=np.float32)
     pos %= L
     MASL.MA(pos, delta, BoxSize=L, MAS=MAS)
-    delta /= np.mean(delta, dtype=np.float64)
+    delta = delta.astype(np.float64)
+    delta /= np.mean(delta)
     delta -= 1
     return delta
 
@@ -28,7 +29,7 @@ def MAz(pos, vel, L, N, cosmo, z, MAS='CIC', axis=0):
 
 
 def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
-    Pk = PKL.Pk(delta, L, axis, MAS, threads, verbose=False)
+    Pk = PKL.Pk(delta.astype(np.float32), L, axis, MAS, threads, verbose=False)
     k = Pk.k3D
     Pk = Pk.Pk
     return k, Pk
