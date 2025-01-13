@@ -225,12 +225,13 @@ def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None)
         xs = []
         for summ in exp.summary:
             x, theta, id = summaries[summ], parameters[summ], ids[summ]
-            if summ == 'Pk0':
+            if 'Pk0' in summ:
                 x = preprocess_Pk(x, kmax, monopole=True)
             elif 'Pk' in summ:
-                if 'Pk0' in summaries:
+                norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
+                if norm_key in summaries:
                     x = preprocess_Pk(
-                        x, kmax, monopole=False, norm=summaries['Pk0'])
+                        x, kmax, monopole=False, norm=summaries[norm_key])
                 else:
                     raise ValueError(
                         f'Need monopole for normalization of {summ}')
