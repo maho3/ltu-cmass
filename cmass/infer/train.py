@@ -37,102 +37,60 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
-def load_halo_summaries(suitepath, a, Nmax):
-    logging.info(f'Looking for halo summaries at {suitepath}')
+def load_summaries(suitepath, tracer, Nmax, a=None):
+    if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+        raise ValueError(f'Unknown tracer: {tracer}')
+
+    logging.info(f'Looking for {tracer} summaries at {suitepath}')
+
+    # get list of simulation paths
     simpaths = os.listdir(suitepath)
     simpaths.sort(key=lambda x: int(x))  # sort by lhid
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
 
+    # load summaries
     summlist, paramlist, idlist = [], [], []
+    Ntot = 0
     for lhid in tqdm(simpaths):
+        # specify paths to diagnostics
         sourcepath = join(suitepath, lhid)
         diagpath = join(sourcepath, 'diag')
+        if tracer == 'galaxy':
+            diagpath = join(diagpath, 'galaxies')
+        elif 'lightcone' in tracer:
+            diagpath = join(diagpath, f'{tracer}')
         if not os.path.isdir(diagpath):
             continue
-        diagfile = join(diagpath, 'halos.h5')
-        summ = load_Pk(diagfile, a)  # TODO: load other summaries
-        if len(summ) > 0:
-            summlist.append(summ)
-            paramlist.append(get_cosmo(sourcepath))
-            idlist.append(lhid)
 
-    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
-
-    for key in summaries:
-        logging.info(
-            f'Successfully loaded {len(summaries[key])} / {len(simpaths)} {key}'
-            ' summaries')
-    return summaries, parameters, ids
-
-
-def load_galaxy_summaries(suitepath, a, Nmax):
-    logging.info(f'Looking for galaxy summaries at {suitepath}')
-    simpaths = os.listdir(suitepath)
-    simpaths.sort(key=lambda x: int(x))  # sort by lhid
-    if Nmax >= 0:
-        simpaths = simpaths[:Nmax]
-
-    summlist, paramlist, idlist = [], [], []
-    Ntot = 0
-    for lhid in tqdm(simpaths):
-        sourcepath = join(suitepath, lhid)
-        diagpath = join(sourcepath, 'diag', 'galaxies')
-        if not os.path.isdir(diagpath):
-            continue
-        filelist = os.listdir(diagpath)
+        # for each diagnostics file
+        if tracer == 'halo':
+            filelist = ['halos.h5']
+        else:
+            filelist = os.listdir(diagpath)
         Ntot += len(filelist)
         for f in filelist:
-            diagfile = join(sourcepath, 'diag', 'galaxies', f)
-            summ = load_Pk(diagfile, a)
+            diagfile = join(diagpath, f)
+            # load summaries  # TODO: load other summaries
+            if 'lightcone' in tracer:
+                summ = load_lc_Pk(diagfile)
+            else:
+                summ = load_Pk(diagfile, a)
+            # load parameters
             if len(summ) > 0:
-                try:
-                    paramlist.append(np.concatenate(
-                        [get_cosmo(sourcepath), get_hod(diagfile)], axis=0))
-                except (OSError, KeyError):
-                    continue
+                params = get_cosmo(sourcepath)
+                if tracer != 'halo':  # add HOD params
+                    try:  # sometimes, HOD params not saved right
+                        params = np.concatenate(
+                            [params, get_hod(diagfile)], axis=0)
+                    except (OSError, KeyError):
+                        print(tracer)
+                        continue
                 summlist.append(summ)
+                paramlist.append(params)
                 idlist.append(lhid)
 
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
-
-    for key in summaries:
-        logging.info(
-            f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
-            ' summaries')
-    return summaries, parameters, ids
-
-
-def load_lightcone_summaries(suitepath, cap, Nmax):
-    logging.info(f'Looking for {cap}_lightcone summaries at {suitepath}')
-    simpaths = os.listdir(suitepath)
-    simpaths.sort(key=lambda x: int(x))  # sort by lhid
-    if Nmax >= 0:
-        simpaths = simpaths[:Nmax]
-
-    summlist, paramlist, idlist = [], [], []
-    Ntot = 0
-    for lhid in tqdm(simpaths):
-        sourcepath = join(suitepath, lhid)
-        diagpath = join(sourcepath, 'diag', f'{cap}_lightcone')
-        if not os.path.isdir(diagpath):
-            continue
-        filelist = os.listdir(diagpath)
-        Ntot += len(filelist)
-        for f in filelist:
-            diagfile = join(sourcepath, 'diag', f'{cap}_lightcone', f)
-            summ = load_lc_Pk(diagfile)
-            if len(summ) > 0:
-                try:
-                    paramlist.append(np.concatenate(
-                        [get_cosmo(sourcepath), get_hod(diagfile)], axis=0))
-                except (OSError, KeyError):
-                    continue
-                summlist.append(summ)
-                idlist.append(lhid)
-
-    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
-
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
@@ -335,8 +293,8 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
-        summaries, parameters, ids = load_halo_summaries(
-            suite_path, cfg.nbody.af, cfg.infer.Nmax)
+        summaries, parameters, ids = load_summaries(
+            suite_path, 'halo', cfg.infer.Nmax, a=cfg.nbody.af)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'halo', '+'.join(exp.summary))
             run_experiment(summaries, parameters, ids, exp, cfg,
@@ -346,8 +304,8 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.galaxy:
         logging.info('Running galaxies inference...')
-        summaries, parameters, ids = load_galaxy_summaries(
-            suite_path, cfg.nbody.af, cfg.infer.Nmax)
+        summaries, parameters, ids = load_summaries(
+            suite_path, 'galaxy', cfg.infer.Nmax, a=cfg.nbody.af)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
             run_experiment(summaries, parameters, ids, exp, cfg,
@@ -357,8 +315,8 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone inference...')
-        summaries, parameters, ids = load_lightcone_summaries(
-            suite_path, 'ngc', cfg.infer.Nmax)
+        summaries, parameters, ids = load_summaries(
+            suite_path, 'ngc_lightcone', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, ids, exp, cfg,
@@ -368,8 +326,8 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.infer.sgc_lightcone:
         logging.info('Running sgc_lightcone inference...')
-        summaries, parameters, ids = load_lightcone_summaries(
-            suite_path, 'sgc', cfg.infer.Nmax)
+        summaries, parameters, ids = load_summaries(
+            suite_path, 'sgc_lightcone', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, ids, exp, cfg,
@@ -378,9 +336,9 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping sgc_lightcone inference...')
 
     if cfg.infer.mtng_lightcone:
-        logging.info('Running sgc_lightcone inference...')
-        summaries, parameters, ids = load_lightcone_summaries(
-            suite_path, 'mtng', cfg.infer.Nmax)
+        logging.info('Running mtng_lightcone inference...')
+        summaries, parameters, ids = load_summaries(
+            suite_path, 'sgc_lightcone', cfg.infer.Nmax)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
             run_experiment(summaries, parameters, ids, exp, cfg,
