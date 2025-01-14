@@ -211,10 +211,6 @@ def run_validation(posterior, history, x, theta, out_dir, names=None):
     )
     metric(posterior, x, theta.to('cpu'))
 
-    # save test data
-    np.save(join(out_dir, 'x_test.npy'), x.to('cpu'))
-    np.save(join(out_dir, 'theta_test.npy'), theta.to('cpu'))
-
 
 def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
@@ -249,9 +245,14 @@ def run_experiment(summaries, parameters, ids, exp, cfg, model_path, names=None)
             split_train_test(x, theta, id, cfg.infer.test_frac)
         logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
 
+        # save training/test data
+        np.save(join(exp_path, 'x_train.npy'), x_train)
+        np.save(join(exp_path, 'theta_train.npy'), theta_train)
+        np.save(join(exp_path, 'x_test.npy'), x_test)
+        np.save(join(exp_path, 'theta_test.npy'), theta_test)
+
         # run inference
-        posterior, history = run_inference(
-            x_train, theta_train, cfg, exp_path)
+        posterior, history = run_inference(x_train, theta_train, cfg, exp_path)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)
