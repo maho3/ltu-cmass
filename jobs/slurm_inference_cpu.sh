@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=galinference  # Job name
+#SBATCH --job-name=inference  # Job name
 #SBATCH --array=0-23  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
@@ -25,8 +25,8 @@ sim=fastpm
 infer=default
 
 halo=False
-galaxy=True
-ngc=False
+galaxy=False
+ngc=True
 sgc=False
 mtng=False
 
@@ -39,5 +39,5 @@ postfix="$postfix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_l
 postfix="$postfix infer.device=$device $extras"
 
 echo "Running inference with $postfix"
-# python -m cmass.infer.preprocess $postfix
+python -m cmass.infer.preprocess $postfix
 python -m cmass.infer.train $postfix
