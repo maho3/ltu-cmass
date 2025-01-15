@@ -53,7 +53,10 @@ def load_lc_Pk(diag_file):
     return summ
 
 
-def preprocess_Pk(X, kmax):
+def preprocess_Pk(X, kmax, monopole=True, norm=None):
+    if (not monopole) and (norm is None):
+        raise ValueError('norm must be provided when monopole is False')
+
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
@@ -62,8 +65,21 @@ def preprocess_Pk(X, kmax):
         Xout.append(value)
     Xout = np.array(Xout)
 
-    # log transform
-    Xout = np.log(Xout + 1e-5)
+    if monopole:
+        # log transform
+        Xout = np.log(Xout)
+    else:
+        # compute monopole
+        Xnorm = []
+        for x in norm:
+            k, value = x['k'], x['value']
+            # cut k
+            value = value[k <= kmax]
+            Xnorm.append(value)
+        Xnorm = np.array(Xnorm)
+
+        # normalize by the monopole
+        Xout /= Xnorm
 
     # impute nans
     Xout = np.nan_to_num(Xout, nan=0.0)
