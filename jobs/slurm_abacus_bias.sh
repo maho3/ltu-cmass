@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=9
 
 module restore cmass
 conda activate cmassrun
@@ -22,14 +22,14 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=abacuslike
-sim=fastpm
+nbody=pinocchio_2gpch
+sim=pinocchio
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=False
 extras="nbody.zf=0.500015"
 L=2000
-N=256
+N=1024
 
 outdir=/anvil/scratch/x-mho1/cmass-ili/abacuslike/$sim/L$L-N$N
 echo "outdir=$outdir"

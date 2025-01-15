@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+SLURM_ARRAY_TASK_ID=1668
 
 module restore cmass
 conda activate cmassrun
@@ -26,7 +26,7 @@ nbody=mtnglike
 sim=fastpm
 multisnapshot=False
 diag_from_scratch=False
-rm_galaxies=True
+rm_galaxies=False
 extras="nbody.zf=0.500015"
 L=3000
 N=384
