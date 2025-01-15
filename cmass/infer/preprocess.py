@@ -120,6 +120,13 @@ def split_train_test(x, theta, ids, test_frac, seed=None):
 
 def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
+
+    # check that there's data
+    for summ in exp.summary:
+        if (summ not in summaries) or (len(summaries[summ]) == 0):
+            logging.warning(f'No data for {exp.summary}. Skipping...')
+            return
+
     name = '+'.join(exp.summary)
     for kmax in exp.kmax:
         logging.info(f'Running preprocessing for {name} with kmax={kmax}')
@@ -153,6 +160,7 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 
         # save training/test data
         logging.info(f'Saving training/test data to {exp_path}')
+        os.makedirs(exp_path, exist_ok=True)
         np.save(join(exp_path, 'x_train.npy'), x_train)
         np.save(join(exp_path, 'theta_train.npy'), theta_train)
         np.save(join(exp_path, 'x_test.npy'), x_test)
