@@ -9,6 +9,7 @@ from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
+from torch import nn
 
 from ..utils import timing_decorator
 from ..nbody.tools import parse_nbody_config
@@ -44,8 +45,8 @@ def run_inference(x, theta, cfg, out_dir):
     else:
         raise NotImplementedError
 
-    if cfg.infer.fcn_hidden is None:
-        embedding = None
+    if ('fcn_hidden' not in cfg.infer) or (cfg.infer.fcn_hidden is None):
+        embedding = nn.Identity()
     else:
         embedding = FCN(
             n_hidden=cfg.infer.fcn_hidden,

@@ -100,7 +100,9 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
     return summaries, parameters, ids
 
 
-def split_train_test(x, theta, ids, test_frac):
+def split_train_test(x, theta, ids, test_frac, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
     x, theta, ids = map(np.array, [x, theta, ids])
     unique_ids = np.unique(ids)
     np.random.shuffle(unique_ids)
@@ -113,7 +115,7 @@ def split_train_test(x, theta, ids, test_frac):
     x_train, x_test = x[train_mask], x[test_mask]
     theta_train, theta_test = theta[train_mask], theta[test_mask]
 
-    return x_train, x_test, theta_train, theta_test,
+    return x_train, x_test, theta_train, theta_test
 
 
 def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
@@ -146,7 +148,7 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 
         # split train/test
         x_train, x_test, theta_train, theta_test = split_train_test(
-            x, theta, id, cfg.infer.test_frac)
+            x, theta, id, cfg.infer.test_frac, cfg.infer.seed)
         logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
 
         # save training/test data
