@@ -28,14 +28,14 @@ net_index: 0     # index of network to use in cfg.net
 
 experiments:
   - summary: [Pk0]   # monopole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [Pk0, Pk2]   # monopole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [zPk0]   # monopole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [zPk0, zPk2]   # monopole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [zPk0, zPk2, zPk4]  # redshift-space monopole, quadrupole, hexadecapole
-    kmax: [0.2, 0.3, 0.4, 0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
