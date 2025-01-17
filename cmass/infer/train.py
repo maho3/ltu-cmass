@@ -8,36 +8,25 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import torch
 from torch import nn
 
+from .tools import split_experiments
 from ..utils import timing_decorator
 from ..nbody.tools import parse_nbody_config
 
 import ili
 from ili.dataloaders import NumpyLoader
 from ili.inference import InferenceRunner
-from ili.validation.metrics import PosteriorCoverage, PlotSinglePosterior
 from ili.embedding import FCN
 
 import matplotlib.pyplot as plt
-
-
-def split_experiments(exp_cfg):
-    new_exps = []
-    for exp in exp_cfg:
-        for kmax in exp.kmax:
-            new_exp = exp.copy()
-            new_exp.kmax = [kmax]
-            new_exps.append(new_exp)
-    return new_exps
 
 
 def run_inference(x, theta, cfg, out_dir):
     loader = NumpyLoader(x=x, theta=theta)
 
     # select the network configuration
-    mcfg = cfg.net[cfg.infer.net_index]
+    mcfg = cfg.net
     logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
@@ -94,43 +83,24 @@ def run_inference(x, theta, cfg, out_dir):
     # train the model
     posterior, histories = runner(loader=loader)
 
-    return posterior, histories
-
-
-def run_validation(posterior, history, x, theta, out_dir, names=None):
-    logging.info('Running validation...')
-
     # Plot training history
     logging.info('Plotting training history...')
     f, ax = plt.subplots(1, 1, figsize=(6, 4))
-    for i, h in enumerate(history):
+    for i, h in enumerate(histories):
         ax.plot(h['validation_log_probs'], label=f'Net {i}')
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
     f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
 
-    # Plotting single posterior
-    logging.info('Plotting single posterior...')
-    xobs, thetaobs = x[0], theta[0]
-    metric = PlotSinglePosterior(
-        num_samples=1000, sample_method='direct',
-        labels=names, out_dir=out_dir
-    )
-    metric(posterior, x_obs=xobs, theta_fid=thetaobs.to('cpu'))
-
-    # Posterior coverage
-    logging.info('Running posterior coverage...')
-    metric = PosteriorCoverage(
-        num_samples=1000, sample_method='direct',
-        labels=names,
-        plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
-        out_dir=out_dir,
-        save_samples=True
-    )
-    metric(posterior, x, theta.to('cpu'))
+    return posterior, histories
 
 
-def run_experiment(exp, cfg, model_path, names=None):
+def evaluate_posterior(posterior, x, theta):
+    log_prob = posterior.log_prob(theta=theta, x=x)
+    return log_prob.mean()
+
+
+def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
     for kmax in exp.kmax:
@@ -152,21 +122,21 @@ def run_experiment(exp, cfg, model_path, names=None):
 
         logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
 
-        # run inference
-        posterior, history = run_inference(x_train, theta_train, cfg, exp_path)
+        out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+        logging.info(f'Saving models to {out_dir}')
 
-        # run validation
-        x_test = torch.Tensor(x_test).to(cfg.infer.device)
-        theta_test = torch.Tensor(theta_test).to(cfg.infer.device)
-        run_validation(posterior, history, x_test, theta_test,
-                       exp_path, names=names)
+        # run inference
+        posterior, history = run_inference(x_train, theta_train, cfg, out_dir)
+
+        # evaluate the posterior and save to file
+        log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
+        with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+            f.write(f'{log_prob_test}\n')
 
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     cfg = parse_nbody_config(cfg)
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
@@ -175,16 +145,15 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
+    cfg.net = cfg.net[cfg.infer.net_index]
 
-    cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
-    hodnames = [r'$\alpha$', r'$\log M_0$', r'$\log M_1$',
-                r'$\log M_{\min}$', r'$\sigma_{\log M}$']  # TODO: load these from file?
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     if cfg.infer.halo:
         logging.info('Running halo inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping halo inference...')
 
@@ -192,7 +161,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running galaxies inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping galaxy inference...')
 
@@ -200,7 +169,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running ngc_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping ngc_lightcone inference...')
 
@@ -208,7 +177,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running sgc_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping sgc_lightcone inference...')
 
@@ -216,7 +185,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running mtng_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping mtng_lightcone inference...')
 

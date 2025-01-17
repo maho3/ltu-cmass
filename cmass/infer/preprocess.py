@@ -13,17 +13,9 @@ from tqdm import tqdm
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from .loaders import get_cosmo, get_hod, load_Pk, load_lc_Pk, preprocess_Pk
-
-
-def split_experiments(exp_cfg):
-    new_exps = []
-    for exp in exp_cfg:
-        for kmax in exp.kmax:
-            new_exp = exp.copy()
-            new_exp.kmax = [kmax]
-            new_exps.append(new_exp)
-    return new_exps
+from .tools import split_experiments
+from .loaders import get_cosmo, get_hod
+from .loaders import load_Pk, load_lc_Pk, preprocess_Pk
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -170,9 +162,6 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 @ timing_decorator
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-
-    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     cfg = parse_nbody_config(cfg)
     suite_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -184,6 +173,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
+
+    logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     if cfg.infer.halo:
         logging.info('Running halo preprocessing...')
