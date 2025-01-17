@@ -139,6 +139,7 @@ timing_stats*
 sbi-logs
 matts_tests
 .vscode
+cmass-paper
 
 *slurm_hostfile*
 
