@@ -9,8 +9,8 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=null
-export TQDM_DISABLE=0
+SLURM_ARRAY_TASK_ID=0
+# export TQDM_DISABLE=0
 
 module restore cmass
 conda activate cmass
@@ -33,11 +33,11 @@ mtng=False
 extras="nbody.zf=0.500015"
 device=cpu
 
-postfix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index"
-postfix="$postfix infer.halo=$halo infer.galaxy=$galaxy"
-postfix="$postfix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
-postfix="$postfix infer.device=$device $extras"
+suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index"
+suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
+suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
+suffix="$suffix infer.device=$device $extras"
 
-echo "Running inference with $postfix"
-python -m cmass.infer.preprocess $postfix
-python -m cmass.infer.train $postfix
+echo "Running inference with $suffix"
+# python -m cmass.infer.preprocess $suffix
+python -m cmass.infer.train $suffix

@@ -36,6 +36,10 @@ def split_experiments(exp_cfg):
 def run_inference(x, theta, cfg, out_dir):
     loader = NumpyLoader(x=x, theta=theta)
 
+    # select the network configuration
+    mcfg = cfg.net[cfg.infer.net_index]
+    logging.info(f'Using network architecture: {mcfg}')
+
     # define a prior
     if cfg.infer.prior.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -45,11 +49,11 @@ def run_inference(x, theta, cfg, out_dir):
     else:
         raise NotImplementedError
 
-    if ('fcn_hidden' not in cfg.infer) or (cfg.infer.fcn_hidden is None):
+    if mcfg.fcn_depth == 0:
         embedding = nn.Identity()
     else:
         embedding = FCN(
-            n_hidden=cfg.infer.fcn_hidden,
+            n_hidden=[mcfg.fcn_width]*mcfg.fcn_depth,
             act_fn='ReLU'
         )
 
@@ -62,14 +66,9 @@ def run_inference(x, theta, cfg, out_dir):
         extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
-    nets = []
-    for net in cfg.infer.nets:
-        logging.info(f'Adding {net}')
-        nets.append(net_loader(
-            **net,
-            **extra_kwargs,
-            embedding_net=embedding)
-        )
+    kwargs = {k: v for k, v in mcfg.items() if k in [
+        'model', 'hidden_features', 'num_transforms', 'num_components']}
+    nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
     train_args = {
