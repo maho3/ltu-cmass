@@ -36,7 +36,7 @@ from ..nbody.tools import parse_nbody_config
 @ timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
-    cosmo, L, zf,
+    cosmo, L, redshift,
     model, theta,
     hmeta=None,
     seed=0, mdef='vir'
@@ -52,7 +52,7 @@ def populate_hod(
 
     BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
-        hpos, hvel, 10**hmass, zf, BoxSize, cosmo,
+        hpos, hvel, 10**hmass, redshift, BoxSize, cosmo,
         mdef=mdef, conc=hconc
     )
 
@@ -60,7 +60,7 @@ def populate_hod(
         cosmo,
         model=model,
         theta=theta,
-        zf=zf,
+        zf=redshift,
         mdef=mdef
     )
     hod.populate_mock(catalog, seed=seed, halo_mass_column_key=f'halo_m{mdef}')
@@ -69,12 +69,12 @@ def populate_hod(
     return galcat
 
 
-def run_snapshot(hpos, hvel, hmass, cfg, hmeta=None):
+def run_snapshot(hpos, hvel, hmass, a, cfg, hmeta=None):
     # Populate HOD
     logging.info('Populating HOD...')
     hod = populate_hod(
         hpos, hvel, hmass,
-        cfg.nbody.cosmo, cfg.nbody.L, cfg.nbody.zf,
+        cfg.nbody.cosmo, cfg.nbody.L, (1/a)-1,
         cfg.bias.hod.model, cfg.bias.hod.theta,
         seed=cfg.bias.hod.seed,
         hmeta=hmeta if cfg.bias.hod.use_conc else None,
@@ -160,7 +160,7 @@ def main(cfg: DictConfig) -> None:
         hpos, hvel, hmass, hmeta = load_snapshot(source_path, a)
 
         # Populate HOD
-        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, cfg, hmeta=hmeta)
+        gpos, gvel, gmeta = run_snapshot(hpos, hvel, hmass, a, cfg, hmeta=hmeta)
 
         # Save snapshot
         save_snapshot(save_file, a, gpos, gvel, **gmeta)

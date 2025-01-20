@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk
+from .tools import calcPk, calcBk
 from ..survey.tools import sky_to_xyz
 
 
@@ -91,7 +91,7 @@ def store_summary(
     logging.info(f'Computing Summary: {summary_name}')
 
     # compute summary
-    import summarizer  # only import if needed
+    import summarizer  # only import if needed. TODO: get working
     summary_function = getattr(summarizer, summary_name)(**binning_config)
     summary_data = summary_function(catalog)
 
@@ -110,7 +110,7 @@ def run_pylians(
     MAS='CIC'
 ):
     # Only for power spectrum
-    accept_summaries = ['Pk']
+    accept_summaries = ['Pk', 'Bk']
 
     for summary_name in summaries:
         if summary_name == 'Pk':
@@ -120,6 +120,13 @@ def run_pylians(
             group.create_dataset(key, data=k)
             key = f"{'z' if use_rsd else ''}{summary_name}"
             group.create_dataset(key, data=Pk)
+        elif summary_name == 'Bk':
+            k, Bk = calcBk(field, box_size, axis=axis,
+                           MAS=MAS, threads=num_threads)
+            key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
+            group.create_dataset(key, data=k)
+            key = f"{'z' if use_rsd else ''}{summary_name}"
+            group.create_dataset(key, data=Bk)
         elif summary_name not in accept_summaries:
             logging.error(f'{summary_name} not yet implemented in Pylians')
             continue
@@ -299,6 +306,21 @@ def summarize_tracer(
                         field, group, ['Pk'], L, axis=0, MAS=MAS,
                         num_threads=threads, use_rsd=True
                     )
+                if 'Bk' in summaries:
+                    # real space
+                    MAS = 'TSC'
+                    field = MA(pos, L, N, MAS=MAS)
+                    run_pylians(
+                        field, group, ['Bk'], L, axis=0, MAS=MAS,
+                        num_threads=threads, use_rsd=False
+                    )
+
+                    # redshift space
+                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
+                    run_pylians(
+                        field, group, ['Bk'], L, axis=0, MAS=MAS,
+                        num_threads=threads, use_rsd=True
+                    )
 
                 # Compute other summaries
                 others = [s for s in summaries if s != 'Pk']
@@ -398,9 +420,17 @@ def summarize_lightcone(
                     field, o, ['Pk'], L, axis=0, MAS=MAS,
                     num_threads=threads, use_rsd=False
                 )
+            if 'Bk' in summaries:
+                MAS = 'TSC'
+                field = MA(pos, L, N, MAS=MAS)
+                run_pylians(
+                    field, o, ['Bk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=False
+                )
 
             # Compute other summaries
-            others = [s for s in summaries if s != 'Pk']
+            others = [s for s in summaries if (
+                ('Pk' not in s) and ('Bk' not in s))]
             if len(others) > 0:
                 run_summarizer(
                     pos, np.zeros_like(pos), cosmo[2], z, L, N,
