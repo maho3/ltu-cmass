@@ -50,6 +50,7 @@ def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
         boxsize=[L]*3,
         boxcenter=(0., 0., 0.),
         pixel_window=MAS.lower(),
+        backend='jax'
     )
     bspec = pb.BSpec(
         base,

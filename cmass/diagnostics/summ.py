@@ -202,10 +202,16 @@ def summarize_rho(
                 logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
                 group = o.create_group(a)
-                run_pylians(
-                    rho, group, ['Pk'], L, axis=0, MAS='CIC',
-                    num_threads=threads, use_rsd=False
-                )
+                if 'Pk' in config.diag.summaries:
+                    run_pylians(
+                        rho, group, ['Pk'], L, axis=0, MAS='CIC',
+                        num_threads=threads, use_rsd=False
+                    )
+                if 'Bk' in config.diag.summaries:
+                    run_pylians(
+                        rho, group, ['Bk'], L, axis=0, MAS='CIC',
+                        num_threads=threads, use_rsd=False
+                    )
     return True
 
 
@@ -323,7 +329,8 @@ def summarize_tracer(
                     )
 
                 # Compute other summaries
-                others = [s for s in summaries if s != 'Pk']
+                others = [s for s in summaries if (
+                    ('Pk' not in s) and ('Bk' not in s))]
                 if len(others) > 0:
                     run_summarizer(
                         pos, vel, cosmo.h, z, L, N,
