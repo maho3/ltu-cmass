@@ -11,7 +11,7 @@
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
 
-# SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=0
 export TQDM_DISABLE=0
 
 module restore cmass

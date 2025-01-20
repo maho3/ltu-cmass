@@ -20,7 +20,7 @@ backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
 batch_size: 128  # batch size
-learning_rate: 5e-4  # learning rate
+learning_rate: 1e-4  # learning rate
 
 device: cpu  # cpu or cuda
 

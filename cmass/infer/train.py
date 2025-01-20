@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 
 
 def run_inference(x, theta, cfg, out_dir):
+    # TODO: split into train/validation by lhid
     loader = NumpyLoader(x=x, theta=theta)
 
     # select the network configuration
