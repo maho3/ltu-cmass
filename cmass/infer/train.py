@@ -9,6 +9,7 @@ from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
+import yaml
 
 from .tools import split_experiments
 from ..utils import timing_decorator
@@ -83,6 +84,10 @@ def run_inference(x, theta, cfg, out_dir):
 
     # train the model
     posterior, histories = runner(loader=loader)
+
+    # save the model configuration
+    with open(join(out_dir, 'config.yaml'), 'w') as f:
+        yaml.dump(kwargs, f)
 
     # Plot training history
     logging.info('Plotting training history...')
