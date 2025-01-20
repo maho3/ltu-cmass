@@ -58,6 +58,7 @@ def get_ICs(cfg, outdir):
         logging.info(command)
         os.system(command)
         ic = load_white_noise(path_to_ic, N, quijote=True)
+        np.savetxt(join(outdir, 'seed.txt'), [seed])
 
     # Convert to real space
     ic = np.fft.irfftn(ic, norm="ortho").astype(np.float32)
@@ -360,7 +361,7 @@ def delete_files(cfg, outdir):
                 return
 
     files_to_keep = ['input_power_spectrum.txt', 'halos.h5',
-                     'nbody.h5', 'parameter_file', 'config.yaml']
+                     'nbody.h5', 'parameter_file', 'config.yaml', 'seed.txt']
 
     for f in all_files:
         if f not in files_to_keep:

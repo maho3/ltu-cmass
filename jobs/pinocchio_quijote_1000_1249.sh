@@ -5,8 +5,8 @@
 #SBATCH -p shared # the default queue is "shared" queue
 #SBATCH --nodes=1
 #SBATCH --ntasks=32 
-#SBATCH --time=13:00:00
-#SBATCH --job-name pinocchio_quijote_0
+#SBATCH --time=8:00:00
+#SBATCH --job-name pinocchio_quijote_1000_1249
 #SBATCH --output=/anvil/scratch/x-dbartlett/cmass/quijotelike/pinocchio/pinocchio_log_%j.out
 #SBATCH --error=/anvil/scratch/x-dbartlett/cmass/quijotelike/pinocchio/pinocchio_log_%j.err
 
@@ -23,8 +23,8 @@ cd /home/x-dbartlett/ltu-cmass
 pwd
 
 # Define the range for lhid
-start_lhid=0
-end_lhid=249
+start_lhid=1192
+end_lhid=1249
 
 # Loop over lhid from start_lhid to end_lhid
 for lhid in $(seq $start_lhid $end_lhid)
