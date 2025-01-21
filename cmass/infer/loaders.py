@@ -88,3 +88,61 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None):
     Xout = Xout.reshape(len(Xout), -1)
 
     return Xout
+
+
+
+def load_Bk(diag_file, a):
+    a = f'{a:.6f}'
+    if not os.path.exists(diag_file):
+        return {}
+    summ = {}
+    try:
+        with h5py.File(diag_file, 'r') as f:
+            for stat in ['Bk', 'Qk']:
+                if stat in f[a]:
+                    for i in range(2):  # monopole, quadrupole
+                        summ[stat+str(2*i)] = {
+                            'k': f[a]['Bk_k123'][:],
+                            'value': f[a][stat][i, :] / np.prod(f[a]['Bk_k123'][:], axis=0),
+                        }
+    except (OSError, KeyError):
+        return {}
+    return summ
+
+
+def load_lc_Bk(diag_file):
+    if not os.path.exists(diag_file):
+        return {}
+    summ = {}
+    try:
+        with h5py.File(diag_file, 'r') as f:
+            for stat in ['Bk', 'Qk']:
+                if stat in f:
+                    for i in range(2):  # monopole, quadrupole
+                        summ[stat+str(2*i)] = {
+                            'k': f['Bk_k123'][:],
+                            'value': f[stat][i, :] / np.prod(f['Bk_k123'][:], axis=0),
+                        }
+    except (OSError, KeyError):
+        return {}
+    return summ
+
+
+def preprocess_Bk(X, kmax,):
+    
+    Xout = []
+    for x in X:
+        k, value = x['k'], x['value']
+        # cut k
+        value = value[~ np.any(k > kmax, axis=0)]
+        Xout.append(value)
+    Xout = np.array(Xout)
+
+    # impute nans
+    Xout = np.nan_to_num(Xout, nan=0.0)
+
+    # flatten
+    Xout = Xout.reshape(len(Xout), -1)
+
+    return Xout
+
