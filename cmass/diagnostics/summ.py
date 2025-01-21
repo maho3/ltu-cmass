@@ -113,20 +113,21 @@ def run_pylians(
     accept_summaries = ['Pk', 'Bk']
 
     for summary_name in summaries:
+        pfx = 'z' if use_rsd else ''
         if summary_name == 'Pk':
             k, Pk = calcPk(field, box_size, axis=axis,
                            MAS=MAS, threads=num_threads)
-            key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
-            group.create_dataset(key, data=k)
-            key = f"{'z' if use_rsd else ''}{summary_name}"
-            group.create_dataset(key, data=Pk)
+            group.create_dataset(pfx+'Pk_k3D', data=k)
+            group.create_dataset(pfx+'Pk', data=Pk)
         elif summary_name == 'Bk':
-            k, Bk = calcBk(field, box_size, axis=axis,
-                           MAS=MAS, threads=num_threads)
-            key = f"{'z' if use_rsd else ''}{summary_name}_k3D"
-            group.create_dataset(key, data=k)
-            key = f"{'z' if use_rsd else ''}{summary_name}"
-            group.create_dataset(key, data=Bk)
+            k123, Bk, Qk, k, Pk = calcBk(
+                field, box_size, axis=axis,
+                MAS=MAS, threads=num_threads)
+            group.create_dataset(pfx+'Bk_k123', data=k123)
+            group.create_dataset(pfx+'Bk', data=Bk)
+            group.create_dataset(pfx+'Qk', data=Qk)
+            group.create_dataset(pfx+'bPk_k3D', data=k123)
+            group.create_dataset(pfx+'bPk', data=Pk)
         elif summary_name not in accept_summaries:
             logging.error(f'{summary_name} not yet implemented in Pylians')
             continue
@@ -202,10 +203,16 @@ def summarize_rho(
                 logging.info(f'Processing density field a={a}')
                 rho = f[a]['rho'][...].astype(np.float32)
                 group = o.create_group(a)
-                run_pylians(
-                    rho, group, ['Pk'], L, axis=0, MAS='CIC',
-                    num_threads=threads, use_rsd=False
-                )
+                if 'Pk' in config.diag.summaries:
+                    run_pylians(
+                        rho, group, ['Pk'], L, axis=0, MAS='CIC',
+                        num_threads=threads, use_rsd=False
+                    )
+                if 'Bk' in config.diag.summaries:
+                    run_pylians(
+                        rho, group, ['Bk'], L, axis=0, MAS='CIC',
+                        num_threads=threads, use_rsd=False
+                    )
     return True
 
 
@@ -323,7 +330,8 @@ def summarize_tracer(
                     )
 
                 # Compute other summaries
-                others = [s for s in summaries if s != 'Pk']
+                others = [s for s in summaries if (
+                    ('Pk' not in s) and ('Bk' not in s))]
                 if len(others) > 0:
                     run_summarizer(
                         pos, vel, cosmo.h, z, L, N,
