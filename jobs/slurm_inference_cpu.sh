@@ -10,12 +10,12 @@
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
 # SLURM_ARRAY_TASK_ID=1
-export TQDM_DISABLE=0
+# export TQDM_DISABLE=0
 
 module restore cmass
 conda activate cmass
 
-exp_index=0
+exp_index=9
 net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
@@ -41,5 +41,5 @@ suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference with $suffix"
 # python -m cmass.infer.preprocess $suffix
-python -m cmass.infer.train $suffix net=tuning
-# python -m cmass.infer.validate $suffix
+# python -m cmass.infer.train $suffix net=tuning
+python -m cmass.infer.validate $suffix

@@ -61,9 +61,12 @@ def load_ensemble(exp_path, Nnets):
         else:
             log_probs.append(-np.inf)
 
-    N_converged_nets = np.isfinite(log_probs).sum()
-    logging.info(
-        f'Found {N_converged_nets} converged nets.')
+    # Remove nets that did not converge
+    mask = np.isfinite(log_probs)
+    net_dirs = np.array(net_dirs)[mask]
+    log_probs = np.array(log_probs)[mask]
+
+    logging.info(f'Found {len(log_probs)} converged nets.')
 
     top_nets = np.argsort(log_probs)[::-1][:Nnets]
     logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')
@@ -71,7 +74,8 @@ def load_ensemble(exp_path, Nnets):
     ensemble_list = []
     for i in top_nets:
         model_path = join(exp_path, 'nets', net_dirs[i], 'posterior.pkl')
-        ensemble_list.append(load_posterior(model_path, 'cpu'))
+        pi = load_posterior(model_path, 'cpu')
+        ensemble_list.append(pi.posteriors[0])
 
     ensemble = LampeEnsemble(
         posteriors=ensemble_list,
