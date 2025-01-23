@@ -67,6 +67,8 @@ def load_ensemble(exp_path, Nnets):
     log_probs = np.array(log_probs)[mask]
 
     logging.info(f'Found {len(log_probs)} converged nets.')
+    if len(log_probs) == 0:
+        raise ValueError('No converged nets found.')
 
     top_nets = np.argsort(log_probs)[::-1][:Nnets]
     logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')

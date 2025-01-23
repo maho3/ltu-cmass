@@ -92,22 +92,29 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
     return summaries, parameters, ids
 
 
-def split_train_test(x, theta, ids, test_frac, seed=None):
+def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
     if seed is not None:
         np.random.seed(seed)
     x, theta, ids = map(np.array, [x, theta, ids])
+
+    # split by lhid
     unique_ids = np.unique(ids)
     np.random.shuffle(unique_ids)
-    cutoff = int(len(unique_ids) * (1 - test_frac))
-    ids_train, ids_test = unique_ids[:cutoff], unique_ids[cutoff:]
+    s1, s2 = int(val_frac * len(unique_ids)), int(test_frac * len(unique_ids))
+    ui_val = unique_ids[:s1]
+    ui_test = unique_ids[s1:s1+s2]
+    ui_train = unique_ids[s1+s2:]
 
-    train_mask = np.isin(ids, ids_train)
-    test_mask = np.isin(ids, ids_test)
+    # mask
+    train_mask = np.isin(ids, ui_train)
+    val_mask = np.isin(ids, ui_val)
+    test_mask = np.isin(ids, ui_test)
+    x_train, x_val, x_test = x[train_mask], x[val_mask], x[test_mask]
+    theta_train, theta_val, theta_test = theta[train_mask], theta[val_mask], theta[test_mask]
+    ids_train, ids_val, ids_test = ids[train_mask], ids[val_mask], ids[test_mask]
 
-    x_train, x_test = x[train_mask], x[test_mask]
-    theta_train, theta_test = theta[train_mask], theta[test_mask]
-
-    return x_train, x_test, theta_train, theta_test
+    return ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
+            (ids_train, ids_val, ids_test))
 
 
 def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
@@ -146,17 +153,25 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
         x = np.concatenate(xs, axis=-1)
 
         # split train/test
-        x_train, x_test, theta_train, theta_test = split_train_test(
-            x, theta, id, cfg.infer.test_frac, cfg.infer.seed)
-        logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
+        ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
+         (ids_train, ids_val, ids_test)) = split_train_val_test(
+            x, theta, id,
+            cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
+        logging.info(f'Split: {len(x_train)} training, '
+                     f'{len(x_val)} validation, {len(x_test)} testing')
 
         # save training/test data
         logging.info(f'Saving training/test data to {exp_path}')
         os.makedirs(exp_path, exist_ok=True)
         np.save(join(exp_path, 'x_train.npy'), x_train)
-        np.save(join(exp_path, 'theta_train.npy'), theta_train)
+        np.save(join(exp_path, 'x_val.npy'), x_val)
         np.save(join(exp_path, 'x_test.npy'), x_test)
+        np.save(join(exp_path, 'theta_train.npy'), theta_train)
+        np.save(join(exp_path, 'theta_val.npy'), theta_val)
         np.save(join(exp_path, 'theta_test.npy'), theta_test)
+        np.save(join(exp_path, 'ids_train.npy'), ids_train)
+        np.save(join(exp_path, 'ids_val.npy'), ids_val)
+        np.save(join(exp_path, 'ids_test.npy'), ids_test)
 
 
 @ timing_decorator

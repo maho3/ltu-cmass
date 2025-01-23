@@ -16,16 +16,34 @@ from ..utils import timing_decorator
 from ..nbody.tools import parse_nbody_config
 
 import ili
-from ili.dataloaders import NumpyLoader
+from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
+
+import torch
+from torch.utils.data import TensorDataset, DataLoader
 
 import matplotlib.pyplot as plt
 
 
-def run_inference(x, theta, cfg, out_dir):
-    # TODO: split into train/validation by lhid
-    loader = NumpyLoader(x=x, theta=theta)
+def prepare_loader(x, theta, device='cpu', **kwargs):
+    x = torch.Tensor(x).to(device)
+    theta = torch.Tensor(theta).to(device)
+    dataset = TensorDataset(x, theta)
+    loader = DataLoader(dataset, **kwargs)
+    return loader
+
+
+def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
+    train_loader = prepare_loader(
+        x_train, theta_train,
+        device=cfg.infer.device,
+        batch_size=cfg.infer.batch_size, shuffle=True)
+    val_loader = prepare_loader(
+        x_val, theta_val,
+        device=cfg.infer.device,
+        batch_size=cfg.infer.batch_size, shuffle=False)
+    loader = TorchLoader(train_loader, val_loader)
 
     # select the network configuration
     mcfg = cfg.net
@@ -34,8 +52,8 @@ def run_inference(x, theta, cfg, out_dir):
     # define a prior
     if cfg.infer.prior.lower() == 'uniform':
         prior = ili.utils.Uniform(
-            low=theta.min(axis=0),
-            high=theta.max(axis=0),
+            low=theta_train.min(axis=0),
+            high=theta_train.max(axis=0),
             device=cfg.infer.device)
     else:
         raise NotImplementedError
@@ -118,6 +136,8 @@ def run_experiment(exp, cfg, model_path):
             logging.info(f'Loading training/test data from {exp_path}')
             x_train = np.load(join(exp_path, 'x_train.npy'))
             theta_train = np.load(join(exp_path, 'theta_train.npy'))
+            x_val = np.load(join(exp_path, 'x_val.npy'))
+            theta_val = np.load(join(exp_path, 'theta_val.npy'))
             x_test = np.load(join(exp_path, 'x_test.npy'))
             theta_test = np.load(join(exp_path, 'theta_test.npy'))
         except FileNotFoundError:
@@ -132,7 +152,8 @@ def run_experiment(exp, cfg, model_path):
         logging.info(f'Saving models to {out_dir}')
 
         # run inference
-        posterior, history = run_inference(x_train, theta_train, cfg, out_dir)
+        posterior, history = run_inference(
+            x_train, theta_train, x_val, theta_val, cfg, out_dir)
 
         # evaluate the posterior and save to file
         log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
