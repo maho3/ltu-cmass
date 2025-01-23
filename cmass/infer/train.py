@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 import yaml
 
-from .tools import split_experiments
+from .tools import split_experiments, prepare_loader
 from ..utils import timing_decorator
 from ..nbody.tools import parse_nbody_config
 
@@ -20,18 +20,45 @@ from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
 
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 
 import matplotlib.pyplot as plt
 
 
-def prepare_loader(x, theta, device='cpu', **kwargs):
-    x = torch.Tensor(x).to(device)
-    theta = torch.Tensor(theta).to(device)
-    dataset = TensorDataset(x, theta)
-    loader = DataLoader(dataset, **kwargs)
-    return loader
+def prepare_prior(cfg, theta=None):
+    # define a prior
+    if cfg.infer.prior.lower() == 'uniform':
+        prior = ili.utils.Uniform(
+            low=theta.min(axis=0),
+            high=theta.max(axis=0),
+            device=cfg.infer.device)
+    elif cfg.infer.prior.lower() == 'quijote':
+        # cosmology prior
+        prior_lims = np.array([
+            (0.1, 0.5),  # Omega_m
+            (0.03, 0.07),  # Omega_b
+            (0.5, 0.9),  # h
+            (0.8, 1.2),  # n_s
+            (0.7, 0.9),  # sigma8
+        ])
+        if theta.shape[-1] > 5:  # galaxy or lightcone
+            if cfg.bias.hod.model.lower() == 'zheng07':
+                # TODO: load these from cmass.bias.tools.hod?
+                hod_lims = np.array([
+                    [12.0, 14.0],  # logMmin
+                    [0.1, 0.6],  # sigma_logM
+                    [13.0, 15.0],  # logM0
+                    [13.0, 15.0],  # logM1
+                    [0.0, 1.5]]  # alpha
+                )
+                prior_lims = np.vstack([prior_lims, hod_lims])
+        prior = ili.utils.Uniform(
+            low=prior_lims[:, 0],
+            high=prior_lims[:, 1],
+            device=cfg.infer.device)
+    else:
+        raise NotImplementedError
+
+    return prior
 
 
 def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
@@ -50,14 +77,9 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    if cfg.infer.prior.lower() == 'uniform':
-        prior = ili.utils.Uniform(
-            low=theta_train.min(axis=0),
-            high=theta_train.max(axis=0),
-            device=cfg.infer.device)
-    else:
-        raise NotImplementedError
+    prior = prepare_prior(cfg, theta=theta_train)
 
+    # define an embedding network
     if mcfg.fcn_depth == 0:
         embedding = nn.Identity()
     else:

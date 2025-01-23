@@ -3,6 +3,7 @@
 import torch
 import io
 import pickle
+from torch.utils.data import TensorDataset, DataLoader
 
 
 def split_experiments(exp_cfg):
@@ -13,6 +14,14 @@ def split_experiments(exp_cfg):
             new_exp.kmax = [kmax]
             new_exps.append(new_exp)
     return new_exps
+
+
+def prepare_loader(x, theta, device='cpu', **kwargs):
+    x = torch.Tensor(x).to(device)
+    theta = torch.Tensor(theta).to(device)
+    dataset = TensorDataset(x, theta)
+    loader = DataLoader(dataset, **kwargs)
+    return loader
 
 
 class CPU_Unpickler(pickle.Unpickler):
