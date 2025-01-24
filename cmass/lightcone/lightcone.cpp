@@ -237,6 +237,9 @@ struct Lightcone
     void _add_snap (int snap_idx, size_t Nhlo,
                     std::vector<double> &xhlo, std::vector<double> &vhlo)
     {
+        std::vector<double> delta_xgal, delta_vgal; std::vector<hloidx_t> hlo_idx;
+        size_t Ngal;
+
         if (std::find(snap_indices_done.begin(), snap_indices_done.end(), snap_idx)
             != snap_indices_done.end())
             throw std::runtime_error("adding the same snapshot twice");
@@ -247,13 +250,17 @@ struct Lightcone
         if (verbose) std::printf("\tchoose halos\n");
         choose_halos(snap_idx, Nhlo, xhlo, vhlo);
 
+        // update the number of halos
+        Nhlo = tmp_hlo_ID.size();
+        if (!Nhlo) goto snap_done;
+
         // callback into python to obtain the galaxy delta_x, delta_v, hlo_idx
-        std::vector<double> delta_xgal, delta_vgal; std::vector<hloidx_t> hlo_idx;
         if (verbose) std::printf("\tcallback into python HOD\n");
         call_python_hod(snap_idx, Nhlo, hlo_idx, delta_xgal, delta_vgal);
 
-        size_t Ngal = hlo_idx.size();
+        Ngal = hlo_idx.size();
         assert(3UL*Ngal==delta_xgal.size() && 3UL*Ngal==delta_vgal.size());
+        if (!Ngal) goto snap_done;
 
         if ( Ngal > (std::numeric_limits<galid_t>::max()/256) )
             throw std::runtime_error("too many galaxies");
@@ -261,11 +268,11 @@ struct Lightcone
         if (verbose) std::printf("\tchoose_galaxies\n");
         choose_galaxies(snap_idx, Ngal, hlo_idx, delta_xgal, delta_vgal);
 
-        // clean up the temporary halo storage
-        tmp_hlo_CHI.clear(); tmp_hlo_V.clear(); tmp_hlo_Z.clear(); tmp_hlo_ID.clear();
-
-        if (verbose) std::printf("Done with snap index %d\n", snap_idx);
-        snap_indices_done.push_back(snap_idx);
+        snap_done:
+            // clean up the temporary halo storage
+            tmp_hlo_CHI.clear(); tmp_hlo_V.clear(); tmp_hlo_Z.clear(); tmp_hlo_ID.clear();
+            if (verbose) std::printf("Done with snap index %d\n", snap_idx);
+            snap_indices_done.push_back(snap_idx);
     }
 
     void add_snap (int snap_idx,
@@ -606,6 +613,8 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
         for (size_t jj=0; jj<Ngal; ++jj)
         {
             if (!mangle_status_) [[unlikely]] continue;
+
+            assert(hlo_idx[jj]<tmp_hlo_ID.size());
 
             for (int kk=0; kk<3; ++kk) los[kk] = tmp_hlo_CHI[3*hlo_idx[jj]+kk] + delta_xgal[3*jj+kk];
             double chi = std::hypot(los[0], los[1], los[2]);

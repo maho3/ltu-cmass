@@ -12,10 +12,10 @@ N = 300000
 boss_dir = './testdata'
 
 # scale factors, need to be monotonically decreasing
-snap_times = [0.7, 0.675, 0.65, 0.625, 0.6, ]
+snap_times = [0.7, 0.65, 0.6, ]
 
 # some randomness
-rng = np.random.default_rng()
+rng = np.random.default_rng(137)
 
 # make the mask (this is a bit expensive, so we do it outside the lightcone so it can be re-used)
 print('Starting mask loading...')
@@ -47,7 +47,7 @@ def hod_fct (
 
     # as an example, only halos with certain redshifts get galaxies. Each gets a pair of galaxies.
     # I set the delta_x and delta_v very small so it should be possible to see these pairs in the output
-    hlo_idx_out = np.arange(0, len(hlo_idx))
+    hlo_idx_out = np.arange(0, len(hlo_idx), dtype=np.uint64)
     select = np.fabs(np.sin(100.0*z))<0.2
     hlo_idx_out = np.repeat(hlo_idx_out[select], 2)
     delta_x = (rng.random((len(hlo_idx_out), 3))-0.5) * 0.01
@@ -58,18 +58,19 @@ def hod_fct (
 
 # run the constructor
 l = lc.Lightcone(
-    mask=m, #hod_fct=hod_fct,
+    mask=m,
     Omega_m=0.3, zmin=0.40, zmax=0.65, snap_times=snap_times,
-#    boss_dir=None, # NOTE setting to None here disables n(z) downsampling now
+    boss_dir=None, # NOTE setting to None here disables n(z) downsampling now
     verbose=True
 )
 
+# set the HOD function
 l.set_hod(hod_fct)
 
 # add some snapshots
 for snap_idx, a in enumerate(snap_times):
     xhlo = rng.random((N, 3)) * 3e3
-    vhlo = (rng.random((N, 3))-0.5) * 1 #300
+    vhlo = (rng.random((N, 3))-0.5) * 300
     l.add_snap(snap_idx, xhlo, vhlo)
 
 ra, dec, z, galid = l.finalize()
