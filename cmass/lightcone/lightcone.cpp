@@ -157,7 +157,7 @@ struct Lightcone
     const Mask &mask;
     const double BoxSize, Omega_m, zmin, zmax;
     const int remap_case;
-    const bool correct, stitch_before_RSD, verbose;
+    const bool stitch_before_RSD, verbose;
     const unsigned augment;
     const unsigned long seed;
     const std::vector<double> snap_times;
@@ -172,12 +172,12 @@ struct Lightcone
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> &snap_times_,
-               double BoxSize_=3e3, int remap_case_=0, bool correct_=true,
+               double BoxSize_=3e3, int remap_case_=0,
                bool stitch_before_RSD_=true, bool verbose_=false, unsigned augment_=0,
                unsigned long seed_=137UL) :
         boss_dir{boss_dir_}, mask{mask_}, Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
-        BoxSize{BoxSize_}, remap_case{remap_case_}, correct{correct_},
+        BoxSize{BoxSize_}, remap_case{remap_case_},
         stitch_before_RSD{stitch_before_RSD_}, verbose{verbose_}, augment{augment_},
         seed{seed_},
         C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
@@ -206,8 +206,8 @@ struct Lightcone
         gsl_histogram_free(boss_z_hist);
     }
 
-    void _add_snap (int snap_idx, size_t Ngal,
-                    std::vector<double> &xgal, std::vector<double> &vgal, std::vector<double> &vhlo)
+    void _add_snap (int snap_idx, size_t Nhlo,
+                    std::vector<double> &xhlo, std::vector<double> &vhlo)
     {
         if (std::find(snap_indices_done.begin(), snap_indices_done.end(), snap_idx)
             != snap_indices_done.end())
@@ -228,25 +228,20 @@ struct Lightcone
 
     void add_snap (int snap_idx,
                    const pyb::array_t<double,
-                                      pyb::array::c_style | pyb::array::forcecast> &xgal_numpy,
-                   const pyb::array_t<double,
-                                      pyb::array::c_style | pyb::array::forcecast> &vgal_numpy,
+                                      pyb::array::c_style | pyb::array::forcecast> &xhlo_numpy,
                    const pyb::array_t<double,
                                       pyb::array::c_style | pyb::array::forcecast> &vhlo_numpy)
     {
-        size_t Ngal = xgal_numpy.shape()[0];
-        assert(xgal_numpy.shape()[1]==3 && vgal_numpy.shape()[1]==3
-               && (!correct || vhlo_numpy.shape()[1]==3));
-        assert(xgal_numpy.size()==3*Ngal && vgal_numpy.size()==3*Ngal
-               && (!correct || vhlo_numpy.size()==3*Ngal));
+        size_t Nhlo = xhlo_numpy.shape()[0];
+        assert(xhlo_numpy.shape()[1]==3 && vhlo_numpy.shape()[1]==3);
+        assert(xhlo_numpy.size()==3*Nhlo && vhlo_numpy.size()==3*Nhlo);
 
         // copy into vectors which we will modify
-        std::vector<double> xgal(3UL*Ngal), vgal(3UL*Ngal), vhlo((correct) ? 3UL*Ngal : 0);
-        std::memcpy(xgal.data(), xgal_numpy.data(), 3UL*Ngal*sizeof(double));
-        std::memcpy(vgal.data(), vgal_numpy.data(), 3UL*Ngal*sizeof(double));
-        if (correct) std::memcpy(vhlo.data(), vhlo_numpy.data(), 3UL*Ngal*sizeof(double));
+        std::vector<double> xhlo(3UL*Nhlo), vhlo(3UL*Nhlo);
+        std::memcpy(xhlo.data(), xhlo_numpy.data(), 3UL*Nhlo*sizeof(double));
+        std::memcpy(vhlo.data(), vhlo_numpy.data(), 3UL*Nhlo*sizeof(double));
 
-        _add_snap(snap_idx, Ngal, xgal, vgal, vhlo);
+        _add_snap(snap_idx, Nhlo, xhlo, vhlo);
     }
 
     void _finalize ()
@@ -300,44 +295,6 @@ struct Lightcone
                           const std::vector<double> &);
 };
 
-#ifdef TEST
-int main (int argc, char **argv)
-{
-    double Omega_m = 0.3;
-    const char *boss_dir = argv[1];
-    double zmin = std::atof(argv[2]);
-    double zmax = std::atof(argv[3]);
-    std::vector<double> snap_times;
-    for (char **c=argv+4; *c; ++c) snap_times.push_back(std::atof(*c));
-
-    std::printf("...Starting loading mask\n");
-    auto m = Mask(boss_dir);
-    std::printf("...finished loading mask, constructing lightcone...\n");
-    auto l = Lightcone(boss_dir, m, Omega_m, zmin, zmax, snap_times);
-    std::printf("...finished constructing lightcone, making galaxies...\n");
-    
-    std::vector<double> xa, va, vha;
-    const size_t N = 128;
-    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-    gsl_rng_set(rng, 42);
-    for (size_t ii=0; ii<N*3UL; ++ii)
-    {
-        xa.push_back(gsl_rng_uniform(rng) * 3e3);
-        va.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
-        vha.push_back((gsl_rng_uniform(rng)-0.5) * 200.0);
-    }
-    gsl_rng_free(rng);
-    std::printf("...finished making galaxies, adding snapshot...\n");
-
-    l._add_snap(0, N, xa, va, vha);
-    std::printf("...finished adding snapshot, finalizing...\n");
-
-    l._finalize();
-    std::printf("...done!\n");
-
-    return 0;
-}
-#else // TEST
 PYBIND11_MODULE(lc, m)
 {
     pyb::class_<Mask> (m, "Mask")
@@ -355,10 +312,9 @@ PYBIND11_MODULE(lc, m)
             "stitch_before_RSD"_a=true, "verbose"_a=false, "augment"_a=0,
             "seed"_a=137UL
         )
-        .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xgal"_a, "vgal"_a, "vhlo"_a)
+        .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xhlo"_a, "vhlo"_a)
         .def("finalize", &Lightcone::finalize);
 }
-#endif // TEST
 
 void Lightcone::read_boss_nz (void)
 {
