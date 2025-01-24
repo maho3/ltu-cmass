@@ -105,7 +105,10 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     train_args = {
         'training_batch_size': cfg.infer.batch_size,
         'learning_rate': cfg.infer.learning_rate,
+        'stop_after_epochs': cfg.infer.stop_after_epochs,
         'validation_fraction': cfg.infer.val_frac,
+        'lr_decay_factor': cfg.infer.lr_decay_factor,
+        'lr_patience': cfg.infer.lr_patience,
     }
 
     # make output directory
@@ -133,7 +136,7 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     logging.info('Plotting training history...')
     f, ax = plt.subplots(1, 1, figsize=(6, 4))
     for i, h in enumerate(histories):
-        ax.plot(h['validation_log_probs'], label=f'Net {i}')
+        ax.plot(h['validation_log_probs'], label=f'Net {i}', lw=1)
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
     f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')

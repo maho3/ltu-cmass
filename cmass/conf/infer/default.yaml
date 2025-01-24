@@ -7,7 +7,7 @@ ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
 mtng_lightcone: False # whether to train on mtng_lightcone summaries
 
-Nmax: 200  # maximum number of simulations to load (-1 for all)
+Nmax: -1  # maximum number of simulations to load (-1 for all)
 Nnets: 10  # number of best networks to ensemble
 
 val_frac: 0.1  # fraction of data to use for validation
@@ -19,8 +19,12 @@ prior: quijote  # prior to use for training (uniform, quijote_like)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
-batch_size: 128  # batch size
-learning_rate: 1e-4  # learning rate
+batch_size: 64  # batch size
+learning_rate: 2e-5  # learning rate
+stop_after_epochs: 50  # stop early after this many epochs
+weight_decay: 0  # weight decay
+lr_decay_factor: 0.5  # learning rate decay factor
+lr_patience: 10  # learning rate decay patience
 
 device: cpu  # cpu or cuda
 
