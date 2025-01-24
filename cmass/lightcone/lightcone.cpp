@@ -40,6 +40,7 @@ namespace cmangle {
 #endif
 
 typedef uint64_t galid_t;  // Matt: I had to increase this from 32->64
+typedef uint64_t hloid_t;
 
 namespace Geometry
 {
@@ -157,7 +158,7 @@ struct Lightcone
     const Mask &mask;
     const double BoxSize, Omega_m, zmin, zmax;
     const int remap_case;
-    const bool stitch_before_RSD, verbose;
+    const bool verbose;
     const unsigned augment;
     const unsigned long seed;
     const std::vector<double> snap_times;
@@ -166,19 +167,26 @@ struct Lightcone
     gsl_spline *z_chi_interp; std::vector<gsl_interp_accel *> z_chi_interp_acc;
     const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
     gsl_histogram *boss_z_hist;
+    std::vector<int> snap_indices_done;
+
+    // halo positions after remapping and redshift range cut, as well as IDs
+    // the CHI contains the velocity extrapolation correction
+    std::vector<double> tmp_hlo_CHI, tmp_hlo_V, tmp_hlo_Z;
+    std::vector<hloid_t> tmp_hlo_ID;
+
+    // galaxy positions and IDs
     std::vector<double> RA, DEC, Z;
     std::vector<galid_t> GALID;
-    std::vector<int> snap_indices_done;
 
     Lightcone (const char *boss_dir_, const Mask &mask_, double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> &snap_times_,
                double BoxSize_=3e3, int remap_case_=0,
-               bool stitch_before_RSD_=true, bool verbose_=false, unsigned augment_=0,
+               bool verbose_=false, unsigned augment_=0,
                unsigned long seed_=137UL) :
         boss_dir{boss_dir_}, mask{mask_}, Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
         BoxSize{BoxSize_}, remap_case{remap_case_},
-        stitch_before_RSD{stitch_before_RSD_}, verbose{verbose_}, augment{augment_},
+        verbose{verbose_}, augment{augment_},
         seed{seed_},
         C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
     {
@@ -213,14 +221,28 @@ struct Lightcone
             != snap_indices_done.end())
             throw std::runtime_error("adding the same snapshot twice");
 
+        if (verbose) std::printf("\tremap_snapshot\n");
+        remap_snapshot(Nhlo, xhlo, vhlo);
+
+        if (verbose) std::printf("\tchoose halos\n");
+        choose_halos(snap_idx, Nhlo, xhlo, vhlo);
+
+        // TODO callback into python to obtain the galaxy delta_x, delta_v, hlo_idx
+        std::vector<double> delta_xgal, delta_vgal; std::vector<uint64_t> hlo_idx;
+        if (verbose) std::printf("\tcallback into python HOD\n");
+        call_python_hod(hlo_idx, delta_xgal, delta_vgal);
+
+        size_t Ngal = hlo_idx.size();
+        assert( (Ngal*3==delta_xgal.size()) && (Ngal*3==delta_vgal.size()) );
+
         if ( Ngal > (std::numeric_limits<galid_t>::max()/256) )
             throw std::runtime_error("too many galaxies");
 
-        if (verbose) std::printf("\tremap_snapshot\n");
-        remap_snapshot(Ngal, xgal, vgal, vhlo);
-
         if (verbose) std::printf("\tchoose_galaxies\n");
-        choose_galaxies(snap_idx, Ngal, xgal, vgal, vhlo);
+        choose_galaxies(snap_idx, Ngal, hlo_idx, delta_xgal, delta_vgal);
+
+        // clean up the temporary halo storage
+        tmp_hlo_CHI.clear(); tmp_hlo_V.clear(); tmp_hlo_Z.clear(); tmp_hlo_ID.clear();
 
         if (verbose) std::printf("Done with snap index %d\n", snap_idx);
         snap_indices_done.push_back(snap_idx);
@@ -287,10 +309,15 @@ struct Lightcone
     template<bool> double fibcoll ();
     void remap_snapshot (size_t,
                          std::vector<double> &,
-                         std::vector<double> &,
                          std::vector<double> &) const;
+    void choose_halos (int, size_t,
+                       const std::vector<double> &,
+                       const std::vector<double> &);
+    void call_python_hod (std::vector<uint64_t> &,
+                          std::vector<double> &,
+                          std::vector<double> &);
     void choose_galaxies (int, size_t,
-                          const std::vector<double> &,
+                          const std::vector<uint64_t> &,
                           const std::vector<double> &,
                           const std::vector<double> &);
 };
@@ -309,7 +336,7 @@ PYBIND11_MODULE(lc, m)
             "boss_dir"_a, "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
             pyb::kw_only(),
             "BoxSize"_a=3e3, "remap_case"_a=0, "correct"_a=true,
-            "stitch_before_RSD"_a=true, "verbose"_a=false, "augment"_a=0,
+            "verbose"_a=false, "augment"_a=0,
             "seed"_a=137UL
         )
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xhlo"_a, "vhlo"_a)
@@ -487,10 +514,66 @@ static inline galid_t make_galid (galid_t snap_idx, galid_t gal_idx)
     return ( snap_idx << ((sizeof(galid_t)-1)*CHAR_BIT) ) + gal_idx;
 }
 
+void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
+                              const std::vector<double> &xhlo,
+                              const std::vector<double> &vhlo)
+{
+    assert(tmp_hlo_CHI.empty() && tmp_hlo_V.empty() && tmp_hlo_Z.empty() && tmp_hlo_ID.empty());
+
+    // h km/s/Mpc
+    const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
+
+    #pragma omp parallel
+    {
+        // the accelerator is non-const upon evaluation
+        auto acc = z_chi_interp_acc[omp_get_thread_num()];
+        double los[3];
+
+        #pragma omp for schedule (dynamic, 1024)
+        for (size_t jj=0; jj<Nhlo; ++jj)
+        {
+            for (int kk=0; kk<3; ++kk) los[kk] = xhlo[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
+            double chi = std::hypot(los[0], los[1], los[2]);
+
+            double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
+                              / chi;
+
+            // map onto the lightcone -- we assume that this is a relatively small correction
+            //                           so we just do it to first order
+            double delta_z = (chi - snap_chis[snap_idx])
+                             / (Numbers::lightspeed + vhloproj) * H_;
+
+            // correct the position accordingly
+            for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / H_;
+
+            // only a small correction I assume (and it is borne out by experiment!)
+            chi = std::hypot(los[0], los[1], los[2]);
+
+            if (chi>chi_bounds[snap_idx] && chi<chi_bounds[snap_idx+1]
+                // prevent from falling out of the redshift interval we're mapping into
+                // (only relevent if stitching based on chi before RSD)
+                && (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps]))
+            // we are in the comoving shell that's coming from this snapshot
+            // since we're doing halos here, no testing for mask
+            {
+                double z = gsl_spline_eval(z_chi_interp, chi, acc);
+
+                #pragma omp critical (HLO_CHOOSE_APPEND)
+                {
+                    for (int kk=0; kk<3; ++kk) tmp_hlo_CHI.push_back(los[kk]);
+                    for (int kk=0; kk<3; ++kk) tmp_hlo_V.push_back(vhlo[3*jj+kk]);
+                    tmp_hlo_Z.push_back(z);
+                    tmp_hlo_ID.push_back(jj);
+                }
+            }
+        }
+    }
+}
+
 void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
-                                 const std::vector<double> &xgal,
-                                 const std::vector<double> &vgal,
-                                 const std::vector<double> &vhlo)
+                                 const std::vector<uint64_t> &hlo_idx,
+                                 const std::vector<double> &delta_xgal,
+                                 const std::vector<double> &delta_vgal)
 {
     // h km/s/Mpc
     const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
@@ -504,7 +587,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
     {
         // the accelerator is non-const upon evaluation
         auto acc = z_chi_interp_acc[omp_get_thread_num()];
-        double los[3];
+        double los[3], vgal[3];
         int mangle_status_ = 1;
 
         #pragma omp for schedule (dynamic, 1024)
@@ -512,33 +595,13 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
         {
             if (!mangle_status_) [[unlikely]] continue;
 
-            for (int kk=0; kk<3; ++kk) los[kk] = xgal[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
+            for (int kk=0; kk<3; ++kk) los[kk] = tmp_hlo_CHI[3*hlo_idx[jj]+kk] + delta_xgal[3*jj+kk];
             double chi = std::hypot(los[0], los[1], los[2]);
 
-            if (correct)
-            {
-                double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
-                                  / chi;
-
-                // map onto the lightcone -- we assume that this is a relatively small correction
-                //                           so we just do it to first order
-                double delta_z = (chi - snap_chis[snap_idx])
-                                 / (Numbers::lightspeed + vhloproj) * H_;
-
-                // correct the position accordingly
-                for (int kk=0; kk<3; ++kk) los[kk] -= delta_z * vhlo[3*jj+kk] / H_;
-
-                // only a small correction I assume (and it is borne out by experiment!)
-                chi = std::hypot(los[0], los[1], los[2]);
-            }
-
-            double chi_stitch; // the one used for stitching
-
-            if (stitch_before_RSD) chi_stitch = chi;
+            for (int kk=0; kk<3; ++kk) vgal[kk] = tmp_hlo_V[3*hlo_idx[jj]+kk] + delta_vgal[3*jj+kk];
 
             // the radial velocity
-            double vproj = (los[0]*vgal[3*jj+0]+los[1]*vgal[3*jj+1]+los[2]*vgal[3*jj+2])
-                           / chi;
+            double vproj = (los[0]*vgal[0]+los[1]*vgal[1]+los[2]*vgal[2]) / chi;
 
             // now add RSD (the order is important here, as RSD can be a pretty severe effect)
             for (int kk=0; kk<3; ++kk) los[kk] += rsd_factor * vproj * los[kk] / chi;
@@ -546,13 +609,8 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
             // I'm lazy
             chi = std::hypot(los[0], los[1], los[2]);
 
-            if (!stitch_before_RSD) chi_stitch = chi;
-
-            if (chi_stitch>chi_bounds[snap_idx] && chi_stitch<chi_bounds[snap_idx+1]
-                // prevent from falling out of the redshift interval we're mapping into
-                // (only relevent if stitching based on chi before RSD)
-                && (!stitch_before_RSD || (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps])))
-            // we are in the comoving shell that's coming from this snapshot
+            // discard galaxies falling out at the edges
+            if (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps]) [[likely]]
             {
                 // rotate the line of sight into the NGC footprint and transpose the axes into
                 // canonical order
