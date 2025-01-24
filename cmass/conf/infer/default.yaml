@@ -19,8 +19,8 @@ prior: quijote  # prior to use for training (uniform, quijote_like)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
-batch_size: 64  # batch size
-learning_rate: 2e-5  # learning rate
+batch_size: null  # batch size
+learning_rate: null  # learning rate
 stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor

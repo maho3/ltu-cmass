@@ -62,16 +62,6 @@ def prepare_prior(cfg, theta=None):
 
 
 def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
-    train_loader = prepare_loader(
-        x_train, theta_train,
-        device=cfg.infer.device,
-        batch_size=cfg.infer.batch_size, shuffle=True)
-    val_loader = prepare_loader(
-        x_val, theta_val,
-        device=cfg.infer.device,
-        batch_size=cfg.infer.batch_size, shuffle=False)
-    loader = TorchLoader(train_loader, val_loader)
-
     # select the network configuration
     mcfg = cfg.net
     logging.info(f'Using network architecture: {mcfg}')
@@ -102,14 +92,27 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
+    bs, lr = cfg.infer.batch_size, cfg.infer.learning_rate
+    bs = mcfg.batch_size if bs is None else bs
+    lr = mcfg.learning_rate if lr is None else lr
     train_args = {
-        'training_batch_size': cfg.infer.batch_size,
-        'learning_rate': cfg.infer.learning_rate,
+        'learning_rate': lr,
         'stop_after_epochs': cfg.infer.stop_after_epochs,
         'validation_fraction': cfg.infer.val_frac,
         'lr_decay_factor': cfg.infer.lr_decay_factor,
         'lr_patience': cfg.infer.lr_patience,
     }
+
+    # setup data loaders
+    train_loader = prepare_loader(
+        x_train, theta_train,
+        device=cfg.infer.device,
+        batch_size=bs, shuffle=True)
+    val_loader = prepare_loader(
+        x_val, theta_val,
+        device=cfg.infer.device,
+        batch_size=bs, shuffle=False)
+    loader = TorchLoader(train_loader, val_loader)
 
     # make output directory
     os.makedirs(out_dir, exist_ok=True)
@@ -171,7 +174,9 @@ def run_experiment(exp, cfg, model_path):
                 '. Make sure to run cmass.infer.preprocess first.'
             )
 
-        logging.info(f'Split: {len(x_train)} training, {len(x_test)} testing')
+        logging.info(
+            f'Split: {len(x_train)} training, {len(x_val)} validation, '
+            f'{len(x_test)} testing')
 
         out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
         logging.info(f'Saving models to {out_dir}')
