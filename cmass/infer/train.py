@@ -10,6 +10,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 import yaml
+import time
 
 from .tools import split_experiments, prepare_loader
 from ..utils import timing_decorator
@@ -62,6 +63,8 @@ def prepare_prior(cfg, theta=None):
 
 
 def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
+    start = time.time()
+
     # select the network configuration
     mcfg = cfg.net
     logging.info(f'Using network architecture: {mcfg}')
@@ -143,6 +146,11 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
     f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
+
+    # Save the timing
+    end = time.time()
+    with open(join(out_dir, 'timing.txt'), 'w') as f:
+        f.write(f'{end - start:.3f}')
 
     return posterior, histories
 
