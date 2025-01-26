@@ -39,7 +39,7 @@ def prepare_prior(cfg, theta=None):
             (0.03, 0.07),  # Omega_b
             (0.5, 0.9),  # h
             (0.8, 1.2),  # n_s
-            (0.7, 0.9),  # sigma8
+            (0.6, 1.0),  # sigma8
         ])
         if theta.shape[-1] > 5:  # galaxy or lightcone
             if cfg.bias.hod.model.lower() == 'zheng07':
