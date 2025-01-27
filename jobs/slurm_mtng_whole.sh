@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mtnglike_whole   # Job name
-#SBATCH --array=109-1000%10        # Job array range for lhid
+#SBATCH --array=0-999        # Job array range for lhid
 #SBATCH --time=02:00:00         # Time limit
 #SBATCH --account=phy240043   # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
@@ -8,10 +8,10 @@
 #SBATCH --nodes=7               # Number of nodes
 #SBATCH --ntasks=896            # Number of tasks
 #SBATCH --partition=wholenode      # Partition name
-#SBATCH --nice=2              # Decrease priority
+#SBATCH --nice=3              # Decrease priority
 
-# SLURM_ARRAY_TASK_ID=102
-offset=2000
+# SLURM_ARRAY_TASK_ID=400
+offset=0
 
 module restore cmass
 conda activate cmassrun
@@ -29,6 +29,6 @@ else
     echo "File $file does not exist."
     python -m cmass.nbody.fastpm nbody=mtnglike nbody.lhid=$lhid +nbody.postprocess=False
 
-    sbatch jobs/slurm_mtng_postprocess.sh --array=$SLURM_ARRAY_TASK_ID
+    sbatch --export=offset=$offset --array=$SLURM_ARRAY_TASK_ID jobs/slurm_mtng_postprocess.sh 
 fi
 
