@@ -297,7 +297,8 @@ def main(cfg: DictConfig) -> None:
     logging.info("Processing outputs...")
     if cfg.nbody.save_transfer:
         process_transfer(cfg, outdir, delete_files=True)
-    rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+    if cfg.nbody.postprocess:
+        rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
 
     if not cfg.nbody.save_particles:
         pos, vel = None, None

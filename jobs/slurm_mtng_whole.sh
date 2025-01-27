@@ -1,15 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=mtnglike_whole   # Job name
-#SBATCH --array=11-100        # Job array range for lhid
-#SBATCH --time=06:00:00         # Time limit
+#SBATCH --array=109-1000%10        # Job array range for lhid
+#SBATCH --time=02:00:00         # Time limit
 #SBATCH --account=phy240043   # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 #SBATCH --nodes=7               # Number of nodes
 #SBATCH --ntasks=896            # Number of tasks
 #SBATCH --partition=wholenode      # Partition name
+#SBATCH --nice=2              # Decrease priority
 
-# SLURM_ARRAY_TASK_ID=4
+# SLURM_ARRAY_TASK_ID=102
 offset=2000
 
 module restore cmass
@@ -20,22 +21,14 @@ lhid=$((SLURM_ARRAY_TASK_ID + offset))
 cd /home/x-mho1/git/ltu-cmass-run
 outdir=/anvil/scratch/x-mho1/cmass-ili/mtnglike/fastpm/L3000-N384
 
-# 0-1000
 # check if nbody.h5 exists
 file=$outdir/$lhid/nbody.h5
 if [ -f $file ]; then
     echo "File $file exists."
 else
     echo "File $file does not exist."
-    python -m cmass.nbody.fastpm nbody=mtnglike nbody.lhid=$lhid
+    python -m cmass.nbody.fastpm nbody=mtnglike nbody.lhid=$lhid +nbody.postprocess=False
+
+    sbatch jobs/slurm_mtng_postprocess.sh --array=$SLURM_ARRAY_TASK_ID
 fi
 
-# # 1000-2000
-# lhid=$((lhid+1000))
-# file=$outdir/$lhid/nbody.h5
-# if [ -f $file ]; then
-#     echo "File $file exists."
-# else
-#     echo "File $file does not exist."
-#     python -m cmass.nbody.fastpm nbody=mtnglike nbody.lhid=$lhid
-# fi

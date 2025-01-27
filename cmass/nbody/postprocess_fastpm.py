@@ -1,31 +1,23 @@
-import numpy as np
-from os.path import join
+# Postprocess saved outputs of FastPM simulation
+
 import hydra
 import logging
 import os
-import bigfile
 from omegaconf import DictConfig, OmegaConf
-import shutil
-import subprocess
-import h5py
-import multiprocessing as mp
 
 from ..utils import get_source_path, timing_decorator, save_cfg
-from .tools import (
-    parse_nbody_config, get_ICs,
-    save_white_noise_grafic, generate_pk_file, rho_and_vfield,
-    save_nbody
-)
+from .tools import parse_nbody_config
 from cmass.nbody.fastpm import process_outputs
+
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
-    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody'])
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
 
     # Build run config
-    cfg = parse_nbody_config(cfg, lightcone=True)
+    cfg = parse_nbody_config(cfg)
     logging.info(f"Working directory: {os.getcwd()}")
     logging.info(
         "Logging directory: " +
