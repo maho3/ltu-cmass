@@ -301,14 +301,15 @@ def summarize_tracer(
                 if 'Pk' in summaries:
                     # real space
                     MAS = 'NGP'
-                    field = MA(pos, L, N, MAS=MAS)
+                    field = MA(pos, L, N, MAS=MAS).astype(np.float32)
                     run_pylians(
                         field, group, ['Pk'], L, axis=0, MAS=MAS,
                         num_threads=threads, use_rsd=False
                     )
 
                     # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
+                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                                axis=0).astype(np.float32)
                     run_pylians(
                         field, group, ['Pk'], L, axis=0, MAS=MAS,
                         num_threads=threads, use_rsd=True
@@ -316,14 +317,15 @@ def summarize_tracer(
                 if 'Bk' in summaries:
                     # real space
                     MAS = 'TSC'
-                    field = MA(pos, L, N, MAS=MAS)
+                    field = MA(pos, L, N, MAS=MAS).astype(np.float32)
                     run_pylians(
                         field, group, ['Bk'], L, axis=0, MAS=MAS,
                         num_threads=threads, use_rsd=False
                     )
 
                     # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
+                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                                axis=0).astype(np.float32)
                     run_pylians(
                         field, group, ['Bk'], L, axis=0, MAS=MAS,
                         num_threads=threads, use_rsd=True
@@ -423,14 +425,14 @@ def summarize_lightcone(
             # Compute P(k)
             if 'Pk' in summaries:
                 MAS = 'NGP'
-                field = MA(pos, L, N, MAS=MAS)
+                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
                 run_pylians(
                     field, o, ['Pk'], L, axis=0, MAS=MAS,
                     num_threads=threads, use_rsd=False
                 )
             if 'Bk' in summaries:
                 MAS = 'TSC'
-                field = MA(pos, L, N, MAS=MAS)
+                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
                 run_pylians(
                     field, o, ['Bk'], L, axis=0, MAS=MAS,
                     num_threads=threads, use_rsd=False
