@@ -10,6 +10,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 import pickle
+import scipy
 
 from .tools import split_experiments, load_posterior
 from ..utils import timing_decorator
@@ -47,7 +48,7 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     metric(posterior, x, theta.to('cpu'))
 
 
-def load_ensemble(exp_path, Nnets):
+def load_ensemble(exp_path, Nnets, weighted=True):
     # Load top Nnets architectures by test log prob
     net_dirs = os.listdir(join(exp_path, 'nets'))
 
@@ -79,9 +80,16 @@ def load_ensemble(exp_path, Nnets):
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
 
+    if weighted:
+        ensemble_logprobs = log_probs[top_nets]
+        weights = scipy.special.softmax(ensemble_logprobs)
+        weights = torch.Tensor(weights)
+    else:
+        weights = torch.ones(len(top_nets)) / len(top_nets)
+
     ensemble = LampeEnsemble(
         posteriors=ensemble_list,
-        weights=torch.ones(len(top_nets)) / len(top_nets)  # equally weighted
+        weights=weights  # equally weighted
     )
     return ensemble
 
