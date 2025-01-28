@@ -45,11 +45,11 @@ def prepare_prior(cfg, theta=None):
             if cfg.bias.hod.model.lower() == 'zheng07':
                 # TODO: load these from cmass.bias.tools.hod?
                 hod_lims = np.array([
-                    [12.0, 14.0],  # logMmin
-                    [0.1, 0.6],  # sigma_logM
+                    [0.0, 1.5],  # alpha
                     [13.0, 15.0],  # logM0
                     [13.0, 15.0],  # logM1
-                    [0.0, 1.5]]  # alpha
+                    [12.0, 14.0],  # logMmin
+                    [0.1, 0.6]]  # sigma_logM
                 )
                 prior_lims = np.vstack([prior_lims, hod_lims])
         prior = ili.utils.Uniform(
