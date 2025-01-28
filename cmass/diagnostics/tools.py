@@ -57,7 +57,7 @@ def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
 
     # set stuff up
     base = pb.PolyBin3D(
-        sightline='global',
+        sightline='global',  # TODO: check if this properly computes RSDs
         gridsize=n_mesh,
         boxsize=[L]*3,
         boxcenter=(0., 0., 0.),
