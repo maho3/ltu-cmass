@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
-from .loaders import get_cosmo, get_hod, load_Pk, load_lc_Pk, preprocess_Pk
+from .loaders import get_cosmo, get_hod, load_Pk, load_lc_Pk, load_Bk, load_lc_Bk, preprocess_Pk, preprocess_Bk
 
 
 def split_experiments(exp_cfg):
@@ -76,8 +76,10 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
             # load summaries  # TODO: load other summaries
             if 'lightcone' in tracer:
                 summ = load_lc_Pk(diagfile)
+                summ.update(load_lc_Bk(diagfile))
             else:
                 summ = load_Pk(diagfile, a)
+                summ.update(load_Bk(diagfile, a))
             # load parameters
             if len(summ) > 0:
                 params = get_cosmo(sourcepath)
@@ -144,6 +146,8 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
                 else:
                     raise ValueError(
                         f'Need monopole for normalization of {summ}')
+            elif 'Bk' in summ or 'Qk' in summ:
+                x = preprocess_Bk(x, kmax)
             else:
                 raise NotImplementedError  # TODO: implement other summaries
             xs.append(x)
