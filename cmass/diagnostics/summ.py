@@ -284,14 +284,13 @@ def summarize_tracer(
         with h5py.File(filename, 'r') as f:
             pos = f[a]['pos'][...].astype(np.float32)
             vel = f[a]['vel'][...].astype(np.float32)
-            if (proxy is not None) and proxy in f[a].keys():
+            if proxy in f[a].keys():
                 mass = f[a][proxy][...].astype(np.float32)
             else:
                 mass = None
         pos %= L  # Ensure all tracers inside box
 
         # Mask out low mass tracers (to match number density)
-        mass = None
         out_attrs = {}
         if density is not None:
             if proxy is None:
@@ -301,7 +300,7 @@ def summarize_tracer(
                 np.random.shuffle(mass)
             else:
                 if mass is None:
-                    logging.error(
+                    raise KeyError(
                         f'{proxy} not found in {type} file at a={a}')
                 if len(pos) <= Ncut:
                     logging.warning(f'Not enough {type} tracers in {a}')
