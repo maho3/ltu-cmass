@@ -77,8 +77,6 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
             if 'lightcone' in tracer:
                 summ = load_lc_Pk(diagfile)
                 summ.update(load_lc_Bk(diagfile))
-                if 'Bk0' not in summ.keys():
-                    print('BAD:', lhid)
             else:
                 summ = load_Pk(diagfile, a)
                 summ.update(load_Bk(diagfile, a))
