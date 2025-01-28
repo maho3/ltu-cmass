@@ -3,6 +3,7 @@ import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
 import PolyBin3D as pb
+from ..utils import timing_decorator
 
 
 def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
@@ -45,6 +46,7 @@ def calcQk(k, Pk, k123, Bk):
     return Qk
 
 
+@timing_decorator
 def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
     # TODO: Use ili-summarizer here
     k_min = 1.05*2 * np.pi / L
@@ -60,7 +62,8 @@ def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
         boxsize=[L]*3,
         boxcenter=(0., 0., 0.),
         pixel_window=MAS.lower(),
-        backend='jax'
+        backend='jax',
+        nthreads=threads
     )
     pspec = pb.PSpec(
         base,

@@ -105,7 +105,7 @@ def store_summary(
 
 
 def run_pylians(
-    field, group, summaries,
+    field, summaries,
     box_size, axis, num_threads, use_rsd,
     MAS='CIC'
 ):
@@ -117,26 +117,32 @@ def run_pylians(
         if summary_name == 'Pk':
             k, Pk = calcPk(field, box_size, axis=axis,
                            MAS=MAS, threads=num_threads)
-            group.create_dataset(pfx+'Pk_k3D', data=k)
-            group.create_dataset(pfx+'Pk', data=Pk)
+            out = {
+                pfx+'Pk_k3D': k,
+                pfx+'Pk': Pk
+            }
         elif summary_name == 'Bk':
             k123, Bk, Qk, k, Pk = calcBk(
                 field, box_size, axis=axis,
                 MAS=MAS, threads=num_threads)
-            group.create_dataset(pfx+'Bk_k123', data=k123)
-            group.create_dataset(pfx+'Bk', data=Bk)
-            group.create_dataset(pfx+'Qk', data=Qk)
-            group.create_dataset(pfx+'bPk_k3D', data=k123)
-            group.create_dataset(pfx+'bPk', data=Pk)
+            out = {
+                pfx+'Bk_k123': k123,
+                pfx+'Bk': Bk,
+                pfx+'Qk': Qk,
+                pfx+'bPk_k3D': k123,
+                pfx+'bPk': Pk
+            }
         elif summary_name not in accept_summaries:
             logging.error(f'{summary_name} not yet implemented in Pylians')
             continue
+    return out
 
 
 def run_summarizer(
     pos, vel, h, redshift, box_size, grid_size,
     group, summaries, threads
 ):
+    raise NotImplementedError('Summarizer not yet implemented')  # TODO
     # For two-point correlation, bispectrum, wavelets, density split, and
     # k-nearest neighbors
 
@@ -171,18 +177,27 @@ def save_configuration(file, config, save_HOD=True):
         file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
 
 
+def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
+    with h5py.File(file, 'a') as f:
+        if a is not None:
+            group = f.create_group(a)
+        else:
+            group = f
+        if attrs is not None:
+            for key, value in attrs.items():
+                group.attrs[key] = value
+        for key, value in data.items():
+            group.create_dataset(key, data=value)
+
+        if config is not None:
+            save_configuration(f, config, save_HOD=save_HOD)
+
+
 def summarize_rho(
     source_path, L,
     threads=16, from_scratch=True,
     config=None
 ):
-    # check if diagnostics already computed
-    outpath = join(source_path, 'diag', 'rho.h5')
-    if (not from_scratch) and os.path.isfile(outpath):
-        logging.info('rho diagnostics already computed')
-        return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-
     # check for file keys
     filename = join(source_path, 'nbody.h5')
     if not os.path.isfile(filename):
@@ -191,28 +206,38 @@ def summarize_rho(
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
-    logging.info(f'Saving rho diagnostics to {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
 
+    # check if diagnostics already computed
+    outpath = join(source_path, 'diag', 'rho.h5')
+    if os.path.isfile(outpath):
+        if from_scratch:
+            os.remove(outpath)
+        else:
+            logging.info('rho diagnostics already computed')
+            return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
+
     # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=False)
-            for a in alist:
-                logging.info(f'Processing density field a={a}')
-                rho = f[a]['rho'][...].astype(np.float32)
-                group = o.create_group(a)
-                if 'Pk' in config.diag.summaries:
-                    run_pylians(
-                        rho, group, ['Pk'], L, axis=0, MAS='CIC',
-                        num_threads=threads, use_rsd=False
-                    )
-                if 'Bk' in config.diag.summaries:
-                    run_pylians(
-                        rho, group, ['Bk'], L, axis=0, MAS='CIC',
-                        num_threads=threads, use_rsd=False
-                    )
+    for a in alist:
+        logging.info(f'Processing density field a={a}')
+        with h5py.File(filename, 'r') as f:
+            rho = f[a]['rho'][...].astype(np.float32)
+        out_data = {}
+        if 'Pk' in config.diag.summaries:
+            out = run_pylians(
+                rho, ['Pk'], L, axis=0, MAS='CIC',
+                num_threads=threads, use_rsd=False
+            )
+            out_data.update(out)
+        if 'Bk' in config.diag.summaries:
+            out = run_pylians(
+                rho, ['Bk'], L, axis=0, MAS='CIC',
+                num_threads=threads, use_rsd=False
+            )
+            out_data.update(out)
+        if len(out) > 0:
+            save_group(outpath, out_data, None, a, config)
     return True
 
 
@@ -226,13 +251,6 @@ def summarize_tracer(
 ):
     postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
 
-    # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if (not from_scratch) and os.path.isfile(outpath):
-        logging.info(f'{type} diagnostics already computed')
-        return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-
     # check for file keys
     filename = join(source_path, postfix)
     if not os.path.isfile(filename):
@@ -241,6 +259,14 @@ def summarize_tracer(
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
+    # check if diagnostics already computed
+    outpath = join(source_path, 'diag', postfix)
+    if os.path.isfile(outpath):
+        if from_scratch:
+            os.remove(outpath)
+        else:
+            logging.info(f'{type} diagnostics already computed')
+            return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
     if type == 'galaxy':
@@ -250,101 +276,109 @@ def summarize_tracer(
     Ncut = None if density is None else int(density * L**3)
 
     # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=(type == 'galaxy'))
-            for a in alist:
-                z = 1/float(a) - 1
-                logging.info(f'Processing {type} catalog a={a}')
+    for a in alist:
+        z = 1/float(a) - 1
+        logging.info(f'Processing {type} catalog a={a}')
 
-                # Load
-                pos = f[a]['pos'][...].astype(np.float32)
-                vel = f[a]['vel'][...].astype(np.float32)
-                pos %= L  # Ensure all tracers inside box
-
-                # Create output group
-                group = o.create_group(a)
-
-                # Mask out low mass tracers (to match number density)
+        # Load
+        with h5py.File(filename, 'r') as f:
+            pos = f[a]['pos'][...].astype(np.float32)
+            vel = f[a]['vel'][...].astype(np.float32)
+            if (proxy is not None) and proxy in f[a].keys():
+                mass = f[a][proxy][...].astype(np.float32)
+            else:
                 mass = None
-                if density is not None:
-                    if proxy is None:
-                        logging.warning(
-                            'Proxy is set to None. Not rank-ordering.')
-                        mass = np.arange(len(pos))
-                        np.random.shuffle(mass)
-                    else:
-                        if proxy not in f[a].keys():
-                            logging.error(
-                                f'{proxy} not found in {type} file at a={a}')
-                        if len(pos) <= Ncut:
-                            logging.warning(f'Not enough {type} tracers in {a}')
-                        logging.info(
-                            f'Cutting top {Ncut} out of {len(pos)} {type} '
-                            'tracers to match number density')
-                        mass = f[a][proxy][...].astype(np.float32)
-                    mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
-                    pos = pos[mask]
-                    vel = vel[mask]
-                    mass = mass[mask]
+        pos %= L  # Ensure all tracers inside box
 
-                    group.attrs['density'] = float(density)
-                else:
-                    group.attrs['density'] = np.nan
+        # Mask out low mass tracers (to match number density)
+        mass = None
+        out_attrs = {}
+        if density is not None:
+            if proxy is None:
+                logging.warning(
+                    'Proxy is set to None. Not rank-ordering.')
+                mass = np.arange(len(pos))
+                np.random.shuffle(mass)
+            else:
+                if mass is None:
+                    logging.error(
+                        f'{proxy} not found in {type} file at a={a}')
+                if len(pos) <= Ncut:
+                    logging.warning(f'Not enough {type} tracers in {a}')
+                logging.info(
+                    f'Cutting top {Ncut} out of {len(pos)} {type} '
+                    'tracers to match number density')
+            mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
+            pos = pos[mask]
+            vel = vel[mask]
+            mass = mass[mask]
 
-                # Noise out positions (we do not probe less than Lnoise)
-                Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-                pos += np.random.randn(*pos.shape) * Lnoise
+            out_attrs['density'] = float(density)
+        else:
+            out_attrs['density'] = np.nan
 
-                # Compute P(k)
-                if 'Pk' in summaries:
-                    # real space
-                    MAS = 'NGP'
-                    field = MA(pos, L, N, MAS=MAS)
-                    run_pylians(
-                        field, group, ['Pk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=False
-                    )
+        # Noise out positions (we do not probe less than Lnoise)
+        Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+        pos += np.random.randn(*pos.shape) * Lnoise
 
-                    # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
-                    run_pylians(
-                        field, group, ['Pk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=True
-                    )
-                if 'Bk' in summaries:
-                    # real space
-                    MAS = 'TSC'
-                    field = MA(pos, L, N, MAS=MAS)
-                    run_pylians(
-                        field, group, ['Bk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=False
-                    )
+        # Compute P(k)
+        out_data = {}
+        if 'Pk' in summaries:
+            # real space
+            MAS = 'NGP'
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            out = run_pylians(
+                field, ['Pk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
+            out_data.update(out)
 
-                    # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS, axis=0)
-                    run_pylians(
-                        field, group, ['Bk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=True
-                    )
+            # redshift space
+            field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                        axis=0).astype(np.float32)
+            out = run_pylians(
+                field, ['Pk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=True
+            )
+            out_data.update(out)
+        if 'Bk' in summaries:
+            # real space
+            MAS = 'TSC'
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            out = run_pylians(
+                field, ['Bk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
+            out_data.update(out)
 
-                # Compute other summaries
-                others = [s for s in summaries if (
-                    ('Pk' not in s) and ('Bk' not in s))]
-                if len(others) > 0:
-                    run_summarizer(
-                        pos, vel, cosmo.h, z, L, N,
-                        group, others,
-                        threads
-                    )
+            # redshift space
+            field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                        axis=0).astype(np.float32)
+            out = run_pylians(
+                field, ['Bk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=True
+            )
+            out_data.update(out)
 
-                if mass is not None:
-                    # measure halo mass function
-                    be = np.linspace(12.5, 16, 100)
-                    hist, _ = np.histogram(mass, bins=be)
-                    group.create_dataset('mass_bins', data=be)
-                    group.create_dataset('mass_hist', data=hist)
+        # Compute other summaries
+        others = [s for s in summaries if (
+            ('Pk' not in s) and ('Bk' not in s))]
+        if len(others) > 0:
+            out = run_summarizer(
+                pos, vel, cosmo.h, z, L, N, others,
+                threads
+            )
+            out_data.update(out)
+
+        if mass is not None:
+            # measure halo mass function
+            be = np.linspace(12.5, 16, 100)
+            hist, _ = np.histogram(mass, bins=be)
+            out_data['mass_bins'] = be
+            out_data['mass_hist'] = hist
+
+        save_group(outpath, out_data, out_attrs, a,
+                   config, save_HOD=(type == 'galaxy'))
     return True
 
 
@@ -358,93 +392,97 @@ def summarize_lightcone(
 ):
     postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
 
-    # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if (not from_scratch) and os.path.isfile(outpath):
-        logging.info(f'{cap}_lightcone diagnostics already computed')
-        return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-
     # check for file keys
     filename = join(source_path, postfix)
     if not os.path.isfile(filename):
         logging.error(f'File not found: {filename}')
         return False
 
+    # check if diagnostics already computed
+    outpath = join(source_path, 'diag', postfix)
+    if os.path.isfile(outpath):
+        if from_scratch:
+            os.remove(outpath)
+        else:
+            logging.info(f'{cap}_lightcone diagnostics already computed')
+    logging.info(f'Computing diagnostics to save to: {outpath}')
+
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
 
-    # compute diagnostics and save
+    # Load
     with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=True)
+        ra = f['ra'][...]
+        dec = f['dec'][...]
+        z = f['z'][...]
+    rdz = np.vstack([ra, dec, z]).T
 
-            # Load
-            ra = f['ra'][...]
-            dec = f['dec'][...]
-            z = f['z'][...]
-            rdz = np.vstack([ra, dec, z]).T
+    # convert to comoving
+    pos = sky_to_xyz(rdz, cosmo)
 
-            # convert to comoving
-            pos = sky_to_xyz(rdz, cosmo)
+    # Noise out positions (we do not probe less than Lnoise)
+    Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+    pos += np.random.randn(*pos.shape) * Lnoise
 
-            # Noise out positions (we do not probe less than Lnoise)
-            Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-            pos += np.random.randn(*pos.shape) * Lnoise
+    # convert to float32
+    pos = pos.astype(np.float32)
 
-            # convert to float32
-            pos = pos.astype(np.float32)
+    if cap == 'ngc':
+        # offset to center (min is about -1870, -1750, -120)
+        pos += [2000, 1800, 250]
+        # set length scale of grid (range is about 1750, 3350, 1900)
+        L = 3500
+    elif cap == 'sgc':
+        # offset to center (min is about 800, -1275, -375)
+        pos += [-600, 1400, 400]
+        # set length scale of grid (range is about 1750, 3350, 1900)
+        L = 2750
+    elif cap == 'mtng':
+        pos += [100, 100, 100]
+        L = 2000
+    else:
+        raise ValueError
 
-            if cap == 'ngc':
-                # offset to center (min is about -1870, -1750, -120)
-                pos += [2000, 1800, 250]
-                # set length scale of grid (range is about 1750, 3350, 1900)
-                L = 3500
-            elif cap == 'sgc':
-                # offset to center (min is about 800, -1275, -375)
-                pos += [-600, 1400, 400]
-                # set length scale of grid (range is about 1750, 3350, 1900)
-                L = 2750
-            elif cap == 'mtng':
-                pos += [100, 100, 100]
-                L = 2000
-            else:
-                raise ValueError
+    # Check if all tracers are inside the box
+    if np.any(pos < 0) or np.any(pos > L):
+        logging.error('Error! Some tracers outside of box!')
+        return False
 
-            # Check if all tracers are inside the box
-            if np.any(pos < 0) or np.any(pos > L):
-                logging.error('Error! Some tracers outside of box!')
-                return False
+    # Set mesh resolution
+    N = int(L/1000*128)
 
-            # Set mesh resolution
-            N = int(L/1000*128)
+    out_data = {}
+    # Compute P(k)
+    if 'Pk' in summaries:
+        MAS = 'NGP'
+        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+        out = run_pylians(
+            field, ['Pk'], L, axis=0, MAS=MAS,
+            num_threads=threads, use_rsd=False
+        )
+        out_data.update(out)
+    if 'Bk' in summaries:
+        MAS = 'TSC'
+        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+        out = run_pylians(
+            field, ['Bk'], L, axis=0, MAS=MAS,
+            num_threads=threads, use_rsd=False
+        )
+        out_data.update(out)
 
-            # Compute P(k)
-            if 'Pk' in summaries:
-                MAS = 'NGP'
-                field = MA(pos, L, N, MAS=MAS)
-                run_pylians(
-                    field, o, ['Pk'], L, axis=0, MAS=MAS,
-                    num_threads=threads, use_rsd=False
-                )
-            if 'Bk' in summaries:
-                MAS = 'TSC'
-                field = MA(pos, L, N, MAS=MAS)
-                run_pylians(
-                    field, o, ['Bk'], L, axis=0, MAS=MAS,
-                    num_threads=threads, use_rsd=False
-                )
+    # Compute other summaries
+    others = [s for s in summaries if (
+        ('Pk' not in s) and ('Bk' not in s))]
+    if len(others) > 0:
+        out = run_summarizer(
+            pos, np.zeros_like(pos), cosmo[2], z, L, N,
+            others,
+            threads
+        )
+        out_data.update(out)
 
-            # Compute other summaries
-            others = [s for s in summaries if (
-                ('Pk' not in s) and ('Bk' not in s))]
-            if len(others) > 0:
-                run_summarizer(
-                    pos, np.zeros_like(pos), cosmo[2], z, L, N,
-                    o, others,
-                    threads
-                )
+    save_group(outpath, out_data, None, None,
+               config, save_HOD=True)
     return True
 
 
