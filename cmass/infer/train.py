@@ -136,7 +136,7 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
 
     # save the model configuration
     with open(join(out_dir, 'config.yaml'), 'w') as f:
-        yaml.dump(kwargs, f)
+        yaml.dump({**kwargs, **train_args}, f)
 
     # Plot training history
     logging.info('Plotting training history...')
