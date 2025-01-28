@@ -20,7 +20,7 @@ summaries:
     # - TwoPCF         # two-point correlation function
     # - KNN            # k-nearest neighbors
     # - WST            # wavelet scattering transform
-    # - Bk             # bispectrum
+    - Bk             # bispectrum
     # - Density Split  # density split statistics
 
 # whether to use abundance matching to affix number density
