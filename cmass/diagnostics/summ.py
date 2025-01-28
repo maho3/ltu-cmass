@@ -195,24 +195,24 @@ def summarize_rho(
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
 
     # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=False)
-            for a in alist:
-                logging.info(f'Processing density field a={a}')
+    with h5py.File(outpath, 'w') as o:
+        if config is not None:
+            save_configuration(o, config, save_HOD=False)
+        for a in alist:
+            logging.info(f'Processing density field a={a}')
+            with h5py.File(filename, 'r') as f:
                 rho = f[a]['rho'][...].astype(np.float32)
-                group = o.create_group(a)
-                if 'Pk' in config.diag.summaries:
-                    run_pylians(
-                        rho, group, ['Pk'], L, axis=0, MAS='CIC',
-                        num_threads=threads, use_rsd=False
-                    )
-                if 'Bk' in config.diag.summaries:
-                    run_pylians(
-                        rho, group, ['Bk'], L, axis=0, MAS='CIC',
-                        num_threads=threads, use_rsd=False
-                    )
+            group = o.create_group(a)
+            if 'Pk' in config.diag.summaries:
+                run_pylians(
+                    rho, group, ['Pk'], L, axis=0, MAS='CIC',
+                    num_threads=threads, use_rsd=False
+                )
+            if 'Bk' in config.diag.summaries:
+                run_pylians(
+                    rho, group, ['Bk'], L, axis=0, MAS='CIC',
+                    num_threads=threads, use_rsd=False
+                )
     return True
 
 
@@ -250,103 +250,106 @@ def summarize_tracer(
     Ncut = None if density is None else int(density * L**3)
 
     # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=(type == 'galaxy'))
-            for a in alist:
-                z = 1/float(a) - 1
-                logging.info(f'Processing {type} catalog a={a}')
+    with h5py.File(outpath, 'w') as o:
+        if config is not None:
+            save_configuration(o, config, save_HOD=(type == 'galaxy'))
+        for a in alist:
+            z = 1/float(a) - 1
+            logging.info(f'Processing {type} catalog a={a}')
 
-                # Load
+            # Load
+            with h5py.File(filename, 'r') as f:
                 pos = f[a]['pos'][...].astype(np.float32)
                 vel = f[a]['vel'][...].astype(np.float32)
-                pos %= L  # Ensure all tracers inside box
-
-                # Create output group
-                group = o.create_group(a)
-
-                # Mask out low mass tracers (to match number density)
-                mass = None
-                if density is not None:
-                    if proxy is None:
-                        logging.warning(
-                            'Proxy is set to None. Not rank-ordering.')
-                        mass = np.arange(len(pos))
-                        np.random.shuffle(mass)
-                    else:
-                        if proxy not in f[a].keys():
-                            logging.error(
-                                f'{proxy} not found in {type} file at a={a}')
-                        if len(pos) <= Ncut:
-                            logging.warning(f'Not enough {type} tracers in {a}')
-                        logging.info(
-                            f'Cutting top {Ncut} out of {len(pos)} {type} '
-                            'tracers to match number density')
-                        mass = f[a][proxy][...].astype(np.float32)
-                    mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
-                    pos = pos[mask]
-                    vel = vel[mask]
-                    mass = mass[mask]
-
-                    group.attrs['density'] = float(density)
+                if (proxy is not None) and proxy in f[a].keys():
+                    mass = f[a][proxy][...].astype(np.float32)
                 else:
-                    group.attrs['density'] = np.nan
+                    mass = None
+            pos %= L  # Ensure all tracers inside box
 
-                # Noise out positions (we do not probe less than Lnoise)
-                Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-                pos += np.random.randn(*pos.shape) * Lnoise
+            # Create output group
+            group = o.create_group(a)
 
-                # Compute P(k)
-                if 'Pk' in summaries:
-                    # real space
-                    MAS = 'NGP'
-                    field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-                    run_pylians(
-                        field, group, ['Pk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=False
-                    )
+            # Mask out low mass tracers (to match number density)
+            mass = None
+            if density is not None:
+                if proxy is None:
+                    logging.warning(
+                        'Proxy is set to None. Not rank-ordering.')
+                    mass = np.arange(len(pos))
+                    np.random.shuffle(mass)
+                else:
+                    if mass is None:
+                        logging.error(
+                            f'{proxy} not found in {type} file at a={a}')
+                    if len(pos) <= Ncut:
+                        logging.warning(f'Not enough {type} tracers in {a}')
+                    logging.info(
+                        f'Cutting top {Ncut} out of {len(pos)} {type} '
+                        'tracers to match number density')
+                mask = np.argsort(mass)[-Ncut:]  # Keep top Ncut tracers
+                pos = pos[mask]
+                vel = vel[mask]
+                mass = mass[mask]
 
-                    # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
-                                axis=0).astype(np.float32)
-                    run_pylians(
-                        field, group, ['Pk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=True
-                    )
-                if 'Bk' in summaries:
-                    # real space
-                    MAS = 'TSC'
-                    field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-                    run_pylians(
-                        field, group, ['Bk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=False
-                    )
+                group.attrs['density'] = float(density)
+            else:
+                group.attrs['density'] = np.nan
 
-                    # redshift space
-                    field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
-                                axis=0).astype(np.float32)
-                    run_pylians(
-                        field, group, ['Bk'], L, axis=0, MAS=MAS,
-                        num_threads=threads, use_rsd=True
-                    )
+            # Noise out positions (we do not probe less than Lnoise)
+            Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+            pos += np.random.randn(*pos.shape) * Lnoise
 
-                # Compute other summaries
-                others = [s for s in summaries if (
-                    ('Pk' not in s) and ('Bk' not in s))]
-                if len(others) > 0:
-                    run_summarizer(
-                        pos, vel, cosmo.h, z, L, N,
-                        group, others,
-                        threads
-                    )
+            # Compute P(k)
+            if 'Pk' in summaries:
+                # real space
+                MAS = 'NGP'
+                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+                run_pylians(
+                    field, group, ['Pk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=False
+                )
 
-                if mass is not None:
-                    # measure halo mass function
-                    be = np.linspace(12.5, 16, 100)
-                    hist, _ = np.histogram(mass, bins=be)
-                    group.create_dataset('mass_bins', data=be)
-                    group.create_dataset('mass_hist', data=hist)
+                # redshift space
+                field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                            axis=0).astype(np.float32)
+                run_pylians(
+                    field, group, ['Pk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=True
+                )
+            if 'Bk' in summaries:
+                # real space
+                MAS = 'TSC'
+                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+                run_pylians(
+                    field, group, ['Bk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=False
+                )
+
+                # redshift space
+                field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                            axis=0).astype(np.float32)
+                run_pylians(
+                    field, group, ['Bk'], L, axis=0, MAS=MAS,
+                    num_threads=threads, use_rsd=True
+                )
+
+            # Compute other summaries
+            others = [s for s in summaries if (
+                ('Pk' not in s) and ('Bk' not in s))]
+            if len(others) > 0:
+                run_summarizer(
+                    pos, vel, cosmo.h, z, L, N,
+                    group, others,
+                    threads
+                )
+
+            if mass is not None:
+                # measure halo mass function
+                be = np.linspace(12.5, 16, 100)
+                hist, _ = np.histogram(mass, bins=be)
+                group.create_dataset('mass_bins', data=be)
+                group.create_dataset('mass_hist', data=hist)
     return True
 
 
@@ -377,76 +380,77 @@ def summarize_lightcone(
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
 
     # compute diagnostics and save
-    with h5py.File(filename, 'r') as f:
-        with h5py.File(outpath, 'w') as o:
-            if config is not None:
-                save_configuration(o, config, save_HOD=True)
+    with h5py.File(outpath, 'w') as o:
+        if config is not None:
+            save_configuration(o, config, save_HOD=True)
 
-            # Load
+        # Load
+
+        with h5py.File(filename, 'r') as f:
             ra = f['ra'][...]
             dec = f['dec'][...]
             z = f['z'][...]
-            rdz = np.vstack([ra, dec, z]).T
+        rdz = np.vstack([ra, dec, z]).T
 
-            # convert to comoving
-            pos = sky_to_xyz(rdz, cosmo)
+        # convert to comoving
+        pos = sky_to_xyz(rdz, cosmo)
 
-            # Noise out positions (we do not probe less than Lnoise)
-            Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-            pos += np.random.randn(*pos.shape) * Lnoise
+        # Noise out positions (we do not probe less than Lnoise)
+        Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+        pos += np.random.randn(*pos.shape) * Lnoise
 
-            # convert to float32
-            pos = pos.astype(np.float32)
+        # convert to float32
+        pos = pos.astype(np.float32)
 
-            if cap == 'ngc':
-                # offset to center (min is about -1870, -1750, -120)
-                pos += [2000, 1800, 250]
-                # set length scale of grid (range is about 1750, 3350, 1900)
-                L = 3500
-            elif cap == 'sgc':
-                # offset to center (min is about 800, -1275, -375)
-                pos += [-600, 1400, 400]
-                # set length scale of grid (range is about 1750, 3350, 1900)
-                L = 2750
-            elif cap == 'mtng':
-                pos += [100, 100, 100]
-                L = 2000
-            else:
-                raise ValueError
+        if cap == 'ngc':
+            # offset to center (min is about -1870, -1750, -120)
+            pos += [2000, 1800, 250]
+            # set length scale of grid (range is about 1750, 3350, 1900)
+            L = 3500
+        elif cap == 'sgc':
+            # offset to center (min is about 800, -1275, -375)
+            pos += [-600, 1400, 400]
+            # set length scale of grid (range is about 1750, 3350, 1900)
+            L = 2750
+        elif cap == 'mtng':
+            pos += [100, 100, 100]
+            L = 2000
+        else:
+            raise ValueError
 
-            # Check if all tracers are inside the box
-            if np.any(pos < 0) or np.any(pos > L):
-                logging.error('Error! Some tracers outside of box!')
-                return False
+        # Check if all tracers are inside the box
+        if np.any(pos < 0) or np.any(pos > L):
+            logging.error('Error! Some tracers outside of box!')
+            return False
 
-            # Set mesh resolution
-            N = int(L/1000*128)
+        # Set mesh resolution
+        N = int(L/1000*128)
 
-            # Compute P(k)
-            if 'Pk' in summaries:
-                MAS = 'NGP'
-                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-                run_pylians(
-                    field, o, ['Pk'], L, axis=0, MAS=MAS,
-                    num_threads=threads, use_rsd=False
-                )
-            if 'Bk' in summaries:
-                MAS = 'TSC'
-                field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-                run_pylians(
-                    field, o, ['Bk'], L, axis=0, MAS=MAS,
-                    num_threads=threads, use_rsd=False
-                )
+        # Compute P(k)
+        if 'Pk' in summaries:
+            MAS = 'NGP'
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            run_pylians(
+                field, o, ['Pk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
+        if 'Bk' in summaries:
+            MAS = 'TSC'
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            run_pylians(
+                field, o, ['Bk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
 
-            # Compute other summaries
-            others = [s for s in summaries if (
-                ('Pk' not in s) and ('Bk' not in s))]
-            if len(others) > 0:
-                run_summarizer(
-                    pos, np.zeros_like(pos), cosmo[2], z, L, N,
-                    o, others,
-                    threads
-                )
+        # Compute other summaries
+        others = [s for s in summaries if (
+            ('Pk' not in s) and ('Bk' not in s))]
+        if len(others) > 0:
+            run_summarizer(
+                pos, np.zeros_like(pos), cosmo[2], z, L, N,
+                o, others,
+                threads
+            )
     return True
 
 
