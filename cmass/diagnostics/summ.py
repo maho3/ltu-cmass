@@ -383,7 +383,7 @@ def summarize_tracer(
 
 def summarize_lightcone(
     source_path, L, N, cosmo,
-    cap='ngc',
+    cap='ngc', high_res=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
     summaries=['Pk'],
@@ -448,7 +448,10 @@ def summarize_lightcone(
         return False
 
     # Set mesh resolution
-    N = int(L/1000*128)
+    if high_res:
+        N = int(L/1000*256)
+    else:
+        N = int(L/1000*128)
 
     out_data = {}
     # Compute P(k)
@@ -557,7 +560,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.diag.all or cfg.diag.ngc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, Planck18,
-            cap='ngc',
+            cap='ngc', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,
@@ -569,7 +572,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.diag.all or cfg.diag.sgc:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, Planck18,
-            cap='sgc',
+            cap='sgc', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,
@@ -581,7 +584,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.diag.all or cfg.diag.mtng:
         done = summarize_lightcone(
             source_path, cfg.nbody.L, N, Planck18,
-            cap='mtng',
+            cap='mtng', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,

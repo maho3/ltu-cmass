@@ -14,6 +14,9 @@ mtng: false
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
 
+# whether to compute summaries on a high resolution grid
+high_res: false
+
 # which summaries to run
 summaries:
     - Pk             # power spectrum
