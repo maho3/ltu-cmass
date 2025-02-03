@@ -2,8 +2,9 @@ import numpy as np
 import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
-import PolyBin3D as pb
 from ..utils import timing_decorator
+import BFast
+# import PolyBin3D as pb
 
 
 def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
@@ -37,7 +38,7 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
     return k, Pk
 
 
-def calcQk(k, Pk, k123, Bk):
+def calcQk_polybin(k, Pk, k123, Bk):
     # Qk = Bk123 / (Pk1 * Pk2 + Pk2 * Pk3 + Pk3 * Pk1)
     Pk1 = np.array([np.interp(k123[0], k, Pk[i]) for i in range(Pk.shape[0])])
     Pk2 = np.array([np.interp(k123[1], k, Pk[i]) for i in range(Pk.shape[0])])
@@ -47,7 +48,8 @@ def calcQk(k, Pk, k123, Bk):
 
 
 @timing_decorator
-def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
+def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
+    raise NotImplementedError('Deprecated in favor of BFast')
     # TODO: Use ili-summarizer here
     k_min = 1.05*2 * np.pi / L
     n_mesh = delta.shape[0]
@@ -91,8 +93,36 @@ def calcBk(delta, L, axis=0, MAS='CIC', threads=16):
     weight = k123.prod(axis=0)
     pk = np.array([pk_corr[f'p{ell}'] for ell in [0, 2]])
     bk = np.array([bk_corr[f'b{ell}']*weight for ell in [0, 2]])
-    qk = calcQk(k, pk, k123, bk)
+    qk = calcQk_polybin(k, pk, k123, bk)
     return k123, bk, qk, k, pk
+
+
+def calcQk_bfast(Pk, Bk):
+    Qk = Bk / (Pk[0] * Pk[1] + Pk[1] * Pk[2] + Pk[2] * Pk[0])
+    return Qk
+
+
+@timing_decorator
+def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir='./'):
+
+    kF = 2*np.pi/L
+    kmax = 0.5  # h/Mpc
+    Nbins = 20  # Set due to memory limits for 3 Gpc/h box
+    fc = dk = kmax/kF/(Nbins+1/2)
+
+    result = BFast.Bk(
+        delta, L, fc, dk, Nbins, 'All', MAS=MAS,
+        fast=True, precision='float32', verbose=False,
+        file_path=cache_dir
+    )
+
+    k123 = result[:, :3].T
+    pk = result[:, 3:5].T
+    bk = result[:, 6:7].T
+    counts = result[7]
+
+    qk = calcQk_polybin(k123, pk, bk)
+    return k123, bk, qk, k123, pk
 
 
 def get_box_catalogue(pos, z, L, N):

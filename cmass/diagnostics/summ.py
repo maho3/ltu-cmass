@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk, calcBk
+from .tools import calcPk, calcBk_bfast
 from ..survey.tools import sky_to_xyz
 
 
@@ -122,7 +122,7 @@ def run_pylians(
                 pfx+'Pk': Pk
             }
         elif summary_name == 'Bk':
-            k123, Bk, Qk, k, Pk = calcBk(
+            k123, Bk, Qk, k, Pk = calcBk_bfast(
                 field, box_size, axis=axis,
                 MAS=MAS, threads=num_threads)
             out = {
