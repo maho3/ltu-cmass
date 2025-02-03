@@ -242,8 +242,8 @@ def summarize_rho(
 
 
 def summarize_tracer(
-    source_path, L, N, cosmo,
-    density=None, proxy=None,
+    source_path, L, cosmo,
+    density=None, proxy=None, high_res=False,
     threads=16, from_scratch=True,
     type='halo', hod_seed=None,
     summaries=['Pk'],
@@ -274,6 +274,12 @@ def summarize_tracer(
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
+
+    # set mesh resolution
+    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
+        N = (L//1000)*256
+    else:  # fixed resolution at 128 cells per 1000 Mpc/h
+        N = (L//1000)*128
 
     # compute diagnostics and save
     for a in alist:
@@ -382,8 +388,8 @@ def summarize_tracer(
 
 
 def summarize_lightcone(
-    source_path, L, N, cosmo,
-    cap='ngc',
+    source_path, L, cosmo,
+    cap='ngc', high_res=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
     summaries=['Pk'],
@@ -448,12 +454,15 @@ def summarize_lightcone(
         return False
 
     # Set mesh resolution
-    N = int(L/1000*128)
+    if high_res:
+        N = int(L/1000*256)
+    else:
+        N = int(L/1000*128)
 
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        MAS = 'NGP'
+        MAS = 'TSC' if high_res else 'CIC'
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Pk'], L, axis=0, MAS=MAS,
@@ -520,15 +529,13 @@ def main(cfg: DictConfig) -> None:
     else:
         logging.info('Skipping rho diagnostics')
 
-    # set mesh resolution
-    N = (cfg.nbody.L//1000)*128  # fixed resolution at 128 cells per 1000 Mpc/h
-
     # measure halo diagnostics
     if cfg.diag.all or cfg.diag.halo:
         done = summarize_tracer(
-            source_path, cfg.nbody.L, N, cosmo,
+            source_path, cfg.nbody.L, cosmo,
             density=cfg.diag.halo_density,
             proxy=cfg.diag.halo_proxy,
+            high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             type='halo',
             summaries=summaries,
@@ -541,9 +548,10 @@ def main(cfg: DictConfig) -> None:
     # measure galaxy diagnostics
     if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
-            source_path, cfg.nbody.L, N, cosmo,
+            source_path, cfg.nbody.L, cosmo,
             density=cfg.diag.galaxy_density,
             proxy=cfg.diag.galaxy_proxy,
+            high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             type='galaxy', hod_seed=cfg.bias.hod.seed,
             summaries=summaries,
@@ -556,8 +564,8 @@ def main(cfg: DictConfig) -> None:
     # measure lightcone diagnostics
     if cfg.diag.all or cfg.diag.ngc:
         done = summarize_lightcone(
-            source_path, cfg.nbody.L, N, Planck18,
-            cap='ngc',
+            source_path, cfg.nbody.L, Planck18,
+            cap='ngc', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,
@@ -568,8 +576,8 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping ngc_lightcone diagnostics')
     if cfg.diag.all or cfg.diag.sgc:
         done = summarize_lightcone(
-            source_path, cfg.nbody.L, N, Planck18,
-            cap='sgc',
+            source_path, cfg.nbody.L, Planck18,
+            cap='sgc', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,
@@ -580,8 +588,8 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping sgc_lightcone diagnostics')
     if cfg.diag.all or cfg.diag.mtng:
         done = summarize_lightcone(
-            source_path, cfg.nbody.L, N, Planck18,
-            cap='mtng',
+            source_path, cfg.nbody.L, Planck18,
+            cap='mtng', high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
             hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
             summaries=summaries,

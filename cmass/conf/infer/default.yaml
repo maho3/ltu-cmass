@@ -28,6 +28,8 @@ experiments:
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  # - summary: [Pk0, Pk2, Qk0, Qk2]   # monopole, quadrupole
+  #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
