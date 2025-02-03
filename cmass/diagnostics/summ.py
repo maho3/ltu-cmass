@@ -107,7 +107,7 @@ def store_summary(
 def run_pylians(
     field, summaries,
     box_size, axis, num_threads, use_rsd,
-    MAS='CIC'
+    MAS='CIC', cache_dir=None
 ):
     # Only for power spectrum
     accept_summaries = ['Pk', 'Bk']
@@ -124,7 +124,8 @@ def run_pylians(
         elif summary_name == 'Bk':
             k123, Bk, Qk, k, Pk = calcBk_bfast(
                 field, box_size, axis=axis,
-                MAS=MAS, threads=num_threads)
+                MAS=MAS, threads=num_threads,
+                cache_dir=cache_dir)
             out = {
                 pfx+'Bk_k123': k123,
                 pfx+'Bk': Bk,
@@ -231,9 +232,14 @@ def summarize_rho(
             )
             out_data.update(out)
         if 'Bk' in config.diag.summaries:
+            if config is not None:
+                cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+            else:
+                cache_dir = None
             out = run_pylians(
                 rho, ['Bk'], L, axis=0, MAS='CIC',
-                num_threads=threads, use_rsd=False
+                num_threads=threads, use_rsd=False,
+                cache_dir=cache_dir
             )
             out_data.update(out)
         if len(out) > 0:
@@ -341,15 +347,21 @@ def summarize_tracer(
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
+        # Compute B(k)
         if 'Bk' in summaries:
             N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
             MAS = 'TSC'
+            if config is not None:
+                cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+            else:
+                cache_dir = None
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
                 field, ['Bk'], L, axis=0, MAS=MAS,
-                num_threads=threads, use_rsd=False
+                num_threads=threads, use_rsd=False,
+                cache_dir=cache_dir
             )
             out_data.update(out)
 
@@ -358,7 +370,8 @@ def summarize_tracer(
                         axis=0).astype(np.float32)
             out = run_pylians(
                 field, ['Bk'], L, axis=0, MAS=MAS,
-                num_threads=threads, use_rsd=True
+                num_threads=threads, use_rsd=True,
+                cache_dir=cache_dir
             )
             out_data.update(out)
 
@@ -461,14 +474,20 @@ def summarize_lightcone(
             num_threads=threads, use_rsd=False
         )
         out_data.update(out)
+    # Compute B(k)
     if 'Bk' in summaries:
         N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
         MAS = 'TSC'
+        if config is not None:
+            cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+        else:
+            cache_dir = None
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Bk'], L, axis=0, MAS=MAS,
-            num_threads=threads, use_rsd=False
+            num_threads=threads, use_rsd=False,
+            cache_dir=cache_dir
         )
         out_data.update(out)
 

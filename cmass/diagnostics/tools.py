@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import Pk_library as PKL
 import MAS_library as MASL
@@ -115,7 +116,12 @@ def calcQk_bfast(Pk, Bk):
 
 
 @timing_decorator
-def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir='./'):
+def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
+    if cache_dir is None:
+        cache_dir = './'
+    else:
+        cache_dir += '/'
+    os.makedirs(cache_dir, exist_ok=True)
 
     kF = 2*np.pi/L
     kmax = 0.5  # h/Mpc
