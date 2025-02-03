@@ -14,7 +14,7 @@ mtng: false
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
 
-# whether to compute summaries on a high resolution grid
+# whether to compute summaries on a high resolution grid (~ 4 Mpc/h)
 high_res: true
 
 # which summaries to run
