@@ -14,6 +14,18 @@ def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
     return pos
 
 
+def get_mesh_resolution(L, high_res=False):
+
+    # set mesh resolution
+    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
+        N = (L//1000)*256
+        MAS = 'TSC'
+    else:  # fixed resolution at 128 cells per 1000 Mpc/h
+        N = (L//1000)*128
+        MAS = 'CIC'
+    return N, MAS
+
+
 def MA(pos, L, N, MAS='CIC'):
     pos = np.ascontiguousarray(pos)
     delta = np.zeros((N, N, N), dtype=np.float32)
@@ -117,11 +129,11 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir='./'):
     )
 
     k123 = result[:, :3].T
-    pk = result[:, 3:5].T
+    pk = result[:, 3:6].T
     bk = result[:, 6:7].T
     counts = result[7]
+    qk = calcQk_bfast(pk, bk)
 
-    qk = calcQk_polybin(k123, pk, bk)
     return k123, bk, qk, k123, pk
 
 

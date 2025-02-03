@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk, calcBk_bfast
+from .tools import calcPk, calcBk_bfast, get_mesh_resolution
 from ..survey.tools import sky_to_xyz
 
 
@@ -275,12 +275,6 @@ def summarize_tracer(
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
 
-    # set mesh resolution
-    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
-        N = (L//1000)*256
-    else:  # fixed resolution at 128 cells per 1000 Mpc/h
-        N = (L//1000)*128
-
     # compute diagnostics and save
     for a in alist:
         z = 1/float(a) - 1
@@ -329,8 +323,9 @@ def summarize_tracer(
         # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
+            N, MAS = get_mesh_resolution(L, high_res)
+
             # real space
-            MAS = 'NGP'
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
                 field, ['Pk'], L, axis=0, MAS=MAS,
@@ -347,8 +342,10 @@ def summarize_tracer(
             )
             out_data.update(out)
         if 'Bk' in summaries:
-            # real space
+            N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
             MAS = 'TSC'
+
+            # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
                 field, ['Bk'], L, axis=0, MAS=MAS,
@@ -453,16 +450,11 @@ def summarize_lightcone(
         logging.error('Error! Some tracers outside of box!')
         return False
 
-    # Set mesh resolution
-    if high_res:
-        N = int(L/1000*256)
-    else:
-        N = int(L/1000*128)
-
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        MAS = 'TSC' if high_res else 'CIC'
+        N, MAS = get_mesh_resolution(L, high_res)
+
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Pk'], L, axis=0, MAS=MAS,
@@ -470,7 +462,9 @@ def summarize_lightcone(
         )
         out_data.update(out)
     if 'Bk' in summaries:
+        N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
         MAS = 'TSC'
+
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Bk'], L, axis=0, MAS=MAS,
