@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=inference  # Job name
-#SBATCH --array=0-15  # Array range
+#SBATCH --array=0-199  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
 #SBATCH --gpus-per-node=1     # Number of GPUs
@@ -16,7 +16,8 @@ export TQDM_DISABLE=0
 module restore cmass
 conda activate cmass
 
-exp_index=$SLURM_ARRAY_TASK_ID
+exp_index=9
+net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass
@@ -34,11 +35,12 @@ mtng=False
 extras="nbody.zf=0.500015"
 device=cuda
 
-postfix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index"
-postfix="$postfix infer.halo=$halo infer.galaxy=$galaxy"
-postfix="$postfix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
-postfix="$postfix infer.device=$device $extras"
+suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
+suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
+suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
+suffix="$suffix infer.device=$device $extras"
 
-echo "Running inference with $postfix"
-python -m cmass.infer.preprocess $postfix
-python -m cmass.infer.train $postfix
+echo "Running inference with $suffix"
+# python -m cmass.infer.preprocess $suffix
+python -m cmass.infer.train $suffix net=tuning
+# python -m cmass.infer.validate $suffix
