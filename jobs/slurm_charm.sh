@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=charm_mtng  # Job name
-#SBATCH --array=110-199         # Job array range for lhid
+#SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=24:00:00         # Time limit
@@ -12,7 +12,7 @@
 
 # SLURM_ARRAY_TASK_ID=150
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
-baseoffset=0
+baseoffset=2000
 
 module restore cmass
 conda activate cmassrun
@@ -34,7 +34,7 @@ outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 # Loop through offsets and process files
-for offset in $(seq 0 200 1800); do
+for offset in $(seq 0 200 800); do
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5
