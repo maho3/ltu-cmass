@@ -456,7 +456,7 @@ def summarize_lightcone(
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        MAS = 'NGP'
+        MAS = 'TSC' if high_res else 'CIC'
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Pk'], L, axis=0, MAS=MAS,

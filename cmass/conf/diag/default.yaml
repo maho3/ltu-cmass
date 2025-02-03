@@ -15,7 +15,7 @@ mtng: false
 threads: -1  # -1 for all available threads
 
 # whether to compute summaries on a high resolution grid
-high_res: false
+high_res: true
 
 # which summaries to run
 summaries:
@@ -23,7 +23,7 @@ summaries:
     # - TwoPCF         # two-point correlation function
     # - KNN            # k-nearest neighbors
     # - WST            # wavelet scattering transform
-    - Bk             # bispectrum
+    # - Bk             # bispectrum
     # - Density Split  # density split statistics
 
 # whether to use abundance matching to affix number density
