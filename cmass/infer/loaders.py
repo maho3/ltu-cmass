@@ -90,7 +90,6 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None):
     return Xout
 
 
-
 def load_Bk(diag_file, a):
     a = f'{a:.6f}'
     if not os.path.exists(diag_file):
@@ -129,7 +128,7 @@ def load_lc_Bk(diag_file):
 
 
 def preprocess_Bk(X, kmax,):
-    
+
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
@@ -145,4 +144,3 @@ def preprocess_Bk(X, kmax,):
     Xout = Xout.reshape(len(Xout), -1)
 
     return Xout
-
