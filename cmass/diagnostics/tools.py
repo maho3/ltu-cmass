@@ -123,9 +123,12 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
         cache_dir += '/'
     os.makedirs(cache_dir, exist_ok=True)
 
-    kF = 2*np.pi/L
+    # k-grid set by the largest configuration
+    Lmax = 3500.  # Mpc/h
+    kF = 2*np.pi/Lmax
     kmax = 0.5  # h/Mpc
-    Nbins = 20  # Set due to memory limits for 3 Gpc/h box
+    Nbins = 27  # Set due to memory limits for 3 Gpc/h box
+    # kbinning which allows Nbins in this range (from Bfast code)
     fc = dk = kmax/kF/(Nbins+1/2)
 
     result = BFast.Bk(
