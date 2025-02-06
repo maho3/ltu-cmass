@@ -141,7 +141,7 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
     k123 = result[:, :3].T
     pk = result[:, 3:6].T
     bk = result[:, 6:7].T
-    counts = result[7]
+    counts = result[7]  # number of triangles in each bin (not used)
     qk = calcQk_bfast(pk, bk)
 
     return k123, bk, qk, k123, pk

@@ -1,5 +1,5 @@
 
-# whether to calculate diagnostics from scratch, overwriting existing files
+# whether to calculate diagnostics from scratch, deleting old files
 from_scratch: true
 
 # whether to compute for each tracer
