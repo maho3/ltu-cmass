@@ -19,6 +19,7 @@ from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
 from .tools import store_summary
 from ..survey.tools import sky_to_xyz
+import datetime
 
 
 def run_pylians(
@@ -98,12 +99,13 @@ def save_configuration(file, config, save_HOD=True):
 def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
     with h5py.File(file, 'a') as f:
         if a is not None:
-            group = f.create_group(a)
+            group = f.require_group(a)
         else:
             group = f
         if attrs is not None:
             for key, value in attrs.items():
                 group.attrs[key] = value
+            group.attrs['timestamp'] = datetime.datetime.now().isoformat()
         for key, value in data.items():
             group.create_dataset(key, data=value)
 
@@ -130,7 +132,7 @@ def summarize_rho(
     outpath = join(source_path, 'diag', 'rho.h5')
     if os.path.isfile(outpath):
         if from_scratch:
-            os.remove(outpath)
+            os.remove(outpath)  # TODO: Replace with key checking/removal
         else:
             logging.info('rho diagnostics already computed')
             return True
@@ -337,6 +339,7 @@ def summarize_lightcone(
             os.remove(outpath)
         else:
             logging.info(f'{cap}_lightcone diagnostics already computed')
+            return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
     os.makedirs(join(source_path, 'diag'), exist_ok=True)

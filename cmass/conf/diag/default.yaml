@@ -19,7 +19,7 @@ high_res: true
 
 # which summaries to run
 summaries:
-    # - Pk             # power spectrum
+    - Pk             # power spectrum
     # - TwoPCF         # two-point correlation function
     # - KNN            # k-nearest neighbors
     # - WST            # wavelet scattering transform
