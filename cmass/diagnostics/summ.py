@@ -16,98 +16,16 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk, calcBk
+from .tools import calcPk, calcBk_bfast, get_mesh_resolution
+from .tools import store_summary
 from ..survey.tools import sky_to_xyz
-
-
-def get_binning(summary, L, N, threads, rsd=False):
-    ells = [0,] if not rsd else [0, 2, 4]
-    if summary == 'Pk':
-        return {
-            'k_edges': np.linspace(0, 1., 31),
-            'n_mesh': N,
-            'los': 'z',
-            'compensations': 'ngp',
-            'ells': ells,
-        }
-    if summary == 'Bk':
-        k_min = 1.05*2 * np.pi / L
-        n_mesh = 64
-        k_max = 0.95 * np.pi * n_mesh / L
-        num_bins = 15
-        return {
-            'k_bins': np.logspace(np.log10(k_min), np.log10(k_max), num_bins),
-            'n_mesh': n_mesh,
-            'lmax': 2,
-            'ells': ells,
-        }
-    if summary == 'TwoPCF':
-        num_bins = 60
-        return {
-            'r_bins': np.logspace(-2, np.log10(150.), num_bins),
-            'mu_bins': np.linspace(-1., 1., 201),
-            'ells': ells,
-            'n_threads': threads,
-            'los': 'z',
-        }
-    if summary == 'WST':
-        num_bins = 60
-        return {
-            'J_3d': 3,
-            'L_3d': 3,
-            'integral_powers': [0.8,],
-            'sigma': 0.8,
-            'n_mesh': N,
-        }
-    if summary == 'DensitySplit':
-        num_bins = 60
-        return {
-            'r_bins': np.logspace(-1, np.log10(150.), num_bins),
-            'mu_bins': np.linspace(-1., 1., 201),
-            'n_quantiles': 5,
-            'smoothing_radius': 10.0,
-            'ells': ells,
-            'n_threads': threads,
-        }
-    if summary == 'KNN':
-        num_bins = 60
-        return {
-            'r_bins': np.logspace(-2, np.log10(30.), num_bins),
-            'k': [1, 3, 7, 11],
-            'n_threads': threads,
-        }
-    else:
-        raise NotImplementedError(f'{summary} not implemented')
-
-
-def store_summary(
-    catalog, group, summary_name,
-    box_size, num_bins, num_threads, use_rsd=False
-):
-    # get summary binning
-    binning_config = get_binning(
-        summary_name, box_size, num_bins, num_threads, rsd=use_rsd)
-
-    logging.info(f'Computing Summary: {summary_name}')
-
-    # compute summary
-    import summarizer  # only import if needed. TODO: get working
-    summary_function = getattr(summarizer, summary_name)(**binning_config)
-    summary_data = summary_function(catalog)
-
-    # store summary
-    summary_dataset = summary_function.to_dataset(summary_data)
-    for coord_name, coord_value in summary_dataset.coords.items():
-        dataset_key = f"{'z' if use_rsd else ''}{summary_name}_{coord_name}"
-        group.create_dataset(dataset_key, data=coord_value.values)
-    summary_key = summary_name if not use_rsd else f'z{summary_name}'
-    group.create_dataset(summary_key, data=summary_dataset.values)
+import datetime
 
 
 def run_pylians(
     field, summaries,
     box_size, axis, num_threads, use_rsd,
-    MAS='CIC'
+    MAS='CIC', cache_dir=None
 ):
     # Only for power spectrum
     accept_summaries = ['Pk', 'Bk']
@@ -122,9 +40,10 @@ def run_pylians(
                 pfx+'Pk': Pk
             }
         elif summary_name == 'Bk':
-            k123, Bk, Qk, k, Pk = calcBk(
+            k123, Bk, Qk, k, Pk = calcBk_bfast(
                 field, box_size, axis=axis,
-                MAS=MAS, threads=num_threads)
+                MAS=MAS, threads=num_threads,
+                cache_dir=cache_dir)
             out = {
                 pfx+'Bk_k123': k123,
                 pfx+'Bk': Bk,
@@ -180,12 +99,13 @@ def save_configuration(file, config, save_HOD=True):
 def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
     with h5py.File(file, 'a') as f:
         if a is not None:
-            group = f.create_group(a)
+            group = f.require_group(a)
         else:
             group = f
         if attrs is not None:
             for key, value in attrs.items():
                 group.attrs[key] = value
+            group.attrs['timestamp'] = datetime.datetime.now().isoformat()
         for key, value in data.items():
             group.create_dataset(key, data=value)
 
@@ -212,7 +132,7 @@ def summarize_rho(
     outpath = join(source_path, 'diag', 'rho.h5')
     if os.path.isfile(outpath):
         if from_scratch:
-            os.remove(outpath)
+            os.remove(outpath)  # TODO: Replace with key checking/removal
         else:
             logging.info('rho diagnostics already computed')
             return True
@@ -231,9 +151,14 @@ def summarize_rho(
             )
             out_data.update(out)
         if 'Bk' in config.diag.summaries:
+            if config is not None:
+                cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+            else:
+                cache_dir = None
             out = run_pylians(
                 rho, ['Bk'], L, axis=0, MAS='CIC',
-                num_threads=threads, use_rsd=False
+                num_threads=threads, use_rsd=False,
+                cache_dir=cache_dir
             )
             out_data.update(out)
         if len(out) > 0:
@@ -274,12 +199,6 @@ def summarize_tracer(
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
-
-    # set mesh resolution
-    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
-        N = (L//1000)*256
-    else:  # fixed resolution at 128 cells per 1000 Mpc/h
-        N = (L//1000)*128
 
     # compute diagnostics and save
     for a in alist:
@@ -329,8 +248,9 @@ def summarize_tracer(
         # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
+            N, MAS = get_mesh_resolution(L, high_res)
+
             # real space
-            MAS = 'NGP'
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
                 field, ['Pk'], L, axis=0, MAS=MAS,
@@ -346,13 +266,21 @@ def summarize_tracer(
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
+        # Compute B(k)
         if 'Bk' in summaries:
-            # real space
+            N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
             MAS = 'TSC'
+            if config is not None:
+                cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+            else:
+                cache_dir = None
+
+            # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
                 field, ['Bk'], L, axis=0, MAS=MAS,
-                num_threads=threads, use_rsd=False
+                num_threads=threads, use_rsd=False,
+                cache_dir=cache_dir
             )
             out_data.update(out)
 
@@ -361,7 +289,8 @@ def summarize_tracer(
                         axis=0).astype(np.float32)
             out = run_pylians(
                 field, ['Bk'], L, axis=0, MAS=MAS,
-                num_threads=threads, use_rsd=True
+                num_threads=threads, use_rsd=True,
+                cache_dir=cache_dir
             )
             out_data.update(out)
 
@@ -410,6 +339,7 @@ def summarize_lightcone(
             os.remove(outpath)
         else:
             logging.info(f'{cap}_lightcone diagnostics already computed')
+            return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
     os.makedirs(join(source_path, 'diag'), exist_ok=True)
@@ -453,28 +383,31 @@ def summarize_lightcone(
         logging.error('Error! Some tracers outside of box!')
         return False
 
-    # Set mesh resolution
-    if high_res:
-        N = int(L/1000*256)
-    else:
-        N = int(L/1000*128)
-
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        MAS = 'TSC' if high_res else 'CIC'
+        N, MAS = get_mesh_resolution(L, high_res)
+
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Pk'], L, axis=0, MAS=MAS,
             num_threads=threads, use_rsd=False
         )
         out_data.update(out)
+    # Compute B(k)
     if 'Bk' in summaries:
+        N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
         MAS = 'TSC'
+        if config is not None:
+            cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+        else:
+            cache_dir = None
+
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
             field, ['Bk'], L, axis=0, MAS=MAS,
-            num_threads=threads, use_rsd=False
+            num_threads=threads, use_rsd=False,
+            cache_dir=cache_dir
         )
         out_data.update(out)
 
