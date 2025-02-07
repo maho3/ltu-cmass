@@ -4,7 +4,7 @@
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
 #SBATCH --gpus=v100:1     # Number of GPUs
-#SBATCH --time=01:00:00         # Time limit
+#SBATCH --time=04:00:00         # Time limit
 #SBATCH --partition=GPU-shared      # Partition name
 #SBATCH --account=phy240015p   # Account name
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
