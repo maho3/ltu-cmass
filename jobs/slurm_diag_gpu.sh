@@ -1,26 +1,21 @@
 #!/bin/bash
 #SBATCH --job-name=abacuspinn_gpu   # Job name
-#SBATCH --array=0-999         # Job array range for lhid
+#SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=32            # Number of tasks
-#SBATCH --gpus-per-node=1     # Number of GPUs
+#SBATCH --ntasks=5            # Number of tasks
+#SBATCH --gpus=v100:1     # Number of GPUs
 #SBATCH --time=01:00:00         # Time limit
-#SBATCH --partition=gpu      # Partition name
-#SBATCH --account=phy240043-gpu   # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --partition=GPU-shared      # Partition name
+#SBATCH --account=phy240015p   # Account name
+#SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=668
+# SLURM_ARRAY_TASK_ID=66
 
 module restore cmass
 conda activate cmass
 lhid=$SLURM_ARRAY_TASK_ID
 
-
-# For JAX gpu memory
-XLA_PYTHON_CLIENT_PREALLOCATE=false
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.50
-XLA_PYTHON_CLIENT_ALLOCATOR=platform
 
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
@@ -28,22 +23,22 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=5
 Naug=1
 
-nbody=mtnglike
-sim=fastpm
+nbody=pinocchio_2gpch
+sim=pinocchio
 multisnapshot=True
 diag_from_scratch=True
 rm_galaxies=False
 extras="" # "nbody.zf=0.500015"
-L=3000
-N=384
+L=2000
+N=1024
 
-# outdir=/anvil/scratch/x-mho1/cmass-ili/abacuslike/$sim/L$L-N$N
+outdir=/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/$sim/L$L-N$N
 # outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
-outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
+# outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in 0 1000; do
+for offset in $(seq 0 100 1999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
