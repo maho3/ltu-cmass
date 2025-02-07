@@ -124,13 +124,11 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
         cache_dir += '/'
     os.makedirs(cache_dir, exist_ok=True)
 
-    # k-grid set by the largest configuration
-    Lmax = 3500.  # Mpc/h
-    kF = 2*np.pi/Lmax
-    kmax = 0.5  # h/Mpc
-    Nbins = 27  # Set due to memory limits for 3 Gpc/h box
+    kF = 2*np.pi/L  # Fundamental frequency
+    kmax = np.pi*delta.shape[0]/L  # Nyquist frequency
+    Nbins = 23  # Set due to GPU memory limits for 3 Gpc/h box
     # kbinning which allows Nbins in this range (from Bfast code)
-    fc = dk = kmax/kF/(Nbins+1/2)
+    fc = dk = kmax/kF/(Nbins+1/2)  # span kF to kmax
 
     result = BFast.Bk(
         delta, L, fc, dk, Nbins, 'All', MAS=MAS,
