@@ -427,8 +427,8 @@ def summarize_lightcone(
     return True
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
