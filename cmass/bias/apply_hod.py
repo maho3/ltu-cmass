@@ -33,7 +33,7 @@ from ..utils import (
 from ..nbody.tools import parse_nbody_config
 
 
-@ timing_decorator
+@timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, redshift,
@@ -124,8 +124,8 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
             group.create_dataset(key, data=value)
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=abacuspinn_gpu   # Job name
+#SBATCH --job-name=quijotepinn_gpu   # Job name
 #SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
@@ -23,16 +23,16 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=5
 Naug=1
 
-nbody=pinocchio_2gpch
+nbody=pinocchio_quijote
 sim=pinocchio
 multisnapshot=True
 diag_from_scratch=True
 rm_galaxies=False
 extras="" # "nbody.zf=0.500015"
-L=2000
-N=1024
+L=1000
+N=512
 
-outdir=/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/$sim/L$L-N$N
+outdir=/ocean/projects/phy240015p/mho1/cmass-ili/quijotelike/$sim/L$L-N$N
 # outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 # outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"

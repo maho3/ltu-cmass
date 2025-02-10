@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=mtnglike_bias   # Job name
-#SBATCH --array=0-99         # Job array range for lhid
+#SBATCH --job-name=abacuslike_bias   # Job name
+#SBATCH --array=130-181        # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
 #SBATCH --gpus=v100:1     # Number of GPUs
-#SBATCH --time=48:00:00         # Time limit
+#SBATCH --time=04:00:00         # Time limit
 #SBATCH --partition=GPU-shared      # Partition name
 #SBATCH --account=phy240015p   # Account name
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=68
+# SLURM_ARRAY_TASK_ID=130
 
 module restore cmass
 conda activate cmass
@@ -23,20 +23,21 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=mtnglike
-sim=fastpm
+nbody=abacus
+sim=nbody
 multisnapshot=False
 diag_from_scratch=True
-rm_galaxies=True
-extras="nbody.zf=0.500015"
-L=3000
-N=384
+rm_galaxies=False
+extras="" # nbody.zf=0.500015"
+L=2000
+N=256
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 100 2999); do
+# for offset in $(seq 0 100 1999); do
+for offset in 0; do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
@@ -67,32 +68,18 @@ for offset in $(seq 0 100 2999); do
         fi
         # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-        # ngc_lightcone
+        # augments
         for aug_seed in $(seq 0 $(($Naug-1))); do
             printf -v aug_str "%05d" $aug_seed
             # lightcone
-            file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
             if [ -f $file ]; then
                 echo "File $file exists."
             else
                 echo "File $file does not exist."
-                python -m cmass.survey.lightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+                python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
             fi
-            python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        done
-
-        # mtng_lightcone
-        for aug_seed in $(seq 0 $(($Naug-1))); do
-            printf -v aug_str "%05d" $aug_seed
-            # lightcone
-            file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
-            if [ -f $file ]; then
-                echo "File $file exists."
-            else
-                echo "File $file does not exist."
-                python -m cmass.survey.mtng_selection $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            fi
-            python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
         # Trash collection
@@ -101,13 +88,9 @@ for offset in $(seq 0 100 2999); do
             echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
             rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
-            # ngc_lightcone
-            echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/ngc_lightcone/hod${hod_str}_aug*.h5
-
             # lightcone
             echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
+            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done
