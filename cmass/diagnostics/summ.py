@@ -17,7 +17,7 @@ from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
-from .tools import store_summary
+from .tools import store_summary, check_existing
 from ..survey.tools import sky_to_xyz
 import datetime
 
@@ -126,10 +126,9 @@ def summarize_rho(
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
-
     # check if diagnostics already computed
     outpath = join(source_path, 'diag', 'rho.h5')
+    summaries = config.diag.summaries
     if os.path.isfile(outpath):
         if from_scratch:
             os.remove(outpath)  # TODO: Replace with key checking/removal
@@ -193,7 +192,6 @@ def summarize_tracer(
             logging.info(f'{type} diagnostics already computed')
             return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
 
@@ -342,7 +340,6 @@ def summarize_lightcone(
             return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
 
     # Load
@@ -438,6 +435,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
+    os.makedirs(join(source_path, 'diag'), exist_ok=True)
 
     from_scratch = cfg.diag.from_scratch
     summaries = cfg.diag.summaries

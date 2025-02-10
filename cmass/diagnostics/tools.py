@@ -6,7 +6,65 @@ import redshift_space_library as RSL
 from ..utils import timing_decorator
 import BFast
 import logging
+import h5py
 # import PolyBin3D as pb
+
+
+def _delete(group, to_delete):
+    for key in group.keys():
+        if isinstance(group[key], h5py.Group):  # if its another group
+            _delete(group[key], to_delete)
+        elif key in to_delete:  # if its a dataset
+            del group[key]
+
+
+def _check(group, to_check):
+    # checks that all to_check keys are in group or its subgroups
+    saved_keys = list(group.keys())
+
+    # check recursively
+    if isinstance(group[saved_keys[0]], h5py.Group):
+        computed = True
+        for key in saved_keys:
+            if isinstance(group[key], h5py.Group):  # if its another group
+                computed &= _check(group[key], to_check)
+        return computed
+
+    # check if all keys are in group
+    for key in to_check:
+        if key not in saved_keys:
+            return False
+    return True
+
+
+def check_existing(file, summaries, from_scratch=False, rsd=False):
+    # Check if summaries are already saved, and may remove them if from_scratch
+    to_compute = []
+
+    for s in summaries:
+        # which keys to check for
+        if s == 'Pk':
+            to_check = ['Pk_k3D', 'Pk']
+        elif s == 'Bk':
+            to_check = ['Bk_k123', 'Bk', 'Qk', 'bPk_k3D', 'bPk']
+        else:
+            raise NotImplementedError(f'Summary {s} not yet implemented')
+
+        if rsd:  # check for redshift space
+            to_check += [f'z{s}' for s in to_check]
+
+        # check if keys exist in the file
+        with h5py.File(file, 'r') as f:
+            computed = _check(f, to_check)
+
+        # if we need to delete some
+        if (not computed) or (computed and from_scratch):
+            with h5py.File(file, 'a') as f:
+                _delete(f, to_check)
+                computed = False
+        if not computed:
+            to_compute.append(s)
+    return to_compute
 
 
 def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
