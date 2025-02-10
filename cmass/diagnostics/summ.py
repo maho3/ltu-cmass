@@ -97,6 +97,7 @@ def save_configuration(file, config, save_HOD=True):
 
 
 def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
+    logging.info(f'Saving {len(data)} datasets to {file}')
     with h5py.File(file, 'a') as f:
         if a is not None:
             group = f.require_group(a)
@@ -107,6 +108,8 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
                 group.attrs[key] = value
             group.attrs['timestamp'] = datetime.datetime.now().isoformat()
         for key, value in data.items():
+            if key in group:
+                del group[key]
             group.create_dataset(key, data=value)
 
         if config is not None:
@@ -126,15 +129,13 @@ def summarize_rho(
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
-    # check if diagnostics already computed
+    # check if diagnostics already computed, delete if from_scratch
     outpath = join(source_path, 'diag', 'rho.h5')
     summaries = config.diag.summaries
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)  # TODO: Replace with key checking/removal
-        else:
-            logging.info('rho diagnostics already computed')
-            return True
+    summaries = check_existing(filename, summaries, from_scratch, rsd=False)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute diagnostics and save
@@ -143,13 +144,13 @@ def summarize_rho(
         with h5py.File(filename, 'r') as f:
             rho = f[a]['rho'][...].astype(np.float32)
         out_data = {}
-        if 'Pk' in config.diag.summaries:
+        if 'Pk' in summaries:
             out = run_pylians(
                 rho, ['Pk'], L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
-        if 'Bk' in config.diag.summaries:
+        if 'Bk' in summaries:
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
             else:
@@ -184,16 +185,15 @@ def summarize_tracer(
         alist = list(f.keys())
 
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)
-        else:
-            logging.info(f'{type} diagnostics already computed')
-            return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
+    outpath = join(source_path, 'diag', postfix)
+    summaries = config.diag.summaries
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
@@ -445,7 +445,7 @@ def main(cfg: DictConfig) -> None:
 
     cosmo = cosmo_to_astropy(cfg.nbody.cosmo)
 
-    logging.info(f'Computing diagnostics: {summaries}')
+    logging.info(f'Selected diagnostics: {summaries}')
 
     all_done = True
 

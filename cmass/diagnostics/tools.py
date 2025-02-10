@@ -38,6 +38,9 @@ def _check(group, to_check):
 
 
 def check_existing(file, summaries, from_scratch=False, rsd=False):
+    if not os.path.isfile(file):
+        return summaries
+
     # Check if summaries are already saved, and may remove them if from_scratch
     to_compute = []
 
@@ -57,13 +60,21 @@ def check_existing(file, summaries, from_scratch=False, rsd=False):
         with h5py.File(file, 'r') as f:
             computed = _check(f, to_check)
 
-        # if we need to delete some
-        if (not computed) or (computed and from_scratch):
-            with h5py.File(file, 'a') as f:
-                _delete(f, to_check)
-                computed = False
+        # if already computed
+        if computed and (not from_scratch):
+            logging.info(f'{s} summaries already computed. Skipping...')
+            continue
+
+        # if not computed or from_scratch
         if not computed:
-            to_compute.append(s)
+            logging.info(f'{s} summaries not fully computed. '
+                         f'Running {s} from scratch...')
+        else:
+            logging.info(f'{s} already computed, but from_scratch=True. '
+                         f'Running {s} from scratch...')
+        with h5py.File(file, 'a') as f:
+            _delete(f, to_check)
+        to_compute.append(s)
     return to_compute
 
 
