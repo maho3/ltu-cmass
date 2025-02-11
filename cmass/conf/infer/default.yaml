@@ -1,15 +1,15 @@
 
-save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/fastpm_benchmark  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # index of network to use in cfg.net
-device: cpu  # cpu or cuda
+net_index: 386     # index of network to use in cfg.net
+device: gpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~
 Nmax: -1  # maximum number of simulations to load (-1 for all)
 
-halo: False      # whether to train on halo summaries
+halo: True      # whether to train on halo summaries
 galaxy: False    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
@@ -20,14 +20,14 @@ experiments:
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [Pk0, Pk2]   # monopole, quadrupole
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0]   # z-space monopole
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2]   # z-space monopole, quadrupole
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    # - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
+    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    # - summary: [zPk0]   # z-space monopole
+    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    # - summary: [zPk0, zPk2]   # z-space monopole, quadrupole
+    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    # - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
+    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   # - summary: [Pk0, Pk2, Qk0, Qk2]   # monopole, quadrupole
   #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
 
@@ -38,8 +38,8 @@ val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
 
-prior: quijote  # prior to use for training (uniform, quijote)
-backend: lampe # backend to use for training (sbi/lampe/pydelfi)
+prior: uniform  # prior to use for training (uniform, quijote)
+backend: sbi # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
 batch_size: null  # batch size
