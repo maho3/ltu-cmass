@@ -183,11 +183,14 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
+    wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
+    summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stores, only to read
     suite_path = get_source_path(
-        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        summ_dir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
-    model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
+    #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
+    model_dir = join(wdir,"preprocessed")#by default, may throw error, use save_dir to be sure
     if cfg.infer.save_dir is not None:
         model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
