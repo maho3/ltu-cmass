@@ -16,14 +16,21 @@ def get_hod(diagfile):
         hod_params = f.attrs['HOD_params'][:]
     return hod_params
 
+def closest_a(lst, a):
+     lst = [float(el) for el in lst]
+     lst = np.asarray(lst)
+     idx = (np.abs(lst - a)).argmin()
+     return lst[idx]
 
 def load_Pk(diag_file, a):
-    a = f'{a:.6f}'
+    #a = f'{a:.6f}'
     if not os.path.exists(diag_file):
         return {}
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
+            a = closest_a(list(f.keys()),a)
+            a = f'{a:.6f}'
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
                     for i in range(3):  # monopole, quadrupole, hexadecapole
@@ -97,14 +104,17 @@ def load_Bk(diag_file, a):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            for stat in ['Bk', 'Qk']:
+            for stat in ['Bk', 'Qk','zBk','zQk']:
                 if stat in f[a]:
-                    for i in range(2):  # monopole, quadrupole
+                    #for i in range(2):  # monopole, quadrupole
+                    for i in range(1): # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :] / np.prod(f[a]['Bk_k123'][:], axis=0),
                         }
+
     except (OSError, KeyError):
+        #print(f[a][stat][i, :].shape,f[a]['Bk_k123'][:].shape)
         return {}
     return summ
 
