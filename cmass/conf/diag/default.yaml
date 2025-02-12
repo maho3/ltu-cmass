@@ -1,5 +1,5 @@
 
-# whether to calculate diagnostics from scratch, overwriting existing files
+# whether to calculate diagnostics from scratch, deleting old files
 from_scratch: true
 
 # whether to compute for each tracer
@@ -14,13 +14,16 @@ mtng: false
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
 
+# whether to compute summaries on a high resolution grid (~ 4 Mpc/h)
+high_res: true
+
 # which summaries to run
 summaries:
     - Pk             # power spectrum
     # - TwoPCF         # two-point correlation function
     # - KNN            # k-nearest neighbors
     # - WST            # wavelet scattering transform
-    # - Bk             # bispectrum
+    - Bk             # bispectrum
     # - Density Split  # density split statistics
 
 # whether to use abundance matching to affix number density
