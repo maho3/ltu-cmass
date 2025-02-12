@@ -207,7 +207,7 @@ def summarize_tracer(
         with h5py.File(filename, 'r') as f:
             pos = f[a]['pos'][...].astype(np.float32)
             vel = f[a]['vel'][...].astype(np.float32)
-            if proxy in f[a].keys():
+            if str(proxy) in f[a].keys():
                 mass = f[a][proxy][...].astype(np.float32)
             else:
                 mass = None
@@ -293,8 +293,7 @@ def summarize_tracer(
             out_data.update(out)
 
         # Compute other summaries
-        others = [s for s in summaries if (
-            ('Pk' not in s) and ('Bk' not in s))]
+        others = [s for s in summaries if (('Pk' not in s) and ('Bk' not in s))]
         if len(others) > 0:
             out = run_summarizer(
                 pos, vel, cosmo.h, z, L, N, others,
@@ -331,16 +330,14 @@ def summarize_lightcone(
         return False
 
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)
-        else:
-            logging.info(f'{cap}_lightcone diagnostics already computed')
-            return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    outpath = join(source_path, 'diag', postfix)
+    summaries = config.diag.summaries
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # Load
     with h5py.File(filename, 'r') as f:
