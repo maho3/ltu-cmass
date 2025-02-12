@@ -131,7 +131,6 @@ def summarize_rho(
 
     # check if diagnostics already computed, delete if from_scratch
     outpath = join(source_path, 'diag', 'rho.h5')
-    summaries = config.diag.summaries
     summaries = check_existing(filename, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
@@ -188,7 +187,6 @@ def summarize_tracer(
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
     outpath = join(source_path, 'diag', postfix)
-    summaries = config.diag.summaries
     summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
@@ -332,8 +330,7 @@ def summarize_lightcone(
     # check if diagnostics already computed
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
     outpath = join(source_path, 'diag', postfix)
-    summaries = config.diag.summaries
-    summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
