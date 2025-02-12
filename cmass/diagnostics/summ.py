@@ -17,7 +17,7 @@ from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
-from .tools import store_summary
+from .tools import store_summary, check_existing
 from ..survey.tools import sky_to_xyz
 import datetime
 
@@ -97,6 +97,7 @@ def save_configuration(file, config, save_HOD=True):
 
 
 def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
+    logging.info(f'Saving {len(data)} datasets to {file}')
     with h5py.File(file, 'a') as f:
         if a is not None:
             group = f.require_group(a)
@@ -107,6 +108,8 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
                 group.attrs[key] = value
             group.attrs['timestamp'] = datetime.datetime.now().isoformat()
         for key, value in data.items():
+            if key in group:
+                del group[key]
             group.create_dataset(key, data=value)
 
         if config is not None:
@@ -126,16 +129,12 @@ def summarize_rho(
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
-
-    # check if diagnostics already computed
+    # check if diagnostics already computed, delete if from_scratch
     outpath = join(source_path, 'diag', 'rho.h5')
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)  # TODO: Replace with key checking/removal
-        else:
-            logging.info('rho diagnostics already computed')
-            return True
+    summaries = check_existing(filename, summaries, from_scratch, rsd=False)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute diagnostics and save
@@ -144,13 +143,13 @@ def summarize_rho(
         with h5py.File(filename, 'r') as f:
             rho = f[a]['rho'][...].astype(np.float32)
         out_data = {}
-        if 'Pk' in config.diag.summaries:
+        if 'Pk' in summaries:
             out = run_pylians(
                 rho, ['Pk'], L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
-        if 'Bk' in config.diag.summaries:
+        if 'Bk' in summaries:
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
             else:
@@ -185,17 +184,14 @@ def summarize_tracer(
         alist = list(f.keys())
 
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)
-        else:
-            logging.info(f'{type} diagnostics already computed')
-            return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
+    outpath = join(source_path, 'diag', postfix)
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
@@ -209,7 +205,7 @@ def summarize_tracer(
         with h5py.File(filename, 'r') as f:
             pos = f[a]['pos'][...].astype(np.float32)
             vel = f[a]['vel'][...].astype(np.float32)
-            if proxy in f[a].keys():
+            if str(proxy) in f[a].keys():
                 mass = f[a][proxy][...].astype(np.float32)
             else:
                 mass = None
@@ -295,8 +291,7 @@ def summarize_tracer(
             out_data.update(out)
 
         # Compute other summaries
-        others = [s for s in summaries if (
-            ('Pk' not in s) and ('Bk' not in s))]
+        others = [s for s in summaries if (('Pk' not in s) and ('Bk' not in s))]
         if len(others) > 0:
             out = run_summarizer(
                 pos, vel, cosmo.h, z, L, N, others,
@@ -333,17 +328,13 @@ def summarize_lightcone(
         return False
 
     # check if diagnostics already computed
-    outpath = join(source_path, 'diag', postfix)
-    if os.path.isfile(outpath):
-        if from_scratch:
-            os.remove(outpath)
-        else:
-            logging.info(f'{cap}_lightcone diagnostics already computed')
-            return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
-
-    os.makedirs(join(source_path, 'diag'), exist_ok=True)
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    outpath = join(source_path, 'diag', postfix)
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
+    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # Load
     with h5py.File(filename, 'r') as f:
@@ -427,8 +418,8 @@ def summarize_lightcone(
     return True
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
@@ -438,6 +429,7 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
+    os.makedirs(join(source_path, 'diag'), exist_ok=True)
 
     from_scratch = cfg.diag.from_scratch
     summaries = cfg.diag.summaries
@@ -447,7 +439,7 @@ def main(cfg: DictConfig) -> None:
 
     cosmo = cosmo_to_astropy(cfg.nbody.cosmo)
 
-    logging.info(f'Computing diagnostics: {summaries}')
+    logging.info(f'Selected diagnostics: {summaries}')
 
     all_done = True
 
