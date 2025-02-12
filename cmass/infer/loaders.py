@@ -99,7 +99,7 @@ def load_Bk(diag_file, a):
         with h5py.File(diag_file, 'r') as f:
             for stat in ['Bk', 'Qk']:
                 if stat in f[a]:
-                    for i in range(2):  # monopole, quadrupole
+                    for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :] / np.prod(f[a]['Bk_k123'][:], axis=0),
@@ -117,7 +117,7 @@ def load_lc_Bk(diag_file):
         with h5py.File(diag_file, 'r') as f:
             for stat in ['Bk', 'Qk']:
                 if stat in f:
-                    for i in range(2):  # monopole, quadrupole
+                    for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :] / np.prod(f['Bk_k123'][:], axis=0),
