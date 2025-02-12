@@ -97,7 +97,7 @@ def load_Bk(diag_file, a):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            for stat in ['Bk', 'Qk']:
+            for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
                 if stat in f[a]:
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
