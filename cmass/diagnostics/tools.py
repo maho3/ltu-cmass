@@ -205,7 +205,7 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
         file_path=cache_dir
     )
 
-    k123 = result[:, :3].T
+    k123 = result[:, :3].T * kF
     pk = result[:, 3:6].T
     bk = result[:, 6:7].T
     counts = result[7]  # number of triangles in each bin (not used)
