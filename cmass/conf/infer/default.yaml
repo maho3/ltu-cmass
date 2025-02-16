@@ -1,9 +1,12 @@
 
-save_dir: /anvil/scratch/x-nchartier/cmass/fastpm_benchmark  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/fastpm_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
+net_type: maf # if not None, net_index is ignored; careful about backend, eg "gf" does not work with sbi
+N_type: 50 # we assume the "net_type"_"N_type".yaml exists (to change)
 net_index: 386     # index of network to use in cfg.net
+net_suffix: None # 15/02/2025, to separate my trainings by maf, gf, etc
 device: gpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~
@@ -20,16 +23,18 @@ experiments:
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
   - summary: [Pk0, Pk2]   # monopole, quadrupole
     kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-    # - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-    # - summary: [zPk0]   # z-space monopole
-    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-    # - summary: [zPk0, zPk2]   # z-space monopole, quadrupole
-    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-    # - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
-    #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  # - summary: [Pk0, Pk2, Qk0, Qk2]   # monopole, quadrupole
-  #   kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [zPk0]   # z-space monopole
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [zPk0, zPk2]   # z-space monopole, quadrupole
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [Pk0, Pk2,Pk4, Qk0]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+  - summary: [zPk0, zPk2,zPk4, zQk0]
+    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
