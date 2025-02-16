@@ -98,12 +98,14 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None):
 
 
 def load_Bk(diag_file, a):
-    a = f'{a:.6f}'
+    #a = f'{a:.6f}'
     if not os.path.exists(diag_file):
         return {}
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
+            a = closest_a(list(f.keys()),a)
+            a = f'{a:.6f}'
             for stat in ['Bk', 'Qk','zBk','zQk']:
                 if stat in f[a]:
                     #for i in range(2):  # monopole, quadrupole
