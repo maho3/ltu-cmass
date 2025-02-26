@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=inference  # Job name
-#SBATCH --array=0-99%10  # Array range
+#SBATCH --job-name=validate  # Job name
+#SBATCH --array=0-39  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=4            # Number of tasks
+#SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
@@ -15,8 +15,8 @@ export TQDM_DISABLE=0
 module restore cmass
 conda activate cmassrun
 
-# exp_index=12
-net_index=$SLURM_ARRAY_TASK_ID
+exp_index=$SLURM_ARRAY_TASK_ID
+net_index=0
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
@@ -41,5 +41,5 @@ suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference with $suffix"
 # python -m cmass.infer.preprocess $suffix
-python -m cmass.infer.train $suffix net=tuning
-# python -m cmass.infer.validate $suffix
+# python -m cmass.infer.train $suffix net=tuning
+python -m cmass.infer.validate $suffix
