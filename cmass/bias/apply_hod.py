@@ -33,7 +33,7 @@ from ..utils import (
 from ..nbody.tools import parse_nbody_config
 
 
-@ timing_decorator
+@timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, redshift,
@@ -86,8 +86,8 @@ def run_snapshot(hpos, hvel, hmass, a, cfg, hmeta=None):
         [hod['x'], hod['y'], hod['z']]).T  # comoving positions [Mpc/h]
     gvel = np.array(
         [hod['vx'], hod['vy'], hod['vz']]).T  # physical velocities [km/s]
-    meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
-    return gpos, gvel, meta
+    gmeta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
+    return gpos, gvel, gmeta
 
 
 def load_snapshot(source_path, a):
@@ -124,8 +124,8 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
             group.create_dataset(key, data=value)
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
