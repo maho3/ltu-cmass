@@ -35,7 +35,7 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 def compute_Pk(
     grdz, rrdz, cosmo,
     gweights=None, rweights=None,
-    Ngrid=256, kmin=0., kmax=2, dk=0.005,
+    Ngrid=256, kmin=0., kmax=2, dk=0.005, return_wedges=False
 ):
     if gweights is None:
         gweights = np.ones(len(grdz))
@@ -52,20 +52,27 @@ def compute_Pk(
 
     # compute the power spectra multipoles
     kedges = np.arange(kmin, kmax, dk)
-    poles = CatalogFFTPower(
+    power = CatalogFFTPower(
         data_positions1=gpos, data_weights1=gweights,
         randoms_positions1=rpos, randoms_weights1=rweights,
         nmesh=Ngrid, resampler='tsc', interlacing=2,
         ells=(0, 2, 4), edges=kedges,
         position_type='pos', dtype=np.float32,
         wrap=False
-    ).poles
-
-    k = poles.k
-    p0k = poles(ell=0, complex=False, remove_shotnoise=True)
-    p2k = poles(ell=2, complex=False)
-    p4k = poles(ell=4, complex=False)
-    return k, p0k, p2k, p4k
+    )
+    if return_wedges:
+        wedges = power.wedges
+        k = wedges.k
+        muavg = wedges.muavg
+        wedge_values = [power.wedges(mu=mu, return_k=False, complex=False) for mu in muavg]
+        return k, muavg, wedge_values
+    else:
+        poles = power.poles
+        k = poles.k
+        p0k = poles(ell=0, complex=False, remove_shotnoise=True)
+        p2k = poles(ell=2, complex=False)
+        p4k = poles(ell=4, complex=False)
+        return k, p0k, p2k, p4k
 
 
 @timing_decorator
@@ -105,10 +112,16 @@ def main(cfg: DictConfig) -> None:
     cosmo = astropy.cosmology.Planck18
 
     # compute P(k)
-    k, p0k, p2k, p4k = compute_Pk(
-        grdz, rrdz, cosmo,
-        gweights=gweights
-    )
+    if cfg.summary.wedges:
+        k, mu, pwedges =  compute_Pk(
+            grdz, rrdz, cosmo,
+            gweights=gweights, return_wedges=True
+        )
+    else:
+        k, p0k, p2k, p4k = compute_Pk(
+            grdz, rrdz, cosmo,
+            gweights=gweights
+        )
 
     # save results
     if is_North:
@@ -122,7 +135,10 @@ def main(cfg: DictConfig) -> None:
     outname += '.h5'
     outpath = join(outpath, outname)
     logging.info(f'Saving P(k) to {outpath}...')
-    save_summary(outpath, 'Pk', k=k, p0k=p0k, p2k=p2k, p4k=p4k)
+    if cfg.summary.wedges:
+        save_summary(outpath, 'Pk_wedges', k=k, mu=mu, pwedges=pwedges)
+    else:
+        save_summary(outpath, 'Pk', k=k, p0k=p0k, p2k=p2k, p4k=p4k)
 
 
 if __name__ == "__main__":
