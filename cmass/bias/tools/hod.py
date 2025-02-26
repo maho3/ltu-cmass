@@ -12,6 +12,8 @@ which additionally uses the `Hod_parameter` helper class
 for each parameter.
 """
 
+from halotools.custom_exceptions import HalotoolsError
+from scipy.special import erf
 import logging
 import numpy as np
 from omegaconf import open_dict
@@ -415,7 +417,7 @@ def mass_to_concentration(mass, redshift, cosmo, mdef='vir'):
 
 def build_halo_catalog(
     pos, vel, mass, redshift, BoxSize, cosmo,
-    radius=None, conc=None, mdef='vir'
+    radius=None, conc=None, halo_redshift=None, mdef='vir'
 ):
     '''Build a halo catalog from the given halo properties.
 
@@ -456,6 +458,7 @@ def build_halo_catalog(
         mkey: mass,
         rkey: radius,
         'halo_nfw_conc': conc,
+        'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
         'halo_id': np.arange(len(mass)),
         'halo_hostid': np.zeros(len(mass), dtype=int),
         'halo_upid': np.zeros(len(mass)) - 1,
@@ -475,6 +478,38 @@ def build_halo_catalog(
 
     # convert to Halotools format
     return UserSuppliedHaloCatalog(**kws)
+
+
+def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
+    return logM_i_pivot + mu_i_p * ((1 / (1 + z)) - (1 / (1 + z_pivot)))
+
+
+class Zheng07zdepCens(Zheng07Cens):
+    # Params: logMmin, sigma_logM, mumin, zpivot
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.param_dict['mumin'] = 0.0
+        self.param_dict['zpivot'] = 0.5
+
+        self.list_of_haloprops_needed = ['halo_redshift']
+
+    def mean_occupation(self, **kwargs):
+        # Retrieve the array storing the mass-like variable
+        mass = kwargs["table"][self.prim_haloprop_key]
+        redshift = kwargs["table"]["halo_redshift"]
+
+        logM = np.log10(mass)
+        logMmin = logM_i(
+            redshift, self.param_dict["logMmin"], self.param_dict["mumin"],
+            self.param_dict["zpivot"]
+        )
+        mean_ncen = 0.5 * (
+            1.0
+            + erf((logM - logMmin) / self.param_dict["sigma_logM"])
+        )
+
+        return mean_ncen
 
 
 def build_HOD_model(
@@ -506,6 +541,13 @@ def build_HOD_model(
     # Occupation functions
     if model == 'zheng07':
         cenocc = Zheng07Cens(prim_haloprop_key=mkey)
+        satocc = Zheng07Sats(
+            prim_haloprop_key=mkey,
+            cenocc_model=cenocc,
+            modulate_with_cenocc=True
+        )
+    elif model == 'zheng07zdep':
+        cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
         satocc = Zheng07Sats(
             prim_haloprop_key=mkey,
             cenocc_model=cenocc,

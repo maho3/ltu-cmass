@@ -50,10 +50,15 @@ def populate_hod(
         logging.info('Using halo-concentration relation...')
         hconc = None
 
+    if (hmeta is not None) and ('redshift' in hmeta):
+        hredshift = hmeta['redshift']
+    else:
+        hredshift = redshift
+
     BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
         hpos, hvel, 10**hmass, redshift, BoxSize, cosmo,
-        mdef=mdef, conc=hconc
+        mdef=mdef, conc=hconc, halo_redshift=hredshift
     )
 
     hod = build_HOD_model(
