@@ -3,11 +3,10 @@ from ..bias.apply_hod import load_snapshot, run_snapshot
 
 
 class HODEngine():
-    def __init__(self, cfg, snap_times, simdir, params):
+    def __init__(self, cfg, snap_times, simdir):
         self.cfg = cfg
         self.snap_times = snap_times
         self.simdir = simdir
-        self.params = params
 
     def __call__(self, snap_idx, hlo_idx, z):
         a = self.snap_times[snap_idx]
