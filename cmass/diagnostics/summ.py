@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk, calcBk_bfast, get_mesh_resolution
+from .tools import calcPk, calcBk_bfast, get_mesh_resolution, compute_Wavelets
 from .tools import store_summary, check_existing
 from ..survey.tools import sky_to_xyz
 import datetime
@@ -56,6 +56,13 @@ def run_pylians(
             continue
     return out
 
+def run_wavelets(field, grid_size):
+    order0, order12 = compute_Wavelets(field, N=grid_size)
+    out ={
+        'S0': order0,
+        'S12': order12
+    }
+    return out
 
 def run_summarizer(
     pos, vel, h, redshift, box_size, grid_size,

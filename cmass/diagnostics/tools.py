@@ -10,6 +10,46 @@ import h5py
 # import PolyBin3D as pb
 
 
+from kymatio.torch import HarmonicScattering3D
+from kymatio.scattering3d.backend.torch_backend \
+    import TorchBackend3D
+
+def compute_Wavelets(delta, N):
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"   
+    # The actual maximum width of the dilated wavelet is 2*sigma*2^J=128, when the pixels in a box side is 128;
+    sigma = 1.0
+    J = 6
+    L = 6
+    # The list of integral powers, which is the power applied after the modulus operation, i.e. Sum |f*g|^{integral_powers}
+    integral_powers = [0.5, 1.0, 2.0, 3.0, 4.0]
+    # Up to 2nd-order coefficient;
+    max_order=2
+
+    # Initialize the scattering calculation;
+    scattering = HarmonicScattering3D(J=J, shape=(N, N, N),
+                                      L=L, sigma_0=sigma,max_order=max_order,
+                                      integral_powers=integral_powers)
+    # To cuda;
+    scattering.cuda()
+    torch.cuda.empty_cache()
+
+    # preprocess your input if required here
+    batch_x=[(delta+1)/2 ]        
+    x=np.array(batch_x)
+    x=torch.from_numpy(x)
+    x_gpu = x.cuda()
+
+    # 1st and 2nd-order coefficients;
+    order12_gpu = scattering(x_gpu) 
+    order12 = order12_gpu.cpu().numpy() 
+
+    # Zeroth-order coefficients;
+    order0_gpu = TorchBackend3D.compute_integrals(x,integral_powers)
+    order0=order_0_gpu.cpu().numpy()
+
+    return order0, order12
+
+
 def _delete(group, to_delete):
     for key in group.keys():
         if isinstance(group[key], h5py.Group):  # if its another group
