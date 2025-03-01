@@ -441,7 +441,7 @@ def summarize_lightcone(
             cache_dir = None
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_wavelets(rho)
+        out = run_wavelets(field)
         out_data.update(out)
             
     # Compute other summaries
