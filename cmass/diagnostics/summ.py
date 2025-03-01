@@ -167,7 +167,7 @@ def summarize_rho(
                 cache_dir=cache_dir
             )
             out_data.update(out)
-        if 'WPH' in summaries:
+        if 'WST' in summaries:
             out = run_wavelets(rho)
             out_data.update(out)
         if len(out) > 0:
@@ -300,7 +300,7 @@ def summarize_tracer(
             )
             out_data.update(out)
         # Compute Wavelets
-        if 'WPH' in summaries: # check
+        if 'WST' in summaries: # check
             N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res MAS='CIC'
             
             if config is not None:    # do we need this?
@@ -432,7 +432,7 @@ def summarize_lightcone(
         out_data.update(out)
 
     # Compute Wavelets
-    if 'WPH' in summaries:
+    if 'WST' in summaries:
         N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
         
         if config is not None:
