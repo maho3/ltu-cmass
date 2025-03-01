@@ -56,8 +56,8 @@ def run_pylians(
             continue
     return out
 
-def run_wavelets(field, grid_size):
-    order0, order12 = compute_Wavelets(field, N=grid_size)
+def run_wavelets(field):
+    order0, order12 = compute_Wavelets(field)
     out ={
         'S0': order0,
         'S12': order12
@@ -166,6 +166,9 @@ def summarize_rho(
                 num_threads=threads, use_rsd=False,
                 cache_dir=cache_dir
             )
+            out_data.update(out)
+        if 'WPH' in summaries:
+            out = run_wavelets(rho)
             out_data.update(out)
         if len(out) > 0:
             save_group(outpath, out_data, None, a, config)
@@ -296,7 +299,26 @@ def summarize_tracer(
                 cache_dir=cache_dir
             )
             out_data.update(out)
+        # Compute Wavelets
+        if 'WPH' in summaries: # check
+            N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res MAS='CIC'
+            
+            if config is not None:    # do we need this?
+                cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+            else:
+                cache_dir = None
 
+            # real space
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            out = run_wavelets(field)
+            out_data.update(out)
+            
+            # redshift space
+            field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
+                        axis=0).astype(np.float32)
+            out = run_wavelets(field)
+            out_data.update(out)
+            
         # Compute other summaries
         others = [s for s in summaries if (('Pk' not in s) and ('Bk' not in s))]
         if len(others) > 0:
@@ -409,6 +431,19 @@ def summarize_lightcone(
         )
         out_data.update(out)
 
+    # Compute Wavelets
+    if 'WPH' in summaries:
+        N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
+        
+        if config is not None:
+            cache_dir = join(config.meta.wdir, 'scratch', 'cache')
+        else:
+            cache_dir = None
+
+        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+        out = run_wavelets(rho)
+        out_data.update(out)
+            
     # Compute other summaries
     others = [s for s in summaries if (
         ('Pk' not in s) and ('Bk' not in s))]

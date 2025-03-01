@@ -14,7 +14,7 @@ from kymatio.torch import HarmonicScattering3D
 from kymatio.scattering3d.backend.torch_backend \
     import TorchBackend3D
 
-def compute_Wavelets(delta, N):
+def compute_Wavelets(delta):
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"   
     # The actual maximum width of the dilated wavelet is 2*sigma*2^J=128, when the pixels in a box side is 128;
     sigma = 1.0
@@ -26,7 +26,7 @@ def compute_Wavelets(delta, N):
     max_order=2
 
     # Initialize the scattering calculation;
-    scattering = HarmonicScattering3D(J=J, shape=(N, N, N),
+    scattering = HarmonicScattering3D(J=J, shape=delta.shape,
                                       L=L, sigma_0=sigma,max_order=max_order,
                                       integral_powers=integral_powers)
     # To cuda;
