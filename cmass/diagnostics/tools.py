@@ -9,7 +9,7 @@ import logging
 import h5py
 # import PolyBin3D as pb
 
-
+import torch
 from kymatio.torch import HarmonicScattering3D
 from kymatio.scattering3d.backend.torch_backend \
     import TorchBackend3D
@@ -45,7 +45,7 @@ def compute_Wavelets(delta):
 
     # Zeroth-order coefficients;
     order0_gpu = TorchBackend3D.compute_integrals(x,integral_powers)
-    order0=order_0_gpu.cpu().numpy()
+    order0=order0_gpu.cpu().numpy()
 
     return order0, order12
 
@@ -90,6 +90,8 @@ def check_existing(file, summaries, from_scratch=False, rsd=False):
             to_check = ['Pk_k3D', 'Pk']
         elif s == 'Bk':
             to_check = ['Bk_k123', 'Bk', 'Qk', 'bPk_k3D', 'bPk']
+        elif s == 'WST':
+            to_check = ['S0', 'S12']
         else:
             raise NotImplementedError(f'Summary {s} not yet implemented')
 

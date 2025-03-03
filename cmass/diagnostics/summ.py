@@ -320,7 +320,7 @@ def summarize_tracer(
             out_data.update(out)
             
         # Compute other summaries
-        others = [s for s in summaries if (('Pk' not in s) and ('Bk' not in s))]
+        others = [s for s in summaries if (('Pk' not in s) and ('Bk' not in s) and ('WST' not in s))]
         if len(others) > 0:
             out = run_summarizer(
                 pos, vel, cosmo.h, z, L, N, others,
@@ -446,7 +446,7 @@ def summarize_lightcone(
             
     # Compute other summaries
     others = [s for s in summaries if (
-        ('Pk' not in s) and ('Bk' not in s))]
+        ('Pk' not in s) and ('Bk' not in s) and ('WST' not in s))]
     if len(others) > 0:
         out = run_summarizer(
             pos, np.zeros_like(pos), cosmo[2], z, L, N,
