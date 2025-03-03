@@ -119,7 +119,7 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
 def summarize_rho(
     source_path, L,
     threads=16, from_scratch=True,
-    config=None
+    summaries=['Pk'], config=None
 ):
     # check for file keys
     filename = join(source_path, 'nbody.h5')
@@ -448,7 +448,7 @@ def main(cfg: DictConfig) -> None:
         done = summarize_rho(
             source_path, cfg.nbody.L,
             threads=threads, from_scratch=from_scratch,
-            config=cfg
+            summaries=summaries, config=cfg
         )
         all_done &= done
     else:
