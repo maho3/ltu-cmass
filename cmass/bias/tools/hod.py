@@ -15,6 +15,7 @@ for each parameter.
 import logging
 import numpy as np
 from omegaconf import open_dict
+from .hod_models import Zheng07zdepCens, Zheng07zdepSats
 
 from halotools.empirical_models import NFWProfile
 from halotools.sim_manager import UserSuppliedHaloCatalog
@@ -415,7 +416,7 @@ def mass_to_concentration(mass, redshift, cosmo, mdef='vir'):
 
 def build_halo_catalog(
     pos, vel, mass, redshift, BoxSize, cosmo,
-    radius=None, conc=None, mdef='vir'
+    radius=None, conc=None, halo_redshift=None, mdef='vir'
 ):
     '''Build a halo catalog from the given halo properties.
 
@@ -456,6 +457,7 @@ def build_halo_catalog(
         mkey: mass,
         rkey: radius,
         'halo_nfw_conc': conc,
+        'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
         'halo_id': np.arange(len(mass)),
         'halo_hostid': np.zeros(len(mass), dtype=int),
         'halo_upid': np.zeros(len(mass)) - 1,
@@ -507,6 +509,13 @@ def build_HOD_model(
     if model == 'zheng07':
         cenocc = Zheng07Cens(prim_haloprop_key=mkey)
         satocc = Zheng07Sats(
+            prim_haloprop_key=mkey,
+            cenocc_model=cenocc,
+            modulate_with_cenocc=True
+        )
+    elif model == 'zheng07zdep':
+        cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
+        satocc = Zheng07zdepSats(
             prim_haloprop_key=mkey,
             cenocc_model=cenocc,
             modulate_with_cenocc=True
