@@ -12,19 +12,6 @@ from cmass.diagnostics.tools import MA
 from cmass.infer.loaders import get_cosmo, get_hod 
 import glob
 
-
-parser = argparse.ArgumentParser(description="This takes the type of the simulation as input e.g. Om_p, fiducial")
-parser.add_argument("--sim", type=str)
-parser.add_argument("--nbody", '--names-list', nargs='+')
-args = parser.parse_args()
-nbody_list = args.nbody
-sim = args.sim
-
-param_dict = {
-              'fiducial':['/anvil/scratch/x-abairagi/cmass-ili/'+nbody+'/'+sim+'/L1000-N128/',[0.3175,0.049,0.6711,0.9624,0.834]],
-}
-
-grid = 128
 cosmo_params=["Omega_m", "Omega_b", "h", "n_s", "sigma_8"]
 hod_params=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha']
 
