@@ -72,7 +72,7 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
                 summ.update(load_lc_Bk(diagfile))
             else:
                 summ = load_Pk(diagfile, a)
-                summ.update(load_Bk(diagfile, a))
+                summ.update(load_Bk(diagfile, a)) #13/02/2025 : temp. fix --11/02/2025 Pb with load Bk for now
             # load parameters
             if len(summ) > 0:
                 params = get_cosmo(sourcepath)
@@ -122,9 +122,10 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
 
 def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
-
+    print("SUMMARIES: ",summaries.keys())
     # check that there's data
     for summ in exp.summary:
+        #print("SUMM: ",summ)
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
             return
@@ -148,6 +149,7 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
                         f'Need monopole for normalization of {summ}')
             elif 'Bk' in summ or 'Qk' in summ:
                 x = preprocess_Bk(x, kmax)
+                print(x.shape)
             else:
                 raise NotImplementedError  # TODO: implement other summaries
             xs.append(x)
@@ -183,6 +185,8 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 @ hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
+
+    print("Scale factor a =  ",cfg.nbody.af)
     wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
     summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stores, only to read
     suite_path = get_source_path(
@@ -191,8 +195,9 @@ def main(cfg: DictConfig) -> None:
     )[:-2]  # get to the suite directory
     #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
     model_dir = join(wdir,"preprocessed")#by default, may throw error, use save_dir to be sure
-    if cfg.infer.save_dir is not None:
-        model_dir = cfg.infer.save_dir
+    #if cfg.infer.save_dir is not None:
+    #    print("Infer save_dir not None")
+    #    model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
@@ -204,7 +209,7 @@ def main(cfg: DictConfig) -> None:
         summaries, parameters, ids = load_summaries(
             suite_path, 'halo', cfg.infer.Nmax, a=cfg.nbody.af)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
+            save_path = join(model_dir, 'halo', cfg.sim, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
     else:
         logging.info('Skipping halo preprocessing...')
