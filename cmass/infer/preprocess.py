@@ -146,8 +146,10 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
                 else:
                     raise ValueError(
                         f'Need monopole for normalization of {summ}')
-            elif 'Bk' in summ or 'Qk' in summ:
-                x = preprocess_Bk(x, kmax)
+            elif 'Bk' in summ:
+                x = preprocess_Bk(x, kmax, log=True)
+            elif 'Qk' in summ:
+                x = preprocess_Bk(x, kmax, log=False)
             else:
                 raise NotImplementedError  # TODO: implement other summaries
             xs.append(x)
@@ -179,8 +181,8 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
         np.save(join(exp_path, 'ids_test.npy'), ids_test)
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     suite_path = get_source_path(
