@@ -148,7 +148,6 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer):
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    print(os.getcwd())
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
     
