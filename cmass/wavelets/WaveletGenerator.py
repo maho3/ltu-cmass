@@ -184,7 +184,6 @@ def main(cfg: DictConfig) -> None:
     else:
         WPH, COSMO = Wavelets(dataset, out_dir, cfg.nbody.L, cfg.nbody.N, cfg.diag.batchsize, tracer)
         dataframe = pd.DataFrame(columns=["S0", "S12", "Omega_m", "Omega_b", "h", "n_s", "sigma_8"])
-        print(WPH.shape)
         dataframe[["S0","S12"]] = WPH        
         dataframe[cosmo_params] = COSMO  
      
