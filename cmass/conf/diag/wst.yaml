@@ -1,0 +1,7 @@
+
+# whether to compute for each tracer
+density: false
+halo: true
+galaxy: false
+
+batchsize: 128
