@@ -5,6 +5,18 @@ from halotools.empirical_models import Zheng07Cens, Zheng07Sats
 
 
 def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
+    """
+    Apply a linear dependence in a = 1 / (1 + z) to the logarithm of a mass variables
+    
+    Args:
+        :z (float): Cosmological redshift
+        :logM_i_pivot (float): The value of the mass parameter at the pivot redshift
+        :mu_i_p (float): Slope of the logmass-a relation
+        :z_pivot (float): The pivot redshift
+        
+    Returns:
+        float: The log-mass variable at the requested cosmological redshift
+    """
     return logM_i_pivot + mu_i_p * ((1 / (1 + z)) - (1 / (1 + z_pivot)))
 
 
@@ -89,3 +101,34 @@ class Zheng07zdepSats(Zheng07Sats):
             mean_nsat *= mean_ncen
 
         return mean_nsat
+    
+    
+def linear_interp_extrap(x, xp, yp):
+    """
+    Perform linear interpolation within a given range and linear extrapolation 
+    outside that range.
+    
+    Args:
+        :x (array-like): Points to evaluate the interpolation
+        :xp (array-like): Known x-values (must be sorted)
+        :yp (array-like): Known y-values corresponding to xp
+
+    Returns:
+        y (array-like): Interpolated or extrapolated values at x
+    """
+    
+    x = np.asarray(x)
+    xp = np.asarray(xp)
+    yp = np.asarray(yp)
+
+    # Compute slopes for interpolation
+    slopes = np.diff(yp) / np.diff(xp)
+
+    # Find indices where each x belongs in xp
+    indices = np.searchsorted(xp, x) - 1
+    indices = np.clip(indices, 0, len(slopes) - 1)  # Clip to valid range
+
+    # Perform interpolation/extrapolation
+    y = yp[indices] + slopes[indices] * (x - xp[indices])
+    
+    return y

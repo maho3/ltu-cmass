@@ -65,6 +65,10 @@ def parse_hod(cfg):
             model = Zheng07()  # for backwards compatibility
         elif cfg.bias.hod.model == 'zheng07':
             model = Zheng07()
+        elif cfg.bias.hod.model == 'zheng07zdep':
+            model = Zheng07zdep()
+        elif cfg.bias.hod.model == 'zheng07zinterp':
+            model = None
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
         elif cfg.bias.hod.model == 'zu_mandelbaum15':
@@ -185,7 +189,7 @@ class Hod_model:
 
         return out_params
 
-
+    
 class Zheng07(Hod_model):
     """
     Zheng+07 HOD model
@@ -270,6 +274,232 @@ class Zheng07(Hod_model):
             'alpha': 0.76
         }
         self.set_parameters(p_hod)
+        
+        
+class Zheng07zdep(Hod_model):
+    """
+    Zheng+07 HOD model with redshift dependent mass parameters
+    """
+
+    def __init__(
+        self,
+        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'mucen', 'musat'],
+        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0., -30.0, -10.0]),
+        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0., 0.]),
+        param_defaults=None
+    ):
+        super().__init__(parameters, lower_bound, upper_bound)
+
+        # If using, set literature values for parameters
+        self.param_defaults = param_defaults
+        if self.param_defaults is not None:
+            if self.param_defaults == 'parejko2013_lowz':
+                self.parejko2013_lowz()
+            elif self.param_defaults == 'manera2015_lowz_ngc':
+                self.manera2015_lowz_ngc()
+            elif self.param_defaults == 'manera2015_lowz_sgc':
+                self.manera2015_lowz_sgc()
+            elif self.param_defaults == 'reid2014_cmass':
+                self.reid2014_cmass()
+            else:
+                raise NotImplementedError
+
+    def parejko2013_lowz(self):
+        """
+        lowz catalog from Parejko+2013 Table 3. Note that the
+        parameterization is slightly different so the numbers need to
+        be converted.
+        """
+        p_hod = {
+            'logMmin': 13.25,
+            'sigma_logM': 0.43,  # 0.7 * sqrt(2) * log10(e)
+            'logM0': 13.27,  # log10(kappa * Mmin)
+            'logM1': 14.18,
+            'alpha': 0.94,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+
+    def manera2015_lowz_ngc(self):
+        """
+        best-fit HOD of the lowz catalog NGC from Table 2 of Manera et al.(2015)
+        """
+        p_hod = {
+            'logMmin': 13.20,
+            'sigma_logM': 0.62,
+            'logM0': 13.24,
+            'logM1': 14.32,
+            'alpha': 0.9,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+
+    def manera2015_lowz_sgc(self):
+        """
+        best-fit HOD of the lowz catalog SGC from Table 2 of Manera et al.(2015)
+        Manera+(2015) actually uses a redshift dependent HOD. The HOD that's
+        currently implemented is primarily for the 0.2 < z < 0.35 population,
+        which has nbar~3x10^-4 h^3/Mpc^3
+        """
+        p_hod = {
+            'logMmin': 13.14,
+            'sigma_logM': 0.55,
+            'logM0': 13.43,
+            'logM1': 14.58,
+            'alpha': 0.93,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+
+    def reid2014_cmass(self):
+        """
+        best-fit HOD from Reid et al. (2014) Table 4
+        """
+        p_hod = {
+            'logMmin': 13.03,
+            'sigma_logM': 0.38,
+            'logM0': 13.27,
+            'logM1': 14.08,
+            'alpha': 0.76,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+        
+        
+class Zheng07zinterp(Hod_model):
+    """
+    Zheng+07 HOD model with redshift dependent mass parameters
+    """
+
+    def __init__(
+        self,
+        npivot,
+        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
+        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.,]),
+        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5,]),
+        param_defaults=None
+    ):
+        pars = []
+        low = []
+        up = []
+        self.npivot = npivot
+        if param_defaults is None:
+            defaults = None
+        else:
+            defaults = []
+        for i, (p, v0, v1) in enumerate(zip(parameters, lower_bound, upper_bound)):
+            if p in ['logMmin', 'logM0', 'logM1']:
+                for j in range(npivot):
+                    pars.append(p + '_z' + str(j))
+                    low.append(v0)
+                    up.append(v1)
+                    if param_defaults is not None:
+                        defaults.append(param_defaults[i])
+            else:
+                pars.append(p)
+                low.append(v0)
+                up.append(v1)
+                if param_defaults is not None:
+                    defaults.append(param_defaults[i])
+        super().__init__(parameters, lower_bound, upper_bound)
+
+        # If using, set literature values for parameters
+        self.param_defaults = param_defaults
+        if self.param_defaults is not None:
+            if self.param_defaults == 'parejko2013_lowz':
+                self.parejko2013_lowz()
+            elif self.param_defaults == 'manera2015_lowz_ngc':
+                self.manera2015_lowz_ngc()
+            elif self.param_defaults == 'manera2015_lowz_sgc':
+                self.manera2015_lowz_sgc()
+            elif self.param_defaults == 'reid2014_cmass':
+                self.reid2014_cmass()
+            else:
+                raise NotImplementedError
+                
+    def process_measured_hod(self, p_hod):
+        new_p_hod = {}
+        for k, v in p_hod.items():
+            if k in ['logMmin', 'logM0', 'logM1']:
+                for j in range(self.npivot):
+                    new_p_hod[k + '_z' + str(j)] = v
+            else:
+                new_p_hod = v
+        return new_p_hod
+                
+    def parejko2013_lowz(self):
+        """
+        lowz catalog from Parejko+2013 Table 3. Note that the
+        parameterization is slightly different so the numbers need to
+        be converted.
+        """
+        p_hod = {
+            'logMmin': 13.25,
+            'sigma_logM': 0.43,  # 0.7 * sqrt(2) * log10(e)
+            'logM0': 13.27,  # log10(kappa * Mmin)
+            'logM1': 14.18,
+            'alpha': 0.94,
+        }
+        new_p_hod = self.process_measured_hod(p_hod)
+        self.set_parameters(new_p_hod)
+
+    def manera2015_lowz_ngc(self):
+        """
+        best-fit HOD of the lowz catalog NGC from Table 2 of Manera et al.(2015)
+        """
+        p_hod = {
+            'logMmin': 13.20,
+            'sigma_logM': 0.62,
+            'logM0': 13.24,
+            'logM1': 14.32,
+            'alpha': 0.9,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+        new_p_hod = self.process_measured_hod(p_hod)
+        self.set_parameters(new_p_hod)
+
+    def manera2015_lowz_sgc(self):
+        """
+        best-fit HOD of the lowz catalog SGC from Table 2 of Manera et al.(2015)
+        Manera+(2015) actually uses a redshift dependent HOD. The HOD that's
+        currently implemented is primarily for the 0.2 < z < 0.35 population,
+        which has nbar~3x10^-4 h^3/Mpc^3
+        """
+        p_hod = {
+            'logMmin': 13.14,
+            'sigma_logM': 0.55,
+            'logM0': 13.43,
+            'logM1': 14.58,
+            'alpha': 0.93,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+        new_p_hod = self.process_measured_hod(p_hod)
+        self.set_parameters(new_p_hod)
+
+    def reid2014_cmass(self):
+        """
+        best-fit HOD from Reid et al. (2014) Table 4
+        """
+        p_hod = {
+            'logMmin': 13.03,
+            'sigma_logM': 0.38,
+            'logM0': 13.27,
+            'logM1': 14.08,
+            'alpha': 0.76,
+            'mucen': 0.0,
+            'musat': 0.0,
+        }
+        self.set_parameters(p_hod)
+        new_p_hod = self.process_measured_hod(p_hod)
+        self.set_parameters(new_p_hod)
 
 
 class Leauthaud11(Hod_model):
