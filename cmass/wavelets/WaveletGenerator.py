@@ -139,7 +139,7 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer):
             filename0 = filename0 + datafile[i].split('/')[-1].split('.')[0]+'.npy'
             np.save(filename0,order0[i])
 
-            WPH.append([filename0, filename])
+            WPH.append([filename0, filename12])
 
     if tracer == "galaxies":
         return WPH, COSMO, HOD
