@@ -78,7 +78,7 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer):
         
         # preprocess your input if required here
         pos_file = [h5py.File(file)['0.666667']['pos'][()] for file in datafile]
-        fields = [MA(pos, L, N, MAS='CIC').astype(np.float32) for pos in pos_file]
+        fields = [MA(pos+8*np.random.randn()/np.sqrt(3), L, N, MAS='CIC').astype(np.float32) for pos in pos_file]
         batch_x=[(delta+1)/2 for delta in fields]
         
         # get_cosmo
