@@ -159,7 +159,11 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
+            if cfg.infer.Nmax == -1:
+                save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
+            else:
+                save_path = join(model_dir, f'ngc_lightcone_nsim_{cfg.infer.Nmax}', '+'.join(exp.summary))
+            print(save_path)
             run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
     else:
         logging.info('Skipping ngc_lightcone inference...')
