@@ -33,7 +33,7 @@ from ..utils import (
 from ..nbody.tools import parse_nbody_config
 
 
-@ timing_decorator
+@timing_decorator
 def populate_hod(
     hpos, hvel, hmass,
     cosmo, L, redshift,
@@ -50,10 +50,15 @@ def populate_hod(
         logging.info('Using halo-concentration relation...')
         hconc = None
 
+    if (hmeta is not None) and ('redshift' in hmeta):
+        hredshift = hmeta['redshift']
+    else:
+        hredshift = redshift
+
     BoxSize = L*np.ones(3)
     catalog = build_halo_catalog(
         hpos, hvel, 10**hmass, redshift, BoxSize, cosmo,
-        mdef=mdef, conc=hconc
+        mdef=mdef, conc=hconc, halo_redshift=hredshift
     )
 
     hod = build_HOD_model(
@@ -86,8 +91,8 @@ def run_snapshot(hpos, hvel, hmass, a, cfg, hmeta=None):
         [hod['x'], hod['y'], hod['z']]).T  # comoving positions [Mpc/h]
     gvel = np.array(
         [hod['vx'], hod['vy'], hod['vz']]).T  # physical velocities [km/s]
-    meta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
-    return gpos, gvel, meta
+    gmeta = {'gal_type': hod['gal_type'], 'hostid': hod['halo_id']}
+    return gpos, gvel, gmeta
 
 
 def load_snapshot(source_path, a):
@@ -124,8 +129,8 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
             group.create_dataset(key, data=value)
 
 
-@ timing_decorator
-@ hydra.main(version_base=None, config_path="../conf", config_name="config")
+@timing_decorator
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
