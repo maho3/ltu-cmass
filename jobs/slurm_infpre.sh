@@ -21,7 +21,7 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
+nbody=abacuslike
 sim=fastpm
 infer=default
 
@@ -31,7 +31,7 @@ ngc=False
 sgc=False
 mtng=False
 
-extras="nbody.zf=0.5 hydra/job_logging=disabled" # "nbody.zf=0.500015"
+extras="nbody.zf=0.500015" # "nbody.zf=0.5" # hydra/job_logging=disabled" #
 device=cpu
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"

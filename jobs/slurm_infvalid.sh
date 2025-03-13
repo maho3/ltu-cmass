@@ -9,8 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
-export TQDM_DISABLE=0
+SLURM_ARRAY_TASK_ID=38
 
 module restore cmass
 conda activate cmassrun
@@ -21,7 +20,7 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
+nbody=abacuslike
 sim=fastpm
 infer=default
 
@@ -31,8 +30,11 @@ ngc=False
 sgc=False
 mtng=False
 
-extras="nbody.zf=0.5 hydra/job_logging=disabled" # "nbody.zf=0.500015"
+extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu
+
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
