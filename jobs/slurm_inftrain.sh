@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=2
 
 module restore cmass
 conda activate cmassrun
@@ -24,8 +24,8 @@ nbody=abacuslike
 sim=fastpm
 infer=default
 
-halo=True
-galaxy=False
+halo=False
+galaxy=True
 ngc=False
 sgc=False
 mtng=False
@@ -42,6 +42,6 @@ suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lig
 suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference with $suffix"
-# python -m cmass.infer.preprocess $suffix
+
 python -m cmass.infer.train $suffix net=tuning
-# python -m cmass.infer.validate $suffix
+

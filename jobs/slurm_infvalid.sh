@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-39  # Array range
+# #SBATCH --array=0-39  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -24,8 +24,8 @@ nbody=abacuslike
 sim=fastpm
 infer=default
 
-halo=True
-galaxy=False
+halo=False
+galaxy=True
 ngc=False
 sgc=False
 mtng=False
@@ -33,8 +33,8 @@ mtng=False
 extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu
 
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
@@ -42,6 +42,5 @@ suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lig
 suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference with $suffix"
-# python -m cmass.infer.preprocess $suffix
-# python -m cmass.infer.train $suffix net=tuning
+
 python -m cmass.infer.validate $suffix
