@@ -4,17 +4,20 @@ from ..bias.apply_hod import load_snapshot, run_snapshot
 
 class HODEngine():
     def __init__(self, cfg, snap_times, simdir):
+        print('init HOD engine')
         self.cfg = cfg
         self.snap_times = snap_times
         self.simdir = simdir
 
     def __call__(self, snap_idx, hlo_idx, z):
+        print('calling HOD engine')
         a = self.snap_times[snap_idx]
         if isinstance(z, float):
             z = np.full(len(hlo_idx), z)
 
         # Load snapshot
         hpos, hvel, hmass, hmeta = load_snapshot(self.simdir, a)
+        print('loaded')
 
         # Only keep those selected for the lightcone
         hpos = hpos[hlo_idx]

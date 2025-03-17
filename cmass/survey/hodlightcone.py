@@ -37,6 +37,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone
 from .hodtools import HODEngine
 from ..bias.apply_hod import load_snapshot
+from ..bias.tools.hod import parse_hod
 
 try:
     from ..lightcone import lc
@@ -50,7 +51,7 @@ def split_galsnap_galidx(gid):
     return np.divmod(gid, 2**((gid.itemsize-1)*8))
 
 
-def stitch_lightcone(lightcone, source_path, snap_times, hod_seed):
+def stitch_lightcone(lightcone, source_path, snap_times):
     # Load snapshots
     for snap_idx, a in enumerate(snap_times):
         logging.info(f'Loading snapshot at a={a:.6f}...')
@@ -74,6 +75,7 @@ def main(cfg: DictConfig) -> None:
 
     # Build run config
     cfg = parse_nbody_config(cfg)
+    cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -102,8 +104,7 @@ def main(cfg: DictConfig) -> None:
         zmax=zmax,
         snap_times=snap_times,
         verbose=True,
-        stitch_before_RSD=True,
-        augment=aug_seed,
+        augment=0,
         seed=42
     )
 

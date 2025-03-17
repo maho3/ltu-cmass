@@ -15,7 +15,7 @@ for each parameter.
 import logging
 import numpy as np
 from omegaconf import open_dict
-from .hod_models import Zheng07zdepCens, Zheng07zdepSats
+from .hod_models import Zheng07zdepCens, Zheng07zdepSats, Zheng07zinterpCens, Zheng07zinterpSats
 
 from halotools.empirical_models import NFWProfile
 from halotools.sim_manager import UserSuppliedHaloCatalog
@@ -68,7 +68,7 @@ def parse_hod(cfg):
         elif cfg.bias.hod.model == 'zheng07zdep':
             model = Zheng07zdep()
         elif cfg.bias.hod.model == 'zheng07zinterp':
-            model = None
+            model = Zheng07zinterp(len(cfg.bias.hod.zpivot))
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
         elif cfg.bias.hod.model == 'zu_mandelbaum15':
@@ -405,10 +405,10 @@ class Zheng07zinterp(Hod_model):
                 up.append(v1)
                 if param_defaults is not None:
                     defaults.append(param_defaults[i])
-        super().__init__(parameters, lower_bound, upper_bound)
+        super().__init__(pars, low, up)
 
         # If using, set literature values for parameters
-        self.param_defaults = param_defaults
+        self.param_defaults = defaults
         if self.param_defaults is not None:
             if self.param_defaults == 'parejko2013_lowz':
                 self.parejko2013_lowz()
@@ -428,7 +428,7 @@ class Zheng07zinterp(Hod_model):
                 for j in range(self.npivot):
                     new_p_hod[k + '_z' + str(j)] = v
             else:
-                new_p_hod = v
+                new_p_hod[k] = v
         return new_p_hod
                 
     def parejko2013_lowz(self):
@@ -460,7 +460,6 @@ class Zheng07zinterp(Hod_model):
             'mucen': 0.0,
             'musat': 0.0,
         }
-        self.set_parameters(p_hod)
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
 
@@ -480,7 +479,6 @@ class Zheng07zinterp(Hod_model):
             'mucen': 0.0,
             'musat': 0.0,
         }
-        self.set_parameters(p_hod)
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
 
@@ -497,7 +495,6 @@ class Zheng07zinterp(Hod_model):
             'mucen': 0.0,
             'musat': 0.0,
         }
-        self.set_parameters(p_hod)
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
 
@@ -710,7 +707,7 @@ def build_halo_catalog(
 
 
 def build_HOD_model(
-    cosmology, model, theta, zf, mdef='vir',
+    cosmology, model, theta, zf, mdef='vir', zpivot=None
 ):
     '''Build a HOD model from the given HOD parameters.
 
@@ -724,6 +721,8 @@ def build_HOD_model(
         theta (dict): The HOD parameters.
         mdef (str, optional):
             Halo mass definition. Defaults to 'vir'.
+        zpivot (str, optional):
+            Pivot redshifts to be used if interpolating between redshifts. Defaults to None
 
     Returns:
         hod_model (HODMockFactory): A HOD model object
@@ -746,6 +745,14 @@ def build_HOD_model(
     elif model == 'zheng07zdep':
         cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
         satocc = Zheng07zdepSats(
+            prim_haloprop_key=mkey,
+            cenocc_model=cenocc,
+            modulate_with_cenocc=True
+        )
+    elif model == 'zheng07zinterp':
+        cenocc = Zheng07zinterpCens(zpivot, prim_haloprop_key=mkey)
+        satocc = Zheng07zinterpSats(
+            zpivot,
             prim_haloprop_key=mkey,
             cenocc_model=cenocc,
             modulate_with_cenocc=True
