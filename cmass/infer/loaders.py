@@ -120,7 +120,7 @@ def load_lc_Bk(diag_file):
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
-                            'value': f[stat][i, :] / np.prod(f['Bk_k123'][:], axis=0),
+                            'value': f[stat][i, :]
                         }
     except (OSError, KeyError):
         return {}
