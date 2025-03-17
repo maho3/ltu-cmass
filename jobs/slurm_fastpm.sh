@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=abacus  # Job name
-#SBATCH --array=130-181         # Job array range for lhid
+#SBATCH --array=130         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=128            # Number of tasks
 #SBATCH --time=12:00:00         # Time limit
