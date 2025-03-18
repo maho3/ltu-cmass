@@ -5,7 +5,7 @@
 # #SBATCH --array=201,674,819,831,876
 # #SBATCH --array=150,963
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=16            # Number of tasks
+#SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=03:00:00         # Time limit
 #SBATCH --partition=shared      # Partition name
 #SBATCH --account=phy240043   # Account name
@@ -58,7 +58,7 @@ for offset in 0 1000; do
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
-        hod_seed=$((lhid*10+i+1))
+        hod_seed=$((lhid*10+i+0))
         printf -v hod_str "%05d" $hod_seed
         echo "hod_str=$hod_str"
 
@@ -81,33 +81,33 @@ for offset in 0 1000; do
         # fi
         # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-        # ngc_lightcone
-        for aug_seed in $(seq 0 $(($Naug-1))); do
-            printf -v aug_str "%05d" $aug_seed
-            # lightcone
-            file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
-            if [ -f $file ]; then
-                echo "File $file exists."
-            else
-                echo "File $file does not exist."
-                python -m cmass.survey.hodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
-            fi
-            python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        done
-
-        # # mtng_lightcone
+        # # ngc_lightcone
         # for aug_seed in $(seq 0 $(($Naug-1))); do
         #     printf -v aug_str "%05d" $aug_seed
         #     # lightcone
-        #     file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+        #     file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
         #     if [ -f $file ]; then
         #         echo "File $file exists."
         #     else
         #         echo "File $file does not exist."
-        #         python -m cmass.survey.mtng_selection $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=False 
+        #         python -m cmass.survey.hodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
         #     fi
-        #     python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         # done
+
+        # mtng_lightcone
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            # lightcone
+            file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f $file ]; then
+                echo "File $file exists."
+            else
+                echo "File $file does not exist."
+                python -m cmass.survey.mtnghodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
+            fi
+            python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        done
 
         # # Trash collection
         # if [ $rm_galaxies = True ]; then
