@@ -160,7 +160,7 @@ struct Mask
 struct Lightcone
 {
     const char *boss_dir;
-    const Mask &mask;
+    const Mask *mask;
     const double BoxSize, Omega_m, zmin, zmax;
     const int remap_case;
     const bool do_downsample, verbose;
@@ -171,7 +171,7 @@ struct Lightcone
     std::vector<double> snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
     gsl_spline *z_chi_interp; std::vector<gsl_interp_accel *> z_chi_interp_acc;
     const cuboid::Cuboid C; const double Li[3]; // the sidelengths in decreasing order
-    gsl_histogram *boss_z_hist;
+    gsl_histogram *boss_z_hist = nullptr;
     std::vector<int> snap_indices_done;
 
     // halo positions after remapping and redshift range cut, as well as IDs
@@ -187,7 +187,7 @@ struct Lightcone
     // const HOD_fct_t hod_fct;
     HOD_fct_t hod_fct;
 
-    Lightcone (const Mask &mask_,
+    Lightcone (const Mask *mask_,
                // HOD_fct_t hod_fct_,
                double Omega_m_, double zmin_, double zmax_,
                const std::vector<double> &snap_times_,
@@ -361,7 +361,7 @@ PYBIND11_MODULE(lc, m)
         .def(pyb::init<const char *, bool>(), "boss_dir"_a, pyb::kw_only(), "veto"_a=true);
 
     pyb::class_<Lightcone> (m, "Lightcone")
-        .def(pyb::init<const Mask&, double, double, double, const std::vector<double>&,
+        .def(pyb::init<const Mask *, double, double, double, const std::vector<double>&,
                        const char *,
                        double, int,
                        bool, unsigned,
@@ -652,12 +652,15 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 galid_t galid;
 
                 // for the angular mask
-                cmangle::Point pt;
-                cmangle::point_set_from_radec(&pt, ra, dec);
-                bool m = mask.masked(pt, mangle_status_);
-                mangle_status *= mangle_status_;
-                if (!mangle_status_) [[unlikely]] continue;
-                if (m) goto not_chosen;
+                if (mask)
+                {
+                    cmangle::Point pt;
+                    cmangle::point_set_from_radec(&pt, ra, dec);
+                    bool m = mask->masked(pt, mangle_status_);
+                    mangle_status *= mangle_status_;
+                    if (!mangle_status_) [[unlikely]] continue;
+                    if (m) goto not_chosen;
+                }
 
                 // compute the galaxy ID
                 galid = make_galid(snap_idx, jj);
