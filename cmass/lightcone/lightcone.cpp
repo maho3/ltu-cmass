@@ -67,11 +67,11 @@ namespace Geometry
 
     // get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
     // we only need a rotation around the y-axis I believe
-    const double alpha = 97.0 * M_PI / 180.0; // rotation around y-axis
-    const double beta = 6.0; // rotation around z-axis, in degrees
+    const double alpha = 0; // 97.0 * M_PI / 180.0; // rotation around y-axis  # changed
+    const double beta = 0; // 6.0; // rotation around z-axis, in degrees  # changed
 
     // in units of L1, L2, L3
-    const double origin[] = { 0.5, -0.058, 0.0 };
+    const double origin[] = {0.0, 0.0, 0.0}; // { 0.5, -0.058, 0.0 };
 }
 
 namespace Numbers
