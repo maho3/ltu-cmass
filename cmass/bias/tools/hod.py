@@ -19,8 +19,7 @@ from halotools.empirical_models import halo_mass_to_halo_radius, NFWProfile
 
 from .hod_models import (
     Zheng07, Leauthaud11, Zu_mandelbaum15,
-    Zheng07zdepCens, Zheng07zdepSats, 
-    Zheng07zinterpCens, Zheng07zinterpSats
+    Zheng07zdep, Zheng07zinterp
 )
 
 def parse_hod(cfg):
@@ -64,7 +63,7 @@ def parse_hod(cfg):
         elif cfg.bias.hod.model == 'zheng07zdep':
             model = Zheng07zdep()
         elif cfg.bias.hod.model == 'zheng07zinterp':
-            model = Zheng07zinterp(len(cfg.bias.hod.zpivot))
+            model = Zheng07zinterp(cfg.bias.hod.zpivot)
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
         elif cfg.bias.hod.model == "zu_mandelbaum15":
@@ -145,7 +144,7 @@ def build_HOD_model(
         model = Leauthaud11(mass_def=mdef)
     elif model == 'zheng07zdep':
         model = Zheng07zdep(mass_def=mdef)    
-    elif model == 'zheng07zdep':
+    elif model == 'zheng07zinterp':
         model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot)   
     elif model == "zu_mandelbaum15":
         model = Zu_mandelbaum15(mass_def=mdef)

@@ -131,6 +131,22 @@ class Hod_model:
         )
 
         return HodModelFactory(**model)
+    
+    def set_profiles(
+        self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
+    ):
+        if self.assem_bias:
+            raise NotImplementedError
+        else:
+            self.censprof = TrivialPhaseSpace(
+                cosmology=cosmology, redshift=zf, mdef=self.mass_def
+            )
+            self.satsprof = NFWPhaseSpace(
+                conc_mass_model="direct_from_halo_catalog",
+                cosmology=cosmology,
+                redshift=zf,
+                mdef=self.mass_def,
+            )
 
 
 class Zheng07(Hod_model):
@@ -189,26 +205,6 @@ class Zheng07(Hod_model):
         self.cenocc.param_dict.update(self.get_parameters())
         self.satocc.param_dict.update(self.get_parameters())
         self.satocc._suppress_repeated_param_warning = True
-
-    def set_profiles(
-        self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
-    ):
-        if self.assem_bias:
-            # self.censprof = TrivialPhaseSpace(**kwargs)
-            # self.satsprof = BiasedNFWPhaseSpace(
-            #     conc_mass_model=conc_mass_model, **kwargs
-            # )
-            raise NotImplementedError
-        else:
-            self.censprof = TrivialPhaseSpace(
-                cosmology=cosmology, redshift=zf, mdef=self.mass_def
-            )
-            self.satsprof = NFWPhaseSpace(
-                conc_mass_model="direct_from_halo_catalog",
-                cosmology=cosmology,
-                redshift=zf,
-                mdef=self.mass_def,
-            )
 
     def parejko2013_lowz(self):
         """
@@ -278,9 +274,15 @@ class Zheng07zdep(Hod_model):
         parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'mucen', 'musat'],
         lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0., -30.0, -10.0]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0., 0.]),
-        param_defaults=None
+        param_defaults=None,
+        mass_def="vir"
     ):
-        super().__init__(parameters, lower_bound, upper_bound)
+        super().__init__(
+            parameters=parameters,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            mass_def=mass_def,
+        )
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
@@ -295,6 +297,21 @@ class Zheng07zdep(Hod_model):
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
+                
+    def set_occupation(self, **kwargs):
+        if self.assem_bias:
+            raise NotImplementedError
+        else:
+            self.cenocc = Zheng07zdepCens(prim_haloprop_key=self.mass_key)
+            self.satocc = Zheng07zdepSats(
+                prim_haloprop_key=self.mass_key,
+                cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
+            )
+
+        self.cenocc.param_dict.update(self.get_parameters())
+        self.satocc.param_dict.update(self.get_parameters())
+        self.satocc._suppress_repeated_param_warning = True
 
     def parejko2013_lowz(self):
         """
@@ -369,23 +386,28 @@ class Zheng07zinterp(Hod_model):
 
     def __init__(
         self,
-        npivot,
+        zpivot,
         parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
         lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.,]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5,]),
-        param_defaults=None
+        param_defaults=None,
+        mass_def="vir",
     ):
+        
+        # Obtain single parameter for each pivot point
         pars = []
         low = []
         up = []
-        self.npivot = npivot
+        self.zpivot = zpivot
+        self.npivot = len(zpivot)
+        assert self.npivot > 1, "Cannot interpolate between fewer than 2 points"
         if param_defaults is None:
             defaults = None
         else:
             defaults = []
         for i, (p, v0, v1) in enumerate(zip(parameters, lower_bound, upper_bound)):
             if p in ['logMmin', 'logM0', 'logM1']:
-                for j in range(npivot):
+                for j in range(self.npivot):
                     pars.append(p + '_z' + str(j))
                     low.append(v0)
                     up.append(v1)
@@ -397,7 +419,12 @@ class Zheng07zinterp(Hod_model):
                 up.append(v1)
                 if param_defaults is not None:
                     defaults.append(param_defaults[i])
-        super().__init__(pars, low, up)
+        super().__init__(
+            parameters=pars,
+            lower_bound=low,
+            upper_bound=up,
+            mass_def=mass_def,
+        )
 
         # If using, set literature values for parameters
         self.param_defaults = defaults
@@ -412,6 +439,22 @@ class Zheng07zinterp(Hod_model):
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
+                
+    def set_occupation(self, **kwargs):
+        if self.assem_bias:
+            raise NotImplementedError
+        else:
+            self.cenocc = Zheng07zinterpCens(self.zpivot, prim_haloprop_key=self.mass_key)
+            self.satocc = Zheng07zinterpSats(
+                self.zpivot,
+                prim_haloprop_key=self.mass_key,
+                cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
+            )
+
+        self.cenocc.param_dict.update(self.get_parameters())
+        self.satocc.param_dict.update(self.get_parameters())
+        self.satocc._suppress_repeated_param_warning = True
                 
     def process_measured_hod(self, p_hod):
         new_p_hod = {}
