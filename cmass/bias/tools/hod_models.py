@@ -95,10 +95,6 @@ class Hod_model:
             getattr(self, _param).value = new_parameters[_param]
 
     def sample_parameters(self):
-        if (self.lower_bound is None) or (self.upper_bound is None):
-            raise ValueError(
-                "Lower and upper bounds for each parameter must be set"
-            )
         for _param in self.parameters:
             # Get upper and lower bounds for this parameter
             _lower = getattr(self, _param).lower
@@ -133,6 +129,7 @@ class Hod_model:
             satellites_occupation=self.satocc,
             satellites_profile=self.satsprof,
         )
+
         return HodModelFactory(**model)
 
 
@@ -143,15 +140,17 @@ class Zheng07(Hod_model):
 
     def __init__(
         self,
-        param_keys=["logMmin", "sigma_logM", "logM0", "logM1", "alpha"],
+        parameters=["logMmin", "sigma_logM", "logM0", "logM1", "alpha"],
         lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.0]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5]),
         param_defaults=None,
+        mass_def="vir"
     ):
         super().__init__(
-            param_keys=param_keys,
+            parameters=parameters,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
+            mass_def=mass_def,
         )
 
         # If using, set literature values for parameters
@@ -170,14 +169,15 @@ class Zheng07(Hod_model):
 
     def set_occupation(self, **kwargs):
         if self.assem_bias:
-            self.cenocc = AssembiasZheng07Cens(
-                prim_haloprop_key=self.mass_key, **kwargs
-            )
-            self.satocc = AssembiasZheng07Sats(
-                prim_haloprop_key=self.mass_key,
-                cenocc_model=self.cenocc,
-                **kwargs,
-            )
+            # self.cenocc = AssembiasZheng07Cens(
+            #     prim_haloprop_key=self.mass_key, **kwargs
+            # )
+            # self.satocc = AssembiasZheng07Sats(
+            #     prim_haloprop_key=self.mass_key,
+            #     cenocc_model=self.cenocc,
+            #     **kwargs,
+            # )
+            raise NotImplementedError
         else:
             self.cenocc = Zheng07Cens(prim_haloprop_key=self.mass_key)
             self.satocc = Zheng07Sats(
@@ -194,10 +194,11 @@ class Zheng07(Hod_model):
         self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
     ):
         if self.assem_bias:
-            self.censprof = TrivialPhaseSpace(**kwargs)
-            self.satsprof = BiasedNFWPhaseSpace(
-                conc_mass_model=conc_mass_model, **kwargs
-            )
+            # self.censprof = TrivialPhaseSpace(**kwargs)
+            # self.satsprof = BiasedNFWPhaseSpace(
+            #     conc_mass_model=conc_mass_model, **kwargs
+            # )
+            raise NotImplementedError
         else:
             self.censprof = TrivialPhaseSpace(
                 cosmology=cosmology, redshift=zf, mdef=self.mass_def

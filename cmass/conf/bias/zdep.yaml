@@ -22,7 +22,7 @@ hod:
   # - zheng07zinterp
   # - leauthaud11
   # - zu_mandelbaum15
-  model: 'zheng07zinterp'
+  model: 'zheng07'
 
   # Configure halo mass definition as stored in halo catalogs (e.g. vir, 200c)
   mdef: '200c'

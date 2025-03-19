@@ -18,7 +18,7 @@ from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import halo_mass_to_halo_radius, NFWProfile
 
 from .hod_models import (
-    Zheng07, Leauthaud11, Zu_mandelbaum15
+    Zheng07, Leauthaud11, Zu_mandelbaum15,
     Zheng07zdepCens, Zheng07zdepSats, 
     Zheng07zinterpCens, Zheng07zinterpSats
 )
@@ -156,7 +156,7 @@ def build_HOD_model(
     model.set_occupation()
     model.set_profiles(cosmology=cosmology, zf=zf)
 
-    return model
+    return model.get_model()
  
 #     # determine mass column
 #     mkey = 'halo_m' + mdef
@@ -232,17 +232,10 @@ def build_HOD_model(
 
 
 def build_halo_catalog(
-    pos,
-    vel,
-    mass,
-    redshift,
-    BoxSize,
-    cosmo,
-    radius=None,
-    conc=None,
-    mdef="vir",
+    pos, vel, mass, redshift, BoxSize, cosmo,
+    radius=None, conc=None, halo_redshift=None, mdef='vir'
 ):
-    """Build a halo catalog from the given halo properties.
+    '''Build a halo catalog from the given halo properties.
 
     Args:
         pos (array_like): Halo comoving positions in Mpc/h. Shape (N, 3).
@@ -260,10 +253,10 @@ def build_halo_catalog(
     Returns:
         catalog (UserSuppliedHaloCatalog): A halo catalog object
             that can be used with Halotools.
-    """
-    mkey = f"halo_m{mdef}"
-    rkey = f"halo_r{mdef}"
-
+    '''
+    mkey = f'halo_m{mdef}'
+    rkey = f'halo_r{mdef}'
+    
     if radius is None:
         radius = halo_mass_to_halo_radius(mass, cosmo, redshift, mdef)
     if conc is None:
@@ -272,30 +265,33 @@ def build_halo_catalog(
     # Specify arguments
     kws = {
         # halo properties
-        "halo_x": pos[:, 0],
-        "halo_y": pos[:, 1],
-        "halo_z": pos[:, 2],
-        "halo_vx": vel[:, 0],
-        "halo_vy": vel[:, 1],
-        "halo_vz": vel[:, 2],
+        'halo_x': pos[:, 0],
+        'halo_y': pos[:, 1],
+        'halo_z': pos[:, 2],
+        'halo_vx': vel[:, 0],
+        'halo_vy': vel[:, 1],
+        'halo_vz': vel[:, 2],
         mkey: mass,
         rkey: radius,
-        "halo_nfw_conc": conc,
-        "halo_id": np.arange(len(mass)),
-        "halo_hostid": np.zeros(len(mass), dtype=int),
-        "halo_upid": np.zeros(len(mass)) - 1,
-        "halo_local_id": np.arange(len(mass), dtype="i8"),
+        'halo_nfw_conc': conc,
+        'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
+        
+        'halo_id': np.arange(len(mass)),
+        'halo_hostid': np.zeros(len(mass), dtype=int),
+        'halo_upid': np.zeros(len(mass)) - 1,
+        'halo_local_id': np.arange(len(mass), dtype='i8'),
+
         # metadata
-        "cosmology": cosmo,
-        "redshift": redshift,
-        "particle_mass": 1,  # not used
-        "Lbox": BoxSize,
-        "mdef": mdef,
+        'cosmology': cosmo,
+        'redshift': redshift,
+        'particle_mass': 1,  # not used
+        'Lbox': BoxSize,
+        'mdef': mdef,
     }
-    if mdef != "vir":
+    if mdef != 'vir':
         # these are necessary to satisfy default halo properties, but not used
-        kws["halo_mvir"] = np.full(len(mass), np.nan)
-        kws["halo_rvir"] = np.full(len(mass), np.nan)
+        kws['halo_mvir'] = np.full(len(mass), np.nan)
+        kws['halo_rvir'] = np.full(len(mass), np.nan)
 
     # convert to Halotools format
     return UserSuppliedHaloCatalog(**kws)
