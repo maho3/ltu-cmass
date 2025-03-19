@@ -141,7 +141,7 @@ def build_HOD_model(
     if model == "zheng07":
         model = Zheng07(mass_def=mdef)
     elif model == "leauthaud11":
-        model = Leauthaud11(mass_def=mdef)
+        model = Leauthaud11(mass_def=mdef, zf=zf)
     elif model == 'zheng07zdep':
         model = Zheng07zdep(mass_def=mdef)    
     elif model == 'zheng07zinterp':
@@ -156,78 +156,6 @@ def build_HOD_model(
     model.set_profiles(cosmology=cosmology, zf=zf)
 
     return model.get_model()
- 
-#     # determine mass column
-#     mkey = 'halo_m' + mdef
-
-#     # Get HOD parameters
-#     hod_params = dict(theta)
-
-#     # Occupation functions
-#     if model == 'zheng07':
-#         cenocc = Zheng07Cens(prim_haloprop_key=mkey)
-#         satocc = Zheng07Sats(
-#             prim_haloprop_key=mkey,
-#             cenocc_model=cenocc,
-#             modulate_with_cenocc=True
-#         )
-#     elif model == 'zheng07zdep':
-#         cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
-#         satocc = Zheng07zdepSats(
-#             prim_haloprop_key=mkey,
-#             cenocc_model=cenocc,
-#             modulate_with_cenocc=True
-#         )
-#     elif model == 'zheng07zinterp':
-#         cenocc = Zheng07zinterpCens(zpivot, prim_haloprop_key=mkey)
-#         satocc = Zheng07zinterpSats(
-#             zpivot,
-#             prim_haloprop_key=mkey,
-#             cenocc_model=cenocc,
-#             modulate_with_cenocc=True
-#         )
-#     elif model == 'leauthaud11':
-#         cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, redshift=zf)
-#         satocc = Leauthaud11Sats(
-#             prim_haloprop_key=mkey,
-#             cenocc_model=cenocc, redshift=zf,
-#         )
-#     elif model == 'zu_mandelbaum15':
-#         cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, redshift=zf)
-#         satocc = ZuMandelbaum15Sats(prim_haloprop_key=mkey)
-#         satocc.central_occupation_model = cenocc  # need to set this manually
-#         # m0 and m1 are desired in real units
-#         hod_params['smhm_m0'] = 10**hod_params['smhm_m0']
-#         hod_params['smhm_m1'] = 10**hod_params['smhm_m1']
-#     else:
-#         raise NotImplementedError
-
-#     # Set HOD parameters
-#     cenocc.param_dict.update(hod_params)
-#     satocc.param_dict.update(hod_params)
-#     satocc._suppress_repeated_param_warning = True
-
-#     # profile functions
-#     censprof = TrivialPhaseSpace(
-#         cosmology=cosmology,
-#         redshift=zf,
-#         mdef=mdef
-#     )
-#     satsprof = NFWPhaseSpace(
-#         conc_mass_model='direct_from_halo_catalog',
-#         cosmology=cosmology,
-#         redshift=zf,
-#         mdef=mdef
-#     )
-
-#     # make the model
-#     model = dict(
-#         centrals_occupation=cenocc,
-#         centrals_profile=censprof,
-#         satellites_occupation=satocc,
-#         satellites_profile=satsprof
-#     )
-#     return HodModelFactory(**model)
 
 
 def build_halo_catalog(

@@ -600,12 +600,16 @@ class Leauthaud11(Hod_model):
             ]
         ),
         param_defaults=None,
+        mass_def="vir",
+        zf=None,
     ):
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
+            mass_def=mass_def,
         )
+        self.zf = zf
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
@@ -615,26 +619,18 @@ class Leauthaud11(Hod_model):
             else:
                 raise NotImplementedError
 
-    def set_occupation(self, zf):
+    def set_occupation(self,):
         self.cenocc = Leauthaud11Cens(
-            prim_haloprop_key=self.mass_key, redshift=zf
+            prim_haloprop_key=self.mass_key, redshift=self.zf
         )
         self.satocc = Leauthaud11Sats(
             prim_haloprop_key=self.mass_key,
             cenocc_model=self.cenocc,
-            redshift=zf,
+            redshift=self.zf,
         )
-
-    def set_profiles(self, cosmology, zf):
-        self.censprof = TrivialPhaseSpace(
-            cosmology=cosmology, redshift=zf, mdef=self.mass_def
-        )
-        self.satsprof = NFWPhaseSpace(
-            conc_mass_model="direct_from_halo_catalog",
-            cosmology=cosmology,
-            redshift=zf,
-            mdef=self.mass_def,
-        )
+        self.cenocc.param_dict.update(self.get_parameters())
+        self.satocc.param_dict.update(self.get_parameters())
+        self.satocc._suppress_repeated_param_warning = True
 
     def behroozi10(self):
         """
@@ -717,12 +713,16 @@ class Zu_mandelbaum15(Hod_model):
             ]
         ),
         param_defaults=None,
+        mass_def="vir",
+        zf=None,
     ):
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
+            mass_def=mass_def,
         )
+        self.zf = zf
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
@@ -732,9 +732,9 @@ class Zu_mandelbaum15(Hod_model):
             else:
                 raise NotImplementedError
 
-    def set_occupation(self, zf):
+    def set_occupation(self,):
         self.cenocc = ZuMandelbaum15Cens(
-            prim_haloprop_key=self.mass_key, redshift=zf
+            prim_haloprop_key=self.mass_key, redshift=self.zf
         )
         self.satocc = ZuMandelbaum15Sats(prim_haloprop_key=self.mass_key)
         self.satocc.central_occupation_model = (
@@ -742,23 +742,13 @@ class Zu_mandelbaum15(Hod_model):
         )
 
         # m0 and m1 are desired in real units
-        self.parameters["smhm_m0"] = 10 ** self.parameters["smhm_m0"]
-        self.parameters["smhm_m1"] = 10 ** self.parameters["smhm_m1"]
+        pars = self.get_parameters()
+        self.set_parameter("smhm_m0", 10 ** pars["smhm_m0"])
+        self.set_parameter("smhm_m1", 10 ** pars["smhm_m1"])
 
-        self.cenocc.param_dict.update(self.parameters)
-        self.satocc.param_dict.update(self.parameters)
+        self.cenocc.param_dict.update(self.get_parameters())
+        self.satocc.param_dict.update(self.get_parameters())
         self.satocc._suppress_repeated_param_warning = True
-
-    def set_profiles(self, cosmology, zf):
-        self.censprof = TrivialPhaseSpace(
-            cosmology=cosmology, redshift=zf, mdef=self.mass_def
-        )
-        self.satsprof = NFWPhaseSpace(
-            conc_mass_model="direct_from_halo_catalog",
-            cosmology=cosmology,
-            redshift=zf,
-            mdef=self.mass_def,
-        )
         
     def zu_mandelbaum15(self):
         """
