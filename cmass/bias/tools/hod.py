@@ -74,7 +74,8 @@ def parse_hod(cfg):
         elif cfg.bias.hod.model == 'zu_mandelbaum15':
             model = Zu_mandelbaum15()
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f'Model {cfg.bias.hod.model} not implemented.')
 
         # Check if we're using default parameters
         if hasattr(cfg.bias.hod, 'default_params'):
@@ -189,7 +190,7 @@ class Hod_model:
 
         return out_params
 
-    
+
 class Zheng07(Hod_model):
     """
     Zheng+07 HOD model
@@ -274,8 +275,8 @@ class Zheng07(Hod_model):
             'alpha': 0.76
         }
         self.set_parameters(p_hod)
-        
-        
+
+
 class Zheng07zdep(Hod_model):
     """
     Zheng+07 HOD model with redshift dependent mass parameters
@@ -283,7 +284,8 @@ class Zheng07zdep(Hod_model):
 
     def __init__(
         self,
-        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'mucen', 'musat'],
+        parameters=['logMmin', 'sigma_logM', 'logM0',
+                    'logM1', 'alpha', 'mucen', 'musat'],
         lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0., -30.0, -10.0]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0., 0.]),
         param_defaults=None
@@ -368,8 +370,8 @@ class Zheng07zdep(Hod_model):
             'musat': 0.0,
         }
         self.set_parameters(p_hod)
-        
-        
+
+
 class Zheng07zinterp(Hod_model):
     """
     Zheng+07 HOD model with redshift dependent mass parameters
@@ -420,7 +422,7 @@ class Zheng07zinterp(Hod_model):
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
-                
+
     def process_measured_hod(self, p_hod):
         new_p_hod = {}
         for k, v in p_hod.items():
@@ -430,7 +432,7 @@ class Zheng07zinterp(Hod_model):
             else:
                 new_p_hod[k] = v
         return new_p_hod
-                
+
     def parejko2013_lowz(self):
         """
         lowz catalog from Parejko+2013 Table 3. Note that the

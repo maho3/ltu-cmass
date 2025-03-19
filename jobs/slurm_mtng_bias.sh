@@ -15,12 +15,12 @@
 SLURM_ARRAY_TASK_ID=0
 
 module restore cmass
-conda activate cmassrun
+conda activate cmass
 lhid=$SLURM_ARRAY_TASK_ID
 
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /home/x-mho1/git/ltu-cmass
 
 Nhod=5
 Naug=1
@@ -30,7 +30,7 @@ sim=fastpm_hodz
 multisnapshot=True
 diag_from_scratch=False
 rm_galaxies=True
-extras="bias=zdep hydra/job_logging=disabled"
+extras="bias=zdep" #  hydra/job_logging=disabled"
 L=3000
 N=384
 
@@ -106,7 +106,7 @@ for offset in 0 1000; do
                 echo "File $file does not exist."
                 python -m cmass.survey.mtnghodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
             fi
-            python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            # python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
         # # Trash collection

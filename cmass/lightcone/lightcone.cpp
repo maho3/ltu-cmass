@@ -50,16 +50,16 @@ static constexpr auto pyb_arr_style = pyb::array::c_style | pyb::array::forcecas
 namespace Geometry
 {
     int remaps[][9] =
-                      { // 1.4142 1.0000 0.7071
+                      { // 1.4142 1.0000 0.7071 (for NGC)
                         { 1, 1, 0,
                           0, 0, 1,
                           1, 0, 0, },
-                        // 1.7321 0.8165 0.7071
+                        // 1.7321 0.8165 0.7071 (for NGC)
                         { 1, 1, 1,
                           1, 0, 0,
                           0, 1, 0, },
                         // 1.0000 1.0000 1.0000
-                        // trivial case, only for debugging
+                        // trivial case, for no remapping (also for MTNG)
                         { 1, 0, 0,
                           0, 1, 0,
                           0, 0, 1 },
@@ -67,11 +67,24 @@ namespace Geometry
 
     // get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
     // we only need a rotation around the y-axis I believe
-    const double alpha = 0; // 97.0 * M_PI / 180.0; // rotation around y-axis  # changed
-    const double beta = 0; // 6.0; // rotation around z-axis, in degrees  # changed
+    const double alpha[] = {
+        97.0 * M_PI / 180.0,  // NGC
+        97.0 * M_PI / 180.0,  // NGC
+        0  // MTNG
+    }; // rotation around y-axis
+
+    const double beta[] = {
+        6.0,  // NGC
+        6.0,  // NGC
+        0  // MTNG
+    }; // rotation around z-axis, in degrees
 
     // in units of L1, L2, L3
-    const double origin[] = {0.0, 0.0, 0.0}; // { 0.5, -0.058, 0.0 };
+    const double origin[][3] = {
+        {0.5, -0.058, 0.0}, // NGC
+        {0.5, -0.058, 0.0}, // NGC
+        {0.0, 0.0, 0.0} // MTNG
+    };
 }
 
 namespace Numbers
@@ -554,7 +567,7 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
         #pragma omp for schedule (dynamic, 1024)
         for (size_t jj=0; jj<Nhlo; ++jj)
         {
-            for (int kk=0; kk<3; ++kk) los[kk] = xhlo[3*jj+kk] - Geometry::origin[kk]*BoxSize*Li[kk];
+            for (int kk=0; kk<3; ++kk) los[kk] = xhlo[3*jj+kk] - Geometry::origin[remap_case][kk]*BoxSize*Li[kk];
             double chi = std::hypot(los[0], los[1], los[2]);
 
             double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
@@ -636,9 +649,9 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 // rotate the line of sight into the NGC footprint and transpose the axes into
                 // canonical order
                 double x1, x2, x3;
-                x1 = std::cos(Geometry::alpha) * los[2] - std::sin(Geometry::alpha) * los[1];
+                x1 = std::cos(Geometry::alpha[remap_case]) * los[2] - std::sin(Geometry::alpha[remap_case]) * los[1];
                 x2 = los[0];
-                x3 = std::sin(Geometry::alpha) * los[2] + std::cos(Geometry::alpha) * los[1];
+                x3 = std::sin(Geometry::alpha[remap_case]) * los[2] + std::cos(Geometry::alpha[remap_case]) * los[1];
 
                 double z = gsl_spline_eval(z_chi_interp, chi, acc);
                 double theta = std::acos(x3/chi);
@@ -647,7 +660,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 double dec = 90.0-theta/M_PI*180.0;
                 double ra = phi/M_PI*180.0;
                 if (ra<0.0) ra += 360.0;
-                ra += Geometry::beta;
+                ra += Geometry::beta[remap_case];
 
                 galid_t galid;
 

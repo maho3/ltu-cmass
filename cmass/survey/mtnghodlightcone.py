@@ -28,7 +28,6 @@ NOTE:
 import os
 import numpy as np
 import logging
-import h5py
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
