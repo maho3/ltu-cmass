@@ -1,5 +1,5 @@
 """
-Tools for initilaising and implementing Halo Occupation 
+Tools for initialising and implementing Halo Occupation
 Distribution (HOD) models.
 
 Currently implemented models:
@@ -7,9 +7,7 @@ Currently implemented models:
 - Leauthaud+11
 - Zu & Mandelbaum+15
 
-Each model derives from the `Hod_model` parent class,
-which additionally uses the `Hod_parameter` helper class
-for each parameter.
+The models themselves are described in `hod_models.py`.
 """
 
 import logging
@@ -39,27 +37,29 @@ def parse_hod(cfg):
     """
     with open_dict(cfg):
         # Check the chosen mass definition
-        if cfg.sim in ['borg1lpt', 'borg2lpt', 'borgpm', 'fastpm', 'pmwd']:
-            if cfg.bias.hod.mdef != '200c':
+        if cfg.sim in ["borg1lpt", "borg2lpt", "borgpm", "fastpm", "pmwd"]:
+            if cfg.bias.hod.mdef != "200c":
                 logging.warning(
-                    f'Configuration specified a {cfg.bias.hod.mdef} mass '
-                    f'definition, but the {cfg.sim} simulation is a 200c '
-                    'simulation. So, changing mass definition configuration to '
-                    '200c.')
-                cfg.bias.hod.mdef = '200c'
-        elif cfg.sim == 'pinocchio':
-            if cfg.bias.hod.mdef != 'vir':
+                    f"Configuration specified a {cfg.bias.hod.mdef} mass "
+                    f"definition, but the {cfg.sim} simulation is a 200c "
+                    "simulation. So, changing mass definition configuration to "
+                    "200c."
+                )
+                cfg.bias.hod.mdef = "200c"
+        elif cfg.sim == "pinocchio":
+            if cfg.bias.hod.mdef != "vir":
                 logging.warning(
-                    f'Configuration specified a {cfg.bias.hod.mdef} mass '
-                    f'definition, but the {cfg.sim} simulation is a vir '
-                    'simulation. So, changing mass definition configuration to '
-                    'vir.')
-                cfg.bias.hod.mdef = 'vir'
+                    f"Configuration specified a {cfg.bias.hod.mdef} mass "
+                    f"definition, but the {cfg.sim} simulation is a vir "
+                    "simulation. So, changing mass definition configuration to "
+                    "vir."
+                )
+                cfg.bias.hod.mdef = "vir"
 
         # Check model is available
-        if not hasattr(cfg.bias.hod, 'model'):
+        if not hasattr(cfg.bias.hod, "model"):
             model = Zheng07()  # for backwards compatibility
-        elif cfg.bias.hod.model == 'zheng07':
+        elif cfg.bias.hod.model == "zheng07":
             model = Zheng07()
         elif cfg.bias.hod.model == 'zheng07zdep':
             model = Zheng07zdep()
@@ -67,19 +67,19 @@ def parse_hod(cfg):
             model = Zheng07zinterp(len(cfg.bias.hod.zpivot))
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
-        elif cfg.bias.hod.model == 'zu_mandelbaum15':
+        elif cfg.bias.hod.model == "zu_mandelbaum15":
             model = Zu_mandelbaum15()
         else:
             raise NotImplementedError
 
         # Check if we're using default parameters
-        if hasattr(cfg.bias.hod, 'default_params'):
+        if hasattr(cfg.bias.hod, "default_params"):
             if cfg.bias.hod.default_params is not None:
                 # Assign parameters given this default
                 getattr(model, cfg.bias.hod.default_params)()
 
         # Check if 'seed' set
-        if hasattr(cfg.bias.hod, 'seed'):
+        if hasattr(cfg.bias.hod, "seed"):
             if cfg.bias.hod.seed is not None:
                 # If -1, set to some random value
                 if cfg.bias.hod.seed == -1:
@@ -94,7 +94,7 @@ def parse_hod(cfg):
                     model.sample_parameters()
 
         # Overwrite any previously defined parameters
-        if hasattr(cfg.bias.hod, 'theta'):
+        if hasattr(cfg.bias.hod, "theta"):
             for key in model.parameters:
                 if hasattr(cfg.bias.hod.theta, key):
                     param = float(getattr(cfg.bias.hod.theta, key))
@@ -113,9 +113,14 @@ def parse_hod(cfg):
 
 
 def build_HOD_model(
-    cosmology, model, theta, zf, mdef='vir', zpivot=None
+    cosmology,
+    model,
+    theta,
+    zf,
+    mdef="vir",
+    zpivot=None,
 ):
-    '''Build a HOD model from the given HOD parameters.
+    """Build a HOD model from the given HOD parameters.
 
     Args:
         cosmology (astropy.cosmology.Cosmology):
@@ -133,86 +138,111 @@ def build_HOD_model(
     Returns:
         hod_model (HODMockFactory): A HOD model object
             that can be used with Halotools.
-    '''
-    # determine mass column
-    mkey = 'halo_m' + mdef
-
-    # Get HOD parameters
-    hod_params = dict(theta)
-
-    # Occupation functions
-    if model == 'zheng07':
-        cenocc = Zheng07Cens(prim_haloprop_key=mkey)
-        satocc = Zheng07Sats(
-            prim_haloprop_key=mkey,
-            cenocc_model=cenocc,
-            modulate_with_cenocc=True
-        )
+    """
+    if model == "zheng07":
+        model = Zheng07(mass_def=mdef)
+    elif model == "leauthaud11":
+        model = Leauthaud11(mass_def=mdef)
     elif model == 'zheng07zdep':
-        cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
-        satocc = Zheng07zdepSats(
-            prim_haloprop_key=mkey,
-            cenocc_model=cenocc,
-            modulate_with_cenocc=True
-        )
-    elif model == 'zheng07zinterp':
-        cenocc = Zheng07zinterpCens(zpivot, prim_haloprop_key=mkey)
-        satocc = Zheng07zinterpSats(
-            zpivot,
-            prim_haloprop_key=mkey,
-            cenocc_model=cenocc,
-            modulate_with_cenocc=True
-        )
-    elif model == 'leauthaud11':
-        cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, redshift=zf)
-        satocc = Leauthaud11Sats(
-            prim_haloprop_key=mkey,
-            cenocc_model=cenocc, redshift=zf,
-        )
-    elif model == 'zu_mandelbaum15':
-        cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, redshift=zf)
-        satocc = ZuMandelbaum15Sats(prim_haloprop_key=mkey)
-        satocc.central_occupation_model = cenocc  # need to set this manually
-        # m0 and m1 are desired in real units
-        hod_params['smhm_m0'] = 10**hod_params['smhm_m0']
-        hod_params['smhm_m1'] = 10**hod_params['smhm_m1']
+        model = Zheng07zdep(mass_def=mdef)    
+    elif model == 'zheng07zdep':
+        model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot)   
+    elif model == "zu_mandelbaum15":
+        model = Zu_mandelbaum15(mass_def=mdef)
     else:
         raise NotImplementedError
 
-    # Set HOD parameters
-    cenocc.param_dict.update(hod_params)
-    satocc.param_dict.update(hod_params)
-    satocc._suppress_repeated_param_warning = True
+    model.set_parameters(dict(theta))
+    model.set_occupation()
+    model.set_profiles(cosmology=cosmology, zf=zf)
 
-    # profile functions
-    censprof = TrivialPhaseSpace(
-        cosmology=cosmology,
-        redshift=zf,
-        mdef=mdef
-    )
-    satsprof = NFWPhaseSpace(
-        conc_mass_model='direct_from_halo_catalog',
-        cosmology=cosmology,
-        redshift=zf,
-        mdef=mdef
-    )
+    return model
+ 
+#     # determine mass column
+#     mkey = 'halo_m' + mdef
 
-    # make the model
-    model = dict(
-        centrals_occupation=cenocc,
-        centrals_profile=censprof,
-        satellites_occupation=satocc,
-        satellites_profile=satsprof
-    )
-    return HodModelFactory(**model)
+#     # Get HOD parameters
+#     hod_params = dict(theta)
 
+#     # Occupation functions
+#     if model == 'zheng07':
+#         cenocc = Zheng07Cens(prim_haloprop_key=mkey)
+#         satocc = Zheng07Sats(
+#             prim_haloprop_key=mkey,
+#             cenocc_model=cenocc,
+#             modulate_with_cenocc=True
+#         )
+#     elif model == 'zheng07zdep':
+#         cenocc = Zheng07zdepCens(prim_haloprop_key=mkey)
+#         satocc = Zheng07zdepSats(
+#             prim_haloprop_key=mkey,
+#             cenocc_model=cenocc,
+#             modulate_with_cenocc=True
+#         )
+#     elif model == 'zheng07zinterp':
+#         cenocc = Zheng07zinterpCens(zpivot, prim_haloprop_key=mkey)
+#         satocc = Zheng07zinterpSats(
+#             zpivot,
+#             prim_haloprop_key=mkey,
+#             cenocc_model=cenocc,
+#             modulate_with_cenocc=True
+#         )
+#     elif model == 'leauthaud11':
+#         cenocc = Leauthaud11Cens(prim_haloprop_key=mkey, redshift=zf)
+#         satocc = Leauthaud11Sats(
+#             prim_haloprop_key=mkey,
+#             cenocc_model=cenocc, redshift=zf,
+#         )
+#     elif model == 'zu_mandelbaum15':
+#         cenocc = ZuMandelbaum15Cens(prim_haloprop_key=mkey, redshift=zf)
+#         satocc = ZuMandelbaum15Sats(prim_haloprop_key=mkey)
+#         satocc.central_occupation_model = cenocc  # need to set this manually
+#         # m0 and m1 are desired in real units
+#         hod_params['smhm_m0'] = 10**hod_params['smhm_m0']
+#         hod_params['smhm_m1'] = 10**hod_params['smhm_m1']
+#     else:
+#         raise NotImplementedError
+
+#     # Set HOD parameters
+#     cenocc.param_dict.update(hod_params)
+#     satocc.param_dict.update(hod_params)
+#     satocc._suppress_repeated_param_warning = True
+
+#     # profile functions
+#     censprof = TrivialPhaseSpace(
+#         cosmology=cosmology,
+#         redshift=zf,
+#         mdef=mdef
+#     )
+#     satsprof = NFWPhaseSpace(
+#         conc_mass_model='direct_from_halo_catalog',
+#         cosmology=cosmology,
+#         redshift=zf,
+#         mdef=mdef
+#     )
+
+#     # make the model
+#     model = dict(
+#         centrals_occupation=cenocc,
+#         centrals_profile=censprof,
+#         satellites_occupation=satocc,
+#         satellites_profile=satsprof
+#     )
+#     return HodModelFactory(**model)
 
 
 def build_halo_catalog(
-    pos, vel, mass, redshift, BoxSize, cosmo,
-    radius=None, conc=None, halo_redshift=None, mdef='vir'
+    pos,
+    vel,
+    mass,
+    redshift,
+    BoxSize,
+    cosmo,
+    radius=None,
+    conc=None,
+    mdef="vir",
 ):
-    '''Build a halo catalog from the given halo properties.
+    """Build a halo catalog from the given halo properties.
 
     Args:
         pos (array_like): Halo comoving positions in Mpc/h. Shape (N, 3).
@@ -230,9 +260,9 @@ def build_halo_catalog(
     Returns:
         catalog (UserSuppliedHaloCatalog): A halo catalog object
             that can be used with Halotools.
-    '''
-    mkey = f'halo_m{mdef}'
-    rkey = f'halo_r{mdef}'
+    """
+    mkey = f"halo_m{mdef}"
+    rkey = f"halo_r{mdef}"
 
     if radius is None:
         radius = halo_mass_to_halo_radius(mass, cosmo, redshift, mdef)
@@ -242,42 +272,40 @@ def build_halo_catalog(
     # Specify arguments
     kws = {
         # halo properties
-        'halo_x': pos[:, 0],
-        'halo_y': pos[:, 1],
-        'halo_z': pos[:, 2],
-        'halo_vx': vel[:, 0],
-        'halo_vy': vel[:, 1],
-        'halo_vz': vel[:, 2],
+        "halo_x": pos[:, 0],
+        "halo_y": pos[:, 1],
+        "halo_z": pos[:, 2],
+        "halo_vx": vel[:, 0],
+        "halo_vy": vel[:, 1],
+        "halo_vz": vel[:, 2],
         mkey: mass,
         rkey: radius,
-        'halo_nfw_conc': conc,
-        'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
-        'halo_id': np.arange(len(mass)),
-        'halo_hostid': np.zeros(len(mass), dtype=int),
-        'halo_upid': np.zeros(len(mass)) - 1,
-        'halo_local_id': np.arange(len(mass), dtype='i8'),
-
+        "halo_nfw_conc": conc,
+        "halo_id": np.arange(len(mass)),
+        "halo_hostid": np.zeros(len(mass), dtype=int),
+        "halo_upid": np.zeros(len(mass)) - 1,
+        "halo_local_id": np.arange(len(mass), dtype="i8"),
         # metadata
-        'cosmology': cosmo,
-        'redshift': redshift,
-        'particle_mass': 1,  # not used
-        'Lbox': BoxSize,
-        'mdef': mdef,
+        "cosmology": cosmo,
+        "redshift": redshift,
+        "particle_mass": 1,  # not used
+        "Lbox": BoxSize,
+        "mdef": mdef,
     }
-    if mdef != 'vir':
+    if mdef != "vir":
         # these are necessary to satisfy default halo properties, but not used
-        kws['halo_mvir'] = np.full(len(mass), np.nan)
-        kws['halo_rvir'] = np.full(len(mass), np.nan)
+        kws["halo_mvir"] = np.full(len(mass), np.nan)
+        kws["halo_rvir"] = np.full(len(mass), np.nan)
 
     # convert to Halotools format
     return UserSuppliedHaloCatalog(**kws)
 
 
-def mass_to_concentration(mass, redshift, cosmo, mdef='vir'):
+def mass_to_concentration(mass, redshift, cosmo, mdef="vir"):
     model = NFWProfile(
         cosmology=cosmo,
-        conc_mass_model='dutton_maccio14',
+        conc_mass_model="dutton_maccio14",
         mdef=mdef,
-        redshift=redshift
+        redshift=redshift,
     )
     return model.conc_NFWmodel(prim_haloprop=mass)

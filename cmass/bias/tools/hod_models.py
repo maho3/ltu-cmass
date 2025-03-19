@@ -1,6 +1,18 @@
+"""
+HOD models. Currently implemented models:
+- Zheng+07
+- Leauthaud+11
+- Zu & Mandelbaum+15
+
+Each model derives from the `Hod_model` parent class,
+which additionally uses the `Hod_parameter` helper class
+for each parameter.
+"""
+
 import warnings
 import numpy as np
 from scipy.special import erf
+
 from halotools.empirical_models import (
     Zheng07Cens,
     Zheng07Sats,
@@ -15,7 +27,6 @@ from halotools.empirical_models import (
     BiasedNFWPhaseSpace,
 )
 from halotools.empirical_models import HodModelFactory
-
 
 class Hod_parameter:
     """
@@ -33,10 +44,14 @@ class Hod_parameter:
 class Hod_model:
     """
     Parent class defining a HOD model.
-    Includes methods for setting, getting and sampling parameters.
+    Includes methods for setting, getting and sampling parameters,
+    and for initialising `halotools` objects.
     """
 
-    def __init__(self, parameters, lower_bound, upper_bound):
+    def __init__(self, parameters, lower_bound, upper_bound, mass_def="vir",
+        assem_bias=False,
+        vel_assem_bias=False,):
+      
         self.parameters = parameters
 
         # Loop through parameters and initialise
@@ -54,6 +69,17 @@ class Hod_model:
                     upper=_upper
                 )
             )
+            
+        self.mass_def = mass_def
+        self.mass_key = "halo_m" + self.mass_def
+ 
+        self.cenocc = None
+        self.satocc = None
+        self.censprof = None
+        self.satsprof = None
+
+        self.assem_bias = assem_bias
+        self.vel_assem_bias = vel_assem_bias
 
     def set_parameter(self, key, new_parameter):
         """
@@ -69,6 +95,10 @@ class Hod_model:
             getattr(self, _param).value = new_parameters[_param]
 
     def sample_parameters(self):
+        if (self.lower_bound is None) or (self.upper_bound is None):
+            raise ValueError(
+                "Lower and upper bounds for each parameter must be set"
+            )
         for _param in self.parameters:
             # Get upper and lower bounds for this parameter
             _lower = getattr(self, _param).lower
@@ -89,36 +119,95 @@ class Hod_model:
             out_params[_param] = getattr(self, _param).value
 
         return out_params
-    
-    
-    
+
+    def get_model(self):
+        if (self.cenocc is None) | (self.satocc is None):
+            raise ValueError("Occupation models not set")
+
+        if (self.censprof is None) | (self.satsprof is None):
+            raise ValueError("Profile models not set")
+
+        model = dict(
+            centrals_occupation=self.cenocc,
+            centrals_profile=self.censprof,
+            satellites_occupation=self.satocc,
+            satellites_profile=self.satsprof,
+        )
+        return HodModelFactory(**model)
+
+
 class Zheng07(Hod_model):
     """
-    Zheng+07 HOD model
+    Zheng+07 HOD model.
     """
 
     def __init__(
         self,
-        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
-        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.]),
+        param_keys=["logMmin", "sigma_logM", "logM0", "logM1", "alpha"],
+        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.0]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5]),
-        param_defaults=None
+        param_defaults=None,
     ):
-        super().__init__(parameters, lower_bound, upper_bound)
+        super().__init__(
+            param_keys=param_keys,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
         if self.param_defaults is not None:
-            if self.param_defaults == 'parejko2013_lowz':
+            if self.param_defaults == "parejko2013_lowz":
                 self.parejko2013_lowz()
-            elif self.param_defaults == 'manera2015_lowz_ngc':
+            elif self.param_defaults == "manera2015_lowz_ngc":
                 self.manera2015_lowz_ngc()
-            elif self.param_defaults == 'manera2015_lowz_sgc':
+            elif self.param_defaults == "manera2015_lowz_sgc":
                 self.manera2015_lowz_sgc()
-            elif self.param_defaults == 'reid2014_cmass':
+            elif self.param_defaults == "reid2014_cmass":
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
+
+    def set_occupation(self, **kwargs):
+        if self.assem_bias:
+            self.cenocc = AssembiasZheng07Cens(
+                prim_haloprop_key=self.mass_key, **kwargs
+            )
+            self.satocc = AssembiasZheng07Sats(
+                prim_haloprop_key=self.mass_key,
+                cenocc_model=self.cenocc,
+                **kwargs,
+            )
+        else:
+            self.cenocc = Zheng07Cens(prim_haloprop_key=self.mass_key)
+            self.satocc = Zheng07Sats(
+                prim_haloprop_key=self.mass_key,
+                cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
+            )
+
+        self.cenocc.param_dict.update(self.get_parameters())
+        self.satocc.param_dict.update(self.get_parameters())
+        self.satocc._suppress_repeated_param_warning = True
+
+    def set_profiles(
+        self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
+    ):
+        if self.assem_bias:
+            self.censprof = TrivialPhaseSpace(**kwargs)
+            self.satsprof = BiasedNFWPhaseSpace(
+                conc_mass_model=conc_mass_model, **kwargs
+            )
+        else:
+            self.censprof = TrivialPhaseSpace(
+                cosmology=cosmology, redshift=zf, mdef=self.mass_def
+            )
+            self.satsprof = NFWPhaseSpace(
+                conc_mass_model="direct_from_halo_catalog",
+                cosmology=cosmology,
+                redshift=zf,
+                mdef=self.mass_def,
+            )
 
     def parejko2013_lowz(self):
         """
@@ -409,33 +498,70 @@ class Leauthaud11(Hod_model):
     def __init__(
         self,
         parameters=[
-            'smhm_m0_0',
-            'smhm_m0_a',
-            'smhm_m1_0',
-            'smhm_m1_a',
-            'smhm_beta_0',
-            'smhm_beta_a',
-            'smhm_delta_0',
-            'smhm_delta_a',
-            'smhm_gamma_0',
-            'smhm_gamma_a',
-            'scatter_model_param1',
-            'alphasat',
-            'betasat',
-            'bsat',
-            'betacut',
-            'bcut'
+            "smhm_m0_0",
+            "smhm_m0_a",
+            "smhm_m1_0",
+            "smhm_m1_a",
+            "smhm_beta_0",
+            "smhm_beta_a",
+            "smhm_delta_0",
+            "smhm_delta_a",
+            "smhm_gamma_0",
+            "smhm_gamma_a",
+            "scatter_model_param1",
+            "alphasat",
+            "betasat",
+            "bsat",
+            "betacut",
+            "bcut",
         ],
-        lower_bound=np.array([
-            10.0, -1.0, 12.0, -0.5, 0.3, -0.1, 0.5, -
-            0.4, 1.0, 0.5, 0.1, 0, 0.5, 10.0, -0.2, 1.0,
-        ]),
-        upper_bound=np.array([
-            11.0, 1.0, 13.0, 0.8, 0.6, 0.4, 0.8, 0.6, 1.8, 3.0, 0.2, 1.5, 1.3, 11.0, 0.1, 2.0,
-        ]),
-        param_defaults=None
+        lower_bound=np.array(
+            [
+                10.0,
+                -1.0,
+                12.0,
+                -0.5,
+                0.3,
+                -0.1,
+                0.5,
+                -0.4,
+                1.0,
+                0.5,
+                0.1,
+                0,
+                0.5,
+                10.0,
+                -0.2,
+                1.0,
+            ]
+        ),
+        upper_bound=np.array(
+            [
+                11.0,
+                1.0,
+                13.0,
+                0.8,
+                0.6,
+                0.4,
+                0.8,
+                0.6,
+                1.8,
+                3.0,
+                0.2,
+                1.5,
+                1.3,
+                11.0,
+                0.1,
+                2.0,
+            ]
+        ),
+        param_defaults=None,
     ):
-        super().__init__(parameters, lower_bound, upper_bound)
+        super().__init__(
+            parameters=parameters,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
@@ -445,29 +571,50 @@ class Leauthaud11(Hod_model):
             else:
                 raise NotImplementedError
 
+    def set_occupation(self, zf):
+        self.cenocc = Leauthaud11Cens(
+            prim_haloprop_key=self.mass_key, redshift=zf
+        )
+        self.satocc = Leauthaud11Sats(
+            prim_haloprop_key=self.mass_key,
+            cenocc_model=self.cenocc,
+            redshift=zf,
+        )
+
+    def set_profiles(self, cosmology, zf):
+        self.censprof = TrivialPhaseSpace(
+            cosmology=cosmology, redshift=zf, mdef=self.mass_def
+        )
+        self.satsprof = NFWPhaseSpace(
+            conc_mass_model="direct_from_halo_catalog",
+            cosmology=cosmology,
+            redshift=zf,
+            mdef=self.mass_def,
+        )
+
     def behroozi10(self):
         """
-        Best-fit HOD from Behroozi+10 (arXiv:1001.0015; table 2, column 1) 
+        Best-fit HOD from Behroozi+10 (arXiv:1001.0015; table 2, column 1)
         with redshift dependence, as well as bes fit satellite occupation
         parameters from Leauthaud+12 (arXiv:1104.0928, Table 5, SIGMOD1).
         """
         p_hod = {
-            'smhm_m0_0': 10.72,
-            'smhm_m0_a': 0.55,
-            'smhm_m1_0': 12.35,
-            'smhm_m1_a': 0.28,
-            'smhm_beta_0': 0.44,
-            'smhm_beta_a': 0.18,
-            'smhm_delta_0': 0.57,
-            'smhm_delta_a': 0.17,
-            'smhm_gamma_0': 1.56,
-            'smhm_gamma_a': 2.51,
-            'scatter_model_param1': 0.15,
-            'alphasat': 1,
-            'betasat': 0.859,
-            'bsat': 10.62,
-            'betacut': -0.13,
-            'bcut': 1.47,
+            "smhm_m0_0": 10.72,
+            "smhm_m0_a": 0.55,
+            "smhm_m1_0": 12.35,
+            "smhm_m1_a": 0.28,
+            "smhm_beta_0": 0.44,
+            "smhm_beta_a": 0.18,
+            "smhm_delta_0": 0.57,
+            "smhm_delta_a": 0.17,
+            "smhm_gamma_0": 1.56,
+            "smhm_gamma_a": 2.51,
+            "scatter_model_param1": 0.15,
+            "alphasat": 1,
+            "betasat": 0.859,
+            "bsat": 10.62,
+            "betacut": -0.13,
+            "bcut": 1.47,
         }
         self.set_parameters(p_hod)
 
@@ -480,28 +627,58 @@ class Zu_mandelbaum15(Hod_model):
     def __init__(
         self,
         parameters=[
-            'smhm_m0',
-            'smhm_m1',
-            'smhm_beta',
-            'smhm_delta',
-            'smhm_gamma',
-            'smhm_sigma',
-            'smhm_sigma_slope',
-            'alphasat',
-            'betasat',
-            'bsat',
-            'betacut',
-            'bcut',
+            "smhm_m0",
+            "smhm_m1",
+            "smhm_beta",
+            "smhm_delta",
+            "smhm_gamma",
+            "smhm_sigma",
+            "smhm_sigma_slope",
+            "alphasat",
+            "betasat",
+            "bsat",
+            "betacut",
+            "bcut",
         ],
-        lower_bound=np.array([
-            9.0, 9.5, 0.0, 0.0, -0.1, 0.01, -0.4, 0.5, 0.1, 0.01, -0.05, 0.0,
-        ]),
-        upper_bound=np.array([
-            13.0, 14.0, 2.0, 1.5, 4.9, 3.0, 0.4, 1.5, 1.8, 25.0, 1.50, 6.0,
-        ]),
-        param_defaults=None
+        lower_bound=np.array(
+            [
+                9.0,
+                9.5,
+                0.0,
+                0.0,
+                -0.1,
+                0.01,
+                -0.4,
+                0.5,
+                0.1,
+                0.01,
+                -0.05,
+                0.0,
+            ]
+        ),
+        upper_bound=np.array(
+            [
+                13.0,
+                14.0,
+                2.0,
+                1.5,
+                4.9,
+                3.0,
+                0.4,
+                1.5,
+                1.8,
+                25.0,
+                1.50,
+                6.0,
+            ]
+        ),
+        param_defaults=None,
     ):
-        super().__init__(parameters, lower_bound, upper_bound)
+        super().__init__(
+            parameters=parameters,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
 
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
@@ -511,28 +688,55 @@ class Zu_mandelbaum15(Hod_model):
             else:
                 raise NotImplementedError
 
+    def set_occupation(self, zf):
+        self.cenocc = ZuMandelbaum15Cens(
+            prim_haloprop_key=self.mass_key, redshift=zf
+        )
+        self.satocc = ZuMandelbaum15Sats(prim_haloprop_key=self.mass_key)
+        self.satocc.central_occupation_model = (
+            self.cenocc  # need to set this manually
+        )
+
+        # m0 and m1 are desired in real units
+        self.parameters["smhm_m0"] = 10 ** self.parameters["smhm_m0"]
+        self.parameters["smhm_m1"] = 10 ** self.parameters["smhm_m1"]
+
+        self.cenocc.param_dict.update(self.parameters)
+        self.satocc.param_dict.update(self.parameters)
+        self.satocc._suppress_repeated_param_warning = True
+
+    def set_profiles(self, cosmology, zf):
+        self.censprof = TrivialPhaseSpace(
+            cosmology=cosmology, redshift=zf, mdef=self.mass_def
+        )
+        self.satsprof = NFWPhaseSpace(
+            conc_mass_model="direct_from_halo_catalog",
+            cosmology=cosmology,
+            redshift=zf,
+            mdef=self.mass_def,
+        )
+        
     def zu_mandelbaum15(self):
         """
         Zu \& Mandelbaum+15, arXiv:1505.02781
         Table 2, iHOD
         """
         p_hod = {
-            'smhm_m0': 10.31,
-            'smhm_m1': 12.10,
-            'smhm_beta': 0.33,
-            'smhm_delta': 0.42,
-            'smhm_gamma': 1.21,
-            'smhm_sigma': 0.50,
-            'smhm_sigma_slope': -0.04,
-            'alphasat': 1.00,
-            'betasat': 0.90,
-            'bsat': 8.98,
-            'betacut': 0.41,
-            'bcut': 0.86,
+            "smhm_m0": 10.31,
+            "smhm_m1": 12.10,
+            "smhm_beta": 0.33,
+            "smhm_delta": 0.42,
+            "smhm_gamma": 1.21,
+            "smhm_sigma": 0.50,
+            "smhm_sigma_slope": -0.04,
+            "alphasat": 1.00,
+            "betasat": 0.90,
+            "bsat": 8.98,
+            "betacut": 0.41,
+            "bcut": 0.86,
         }
         self.set_parameters(p_hod)
-        
-
+       
 
 def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
     """
@@ -740,4 +944,4 @@ class Zheng07zinterpSats(Zheng07Sats):
             mean_nsat *= mean_ncen
 
         return mean_nsat
-    
+
