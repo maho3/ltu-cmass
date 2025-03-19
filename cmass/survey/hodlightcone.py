@@ -1,7 +1,7 @@
 """
 Stitches together halo snapshots to create an extrapolated lightcone, applies
-a redshift-dependent HOD model and
-applies CMASS NGC survey mask and selection effects.
+a redshift-dependent HOD model, and applies survey masks and selection effects.
+Allows for NGC, SGC, and MTNG-like lightcones.
 
 Input:
     - halos.h5
@@ -19,6 +19,10 @@ Output:
         - galidx: galaxy index
 
 NOTE:
+    - This script has superseeded lightcone.py and selection.py which stitched
+    together NGC lightcones from snapshots of galaxies. This script now jointly
+    applies HOD and stitches the lightcone, allowing for z-dependent HODs.
+    - This script allows for NGC, SGC, and MTNG-like lightcones.
     - This only works for snapshot mode, wherein lightcone evolution is
     mimicked by stitching snapshots together. For the non-snapshot mode
     alternative, use 'ngc_selection.py'.
@@ -82,28 +86,38 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
-    is_North = cfg.survey.is_North  # whther to use NGC or SGC mask
-    if not is_North:
+    geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
+    geometry = geometry.lower()
+    if geometry == 'sgc':
         raise NotImplementedError(
             'SGC mask not implemented yet in multisnapshot mode.')
+    elif not (geometry in ['ngc', 'mtng']):
+        raise ValueError(
+            'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
 
     # Load mask
     logging.info(f'Loading mask from {cfg.survey.boss_dir}')
-    maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
+    if geometry == 'ngc':
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
+        remap_case = 0
+    elif geometry == 'mtng':
+        maskobs = None
+        remap_case = 2
 
     # Setup lightcone constructor
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     zmin, zmax = 0.4, 0.7  # ngc redshift range
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
-        boss_dir=None,
+        boss_dir=None,  # do not downsample n(z)
         mask=maskobs,
         Omega_m=cfg.nbody.cosmo[0],
         zmin=zmin,
         zmax=zmax,
         snap_times=snap_times,
         verbose=True,
-        augment=0,
+        augment=aug_seed,
+        remap_case=remap_case,
         seed=42
     )
 
@@ -116,10 +130,12 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times)
 
     # Save
-    if is_North:
+    if geometry == 'ngc':
         outdir = join(source_path, 'ngc_lightcone')
-    else:
+    elif geometry == 'sgc':
         outdir = join(source_path, 'sgc_lightcone')
+    elif geometry == 'mtng':
+        outdir = join(source_path, 'mtng_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,

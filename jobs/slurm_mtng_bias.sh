@@ -81,19 +81,19 @@ for offset in 0 1000; do
         # fi
         # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-        # # ngc_lightcone
-        # for aug_seed in $(seq 0 $(($Naug-1))); do
-        #     printf -v aug_str "%05d" $aug_seed
-        #     # lightcone
-        #     file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
-        #     if [ -f $file ]; then
-        #         echo "File $file exists."
-        #     else
-        #         echo "File $file does not exist."
-        #         python -m cmass.survey.hodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
-        #     fi
-        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        # done
+        # ngc_lightcone
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            # lightcone
+            file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f $file ]; then
+                echo "File $file exists."
+            else
+                echo "File $file does not exist."
+                python -m cmass.survey.hodlightcone $postfix survey.geometry=ngc bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
+            fi
+            # python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        done
 
         # mtng_lightcone
         for aug_seed in $(seq 0 $(($Naug-1))); do
@@ -104,7 +104,7 @@ for offset in 0 1000; do
                 echo "File $file exists."
             else
                 echo "File $file does not exist."
-                python -m cmass.survey.mtnghodlightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
+                python -m cmass.survey.hodlightcone $postfix survey.geometry=mtng bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot
             fi
             # python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
