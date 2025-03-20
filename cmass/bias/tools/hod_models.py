@@ -7,11 +7,17 @@ HOD models. Currently implemented models:
 Each model derives from the `Hod_model` parent class,
 which additionally uses the `Hod_parameter` helper class
 for each parameter.
+
+QUESTIONS:
+- Are parameters updated in the phase space and assembly bias correctly?
+- In self.satsprof = Satellites_vBiasedNFWPhaseSpace, should I supply conc_gal_bias_bins:
 """
 
 import warnings
 import numpy as np
 from scipy.special import erf
+from itertools import zip_longest
+from scipy.stats import truncnorm
 
 from halotools.empirical_models import (
     Zheng07Cens,
@@ -28,17 +34,26 @@ from halotools.empirical_models import (
 )
 from halotools.empirical_models import HodModelFactory
 
+from .phase_space_models import Centrals_vBiasedNFWPhaseSpace, Satellites_vBiasedNFWPhaseSpace
+
+
+def truncated_gaussian(mean, std, lower, upper, size=1):
+    a, b = (lower - mean) / std, (upper - mean) / std  # Compute standardised bounds
+    return truncnorm.rvs(a, b, loc=mean, scale=std, size=size)
+
 class Hod_parameter:
     """
     Helper class defining a HOD parameter, including the value
     and upper and lower bounds (for a flat prior)
     """
 
-    def __init__(self, key, value=None, upper=None, lower=None):
+    def __init__(self, key, value=None, upper=None, lower=None, sigma=None, distribution=None):
         self.key = key
         self.value = value
         self.upper = upper
         self.lower = lower
+        self.sigma = sigma
+        setattr(self, 'distribution', 'uniform' if distribution is None else distribution)
 
 
 class Hod_model:
@@ -48,30 +63,33 @@ class Hod_model:
     and for initialising `halotools` objects.
     """
 
-    def __init__(self, parameters, lower_bound, upper_bound, mass_def="vir",
+    def __init__(self, parameters, lower_bound, upper_bound, distribution=None, sigma=None, mass_def="vir",
         assem_bias=False,
         vel_assem_bias=False,):
       
         self.parameters = parameters
 
         # Loop through parameters and initialise
-        for _param, _lower, _upper in zip(
-            self.parameters,
-            lower_bound,
-            upper_bound,
-        ):
+        zipped = zip_longest(
+            self.parameters, lower_bound, upper_bound, distribution or [], sigma or [], fillvalue=None
+        )
+
+        for _param, _lower, _upper, _dist, _sigma in zipped:
             setattr(
                 self,
                 _param,
                 Hod_parameter(
                     key=_param,
                     lower=_lower,
-                    upper=_upper
+                    upper=_upper,
+                    sigma=_sigma,
+                    distribution=_dist
                 )
             )
             
         self.mass_def = mass_def
         self.mass_key = "halo_m" + self.mass_def
+        self.conc_key = "halo_nfw_conc"
  
         self.cenocc = None
         self.satocc = None
@@ -96,14 +114,19 @@ class Hod_model:
 
     def sample_parameters(self):
         for _param in self.parameters:
-            # Get upper and lower bounds for this parameter
-            _lower = getattr(self, _param).lower
-            _upper = getattr(self, _param).upper
-
-            # Sample new parameter
-            sampled_param = np.random.uniform(_lower, _upper)
-
-            # Set new parameter
+            if _param.distribution == 'uniform':
+                _lower = getattr(self, _param).lower
+                _upper = getattr(self, _param).upper
+                sampled_param = np.random.uniform(_lower, _upper)
+            elif _param.distribution == 'norm':
+                sampled_param = np.random.normal(0, getattr(self, _param).sigma)
+            elif _param.distribution == 'truncnorm':
+                _lower = getattr(self, _param).lower
+                _upper = getattr(self, _param).upper
+                _sigma = getattr(self, _param).sigma
+                sampled_param = truncated_gaussian(0, _sigma, _lower, _upper)
+            else:
+                raise NotImplementedError
             getattr(self, _param).value = sampled_param
 
     def get_parameters(self):
@@ -135,8 +158,16 @@ class Hod_model:
     def set_profiles(
         self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
     ):
-        if self.assem_bias:
+        if self.vel_assem_bias:
             raise NotImplementedError
+            self.censprof = Centrals_vBiasedNFWPhaseSpace(
+                cosmology=cosmology, redshift=zf, mdef=self.mass_def,
+                conc_mass_model="direct_from_halo_catalog"
+            )
+            self.satsprof = Satellites_vBiasedNFWPhaseSpace(
+                cosmology=cosmology, redshift=zf, mdef=self.mass_def,
+                conc_mass_model="direct_from_halo_catalog",
+            )
         else:
             self.censprof = TrivialPhaseSpace(
                 cosmology=cosmology, redshift=zf, mdef=self.mass_def
@@ -156,17 +187,49 @@ class Zheng07(Hod_model):
 
     def __init__(
         self,
-        parameters=["logMmin", "sigma_logM", "logM0", "logM1", "alpha"],
-        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.0]),
-        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5]),
+        parameters=["logMmin", "sigma_logM", "logM0", "logM1", "alpha",
+                   "eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites",
+                   "mean_occupation_centrals_assembias_param1",
+                   "mean_occupation_satellites_assembias_param1"],
+        lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0,
+                    0.0, 0.2, 0.2,
+                    -1, -1],
+        upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5,
+                    0.7, 2.0, 2.0,
+                    1, 1],
+        sigma = [None, None, None, None, None,
+                    None, None, None,
+                    0.2, 0.2],
+        distribution = ['uniform', 'uniform', 'uniform', 'uniform', 'uniform',
+                    'uniform', 'uniform', 'uniform',
+                    'truncnorm', 'truncnorm'],
         param_defaults=None,
-        mass_def="vir"
+        mass_def="vir",
+        assem_bias=False,
+        vel_assem_bias=False,
     ):
+        
+        # Determine which parameters we need
+        pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha"]
+        if assem_bias:
+            pars += ["mean_occupation_centrals_assembias_param1",
+                   "mean_occupation_satellites_assembias_param1"]
+        if vel_assem_bias:
+            pars += ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]
+        low = [lower_bound[parameters.index(p)] for p in pars]
+        up = [upper_bound[parameters.index(p)] for p in pars]
+        sig = [sigma[parameters.index(p)] for p in pars]
+        dist = [distribution[parameters.index(p)] for p in pars]
+        
         super().__init__(
-            parameters=parameters,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            parameters=pars,
+            lower_bound=low,
+            upper_bound=up,
+            sigma=sig,
+            distribution=dist,
             mass_def=mass_def,
+            assem_bias=assem_bias,
+            vel_assem_bias=vel_assem_bias,
         )
 
         # If using, set literature values for parameters
@@ -183,16 +246,21 @@ class Zheng07(Hod_model):
             else:
                 raise NotImplementedError
 
-    def set_occupation(self, **kwargs):
+    def set_occupation(self,):
         if self.assem_bias:
-            # self.cenocc = AssembiasZheng07Cens(
-            #     prim_haloprop_key=self.mass_key, **kwargs
-            # )
-            # self.satocc = AssembiasZheng07Sats(
-            #     prim_haloprop_key=self.mass_key,
-            #     cenocc_model=self.cenocc,
-            #     **kwargs,
-            # )
+            self.cenocc = AssembiasZheng07Cens(
+                prim_haloprop_key=self.mass_key, 
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()["mean_occupation_centrals_assembias_param1"],
+            )
+            self.satocc = AssembiasZheng07Sats(
+                prim_haloprop_key=self.mass_key,
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()["mean_occupation_satellites_assembias_param1"],
+                cenocc_model=self.cenocc,
+            )
             raise NotImplementedError
         else:
             self.cenocc = Zheng07Cens(prim_haloprop_key=self.mass_key)
@@ -275,13 +343,20 @@ class Zheng07zdep(Hod_model):
         lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0., -30.0, -10.0]),
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0., 0.]),
         param_defaults=None,
-        mass_def="vir"
+        mass_def="vir",
+        assem_bias=False,
+        vel_assem_bias=False,
     ):
+        if assem_bias or vel_assem_bias:
+            raise NotImplementedError
+            
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
             mass_def=mass_def,
+            assem_bias=assem_bias,
+            vel_assem_bias=vel_assem_bias,
         )
 
         # If using, set literature values for parameters
@@ -392,8 +467,13 @@ class Zheng07zinterp(Hod_model):
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5,]),
         param_defaults=None,
         mass_def="vir",
+        assem_bias=assem_bias,
+        vel_assem_bias=vel_assem_bias,
     ):
         
+        if assem_bias or vel_assem_bias:
+            raise NotImplementedError
+            
         # Obtain single parameter for each pivot point
         pars = []
         low = []
@@ -602,7 +682,13 @@ class Leauthaud11(Hod_model):
         param_defaults=None,
         mass_def="vir",
         zf=None,
+        assem_bias=assem_bias,
+        vel_assem_bias=vel_assem_bias,
     ):
+        
+        if assem_bias or vel_assem_bias:
+            raise NotImplementedError
+            
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
@@ -715,12 +801,20 @@ class Zu_mandelbaum15(Hod_model):
         param_defaults=None,
         mass_def="vir",
         zf=None,
+        assem_bias=False,
+        vel_assem_bias=False,
     ):
+        
+        if assem_bias or vel_assem_bias:
+            raise NotImplementedError
+            
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
             mass_def=mass_def,
+            assem_bias=assem_bias,
+            vel_assem_bias=vel_assem_bias,
         )
         self.zf = zf
 
