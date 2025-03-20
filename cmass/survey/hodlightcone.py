@@ -130,7 +130,8 @@ def main(cfg: DictConfig) -> None:
         verbose=True,
         augment=aug_seed,
         remap_case=remap_case,
-        seed=42
+        seed=42,
+        is_north=geometry == 'ngc'
     )
 
     # Setup HOD model function

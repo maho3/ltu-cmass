@@ -188,6 +188,7 @@ struct Lightcone
     const bool do_downsample, verbose;
     const unsigned augment;
     const unsigned long seed;
+    const bool is_north;
     const std::vector<double> snap_times;
     size_t Nsnaps;
     std::vector<double> snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
@@ -216,8 +217,9 @@ struct Lightcone
                const char *boss_dir_=nullptr, 
                double BoxSize_=3e3, int remap_case_=0,
                bool verbose_=false, unsigned augment_=0,
-               unsigned long seed_=137UL) :
+               unsigned long seed_=137UL, bool is_north_=true) :
         mask{mask_},
+        is_north{is_north_},
         // hod_fct{hod_fct_},
         Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
@@ -386,14 +388,15 @@ PYBIND11_MODULE(lc, m)
         .def(pyb::init<const Mask *, double, double, double, const std::vector<double>&,
                        const char *,
                        double, int,
-                       bool, unsigned,
-                       unsigned long>(),
+                       bool, unsigned, 
+                       unsigned long,
+                       bool>(),
             "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
             pyb::kw_only(),
             "boss_dir"_a=nullptr,
             "BoxSize"_a=3e3, "remap_case"_a=0,
             "verbose"_a=false, "augment"_a=0,
-            "seed"_a=137UL
+            "seed"_a=137UL, "is_north"_a=true
         )
         .def("set_hod", &Lightcone::set_hod, "hod_fct"_a)
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xhlo"_a, "vhlo"_a)
@@ -409,8 +412,12 @@ void Lightcone::read_boss_nz (void)
     // text file, each line number of objects in a redshift bin
     // we assume bins are equally spaced in redshift between zmin and zmax,
     // number of bins is inferred from the file
-    std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat",
-                  boss_dir, zmin, zmax);
+    if (is_north)
+        std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat",
+                      boss_dir, zmin, zmax);
+    else
+        std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_South_zmin%.4f_zmax%.4f.dat",
+                      boss_dir, zmin, zmax);
     auto fp = std::fopen(fname, "r");
     char line[64];
     while (std::fgets(line, 64, fp))
