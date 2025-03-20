@@ -109,12 +109,18 @@ def main(cfg: DictConfig) -> None:
         raise ValueError(
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
 
+    # Get path to lightcone module (where n(z) is saved)
+    nz_dir = os.path.dirname(lc.__file__) if cfg.survey.fix_nz else None
+
     # Setup lightcone constructor
+    if 'z_range' in cfg.survey:
+        zmin, zmax = cfg.survey.z_range
+    else:
+        zmin, zmax = 0.4, 0.7
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
-    zmin, zmax = 0.4, 0.7  # ngc redshift range
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
-        boss_dir=None,  # do not downsample n(z)
+        boss_dir=nz_dir,
         mask=maskobs,
         BoxSize=cfg.nbody.L,
         Omega_m=cfg.nbody.cosmo[0],
