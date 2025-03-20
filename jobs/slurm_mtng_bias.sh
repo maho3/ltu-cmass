@@ -22,7 +22,7 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass
 
-Nhod=5
+Nhod=1
 Naug=1
 
 nbody=mtnglike
@@ -62,14 +62,14 @@ for offset in 0 1000; do
         printf -v hod_str "%05d" $hod_seed
         echo "hod_str=$hod_str"
 
-        file1=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug00000.h5
-        file2=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug00000.h5
-        if [ -f $file1 ] && [ -f $file2 ]; then
-            echo "File mtng and ngc exist."
-            continue
-        else
-            echo "File mtng or ngc does not exist."
-        fi
+        # file1=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug00000.h5
+        # file2=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug00000.h5
+        # if [ -f $file1 ] && [ -f $file2 ]; then
+        #     echo "File mtng and ngc exist."
+        #     continue
+        # else
+        #     echo "File mtng or ngc does not exist."
+        # fi
 
         # # galaxies
         # file=$outdir/$lhid/galaxies/hod$hod_str.h5
@@ -93,6 +93,20 @@ for offset in 0 1000; do
                 python -m cmass.survey.hodlightcone $postfix survey.geometry=ngc bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot 
             fi
             # python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        done
+
+        # sgc_lightcone
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            # lightcone
+            file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f $file ]; then
+                echo "File $file exists."
+            else
+                echo "File $file does not exist."
+                python -m cmass.survey.hodlightcone $postfix survey.geometry=sgc bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed multisnapshot=$multisnapshot
+            fi
+            # python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
         # mtng_lightcone

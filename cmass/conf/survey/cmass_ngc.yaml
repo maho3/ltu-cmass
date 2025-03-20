@@ -1,5 +1,5 @@
 # North galactic cap CMASS survey
-geometry: mtng
+geometry: ngc
 
 # Data augmentation seed (for random rotations)
 aug_seed: 0

@@ -64,6 +64,10 @@ def stitch_lightcone(lightcone, source_path, snap_times):
     # Run lightcone
     ra, dec, z, galid = lightcone.finalize()
 
+    # Conform to [0, 2pi] and [-pi/2, pi/2]
+    ra = np.mod(ra, 360)
+    dec = np.mod(dec + 90, 180) - 90
+
     # Split galid into galsnap and galidx
     galsnap, galidx = split_galsnap_galidx(galid)
     return ra, dec, z, galsnap, galidx
@@ -88,21 +92,22 @@ def main(cfg: DictConfig) -> None:
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
     geometry = geometry.lower()
-    if geometry == 'sgc':
-        raise NotImplementedError(
-            'SGC mask not implemented yet in multisnapshot mode.')
-    elif not (geometry in ['ngc', 'mtng']):
-        raise ValueError(
-            'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
 
     # Load mask
-    logging.info(f'Loading mask from {cfg.survey.boss_dir}')
     if geometry == 'ngc':
-        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=True)
         remap_case = 0
+    elif geometry == 'sgc':
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=False)
+        remap_case = 3
     elif geometry == 'mtng':
         maskobs = None
         remap_case = 2
+    else:
+        raise ValueError(
+            'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
 
     # Setup lightcone constructor
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order

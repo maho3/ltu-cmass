@@ -63,6 +63,10 @@ namespace Geometry
                         { 1, 0, 0,
                           0, 1, 0,
                           0, 0, 1 },
+                        // 1.4142 1.0000 0.7071 (for SGC)
+                        { 1, 1, 0,
+                          0, 0, 1,
+                          1, 0, 0, },
                       };
 
     // get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
@@ -70,20 +74,23 @@ namespace Geometry
     const double alpha[] = {
         97.0 * M_PI / 180.0,  // NGC
         97.0 * M_PI / 180.0,  // NGC
-        0  // MTNG
+        0,  // MTNG
+        -30 * M_PI / 180.0,  // SGC
     }; // rotation around y-axis
 
     const double beta[] = {
         6.0,  // NGC
         6.0,  // NGC
-        0  // MTNG
+        0,  // MTNG
+        0,  // SGC
     }; // rotation around z-axis, in degrees
 
     // in units of L1, L2, L3
     const double origin[][3] = {
         {0.5, -0.058, 0.0}, // NGC
         {0.5, -0.058, 0.0}, // NGC
-        {0.0, 0.0, 0.0} // MTNG
+        {0.0, 0.0, 0.0}, // MTNG
+        {0.5, -0.058, 0.0}, // SGC
     };
 }
 
@@ -127,7 +134,7 @@ struct Mask
 
     std::vector<cmangle::MangleMask *> masks;
 
-    Mask (const char *boss_dir, bool veto=true)
+    Mask (const char *boss_dir, bool veto=true, bool is_north=true)
     {
         for (int ii=0; ii<1+veto*Nveto; ++ii)
             masks.push_back(cmangle::mangle_new());
@@ -141,6 +148,8 @@ struct Mask
             int status_;
             char fname[512];
             std::snprintf(fname, 512, "%s/%s", boss_dir, fnames[ii]);
+            if (ii==0 && !is_north) 
+                std::snprintf(fname, 512, "%s/mask_DR12v5_CMASS_South.ply", boss_dir);
             status_ = cmangle::mangle_read(masks[ii], fname);
             status *= status_;
             if (!status_) continue;
@@ -371,7 +380,7 @@ struct Lightcone
 PYBIND11_MODULE(lc, m)
 {
     pyb::class_<Mask> (m, "Mask")
-        .def(pyb::init<const char *, bool>(), "boss_dir"_a, pyb::kw_only(), "veto"_a=true);
+        .def(pyb::init<const char *, bool, bool>(), "boss_dir"_a, pyb::kw_only(), "veto"_a=true, "is_north"_a=true);
 
     pyb::class_<Lightcone> (m, "Lightcone")
         .def(pyb::init<const Mask *, double, double, double, const std::vector<double>&,
