@@ -54,12 +54,15 @@ def parse_hod(cfg):
                     "vir."
                 )
                 cfg.bias.hod.mdef = "vir"
+                
+        if (cfg.bias.hod.assem_bias or cfg.bias.hod.vel_assem_bias) and (cfg.bias.hod.model != "zheng07"):
+            raise NotImplementedError
 
         # Check model is available
         if not hasattr(cfg.bias.hod, "model"):
             model = Zheng07()  # for backwards compatibility
         elif cfg.bias.hod.model == "zheng07":
-            model = Zheng07()
+            model = Zheng07(assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
         elif cfg.bias.hod.model == 'zheng07zdep':
             model = Zheng07zdep()
         elif cfg.bias.hod.model == 'zheng07zinterp':
@@ -118,6 +121,8 @@ def build_HOD_model(
     zf,
     mdef="vir",
     zpivot=None,
+    assem_bias=False,
+    vel_assem_bias=False,
 ):
     """Build a HOD model from the given HOD parameters.
 
@@ -133,13 +138,21 @@ def build_HOD_model(
             Halo mass definition. Defaults to 'vir'.
         zpivot (str, optional):
             Pivot redshifts to be used if interpolating between redshifts. Defaults to None
+        assem_bias (bool, optional):
+            Whether to include assembly bias
+        vel_assem_bias (bool, optional):
+            Whether to include velocity assembly bias
 
     Returns:
         hod_model (HODMockFactory): A HOD model object
             that can be used with Halotools.
     """
+    
+    if (assem_bias or vel_assem_bias) and (model != "zheng07"):
+        raise NotImplementedError
+    
     if model == "zheng07":
-        model = Zheng07(mass_def=mdef)
+        model = Zheng07(mass_def=mdef, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)
     elif model == "leauthaud11":
         model = Leauthaud11(mass_def=mdef, zf=zf)
     elif model == 'zheng07zdep':

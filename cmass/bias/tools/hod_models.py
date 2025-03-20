@@ -287,6 +287,13 @@ class Zheng07(Hod_model):
             'logM1': 14.18,
             'alpha': 0.94
         }
+        if self.assem_bias:
+            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
+            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+        if self.vel_assem_bias:
+            p_hod['eta_vb_centrals'] = 0.0
+            p_hod['eta_vb_satellites'] = 1.0
+            p_hod['conc_gal_bias_satellites'] = 1.0 
         self.set_parameters(p_hod)
 
     def manera2015_lowz_ngc(self):
@@ -300,6 +307,13 @@ class Zheng07(Hod_model):
             'logM1': 14.32,
             'alpha': 0.9
         }
+        if self.assem_bias:
+            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
+            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+        if self.vel_assem_bias:
+            p_hod['eta_vb_centrals'] = 0.0
+            p_hod['eta_vb_satellites'] = 1.0
+            p_hod['conc_gal_bias_satellites'] = 1.0 
         self.set_parameters(p_hod)
 
     def manera2015_lowz_sgc(self):
@@ -316,6 +330,13 @@ class Zheng07(Hod_model):
             'logM1': 14.58,
             'alpha': 0.93
         }
+        if self.assem_bias:
+            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
+            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+        if self.vel_assem_bias:
+            p_hod['eta_vb_centrals'] = 0.0
+            p_hod['eta_vb_satellites'] = 1.0
+            p_hod['conc_gal_bias_satellites'] = 1.0 
         self.set_parameters(p_hod)
 
     def reid2014_cmass(self):
@@ -329,6 +350,13 @@ class Zheng07(Hod_model):
             'logM1': 14.08,
             'alpha': 0.76
         }
+        if self.assem_bias:
+            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
+            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+        if self.vel_assem_bias:
+            p_hod['eta_vb_centrals'] = 0.0
+            p_hod['eta_vb_satellites'] = 1.0
+            p_hod['conc_gal_bias_satellites'] = 1.0 
         self.set_parameters(p_hod)
         
         
