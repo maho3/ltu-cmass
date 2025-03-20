@@ -116,6 +116,7 @@ def main(cfg: DictConfig) -> None:
     lightcone = lc.Lightcone(
         boss_dir=None,  # do not downsample n(z)
         mask=maskobs,
+        BoxSize=cfg.nbody.L,
         Omega_m=cfg.nbody.cosmo[0],
         zmin=zmin,
         zmax=zmax,
