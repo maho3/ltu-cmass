@@ -114,17 +114,18 @@ class Hod_model:
 
     def sample_parameters(self):
         for _param in self.parameters:
-            if _param.distribution == 'uniform':
+            _dist = getattr(self, _param).distribution
+            if _dist == 'uniform':
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
                 sampled_param = np.random.uniform(_lower, _upper)
-            elif _param.distribution == 'norm':
+            elif _dist == 'norm':
                 sampled_param = np.random.normal(0, getattr(self, _param).sigma)
-            elif _param.distribution == 'truncnorm':
+            elif _dist == 'truncnorm':
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
                 _sigma = getattr(self, _param).sigma
-                sampled_param = truncated_gaussian(0, _sigma, _lower, _upper)
+                sampled_param = float(truncated_gaussian(0, _sigma, _lower, _upper)[0])
             else:
                 raise NotImplementedError
             getattr(self, _param).value = sampled_param
@@ -495,8 +496,8 @@ class Zheng07zinterp(Hod_model):
         upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5,]),
         param_defaults=None,
         mass_def="vir",
-        assem_bias=assem_bias,
-        vel_assem_bias=vel_assem_bias,
+        assem_bias=False,
+        vel_assem_bias=False,
     ):
         
         if assem_bias or vel_assem_bias:
@@ -710,8 +711,8 @@ class Leauthaud11(Hod_model):
         param_defaults=None,
         mass_def="vir",
         zf=None,
-        assem_bias=assem_bias,
-        vel_assem_bias=vel_assem_bias,
+        assem_bias=False,
+        vel_assem_bias=False,
     ):
         
         if assem_bias or vel_assem_bias:
