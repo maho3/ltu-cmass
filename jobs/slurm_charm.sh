@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=charm_abacus  # Job name
-#SBATCH --array=133-181         # Job array range for lhid
+#SBATCH --job-name=charm  # Job name
+# # SBATCH --array=133-181         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=24:00:00         # Time limit
@@ -10,7 +10,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=132
+SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 baseoffset=0
 
@@ -21,14 +21,14 @@ lhid=$((SLURM_ARRAY_TASK_ID + baseoffset))
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacus
+nbody=mtng
 sim=fastpm
 multisnapshot=True
-extras="meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
-L=2000
-N=256
-# keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
-keys_to_check=(0.666667)
+extras="meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+L=3000
+N=384
+keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
+# keys_to_check=(0.666667)
 
 outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
