@@ -73,6 +73,27 @@ def stitch_lightcone(lightcone, source_path, snap_times):
     return ra, dec, z, galsnap, galidx
 
 
+def check_saturation(z, nz_dir, zmin, zmax, geometry):
+    if geometry == 'ngc':
+        cap = 'North'
+    elif geometry == 'sgc':
+        cap = 'South'
+    elif geometry == 'mtng':
+        cap = 'MTNG'
+    else:
+        raise ValueError(geometry)
+
+    filepath = join(
+        nz_dir, f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
+    nzobs = np.loadtxt(filepath, usecols=(0,))
+    zbins = np.linspace(zmin, zmax, len(nzobs)+1)
+
+    # Check if n(z) is saturated (within 1-sigma of observed n(z))
+    nz = np.histogram(z, bins=zbins)[0]
+    saturated = np.all(nz >= nzobs - np.sqrt(nzobs))
+    return saturated
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -110,7 +131,7 @@ def main(cfg: DictConfig) -> None:
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
 
     # Get path to lightcone module (where n(z) is saved)
-    nz_dir = os.path.dirname(lc.__file__) if cfg.survey.fix_nz else None
+    nz_dir = os.path.dirname(lc.__file__)
 
     # Setup lightcone constructor
     if 'z_range' in cfg.survey:
@@ -120,7 +141,7 @@ def main(cfg: DictConfig) -> None:
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
-        boss_dir=nz_dir,
+        boss_dir=nz_dir if cfg.survey.fix_nz else None,
         mask=maskobs,
         BoxSize=cfg.nbody.L,
         Omega_m=cfg.nbody.cosmo[0],
@@ -142,6 +163,9 @@ def main(cfg: DictConfig) -> None:
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times)
 
+    # Check if n(z) is saturated
+    saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+
     # Save
     if geometry == 'ngc':
         outdir = join(source_path, 'ngc_lightcone')
@@ -156,7 +180,8 @@ def main(cfg: DictConfig) -> None:
         galsnap=galsnap,
         galidx=galidx,
         hod_seed=hod_seed,
-        aug_seed=aug_seed
+        aug_seed=aug_seed,
+        saturated=saturated
     )
     save_cfg(source_path, cfg, field='survey')
 
