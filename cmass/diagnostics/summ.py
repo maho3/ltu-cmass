@@ -56,11 +56,12 @@ def run_pylians(
             continue
     return out
 
-def run_wavelets(field):
+def run_wavelets(field, use_rsd):
+    pfx = 'z' if use_rsd else ''
     order0, order12 = compute_Wavelets(field)
     out ={
-        'S0': order0,
-        'S12': order12
+        pfx+'S0': order0,
+        pfx+'S12': order12
     }
     return out
 
@@ -168,7 +169,7 @@ def summarize_rho(
             )
             out_data.update(out)
         if 'WST' in summaries:
-            out = run_wavelets(rho)
+            out = run_wavelets(rho, use_rsd=False)
             out_data.update(out)
         if len(out) > 0:
             save_group(outpath, out_data, None, a, config)
@@ -310,13 +311,13 @@ def summarize_tracer(
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_wavelets(field)
+            out = run_wavelets(field, use_rsd=False)
             out_data.update(out)
             
             # redshift space
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
                         axis=0).astype(np.float32)
-            out = run_wavelets(field)
+            out = run_wavelets(field, use_rsd=True)
             out_data.update(out)
             
         # Compute other summaries
@@ -441,7 +442,7 @@ def summarize_lightcone(
             cache_dir = None
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_wavelets(field)
+        out = run_wavelets(field, use_rsd=False)
         out_data.update(out)
             
     # Compute other summaries
