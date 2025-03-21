@@ -1,4 +1,6 @@
 """
+~~~ DEPRECATED IN FAVOR OF hodlightcone.py ~~~
+
 Stitches together snapshots to create an extrapolated lightcone and
 applies CMASS NGC survey mask and selection effects.
 

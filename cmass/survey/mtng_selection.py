@@ -1,4 +1,6 @@
 """
+~~~ DEPRECATED IN FAVOR OF hodlightcone.py ~~~
+
 Places a cubic simulation in the footprint of the MTNG lightcone. Measures
 ra/dec/z. However, it does not apply survey systematics (geometry, fiber
 collisions, etc).

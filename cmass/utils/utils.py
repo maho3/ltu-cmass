@@ -46,6 +46,7 @@ def save_cfg(source_path, cfg, field=None):
         if field is not None:
             cfg = OmegaConf.masked_copy(cfg, field)
             cfg = OmegaConf.merge(old_cfg, cfg)
+    os.remove(join(source_path, 'config.yaml'))
     OmegaConf.save(cfg, join(source_path, 'config.yaml'))
 
 

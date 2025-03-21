@@ -4,7 +4,7 @@ defaults:
   - nbody: 1gpch
   - fit: quijote_HR
   - bias: cic_hod
-  - survey: cmass_ngc
+  - survey: default
   # - filter: random  # not default
   - diag: default
   - infer: default
