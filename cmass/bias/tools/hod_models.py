@@ -9,7 +9,6 @@ which additionally uses the `Hod_parameter` helper class
 for each parameter.
 
 QUESTIONS:
-- Are parameters updated in the phase space and assembly bias correctly?
 - In self.satsprof = Satellites_vBiasedNFWPhaseSpace, should I supply conc_gal_bias_bins:
 """
 
@@ -160,15 +159,17 @@ class Hod_model:
         self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
     ):
         if self.vel_assem_bias:
-            raise NotImplementedError
             self.censprof = Centrals_vBiasedNFWPhaseSpace(
                 cosmology=cosmology, redshift=zf, mdef=self.mass_def,
                 conc_mass_model="direct_from_halo_catalog"
             )
+            self.censprof.set_parameters(self.get_parameters())
             self.satsprof = Satellites_vBiasedNFWPhaseSpace(
+                conc_key=self.conc_key,
                 cosmology=cosmology, redshift=zf, mdef=self.mass_def,
                 conc_mass_model="direct_from_halo_catalog",
             )
+            self.satsprof.set_parameters(self.get_parameters())
         else:
             self.censprof = TrivialPhaseSpace(
                 cosmology=cosmology, redshift=zf, mdef=self.mass_def
@@ -261,8 +262,8 @@ class Zheng07(Hod_model):
                 split=0.5,
                 assembias_strength=self.get_parameters()["mean_occupation_satellites_assembias_param1"],
                 cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
             )
-            raise NotImplementedError
         else:
             self.cenocc = Zheng07Cens(prim_haloprop_key=self.mass_key)
             self.satocc = Zheng07Sats(
