@@ -22,6 +22,10 @@ def _check(group, to_check):
     # checks that all to_check keys are in group or its subgroups
     saved_keys = list(group.keys())
 
+    # if group is empty
+    if len(saved_keys) == 0:
+        return False
+
     # check recursively
     if isinstance(group[saved_keys[0]], h5py.Group):
         computed = True
