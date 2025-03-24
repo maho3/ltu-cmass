@@ -102,7 +102,7 @@ def load_Bk(diag_file, a):
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
-                            'value': f[a][stat][i, :] / np.prod(f[a]['Bk_k123'][:], axis=0),
+                            'value': f[a][stat][i, :],
                         }
     except (OSError, KeyError):
         return {}
@@ -120,20 +120,22 @@ def load_lc_Bk(diag_file):
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
-                            'value': f[stat][i, :] / np.prod(f['Bk_k123'][:], axis=0),
+                            'value': f[stat][i, :]
                         }
     except (OSError, KeyError):
         return {}
     return summ
 
 
-def preprocess_Bk(X, kmax,):
+def preprocess_Bk(X, kmax, log=False):
 
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
         # cut k
         value = value[~ np.any(k > kmax, axis=0)]
+        if log:
+            value = np.log10(value)
         Xout.append(value)
     Xout = np.array(Xout)
 
