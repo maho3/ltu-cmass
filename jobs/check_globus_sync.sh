@@ -1,15 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=globus_sync   # Job name
-#SBATCH --array=6             # Job array range for subfolders
+#SBATCH --array=0-18             # Job array range for subfolders
 #SBATCH --nodes=1                # Number of nodes
 #SBATCH --ntasks=2              # Number of tasks
-#SBATCH --time=01:00:00          # Time limit
+#SBATCH --time=12:00:00          # Time limit
 #SBATCH --partition=shared       # Partition name
 #SBATCH --account=phy240043      # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file
 
-# SLURM_ARRAY_TASK_ID=5
+# SLURM_ARRAY_TASK_ID=7
 
 # Define absolute path to subdirectory list
 SUBDIR_FILE="/anvil/scratch/x-mho1/globus/subdirs.txt"
@@ -35,27 +35,27 @@ START_TIME=$(date +%s)
 
 # Retrieve file lists
 echo "Retrieving file lists for $SUBDIR..."
-globus ls --long --recursive $SOURCE_ENDPOINT:$SOURCE_PATH > "$RECORD_PATH/source_files.txt"
-globus ls --long --recursive $DEST_ENDPOINT:$DEST_PATH > "$RECORD_PATH/dest_files.txt"
+globus ls --long --recursive --recursive-depth-limit 10 $SOURCE_ENDPOINT:$SOURCE_PATH > "$RECORD_PATH/anvil_files.txt"
+globus ls --long --recursive --recursive-depth-limit 10 $DEST_ENDPOINT:$DEST_PATH > "$RECORD_PATH/bridges_files.txt"
 
-# Extract modification time and filename
-awk -F '|' '$6 ~ /file/ {gsub(/^ +| +$/, "", $5); gsub(/^ +| +$/, "", $7); print $5, $7}' "$RECORD_PATH/source_files.txt" | sort > "$RECORD_PATH/source_sorted.txt"
-awk -F '|' '$6 ~ /file/ {gsub(/^ +| +$/, "", $5); gsub(/^ +| +$/, "", $7); print $5, $7}' "$RECORD_PATH/dest_files.txt" | sort > "$RECORD_PATH/dest_sorted.txt"
+# # Extract modification time and filename
+# awk -F '|' '$6 ~ /file/ {gsub(/^ +| +$/, "", $5); gsub(/^ +| +$/, "", $7); print $5, $7}' "$RECORD_PATH/source_files.txt" | sort > "$RECORD_PATH/source_sorted.txt"
+# awk -F '|' '$6 ~ /file/ {gsub(/^ +| +$/, "", $5); gsub(/^ +| +$/, "", $7); print $5, $7}' "$RECORD_PATH/dest_files.txt" | sort > "$RECORD_PATH/dest_sorted.txt"
 
-# Identify files to transfer or delete
-comm -23 "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt" > "$RECORD_PATH/to_transfer.txt"
-comm -13 "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt" > "$RECORD_PATH/to_delete.txt"
+# # Identify files to transfer or delete
+# comm -23 "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt" > "$RECORD_PATH/to_transfer.txt"
+# comm -13 "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt" > "$RECORD_PATH/to_delete.txt"
 
-# Display results
-echo "Files to be transferred ($SUBDIR):"
-cat "$RECORD_PATH/to_transfer.txt"
-echo "-----------------------------------"
-echo "Files to be deleted ($SUBDIR):"
-cat "$RECORD_PATH/to_delete.txt"
-echo "-----------------------------------"
+# # Display results
+# echo "Files to be transferred ($SUBDIR):"
+# cat "$RECORD_PATH/to_transfer.txt"
+# echo "-----------------------------------"
+# echo "Files to be deleted ($SUBDIR):"
+# cat "$RECORD_PATH/to_delete.txt"
+# echo "-----------------------------------"
 
-# Remove superfluous files
-rm "$RECORD_PATH/source_files.txt" "$RECORD_PATH/dest_files.txt" "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt"
+# # Remove superfluous files
+# rm "$RECORD_PATH/source_files.txt" "$RECORD_PATH/dest_files.txt" "$RECORD_PATH/source_sorted.txt" "$RECORD_PATH/dest_sorted.txt"
 
 END_TIME=$(date +%s)
 ELAPSED_TIME=$((END_TIME - START_TIME))
