@@ -200,9 +200,9 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
     fc = dk = kmax/kF/(Nbins+1/2)  # span kF to kmax
 
     result = BFast.Bk(
-        delta, L, fc, dk, Nbins, 'All', MAS=MAS,
+        delta, L, fc, dk, Nbins, triangle_type='All', MAS=MAS,
         fast=True, precision='float32', verbose=False,
-        file_path=cache_dir
+        file_path=cache_dir, open_triangles=False
     )
 
     k123 = result[:, :3].T * kF
