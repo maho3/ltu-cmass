@@ -20,12 +20,12 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm
+nbody=quijote
+sim=nbody
 infer=default
 
-halo=False
-galaxy=True
+halo=True
+galaxy=False
 ngc=False
 sgc=False
 mtng=False
