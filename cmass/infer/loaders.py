@@ -136,10 +136,10 @@ def preprocess_Bk(X, kmax, log=False):
         m = ~ np.any(k > kmax, axis=0)
         value = value[m]
         k = k[:, m]
-        
-        # check if k1+k2 < k3
+
+        # check if k1 >= k2 + k3
         k1, k2, k3 = k
-        m = (k1 + k2 > k3)
+        m = (k1 < k2 + k3)
         value = value[m]
 
         if log:
