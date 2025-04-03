@@ -205,7 +205,7 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
         file_path=cache_dir, open_triangles=False
     )
 
-    # remove when k0 >= k1 + k2, because open_triangles=False doesn't do it
+    # remove when k1 >= k2 + k3, because open_triangles=False doesn't do it
     k123 = result[:, :3].T * kF  # k123
     mask = k123[0] < k123[1] + k123[2]
 
