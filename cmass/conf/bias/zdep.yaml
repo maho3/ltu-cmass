@@ -22,7 +22,7 @@ hod:
   # - zheng07zinterp
   # - leauthaud11
   # - zu_mandelbaum15
-  model: 'zheng07'
+  model: 'zheng07zinterp'
   
   # Whether including assembly bias
   assem_bias: False

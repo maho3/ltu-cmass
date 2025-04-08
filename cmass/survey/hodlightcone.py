@@ -1,7 +1,7 @@
 """
 Stitches together halo snapshots to create an extrapolated lightcone, applies
-a redshift-dependent HOD model and
-applies CMASS NGC survey mask and selection effects.
+a redshift-dependent HOD model, and applies survey masks and selection effects.
+Allows for NGC, SGC, and MTNG-like lightcones.
 
 Input:
     - halos.h5
@@ -19,6 +19,10 @@ Output:
         - galidx: galaxy index
 
 NOTE:
+    - This script has superseeded lightcone.py and selection.py which stitched
+    together NGC lightcones from snapshots of galaxies. This script now jointly
+    applies HOD and stitches the lightcone, allowing for z-dependent HODs.
+    - This script allows for NGC, SGC, and MTNG-like lightcones.
     - This only works for snapshot mode, wherein lightcone evolution is
     mimicked by stitching snapshots together. For the non-snapshot mode
     alternative, use 'ngc_selection.py'.
@@ -28,7 +32,6 @@ NOTE:
 import os
 import numpy as np
 import logging
-import h5py
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -61,9 +64,34 @@ def stitch_lightcone(lightcone, source_path, snap_times):
     # Run lightcone
     ra, dec, z, galid = lightcone.finalize()
 
+    # Conform to [0, 2pi] and [-pi/2, pi/2]
+    ra = np.mod(ra, 360)
+    dec = np.mod(dec + 90, 180) - 90
+
     # Split galid into galsnap and galidx
     galsnap, galidx = split_galsnap_galidx(galid)
     return ra, dec, z, galsnap, galidx
+
+
+def check_saturation(z, nz_dir, zmin, zmax, geometry):
+    if geometry == 'ngc':
+        cap = 'North'
+    elif geometry == 'sgc':
+        cap = 'South'
+    elif geometry == 'mtng':
+        cap = 'MTNG'
+    else:
+        raise ValueError(geometry)
+
+    filepath = join(
+        nz_dir, f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
+    nzobs = np.loadtxt(filepath, usecols=(0,))
+    zbins = np.linspace(zmin, zmax, len(nzobs)+1)
+
+    # Check if n(z) is saturated (within 1-sigma of observed n(z))
+    nz = np.histogram(z, bins=zbins)[0]
+    saturated = np.all(nz >= nzobs - np.sqrt(nzobs))
+    return saturated
 
 
 @timing_decorator
@@ -83,29 +111,49 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
-    is_North = cfg.survey.is_North  # whther to use NGC or SGC mask
-    if not is_North:
-        raise NotImplementedError(
-            'SGC mask not implemented yet in multisnapshot mode.')
+    
+    geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
+    geometry = geometry.lower()
 
     # Load mask
-    logging.info(f'Loading mask from {cfg.survey.boss_dir}')
-    maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir, veto=True)
+    if geometry == 'ngc':
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=True)
+        remap_case = 0
+    elif geometry == 'sgc':
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=False)
+        remap_case = 3
+    elif geometry == 'mtng':
+        maskobs = None
+        remap_case = 2
+    else:
+        raise ValueError(
+            'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
+
+    # Get path to lightcone module (where n(z) is saved)
+    nz_dir = os.path.dirname(lc.__file__)
 
     # Setup lightcone constructor
+    if 'z_range' in cfg.survey:
+        zmin, zmax = cfg.survey.z_range
+    else:
+        zmin, zmax = 0.4, 0.7
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
-    zmin, zmax = 0.4, 0.7  # ngc redshift range
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
-        boss_dir=None,
+        boss_dir=nz_dir if cfg.survey.fix_nz else None,
         mask=maskobs,
+        BoxSize=cfg.nbody.L,
         Omega_m=cfg.nbody.cosmo[0],
         zmin=zmin,
         zmax=zmax,
         snap_times=snap_times,
         verbose=True,
-        augment=0,
-        seed=42
+        augment=aug_seed,
+        remap_case=remap_case,
+        seed=42,
+        is_north=geometry == 'ngc'
     )
 
     # Setup HOD model function
@@ -116,11 +164,16 @@ def main(cfg: DictConfig) -> None:
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times)
 
+    # Check if n(z) is saturated
+    saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+
     # Save
-    if is_North:
+    if geometry == 'ngc':
         outdir = join(source_path, 'ngc_lightcone')
-    else:
+    elif geometry == 'sgc':
         outdir = join(source_path, 'sgc_lightcone')
+    elif geometry == 'mtng':
+        outdir = join(source_path, 'mtng_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
@@ -128,7 +181,8 @@ def main(cfg: DictConfig) -> None:
         galsnap=galsnap,
         galidx=galidx,
         hod_seed=hod_seed,
-        aug_seed=aug_seed
+        aug_seed=aug_seed,
+        saturated=saturated
     )
     save_cfg(source_path, cfg, field='survey')
 

@@ -13,6 +13,7 @@ The models themselves are described in `hod_models.py`.
 import logging
 import numpy as np
 from omegaconf import open_dict
+from .hod_models import Zheng07zdepCens, Zheng07zdepSats, Zheng07zinterpCens, Zheng07zinterpSats
 
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import halo_mass_to_halo_radius, NFWProfile
@@ -72,7 +73,8 @@ def parse_hod(cfg):
         elif cfg.bias.hod.model == "zu_mandelbaum15":
             model = Zu_mandelbaum15()
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f'Model {cfg.bias.hod.model} not implemented.')
 
         # Check if we're using default parameters
         if hasattr(cfg.bias.hod, "default_params"):
@@ -215,7 +217,6 @@ def build_halo_catalog(
         rkey: radius,
         'halo_nfw_conc': conc,
         'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
-        
         'halo_id': np.arange(len(mass)),
         'halo_hostid': np.zeros(len(mass), dtype=int),
         'halo_upid': np.zeros(len(mass)) - 1,

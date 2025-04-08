@@ -1103,13 +1103,13 @@ class Zu_mandelbaum15(Hod_model):
 def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
     """
     Apply a linear dependence in a = 1 / (1 + z) to the logarithm of a mass variables
-
+    
     Args:
         :z (float): Cosmological redshift
         :logM_i_pivot (float): The value of the mass parameter at the pivot redshift
         :mu_i_p (float): Slope of the logmass-a relation
         :z_pivot (float): The pivot redshift
-
+        
     Returns:
         float: The log-mass variable at the requested cosmological redshift
     """
@@ -1213,7 +1213,6 @@ def linear_interp_extrap(x, xp, yp):
     Returns:
         y (array-like): Interpolated or extrapolated values at x
     """
-
     x = np.asarray(x)
     xp = np.asarray(xp)
     yp = np.asarray(yp)
@@ -1254,7 +1253,6 @@ class Zheng07zinterpCens(Zheng07Cens):
 
         return mean_ncen
 
-
 class Zheng07zinterpSats(Zheng07Sats):
     # Params: logM0, logM1, alpha, musat, zpivot
     def __init__(self, zpivot, **kwargs):
@@ -1262,7 +1260,6 @@ class Zheng07zinterpSats(Zheng07Sats):
 
         self.zpivot = zpivot
         self.npivot = len(zpivot)
-
         self.list_of_haloprops_needed = ["halo_redshift"]
 
     def mean_occupation(self, **kwargs):
