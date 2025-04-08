@@ -52,10 +52,13 @@ hod:
 # Custom parameters for the Zheng+07 model.
 # These will overwrite any defaults set above.
   theta:
-    logMmin: 13.0    # log10(Mmin) in Msun/h
-    sigma_logM: 0.2  # scatter in log10(Mmin)
-    logM0: 14.0      # log10(M0) in Msun/h
-    logM1: 14.0      # log10(M1) in Msun/h
-    alpha: 1.0       # slope of the power-law mass function
-    eta_vb_central: 0.5  # velocity bias for central galaxies
-    eta_vb_satellite: 0.5  # velocity bias for satellite galaxies
+    # logMmin: 13.0    # log10(Mmin) in Msun/h
+    # sigma_logM: 0.2  # scatter in log10(Mmin)
+    # logM0: 14.0      # log10(M0) in Msun/h
+    # logM1: 14.0      # log10(M1) in Msun/h
+    # alpha: 1.0       # slope of the power-law mass function
+    # eta_vb_centrals: 1.0  # velocity bias for central galaxies
+    # eta_vb_satellites: 1.0  # velocity bias for satellite galaxies
+    # conc_gal_bias_satellites: 1.0  # concentration bias for satellites
+    # mean_occupation_centrals_assembias_param1: 1.0 # assembly bias parameter for centrals
+    # mean_occupation_satellites_assembias_param1: 1.0 # assembly bias parameter for satellites
