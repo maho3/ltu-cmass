@@ -29,16 +29,19 @@ from halotools.empirical_models import (
     TrivialPhaseSpace,
     AssembiasZheng07Cens,
     AssembiasZheng07Sats,
-    BiasedNFWPhaseSpace,
 )
-from halotools.empirical_models import HodModelFactory
+from halotools.empirical_models import HodModelFactory, HeavisideAssembias
 
-from .phase_space_models import Centrals_vBiasedNFWPhaseSpace, Satellites_vBiasedNFWPhaseSpace
+from .phase_space_models import (
+    Centrals_vBiasedNFWPhaseSpace,
+    Satellites_vBiasedNFWPhaseSpace,
+)
 
 
 def truncated_gaussian(mean, std, lower, upper, size=1):
     a, b = (lower - mean) / std, (upper - mean) / std  # Compute standardised bounds
     return truncnorm.rvs(a, b, loc=mean, scale=std, size=size)
+
 
 class Hod_parameter:
     """
@@ -46,13 +49,17 @@ class Hod_parameter:
     and upper and lower bounds (for a flat prior)
     """
 
-    def __init__(self, key, value=None, upper=None, lower=None, sigma=None, distribution=None):
+    def __init__(
+        self, key, value=None, upper=None, lower=None, sigma=None, distribution=None
+    ):
         self.key = key
         self.value = value
         self.upper = upper
         self.lower = lower
         self.sigma = sigma
-        setattr(self, 'distribution', 'uniform' if distribution is None else distribution)
+        setattr(
+            self, "distribution", "uniform" if distribution is None else distribution
+        )
 
 
 class Hod_model:
@@ -62,15 +69,27 @@ class Hod_model:
     and for initialising `halotools` objects.
     """
 
-    def __init__(self, parameters, lower_bound, upper_bound, distribution=None, sigma=None, mass_def="vir",
+    def __init__(
+        self,
+        parameters,
+        lower_bound,
+        upper_bound,
+        distribution=None,
+        sigma=None,
+        mass_def="vir",
         assem_bias=False,
-        vel_assem_bias=False,):
-      
+        vel_assem_bias=False,
+    ):
         self.parameters = parameters
 
         # Loop through parameters and initialise
         zipped = zip_longest(
-            self.parameters, lower_bound, upper_bound, distribution or [], sigma or [], fillvalue=None
+            self.parameters,
+            lower_bound,
+            upper_bound,
+            distribution or [],
+            sigma or [],
+            fillvalue=None,
         )
 
         for _param, _lower, _upper, _dist, _sigma in zipped:
@@ -82,14 +101,14 @@ class Hod_model:
                     lower=_lower,
                     upper=_upper,
                     sigma=_sigma,
-                    distribution=_dist
-                )
+                    distribution=_dist,
+                ),
             )
-            
+
         self.mass_def = mass_def
         self.mass_key = "halo_m" + self.mass_def
         self.conc_key = "halo_nfw_conc"
- 
+
         self.cenocc = None
         self.satocc = None
         self.censprof = None
@@ -114,13 +133,13 @@ class Hod_model:
     def sample_parameters(self):
         for _param in self.parameters:
             _dist = getattr(self, _param).distribution
-            if _dist == 'uniform':
+            if _dist == "uniform":
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
                 sampled_param = np.random.uniform(_lower, _upper)
-            elif _dist == 'norm':
+            elif _dist == "norm":
                 sampled_param = np.random.normal(0, getattr(self, _param).sigma)
-            elif _dist == 'truncnorm':
+            elif _dist == "truncnorm":
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
                 _sigma = getattr(self, _param).sigma
@@ -154,19 +173,21 @@ class Hod_model:
         )
 
         return HodModelFactory(**model)
-    
-    def set_profiles(
-        self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs
-    ):
+
+    def set_profiles(self, cosmology, zf, conc_mass_model="dutton_maccio14", **kwargs):
         if self.vel_assem_bias:
             self.censprof = Centrals_vBiasedNFWPhaseSpace(
-                cosmology=cosmology, redshift=zf, mdef=self.mass_def,
-                conc_mass_model="direct_from_halo_catalog"
+                cosmology=cosmology,
+                redshift=zf,
+                mdef=self.mass_def,
+                conc_mass_model="direct_from_halo_catalog",
             )
             self.censprof.set_parameters(self.get_parameters())
             self.satsprof = Satellites_vBiasedNFWPhaseSpace(
                 conc_key=self.conc_key,
-                cosmology=cosmology, redshift=zf, mdef=self.mass_def,
+                cosmology=cosmology,
+                redshift=zf,
+                mdef=self.mass_def,
                 conc_mass_model="direct_from_halo_catalog",
             )
             self.satsprof.set_parameters(self.get_parameters())
@@ -189,40 +210,52 @@ class Zheng07(Hod_model):
 
     def __init__(
         self,
-        parameters=["logMmin", "sigma_logM", "logM0", "logM1", "alpha",
-                   "eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites",
-                   "mean_occupation_centrals_assembias_param1",
-                   "mean_occupation_satellites_assembias_param1"],
-        lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0,
-                    0.0, 0.2, 0.2,
-                    -1, -1],
-        upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5,
-                    0.7, 2.0, 2.0,
-                    1, 1],
-        sigma = [None, None, None, None, None,
-                    None, None, None,
-                    0.2, 0.2],
-        distribution = ['uniform', 'uniform', 'uniform', 'uniform', 'uniform',
-                    'uniform', 'uniform', 'uniform',
-                    'truncnorm', 'truncnorm'],
+        parameters=[
+            "logMmin",
+            "sigma_logM",
+            "logM0",
+            "logM1",
+            "alpha",
+            "eta_vb_centrals",
+            "eta_vb_satellites",
+            "conc_gal_bias_satellites",
+            "mean_occupation_centrals_assembias_param1",
+            "mean_occupation_satellites_assembias_param1",
+        ],
+        lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0, 0.0, 0.2, 0.2, -1, -1],
+        upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5, 0.7, 2.0, 2.0, 1, 1],
+        sigma=[None, None, None, None, None, None, None, None, 0.2, 0.2],
+        distribution=[
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "truncnorm",
+            "truncnorm",
+        ],
         param_defaults=None,
         mass_def="vir",
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        
         # Determine which parameters we need
         pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha"]
         if assem_bias:
-            pars += ["mean_occupation_centrals_assembias_param1",
-                   "mean_occupation_satellites_assembias_param1"]
+            pars += [
+                "mean_occupation_centrals_assembias_param1",
+                "mean_occupation_satellites_assembias_param1",
+            ]
         if vel_assem_bias:
             pars += ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]
         low = [lower_bound[parameters.index(p)] for p in pars]
         up = [upper_bound[parameters.index(p)] for p in pars]
         sig = [sigma[parameters.index(p)] for p in pars]
         dist = [distribution[parameters.index(p)] for p in pars]
-        
+
         super().__init__(
             parameters=pars,
             lower_bound=low,
@@ -248,19 +281,25 @@ class Zheng07(Hod_model):
             else:
                 raise NotImplementedError
 
-    def set_occupation(self,):
+    def set_occupation(
+        self,
+    ):
         if self.assem_bias:
             self.cenocc = AssembiasZheng07Cens(
-                prim_haloprop_key=self.mass_key, 
+                prim_haloprop_key=self.mass_key,
                 sec_haloprop_key=self.conc_key,
                 split=0.5,
-                assembias_strength=self.get_parameters()["mean_occupation_centrals_assembias_param1"],
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_centrals_assembias_param1"
+                ],
             )
             self.satocc = AssembiasZheng07Sats(
                 prim_haloprop_key=self.mass_key,
                 sec_haloprop_key=self.conc_key,
                 split=0.5,
-                assembias_strength=self.get_parameters()["mean_occupation_satellites_assembias_param1"],
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_satellites_assembias_param1"
+                ],
                 cenocc_model=self.cenocc,
                 modulate_with_cenocc=True,
             )
@@ -283,19 +322,19 @@ class Zheng07(Hod_model):
         be converted.
         """
         p_hod = {
-            'logMmin': 13.25,
-            'sigma_logM': 0.43,  # 0.7 * sqrt(2) * log10(e)
-            'logM0': 13.27,  # log10(kappa * Mmin)
-            'logM1': 14.18,
-            'alpha': 0.94
+            "logMmin": 13.25,
+            "sigma_logM": 0.43,  # 0.7 * sqrt(2) * log10(e)
+            "logM0": 13.27,  # log10(kappa * Mmin)
+            "logM1": 14.18,
+            "alpha": 0.94,
         }
         if self.assem_bias:
-            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
-            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
         if self.vel_assem_bias:
-            p_hod['eta_vb_centrals'] = 0.0
-            p_hod['eta_vb_satellites'] = 1.0
-            p_hod['conc_gal_bias_satellites'] = 1.0 
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def manera2015_lowz_ngc(self):
@@ -303,19 +342,19 @@ class Zheng07(Hod_model):
         best-fit HOD of the lowz catalog NGC from Table 2 of Manera et al.(2015)
         """
         p_hod = {
-            'logMmin': 13.20,
-            'sigma_logM': 0.62,
-            'logM0': 13.24,
-            'logM1': 14.32,
-            'alpha': 0.9
+            "logMmin": 13.20,
+            "sigma_logM": 0.62,
+            "logM0": 13.24,
+            "logM1": 14.32,
+            "alpha": 0.9,
         }
         if self.assem_bias:
-            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
-            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
         if self.vel_assem_bias:
-            p_hod['eta_vb_centrals'] = 0.0
-            p_hod['eta_vb_satellites'] = 1.0
-            p_hod['conc_gal_bias_satellites'] = 1.0 
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def manera2015_lowz_sgc(self):
@@ -326,19 +365,19 @@ class Zheng07(Hod_model):
         which has nbar~3x10^-4 h^3/Mpc^3
         """
         p_hod = {
-            'logMmin': 13.14,
-            'sigma_logM': 0.55,
-            'logM0': 13.43,
-            'logM1': 14.58,
-            'alpha': 0.93
+            "logMmin": 13.14,
+            "sigma_logM": 0.55,
+            "logM0": 13.43,
+            "logM1": 14.58,
+            "alpha": 0.93,
         }
         if self.assem_bias:
-            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
-            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
         if self.vel_assem_bias:
-            p_hod['eta_vb_centrals'] = 0.0
-            p_hod['eta_vb_satellites'] = 1.0
-            p_hod['conc_gal_bias_satellites'] = 1.0 
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def reid2014_cmass(self):
@@ -346,22 +385,22 @@ class Zheng07(Hod_model):
         best-fit HOD from Reid et al. (2014) Table 4
         """
         p_hod = {
-            'logMmin': 13.03,
-            'sigma_logM': 0.38,
-            'logM0': 13.27,
-            'logM1': 14.08,
-            'alpha': 0.76
+            "logMmin": 13.03,
+            "sigma_logM": 0.38,
+            "logM0": 13.27,
+            "logM1": 14.08,
+            "alpha": 0.76,
         }
         if self.assem_bias:
-            p_hod['mean_occupation_centrals_assembias_param1'] = 0.0
-            p_hod['mean_occupation_satellites_assembias_param1'] = 0.0
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
         if self.vel_assem_bias:
-            p_hod['eta_vb_centrals'] = 0.0
-            p_hod['eta_vb_satellites'] = 1.0
-            p_hod['conc_gal_bias_satellites'] = 1.0 
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
-        
-        
+
+
 class Zheng07zdep(Hod_model):
     """
     Zheng+07 HOD model with redshift dependent mass parameters
@@ -369,21 +408,63 @@ class Zheng07zdep(Hod_model):
 
     def __init__(
         self,
-        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'mucen', 'musat'],
-        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0., -30.0, -10.0]),
-        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0., 0.]),
+        parameters=[
+            "logMmin",
+            "sigma_logM",
+            "logM0",
+            "logM1",
+            "alpha",
+            "mucen",
+            "musat",
+            "eta_vb_centrals",
+            "eta_vb_satellites",
+            "conc_gal_bias_satellites",
+            "mean_occupation_centrals_assembias_param1",
+            "mean_occupation_satellites_assembias_param1",
+        ],
+        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.0, -30.0, -10.0, 0.0, 0.2, 0.2, -1, -1]),
+        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0.0, 0.0, 0.7, 2.0, 2.0, 1, 1]),
+        sigma=[None, None, None, None, None, None, None, None, None, None, 0.2, 0.2],
+        distribution=[
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "truncnorm",
+            "truncnorm",
+        ],
         param_defaults=None,
         mass_def="vir",
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        if assem_bias or vel_assem_bias:
-            raise NotImplementedError
-            
+        
+        # Determine which parameters we need
+        pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha", "mucen", "musat"]
+        if assem_bias:
+            pars += [
+                "mean_occupation_centrals_assembias_param1",
+                "mean_occupation_satellites_assembias_param1",
+            ]
+        if vel_assem_bias:
+            pars += ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]
+        low = [lower_bound[parameters.index(p)] for p in pars]
+        up = [upper_bound[parameters.index(p)] for p in pars]
+        sig = [sigma[parameters.index(p)] for p in pars]
+        dist = [distribution[parameters.index(p)] for p in pars]
+
         super().__init__(
-            parameters=parameters,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            parameters=pars,
+            lower_bound=low,
+            upper_bound=up,
+            sigma=sig,
+            distribution=dist,
             mass_def=mass_def,
             assem_bias=assem_bias,
             vel_assem_bias=vel_assem_bias,
@@ -392,20 +473,37 @@ class Zheng07zdep(Hod_model):
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
         if self.param_defaults is not None:
-            if self.param_defaults == 'parejko2013_lowz':
+            if self.param_defaults == "parejko2013_lowz":
                 self.parejko2013_lowz()
-            elif self.param_defaults == 'manera2015_lowz_ngc':
+            elif self.param_defaults == "manera2015_lowz_ngc":
                 self.manera2015_lowz_ngc()
-            elif self.param_defaults == 'manera2015_lowz_sgc':
+            elif self.param_defaults == "manera2015_lowz_sgc":
                 self.manera2015_lowz_sgc()
-            elif self.param_defaults == 'reid2014_cmass':
+            elif self.param_defaults == "reid2014_cmass":
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
-                
+
     def set_occupation(self, **kwargs):
         if self.assem_bias:
-            raise NotImplementedError
+            self.cenocc = AssembiasZheng07zdepCens(
+                prim_haloprop_key=self.mass_key,
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_centrals_assembias_param1"
+                ],
+            )
+            self.satocc = AssembiasZheng07zdepSats(
+                prim_haloprop_key=self.mass_key,
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_satellites_assembias_param1"
+                ],
+                cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
+            )
         else:
             self.cenocc = Zheng07zdepCens(prim_haloprop_key=self.mass_key)
             self.satocc = Zheng07zdepSats(
@@ -425,14 +523,21 @@ class Zheng07zdep(Hod_model):
         be converted.
         """
         p_hod = {
-            'logMmin': 13.25,
-            'sigma_logM': 0.43,  # 0.7 * sqrt(2) * log10(e)
-            'logM0': 13.27,  # log10(kappa * Mmin)
-            'logM1': 14.18,
-            'alpha': 0.94,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.25,
+            "sigma_logM": 0.43,  # 0.7 * sqrt(2) * log10(e)
+            "logM0": 13.27,  # log10(kappa * Mmin)
+            "logM1": 14.18,
+            "alpha": 0.94,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
+        if self.assem_bias:
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
+        if self.vel_assem_bias:
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def manera2015_lowz_ngc(self):
@@ -440,14 +545,21 @@ class Zheng07zdep(Hod_model):
         best-fit HOD of the lowz catalog NGC from Table 2 of Manera et al.(2015)
         """
         p_hod = {
-            'logMmin': 13.20,
-            'sigma_logM': 0.62,
-            'logM0': 13.24,
-            'logM1': 14.32,
-            'alpha': 0.9,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.20,
+            "sigma_logM": 0.62,
+            "logM0": 13.24,
+            "logM1": 14.32,
+            "alpha": 0.9,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
+        if self.assem_bias:
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
+        if self.vel_assem_bias:
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def manera2015_lowz_sgc(self):
@@ -458,14 +570,21 @@ class Zheng07zdep(Hod_model):
         which has nbar~3x10^-4 h^3/Mpc^3
         """
         p_hod = {
-            'logMmin': 13.14,
-            'sigma_logM': 0.55,
-            'logM0': 13.43,
-            'logM1': 14.58,
-            'alpha': 0.93,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.14,
+            "sigma_logM": 0.55,
+            "logM0": 13.43,
+            "logM1": 14.58,
+            "alpha": 0.93,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
+        if self.assem_bias:
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
+        if self.vel_assem_bias:
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
 
     def reid2014_cmass(self):
@@ -473,17 +592,24 @@ class Zheng07zdep(Hod_model):
         best-fit HOD from Reid et al. (2014) Table 4
         """
         p_hod = {
-            'logMmin': 13.03,
-            'sigma_logM': 0.38,
-            'logM0': 13.27,
-            'logM1': 14.08,
-            'alpha': 0.76,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.03,
+            "sigma_logM": 0.38,
+            "logM0": 13.27,
+            "logM1": 14.08,
+            "alpha": 0.76,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
+        if self.assem_bias:
+            p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
+        if self.vel_assem_bias:
+            p_hod["eta_vb_centrals"] = 0.0
+            p_hod["eta_vb_satellites"] = 1.0
+            p_hod["conc_gal_bias_satellites"] = 1.0
         self.set_parameters(p_hod)
-        
-        
+
+
 class Zheng07zinterp(Hod_model):
     """
     Zheng+07 HOD model with redshift dependent mass parameters
@@ -492,22 +618,45 @@ class Zheng07zinterp(Hod_model):
     def __init__(
         self,
         zpivot,
-        parameters=['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'],
-        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.,]),
-        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5,]),
+        parameters=[
+            "logMmin",
+            "sigma_logM",
+            "logM0",
+            "logM1",
+            "alpha",
+            "eta_vb_centrals",
+            "eta_vb_satellites",
+            "conc_gal_bias_satellites",
+            "mean_occupation_centrals_assembias_param1",
+            "mean_occupation_satellites_assembias_param1",
+        ],
+        lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0, 0.0, 0.2, 0.2, -1, -1],
+        upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5, 0.7, 2.0, 2.0, 1, 1],
+        sigma=[None, None, None, None, None, None, None, None, 0.2, 0.2],
+        distribution=[
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "uniform",
+            "truncnorm",
+            "truncnorm",
+        ],
         param_defaults=None,
         mass_def="vir",
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        
-        if assem_bias or vel_assem_bias:
-            raise NotImplementedError
-            
-        # Obtain single parameter for each pivot point
+
+        # Obtain single mass parameter for each pivot point
         pars = []
         low = []
         up = []
+        sig = []
+        dist = []
         self.zpivot = zpivot
         self.npivot = len(zpivot)
         assert self.npivot > 1, "Cannot interpolate between fewer than 2 points"
@@ -515,46 +664,94 @@ class Zheng07zinterp(Hod_model):
             defaults = None
         else:
             defaults = []
-        for i, (p, v0, v1) in enumerate(zip(parameters, lower_bound, upper_bound)):
-            if p in ['logMmin', 'logM0', 'logM1']:
+        init_pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha"]
+        for p, v0, v1 in zip(init_pars, lower_bound, upper_bound):
+            i = parameters.index(p)
+            if p in ["logMmin", "logM0", "logM1"]:
                 for j in range(self.npivot):
-                    pars.append(p + '_z' + str(j))
+                    pars.append(p + "_z" + str(j))
                     low.append(v0)
                     up.append(v1)
+                    sig.append(sigma[i])
+                    dist.append(distribution[i])
                     if param_defaults is not None:
                         defaults.append(param_defaults[i])
             else:
                 pars.append(p)
                 low.append(v0)
                 up.append(v1)
+                sig.append(sigma[i])
+                dist.append(distribution[i])
                 if param_defaults is not None:
                     defaults.append(param_defaults[i])
+
+        # Add assembly bias parameters if needed
+        if assem_bias:
+            for p in ["mean_occupation_centrals_assembias_param1", "mean_occupation_satellites_assembias_param1"]:
+                pars.append(p)
+                low.append(lower_bound[parameters.index(p)])
+                up.append(upper_bound[parameters.index(p)])
+                sig.append(sigma[parameters.index(p)])
+                dist.append(distribution[parameters.index(p)])
+        if vel_assem_bias:
+            for p in ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]:
+                pars.append(p)
+                low.append(lower_bound[parameters.index(p)])
+                up.append(upper_bound[parameters.index(p)])
+                sig.append(sigma[parameters.index(p)])
+                dist.append(distribution[parameters.index(p)])
+
         super().__init__(
             parameters=pars,
             lower_bound=low,
             upper_bound=up,
+            sigma=sig,
+            distribution=dist,
             mass_def=mass_def,
+            assem_bias=assem_bias,
+            vel_assem_bias=vel_assem_bias,
         )
 
         # If using, set literature values for parameters
         self.param_defaults = defaults
         if self.param_defaults is not None:
-            if self.param_defaults == 'parejko2013_lowz':
+            if self.param_defaults == "parejko2013_lowz":
                 self.parejko2013_lowz()
-            elif self.param_defaults == 'manera2015_lowz_ngc':
+            elif self.param_defaults == "manera2015_lowz_ngc":
                 self.manera2015_lowz_ngc()
-            elif self.param_defaults == 'manera2015_lowz_sgc':
+            elif self.param_defaults == "manera2015_lowz_sgc":
                 self.manera2015_lowz_sgc()
-            elif self.param_defaults == 'reid2014_cmass':
+            elif self.param_defaults == "reid2014_cmass":
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
-                
+
     def set_occupation(self, **kwargs):
         if self.assem_bias:
-            raise NotImplementedError
+            self.cenocc = AssembiasZheng07zinterpCens(
+                zpivot=self.zpivot,
+                prim_haloprop_key=self.mass_key,
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_centrals_assembias_param1"
+                ],
+            )
+            self.satocc = AssembiasZheng07zinterpSats(
+                zpivot=self.zpivot,
+                prim_haloprop_key=self.mass_key,
+                sec_haloprop_key=self.conc_key,
+                split=0.5,
+                assembias_strength=self.get_parameters()[
+                    "mean_occupation_satellites_assembias_param1"
+                ],
+                cenocc_model=self.cenocc,
+                modulate_with_cenocc=True,
+            )
         else:
-            self.cenocc = Zheng07zinterpCens(self.zpivot, prim_haloprop_key=self.mass_key)
+            self.cenocc = Zheng07zinterpCens(
+                self.zpivot, prim_haloprop_key=self.mass_key
+            )
             self.satocc = Zheng07zinterpSats(
                 self.zpivot,
                 prim_haloprop_key=self.mass_key,
@@ -565,17 +762,24 @@ class Zheng07zinterp(Hod_model):
         self.cenocc.param_dict.update(self.get_parameters())
         self.satocc.param_dict.update(self.get_parameters())
         self.satocc._suppress_repeated_param_warning = True
-                
+
     def process_measured_hod(self, p_hod):
         new_p_hod = {}
         for k, v in p_hod.items():
-            if k in ['logMmin', 'logM0', 'logM1']:
+            if k in ["logMmin", "logM0", "logM1"]:
                 for j in range(self.npivot):
-                    new_p_hod[k + '_z' + str(j)] = v
+                    new_p_hod[k + "_z" + str(j)] = v
             else:
                 new_p_hod[k] = v
+        if self.assem_bias:
+            new_p_hod["mean_occupation_centrals_assembias_param1"] = 0.0
+            new_p_hod["mean_occupation_satellites_assembias_param1"] = 0.0
+        if self.vel_assem_bias:
+            new_p_hod["eta_vb_centrals"] = 0.0
+            new_p_hod["eta_vb_satellites"] = 1.0
+            new_p_hod["conc_gal_bias_satellites"] = 1.0
         return new_p_hod
-                
+
     def parejko2013_lowz(self):
         """
         lowz catalog from Parejko+2013 Table 3. Note that the
@@ -583,11 +787,11 @@ class Zheng07zinterp(Hod_model):
         be converted.
         """
         p_hod = {
-            'logMmin': 13.25,
-            'sigma_logM': 0.43,  # 0.7 * sqrt(2) * log10(e)
-            'logM0': 13.27,  # log10(kappa * Mmin)
-            'logM1': 14.18,
-            'alpha': 0.94,
+            "logMmin": 13.25,
+            "sigma_logM": 0.43,  # 0.7 * sqrt(2) * log10(e)
+            "logM0": 13.27,  # log10(kappa * Mmin)
+            "logM1": 14.18,
+            "alpha": 0.94,
         }
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
@@ -597,13 +801,13 @@ class Zheng07zinterp(Hod_model):
         best-fit HOD of the lowz catalog NGC from Table 2 of Manera et al.(2015)
         """
         p_hod = {
-            'logMmin': 13.20,
-            'sigma_logM': 0.62,
-            'logM0': 13.24,
-            'logM1': 14.32,
-            'alpha': 0.9,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.20,
+            "sigma_logM": 0.62,
+            "logM0": 13.24,
+            "logM1": 14.32,
+            "alpha": 0.9,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
@@ -616,13 +820,13 @@ class Zheng07zinterp(Hod_model):
         which has nbar~3x10^-4 h^3/Mpc^3
         """
         p_hod = {
-            'logMmin': 13.14,
-            'sigma_logM': 0.55,
-            'logM0': 13.43,
-            'logM1': 14.58,
-            'alpha': 0.93,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.14,
+            "sigma_logM": 0.55,
+            "logM0": 13.43,
+            "logM1": 14.58,
+            "alpha": 0.93,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
@@ -632,13 +836,13 @@ class Zheng07zinterp(Hod_model):
         best-fit HOD from Reid et al. (2014) Table 4
         """
         p_hod = {
-            'logMmin': 13.03,
-            'sigma_logM': 0.38,
-            'logM0': 13.27,
-            'logM1': 14.08,
-            'alpha': 0.76,
-            'mucen': 0.0,
-            'musat': 0.0,
+            "logMmin": 13.03,
+            "sigma_logM": 0.38,
+            "logM0": 13.27,
+            "logM1": 14.08,
+            "alpha": 0.76,
+            "mucen": 0.0,
+            "musat": 0.0,
         }
         new_p_hod = self.process_measured_hod(p_hod)
         self.set_parameters(new_p_hod)
@@ -715,10 +919,9 @@ class Leauthaud11(Hod_model):
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        
         if assem_bias or vel_assem_bias:
             raise NotImplementedError
-            
+
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
@@ -730,15 +933,15 @@ class Leauthaud11(Hod_model):
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
         if self.param_defaults is not None:
-            if self.param_defaults == 'behroozi10':
+            if self.param_defaults == "behroozi10":
                 self.behroozi10()
             else:
                 raise NotImplementedError
 
-    def set_occupation(self,):
-        self.cenocc = Leauthaud11Cens(
-            prim_haloprop_key=self.mass_key, redshift=self.zf
-        )
+    def set_occupation(
+        self,
+    ):
+        self.cenocc = Leauthaud11Cens(prim_haloprop_key=self.mass_key, redshift=self.zf)
         self.satocc = Leauthaud11Sats(
             prim_haloprop_key=self.mass_key,
             cenocc_model=self.cenocc,
@@ -834,10 +1037,9 @@ class Zu_mandelbaum15(Hod_model):
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        
         if assem_bias or vel_assem_bias:
             raise NotImplementedError
-            
+
         super().__init__(
             parameters=parameters,
             lower_bound=lower_bound,
@@ -851,12 +1053,14 @@ class Zu_mandelbaum15(Hod_model):
         # If using, set literature values for parameters
         self.param_defaults = param_defaults
         if self.param_defaults is not None:
-            if self.param_defaults == 'zu_mandelbaum15':
+            if self.param_defaults == "zu_mandelbaum15":
                 self.behroozi10()
             else:
                 raise NotImplementedError
 
-    def set_occupation(self,):
+    def set_occupation(
+        self,
+    ):
         self.cenocc = ZuMandelbaum15Cens(
             prim_haloprop_key=self.mass_key, redshift=self.zf
         )
@@ -873,7 +1077,7 @@ class Zu_mandelbaum15(Hod_model):
         self.cenocc.param_dict.update(self.get_parameters())
         self.satocc.param_dict.update(self.get_parameters())
         self.satocc._suppress_repeated_param_warning = True
-        
+
     def zu_mandelbaum15(self):
         """
         Zu \& Mandelbaum+15, arXiv:1505.02781
@@ -894,18 +1098,18 @@ class Zu_mandelbaum15(Hod_model):
             "bcut": 0.86,
         }
         self.set_parameters(p_hod)
-       
+
 
 def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
     """
     Apply a linear dependence in a = 1 / (1 + z) to the logarithm of a mass variables
-    
+
     Args:
         :z (float): Cosmological redshift
         :logM_i_pivot (float): The value of the mass parameter at the pivot redshift
         :mu_i_p (float): Slope of the logmass-a relation
         :z_pivot (float): The pivot redshift
-        
+
     Returns:
         float: The log-mass variable at the requested cosmological redshift
     """
@@ -917,9 +1121,9 @@ class Zheng07zdepCens(Zheng07Cens):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.param_dict['zpivot'] = 0.5
+        self.param_dict["zpivot"] = 0.5
 
-        self.list_of_haloprops_needed = ['halo_redshift']
+        self.list_of_haloprops_needed = ["halo_redshift"]
 
     def mean_occupation(self, **kwargs):
         # Retrieve the array storing the mass-like variable
@@ -928,13 +1132,12 @@ class Zheng07zdepCens(Zheng07Cens):
         logM = np.log10(mass)
 
         logMmin = logM_i(
-            redshift, self.param_dict["logMmin"], self.param_dict["mucen"],
-            self.param_dict["zpivot"]
+            redshift,
+            self.param_dict["logMmin"],
+            self.param_dict["mucen"],
+            self.param_dict["zpivot"],
         )
-        mean_ncen = 0.5 * (
-            1.0
-            + erf((logM - logMmin) / self.param_dict["sigma_logM"])
-        )
+        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) / self.param_dict["sigma_logM"]))
 
         return mean_ncen
 
@@ -944,9 +1147,9 @@ class Zheng07zdepSats(Zheng07Sats):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.param_dict['zpivot'] = 0.5
+        self.param_dict["zpivot"] = 0.5
 
-        self.list_of_haloprops_needed = ['halo_redshift']
+        self.list_of_haloprops_needed = ["halo_redshift"]
 
     def mean_occupation(self, **kwargs):
         # Retrieve the array storing the mass-like variable
@@ -954,12 +1157,16 @@ class Zheng07zdepSats(Zheng07Sats):
         redshift = kwargs["table"]["halo_redshift"]
 
         logM0 = logM_i(
-            redshift, self.param_dict["logM0"], self.param_dict["musat"],
-            self.param_dict["zpivot"]
+            redshift,
+            self.param_dict["logM0"],
+            self.param_dict["musat"],
+            self.param_dict["zpivot"],
         )
         logM1 = logM_i(
-            redshift, self.param_dict["logM1"], self.param_dict["musat"],
-            self.param_dict["zpivot"]
+            redshift,
+            self.param_dict["logM1"],
+            self.param_dict["musat"],
+            self.param_dict["zpivot"],
         )
         M0 = 10.0**logM0
         M1 = 10.0**logM1
@@ -991,13 +1198,13 @@ class Zheng07zdepSats(Zheng07Sats):
             mean_nsat *= mean_ncen
 
         return mean_nsat
-    
-    
+
+
 def linear_interp_extrap(x, xp, yp):
     """
-    Perform linear interpolation within a given range and linear extrapolation 
+    Perform linear interpolation within a given range and linear extrapolation
     outside that range.
-    
+
     Args:
         :x (array-like): Points to evaluate the interpolation
         :xp (array-like): Known x-values (must be sorted)
@@ -1006,7 +1213,7 @@ def linear_interp_extrap(x, xp, yp):
     Returns:
         y (array-like): Interpolated or extrapolated values at x
     """
-    
+
     x = np.asarray(x)
     xp = np.asarray(xp)
     yp = np.asarray(yp)
@@ -1020,7 +1227,7 @@ def linear_interp_extrap(x, xp, yp):
 
     # Perform interpolation/extrapolation
     y = yp[indices] + slopes[indices] * (x - xp[indices])
-    
+
     return y
 
 
@@ -1028,11 +1235,11 @@ class Zheng07zinterpCens(Zheng07Cens):
     # Params: logMmin, sigma_logM, mucen, zpivot
     def __init__(self, zpivot, **kwargs):
         super().__init__(**kwargs)
-        
+
         self.zpivot = zpivot
         self.npivot = len(zpivot)
 
-        self.list_of_haloprops_needed = ['halo_redshift']
+        self.list_of_haloprops_needed = ["halo_redshift"]
 
     def mean_occupation(self, **kwargs):
         # Retrieve the array storing the mass-like variable
@@ -1042,15 +1249,12 @@ class Zheng07zinterpCens(Zheng07Cens):
 
         yp = [self.param_dict[f"logMmin_z{i}"] for i in range(self.npivot)]
         logMmin = linear_interp_extrap(redshift, self.zpivot, yp)
-        
-        mean_ncen = 0.5 * (
-            1.0
-            + erf((logM - logMmin) / self.param_dict["sigma_logM"])
-        )
+
+        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) / self.param_dict["sigma_logM"]))
 
         return mean_ncen
-    
-    
+
+
 class Zheng07zinterpSats(Zheng07Sats):
     # Params: logM0, logM1, alpha, musat, zpivot
     def __init__(self, zpivot, **kwargs):
@@ -1059,7 +1263,7 @@ class Zheng07zinterpSats(Zheng07Sats):
         self.zpivot = zpivot
         self.npivot = len(zpivot)
 
-        self.list_of_haloprops_needed = ['halo_redshift']
+        self.list_of_haloprops_needed = ["halo_redshift"]
 
     def mean_occupation(self, **kwargs):
         # Retrieve the array storing the mass-like variable
@@ -1068,10 +1272,10 @@ class Zheng07zinterpSats(Zheng07Sats):
 
         yp = [self.param_dict[f"logM0_z{i}"] for i in range(self.npivot)]
         logM0 = linear_interp_extrap(redshift, self.zpivot, yp)
-        
+
         yp = [self.param_dict[f"logM1_z{i}"] for i in range(self.npivot)]
         logM1 = linear_interp_extrap(redshift, self.zpivot, yp)
-        
+
         M0 = 10.0**logM0
         M1 = 10.0**logM1
 
@@ -1103,3 +1307,61 @@ class Zheng07zinterpSats(Zheng07Sats):
 
         return mean_nsat
 
+
+class AssembiasZheng07zinterpCens(Zheng07zinterpCens, HeavisideAssembias):
+    r"""Assembly-biased modulation of `Zheng07zinterpCens`."""
+    
+    def __init__(self, zpivot, **kwargs):
+
+        Zheng07zinterpCens.__init__(self, zpivot, **kwargs)
+        HeavisideAssembias.__init__(
+            self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate="mean_occupation",
+            **kwargs
+        )
+
+
+class AssembiasZheng07zinterpSats(Zheng07zinterpSats, HeavisideAssembias):
+    r"""Assembly-biased modulation of `Zheng07zinterpSats`."""
+    
+    def __init__(self, zpivot, **kwargs):
+
+        Zheng07zinterpSats.__init__(self, zpivot, **kwargs)
+        HeavisideAssembias.__init__(
+            self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate="mean_occupation",
+            **kwargs
+        )
+
+
+class AssembiasZheng07zdepCens(Zheng07zdepCens, HeavisideAssembias):
+    r"""Assembly-biased modulation of `Zheng07zdepCens`."""
+    
+    def __init__(self, **kwargs):
+
+        Zheng07zdepCens.__init__(self, **kwargs)
+        HeavisideAssembias.__init__(
+            self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate="mean_occupation",
+            **kwargs
+        )
+
+class AssembiasZheng07zdepSats(Zheng07zdepSats, HeavisideAssembias):
+    r"""Assembly-biased modulation of `Zheng07zdepSats`."""
+    
+    def __init__(self, **kwargs):
+
+        Zheng07zdepSats.__init__(self, **kwargs)
+        HeavisideAssembias.__init__(
+            self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate="mean_occupation",
+            **kwargs
+        )

@@ -55,7 +55,7 @@ def parse_hod(cfg):
                 )
                 cfg.bias.hod.mdef = "vir"
                 
-        if (cfg.bias.hod.assem_bias or cfg.bias.hod.vel_assem_bias) and (cfg.bias.hod.model != "zheng07"):
+        if (cfg.bias.hod.assem_bias or cfg.bias.hod.vel_assem_bias) and (not cfg.bias.hod.model.startswith("zheng07")):
             raise NotImplementedError
 
         # Check model is available
@@ -64,9 +64,9 @@ def parse_hod(cfg):
         elif cfg.bias.hod.model == "zheng07":
             model = Zheng07(assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
         elif cfg.bias.hod.model == 'zheng07zdep':
-            model = Zheng07zdep()
+            model = Zheng07zdep(assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
         elif cfg.bias.hod.model == 'zheng07zinterp':
-            model = Zheng07zinterp(cfg.bias.hod.zpivot)
+            model = Zheng07zinterp(cfg.bias.hod.zpivot, assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
         elif cfg.bias.hod.model == 'leauthaud11':
             model = Leauthaud11()
         elif cfg.bias.hod.model == "zu_mandelbaum15":
@@ -148,7 +148,7 @@ def build_HOD_model(
             that can be used with Halotools.
     """
     
-    if (assem_bias or vel_assem_bias) and (model != "zheng07"):
+    if (assem_bias or vel_assem_bias) and (not model.startswith("zheng07")):
         raise NotImplementedError
     
     if model == "zheng07":
@@ -156,9 +156,9 @@ def build_HOD_model(
     elif model == "leauthaud11":
         model = Leauthaud11(mass_def=mdef, zf=zf)
     elif model == 'zheng07zdep':
-        model = Zheng07zdep(mass_def=mdef)    
+        model = Zheng07zdep(mass_def=mdef, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)    
     elif model == 'zheng07zinterp':
-        model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot)   
+        model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)   
     elif model == "zu_mandelbaum15":
         model = Zu_mandelbaum15(mass_def=mdef)
     else:
