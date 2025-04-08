@@ -310,6 +310,9 @@ class Zheng07(Hod_model):
                 cenocc_model=self.cenocc,
                 modulate_with_cenocc=True,
             )
+            if self.vel_assem_bias:
+                self.cenocc.sec_haloprop_key = self.conc_key
+                self.satocc.sec_haloprop_key = self.conc_key
 
         self.cenocc.param_dict.update(self.get_parameters())
         self.satocc.param_dict.update(self.get_parameters())
