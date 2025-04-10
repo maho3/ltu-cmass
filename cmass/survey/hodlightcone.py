@@ -111,7 +111,7 @@ def main(cfg: DictConfig) -> None:
     )
     hod_seed = cfg.bias.hod.seed  # for indexing different hod realizations
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
-    
+
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
     geometry = geometry.lower()
 
@@ -182,7 +182,8 @@ def main(cfg: DictConfig) -> None:
         galidx=galidx,
         hod_seed=hod_seed,
         aug_seed=aug_seed,
-        saturated=saturated
+        saturated=saturated,
+        config=cfg
     )
     save_cfg(source_path, cfg, field='survey')
 
