@@ -40,7 +40,9 @@ def populate_hod(
     model, theta,
     hmeta=None,
     seed=0, mdef='vir',
-    zpivot=None
+    zpivot=None,
+    assem_bias=False,
+    vel_assem_bias=False,
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
@@ -68,7 +70,9 @@ def populate_hod(
         theta=theta,
         zf=redshift,
         mdef=mdef,
-        zpivot=zpivot
+        zpivot=zpivot,
+        assem_bias=assem_bias,
+        vel_assem_bias=vel_assem_bias,
     )
     hod.populate_mock(catalog, seed=seed, halo_mass_column_key=f'halo_m{mdef}')
     galcat = hod.mock.galaxy_table.as_array()
@@ -87,6 +91,8 @@ def run_snapshot(hpos, hvel, hmass, a, cfg, hmeta=None):
         hmeta=hmeta if cfg.bias.hod.use_conc else None,
         mdef=cfg.bias.hod.mdef,
         zpivot=getattr(cfg.bias.hod, "zpivot", None),
+        assem_bias=getattr(cfg.bias.hod, "assem_bias", False),
+        vel_assem_bias=getattr(cfg.bias.hod, "vel_assem_bias", False),
     )
 
     # Organize outputs

@@ -132,6 +132,7 @@ def preprocess_Bk(X, kmax, log=False):
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
+
         # cut kmax
         m = ~ np.any(k > kmax, axis=0)
         value = value[m]

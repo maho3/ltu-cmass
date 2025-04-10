@@ -104,3 +104,17 @@ def cosmo_to_colossus(cpars):
     csm.addCosmology('myCosmo', **params)
     cosmo = csm.setCosmology('myCosmo')
     return cosmo
+
+
+def save_configuration_h5(file, config, save_HOD=True):
+    file.attrs['config'] = OmegaConf.to_yaml(config)
+    file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
+    file.attrs['cosmo_params'] = config.nbody.cosmo
+
+    if save_HOD:
+        file.attrs['HOD_model'] = config.bias.hod.model
+        file.attrs['HOD_seed'] = config.bias.hod.seed
+
+        keys = sorted(list(config.bias.hod.theta.keys()))
+        file.attrs['HOD_names'] = keys
+        file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]

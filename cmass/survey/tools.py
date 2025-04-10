@@ -20,7 +20,7 @@ from astropy.constants import c
 from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
 
-from ..utils import timing_decorator, cosmo_to_astropy
+from ..utils import timing_decorator, cosmo_to_astropy, save_configuration_h5
 
 
 # cosmo functions
@@ -310,11 +310,14 @@ def load_galaxies(source_dir, a, seed):
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, aug_seed=0, suffix='',
-                   saturated=True):
+                   config=None, **kwargs):
     outfile = join(outdir, f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
-        f.attrs['saturated'] = saturated
+        save_configuration_h5(f, config, save_HOD=True)
+        for k, v in kwargs.items():
+            f.attrs[k] = v
+
         f.create_dataset('ra', data=ra)                # Right ascension [deg]
         f.create_dataset('dec', data=dec)              # Declination [deg]
         f.create_dataset('z', data=z)                  # Redshift
