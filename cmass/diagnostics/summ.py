@@ -12,7 +12,8 @@ from omegaconf import DictConfig, OmegaConf
 import h5py
 from astropy.cosmology import Planck18
 
-from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
+from ..utils import (
+    get_source_path, timing_decorator, cosmo_to_astropy, save_configuration_h5)
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
@@ -82,20 +83,6 @@ def run_summarizer(
             box_size, grid_size, threads, use_rsd=True)
 
 
-def save_configuration(file, config, save_HOD=True):
-    file.attrs['config'] = OmegaConf.to_yaml(config)
-    file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
-    file.attrs['cosmo_params'] = config.nbody.cosmo
-
-    if save_HOD:
-        file.attrs['HOD_model'] = config.bias.hod.model
-        file.attrs['HOD_seed'] = config.bias.hod.seed
-
-        keys = sorted(list(config.bias.hod.theta.keys()))
-        file.attrs['HOD_names'] = keys
-        file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
-
-
 def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
     logging.info(f'Saving {len(data)} datasets to {file}')
     with h5py.File(file, 'a') as f:
@@ -113,7 +100,7 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
             group.create_dataset(key, data=value)
 
         if config is not None:
-            save_configuration(f, config, save_HOD=save_HOD)
+            save_configuration_h5(f, config, save_HOD=save_HOD)
 
 
 def summarize_rho(
