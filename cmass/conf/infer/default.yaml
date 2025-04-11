@@ -44,7 +44,7 @@ test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
 
 prior: uniform  # prior to use for training (uniform, quijote)
-backend: sbi # backend to use for training (sbi/lampe/pydelfi)
+backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
 batch_size: null  # batch size
