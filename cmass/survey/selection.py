@@ -1,4 +1,6 @@
 """
+~~~ DEPRECATED IN FAVOR OF hodlightcone.py ~~~
+
 Reshapes a cubic simulation into a lightcone footprint, measures ra/dec/z,
 and applies CMASS NGC/SGC survey mask and selection effects.
 
