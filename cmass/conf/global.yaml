@@ -16,7 +16,7 @@ meta:
   wdir: "/anvil/scratch/x-nchartier/cmass/abacuslike_benchmark"
   summ_dir: "/anvil/scratch/x-mho1/cmass-ili"
   #logdir: "${meta.wdir}/logs/"
-  logdir: "/anvil/scratch/x-nchartier/cmass/fastpm_benchmark/logs/" 
+  logdir: "/anvil/scratch/x-nchartier/cmass/abacuslike_benchmark/logs/" 
   #cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
   cosmofile: "/home/x-nchartier/Modules/ltu-cmass/params/abacus_cosmologies.txt"      # for abacus-like
