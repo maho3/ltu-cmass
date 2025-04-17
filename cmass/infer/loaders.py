@@ -60,7 +60,7 @@ def load_lc_Pk(diag_file):
     return summ
 
 
-def preprocess_Pk(X, kmax, monopole=True, norm=None):
+def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin = 0.):
     if (not monopole) and (norm is None):
         raise ValueError('norm must be provided when monopole is False')
 
@@ -68,7 +68,7 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None):
     for x in X:
         k, value = x['k'], x['value']
         # cut k
-        value = value[k <= kmax]
+        value = value[ (k >= kmin) & (k <= kmax)]
         Xout.append(value)
     Xout = np.array(Xout)
 
@@ -81,7 +81,7 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None):
         for x in norm:
             k, value = x['k'], x['value']
             # cut k
-            value = value[k <= kmax]
+            value = value[(k >= kmin) & (k <= kmax)]
             Xnorm.append(value)
         Xnorm = np.array(Xnorm)
 
@@ -138,21 +138,27 @@ def load_lc_Bk(diag_file):
     return summ
 
 
-def preprocess_Bk(X, kmax, log=False):
+def preprocess_Bk(X, kmax, kmin = 0., log=False, equilateral_only = False):
 
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
 
-        # cut kmax
-        m = ~ np.any(k > kmax, axis=0)
+        # cut kmax and optionally kmin
+        m = ~ np.any((k > kmax) | (k < kmin), axis=0)
         value = value[m]
         k = k[:, m]
 
-        # check if k1 >= k2 + k3
-        k1, k2, k3 = k
-        m = (k1 < k2 + k3)
-        value = value[m]
+        if equilateral_only:
+            # equal wavevector components and error tolerance for safety
+            k1, k2, k3 = k
+            m = np.isclose(k1, k2) & np.isclose(k2, k3)
+            value = value[m]
+        else:      
+            # check if k1 >= k2 + k3 for generic triangle configurations
+            k1, k2, k3 = k
+            m = (k1 < k2 + k3)
+            value = value[m]
 
         if log:
             value = np.log10(value)
