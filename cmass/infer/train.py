@@ -163,40 +163,47 @@ def evaluate_posterior(posterior, x, theta):
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    for kmax in exp.kmax:
-        logging.info(f'Running inference for {name} with kmax={kmax}')
-        exp_path = join(model_path, f'kmax-{kmax}')
 
-        # load training/test data
-        try:
-            logging.info(f'Loading training/test data from {exp_path}')
-            x_train = np.load(join(exp_path, 'x_train.npy'))
-            theta_train = np.load(join(exp_path, 'theta_train.npy'))
-            x_val = np.load(join(exp_path, 'x_val.npy'))
-            theta_val = np.load(join(exp_path, 'theta_val.npy'))
-            x_test = np.load(join(exp_path, 'x_test.npy'))
-            theta_test = np.load(join(exp_path, 'theta_test.npy'))
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f'Could not find training/test data for {name} with kmax={kmax}'
-                '. Make sure to run cmass.infer.preprocess first.'
-            )
+    kmin_list = exp.kmin if 'kmin' in exp else [0.]
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-        logging.info(
-            f'Split: {len(x_train)} training, {len(x_val)} validation, '
-            f'{len(x_test)} testing')
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
-        out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
-        logging.info(f'Saving models to {out_dir}')
+            # load training/test data
+            try:
+                logging.info(f'Loading training/test data from {exp_path}')
+                x_train = np.load(join(exp_path, 'x_train.npy'))
+                theta_train = np.load(join(exp_path, 'theta_train.npy'))
+                x_val = np.load(join(exp_path, 'x_val.npy'))
+                theta_val = np.load(join(exp_path, 'theta_val.npy'))
+                x_test = np.load(join(exp_path, 'x_test.npy'))
+                theta_test = np.load(join(exp_path, 'theta_test.npy'))
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    f'Could not find training/test data for {name} with '
+                    f'kmin={kmin} and kmax={kmax}'
+                    '. Make sure to run cmass.infer.preprocess first.'
+                )
 
-        # run inference
-        posterior, history = run_inference(
-            x_train, theta_train, x_val, theta_val, cfg, out_dir)
+            logging.info(
+                f'Split: {len(x_train)} training, {len(x_val)} validation, '
+                f'{len(x_test)} testing')
 
-        # evaluate the posterior and save to file
-        log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
-        with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-            f.write(f'{log_prob_test}\n')
+            out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+            logging.info(f'Saving models to {out_dir}')
+
+            # run inference
+            posterior, history = run_inference(
+                x_train, theta_train, x_val, theta_val, cfg, out_dir)
+
+            # evaluate the posterior and save to file
+            log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
+            with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+                f.write(f'{log_prob_test}\n')
 
 
 @timing_decorator

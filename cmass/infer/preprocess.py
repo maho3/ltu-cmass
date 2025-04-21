@@ -202,7 +202,6 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
-    logging.info("Scale factor a =  ", cfg.nbody.af)
     suite_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
@@ -215,6 +214,9 @@ def main(cfg: DictConfig) -> None:
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+
+    if cfg.infer.halo or cfg.infer.galaxy:
+        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
 
     if cfg.infer.halo:
         logging.info('Running halo preprocessing...')
