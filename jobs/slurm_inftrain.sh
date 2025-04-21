@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=38
 
 module restore cmass
 conda activate cmassrun
@@ -44,4 +44,3 @@ suffix="$suffix infer.device=$device $extras"
 echo "Running inference with $suffix"
 
 python -m cmass.infer.train $suffix net=tuning
-

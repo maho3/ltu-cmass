@@ -2,15 +2,15 @@
 #SBATCH --job-name=quijotelike_bias   # Job name
 #SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=32            # Number of tasks
-#SBATCH --time=00:30:00         # Time limit
+#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --time=02:00:00         # Time limit
 #SBATCH --partition=shared      # Partition name
 #SBATCH --account=phy240043   # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=145
-globoffset=2000
+# SLURM_ARRAY_TASK_ID=88
+globoffset=0
 
 module restore cmass
 conda activate cmassrun
@@ -23,17 +23,22 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=quijotelike
-sim=fastpm
+nbody=quijote
+sim=nbody_leauthaud
 multisnapshot=False
-diag_from_scratch=False
+diag_from_scratch=True
 rm_galaxies=False
-extras="meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="" # "meta.cosmofile=./params/abacus_cosmologies.txt"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+# extras="$extras bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10"
 L=1000
 N=128
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
+
+
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 
 for offset in 0 1000; do
@@ -42,7 +47,7 @@ for offset in 0 1000; do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
 
     # density
-    python -m cmass.diagnostics.summ diag.density=True $postfix 
+    # python -m cmass.diagnostics.summ diag.density=True $postfix 
 
     # halos
     file=$outdir/$lhid/halos.h5
@@ -50,9 +55,9 @@ for offset in 0 1000; do
         echo "File $file exists."
     else
         echo "File $file does not exist."
-        python -m cmass.bias.rho_to_halo $postfix
+        # python -m cmass.bias.rho_to_halo $postfix
     fi
-    python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
@@ -63,7 +68,7 @@ for offset in 0 1000; do
             echo "File $file exists."
         else
             echo "File $file does not exist."
-            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            # python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
         fi
         python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 

@@ -20,8 +20,8 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijote
-sim=nbody
+nbody=abacuslike
+sim=fastpm
 infer=default
 
 halo=True
@@ -33,8 +33,8 @@ mtng=False
 extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"

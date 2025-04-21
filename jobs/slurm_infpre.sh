@@ -38,6 +38,7 @@ suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
 suffix="$suffix infer.device=$device $extras"
+# suffix="$suffix infer.val_frac=0 infer.test_frac=1"
 
 echo "Running inference with $suffix"
 python -m cmass.infer.preprocess $suffix
