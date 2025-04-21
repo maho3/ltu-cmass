@@ -25,8 +25,8 @@ hod:
   model: 'zheng07zinterp'
   
   # Whether including assembly bias
-  assem_bias: False
-  vel_assem_bias: False
+  assem_bias: True
+  vel_assem_bias: True
 
   # Configure halo mass definition as stored in halo catalogs (e.g. vir, 200c)
   mdef: '200c'
