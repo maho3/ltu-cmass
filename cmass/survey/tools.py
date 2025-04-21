@@ -304,7 +304,10 @@ def load_galaxies(source_dir, a, seed):
                 'multi-snapshot ngc_lightcone.')
         pos = f[key]['pos'][...]  # comoving positions [Mpc/h]
         vel = f[key]['vel'][...]  # physical velocities [km/s]
-        hostid = f[key]['hostid'][...]
+        if 'hostid' in f[key]:
+            hostid = f[key]['hostid'][...]
+        else:  # not needed for simple survey selection
+            hostid = None
     return pos, vel, hostid
 
 
@@ -314,7 +317,8 @@ def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
     outfile = join(outdir, f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
-        save_configuration_h5(f, config, save_HOD=True)
+        if config is not None:
+            save_configuration_h5(f, config, save_HOD=True)
         for k, v in kwargs.items():
             f.attrs[k] = v
 
