@@ -72,7 +72,7 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
                 summ.update(load_lc_Bk(diagfile))
             else:
                 summ = load_Pk(diagfile, a)
-                summ.update(load_Bk(diagfile, a)) #13/02/2025 : temp. fix --11/02/2025 Pb with load Bk for now
+                summ.update(load_Bk(diagfile, a))
             # load parameters
             if len(summ) > 0:
                 params = get_cosmo(sourcepath)
@@ -122,47 +122,50 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
 
 def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
-    print("SUMMARIES: ",summaries.keys())
-    
+
     # check that there's data
     for summ in exp.summary:
-        #print("SUMM: ",summ)
         if "Eq" in summ:
-            summ = summ.replace("Eq","")
+            summ = summ.replace("Eq", "")
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
             return
 
     name = '+'.join(exp.summary)
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    
-    for kmax in exp.kmax:
-        for kmin in kmin_list:
-            logging.info(f'Running preprocessing for {name} with kmax={kmax} and kmin={kmin}')
-            exp_path = join(model_path, f'kmax-{kmax}_kmin-{kmin}')
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
             xs = []
             # Handling the case where we want equilateral triangles only
             for summ in exp.summary:
-                if "Eq" in summ:
-                    summ = summ.replace("Eq","")
+                if "Eq" in summ:  # only for Bk/Qk
+                    summ = summ.replace("Eq", "")
                     eq_bool = True
                 else:
                     eq_bool = False
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
                 if 'Pk0' in summ:
-                    x = preprocess_Pk(x, kmax, monopole=True, kmin = kmin)
+                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin)
                 elif 'Pk' in summ:
                     norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
                     if norm_key in summaries:
                         x = preprocess_Pk(
-                            x, kmax, monopole=False, norm=summaries[norm_key], kmin = kmin)
+                            x, kmax, monopole=False, norm=summaries[norm_key],
+                            kmin=kmin)
                     else:
                         raise ValueError(
                             f'Need monopole for normalization of {summ}')
                 elif 'Bk' in summ:
-                    x = preprocess_Bk(x, kmax, log=True, equilateral_only = eq_bool, kmin = kmin)
+                    x = preprocess_Bk(x, kmax, log=True,
+                                      equilateral_only=eq_bool, kmin=kmin)
                 elif 'Qk' in summ:
-                    x = preprocess_Bk(x, kmax, log=False, equilateral_only = eq_bool,kmin = kmin)
+                    x = preprocess_Bk(x, kmax, log=False,
+                                      equilateral_only=eq_bool, kmin=kmin)
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
@@ -171,7 +174,7 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
                     f'Inconsistent lengths of summaries for {name}. Check that all '
                     'summaries have been computed for the same simulations.')
             x = np.concatenate(xs, axis=-1)
-    
+
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
              (ids_train, ids_val, ids_test)) = split_train_val_test(
@@ -179,7 +182,7 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
                 cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
-    
+
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
@@ -199,18 +202,14 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
-    print("Scale factor a =  ",cfg.nbody.af)
-    wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
-    summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stores, only to read
+    logging.info("Scale factor a =  ", cfg.nbody.af)
     suite_path = get_source_path(
-        summ_dir, cfg.nbody.suite, cfg.sim,
+        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
-    #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
-    model_dir = join(wdir,"preprocessed")#by default, may throw error, use save_dir to be sure
-    #if cfg.infer.save_dir is not None:
-    #    print("Infer save_dir not None")
-    #    model_dir = cfg.infer.save_dir
+    model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
+    if cfg.infer.save_dir is not None:
+        model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
@@ -222,7 +221,7 @@ def main(cfg: DictConfig) -> None:
         summaries, parameters, ids = load_summaries(
             suite_path, 'halo', cfg.infer.Nmax, a=cfg.nbody.af)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', cfg.sim, '+'.join(exp.summary))
+            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
     else:
         logging.info('Skipping halo preprocessing...')

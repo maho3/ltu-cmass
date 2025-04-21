@@ -186,10 +186,7 @@ def run_experiment(exp, cfg, model_path):
             f'Split: {len(x_train)} training, {len(x_val)} validation, '
             f'{len(x_test)} testing')
 
-        if cfg.infer.net_suffix is not None:
-            out_dir=join(exp_path, 'nets', cfg.infer.net_suffix, f'net-{cfg.infer.net_index}')
-        else:
-            out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+        out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
         logging.info(f'Saving models to {out_dir}')
 
         # run inference
@@ -212,8 +209,7 @@ def main(cfg: DictConfig) -> None:
         model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
-        cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]  
-        
+        cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
     cfg.net = cfg.net[cfg.infer.net_index]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
@@ -221,7 +217,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.halo:
         logging.info('Running halo inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo',cfg.sim, '+'.join(exp.summary))
+            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping halo inference...')

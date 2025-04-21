@@ -16,20 +16,21 @@ def get_hod(diagfile):
         hod_params = f.attrs['HOD_params'][:]
     return hod_params
 
+
 def closest_a(lst, a):
-     lst = [float(el) for el in lst]
-     lst = np.asarray(lst)
-     idx = (np.abs(lst - a)).argmin()
-     return lst[idx]
+    lst = [float(el) for el in lst]
+    lst = np.asarray(lst)
+    idx = (np.abs(lst - a)).argmin()
+    return lst[idx]
+
 
 def load_Pk(diag_file, a):
-    #a = f'{a:.6f}'
     if not os.path.exists(diag_file):
         return {}
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            a = closest_a(list(f.keys()),a)
+            a = closest_a(list(f.keys()), a)
             a = f'{a:.6f}'
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
@@ -60,7 +61,7 @@ def load_lc_Pk(diag_file):
     return summ
 
 
-def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin = 0.):
+def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin=0.):
     if (not monopole) and (norm is None):
         raise ValueError('norm must be provided when monopole is False')
 
@@ -68,7 +69,7 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin = 0.):
     for x in X:
         k, value = x['k'], x['value']
         # cut k
-        value = value[ (k >= kmin) & (k <= kmax)]
+        value = value[(kmin <= k) & (k <= kmax)]
         Xout.append(value)
     Xout = np.array(Xout)
 
@@ -81,7 +82,7 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin = 0.):
         for x in norm:
             k, value = x['k'], x['value']
             # cut k
-            value = value[(k >= kmin) & (k <= kmax)]
+            value = value[(kmin <= k) & (k <= kmax)]
             Xnorm.append(value)
         Xnorm = np.array(Xnorm)
 
@@ -98,24 +99,21 @@ def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin = 0.):
 
 
 def load_Bk(diag_file, a):
-    #a = f'{a:.6f}'
     if not os.path.exists(diag_file):
         return {}
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            a = closest_a(list(f.keys()),a)
+            a = closest_a(list(f.keys()), a)
             a = f'{a:.6f}'
-            for stat in ['Bk', 'Qk','zBk','zQk']:
+            for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
                 if stat in f[a]:
-                    for i in range(1): # just monopole
+                    for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],
                         }
-
     except (OSError, KeyError):
-        #print(f[a][stat][i, :].shape,f[a]['Bk_k123'][:].shape)
         return {}
     return summ
 
@@ -138,14 +136,14 @@ def load_lc_Bk(diag_file):
     return summ
 
 
-def preprocess_Bk(X, kmax, kmin = 0., log=False, equilateral_only = False):
+def preprocess_Bk(X, kmax, kmin=0., log=False, equilateral_only=False):
 
     Xout = []
     for x in X:
         k, value = x['k'], x['value']
 
-        # cut kmax and optionally kmin
-        m = ~ np.any((k > kmax) | (k < kmin), axis=0)
+        # cut kmax and kmin
+        m = ~ np.any((k < kmin) | (kmax < k), axis=0)
         value = value[m]
         k = k[:, m]
 
@@ -154,7 +152,7 @@ def preprocess_Bk(X, kmax, kmin = 0., log=False, equilateral_only = False):
             k1, k2, k3 = k
             m = np.isclose(k1, k2) & np.isclose(k2, k3)
             value = value[m]
-        else:      
+        else:
             # check if k1 >= k2 + k3 for generic triangle configurations
             k1, k2, k3 = k
             m = (k1 < k2 + k3)
