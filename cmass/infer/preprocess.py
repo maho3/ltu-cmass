@@ -125,66 +125,83 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
 
     # check that there's data
     for summ in exp.summary:
+        if "Eq" in summ:
+            summ = summ.replace("Eq", "")
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
             return
 
     name = '+'.join(exp.summary)
-    for kmax in exp.kmax:
-        logging.info(f'Running preprocessing for {name} with kmax={kmax}')
-        exp_path = join(model_path, f'kmax-{kmax}')
-        xs = []
-        for summ in exp.summary:
-            x, theta, id = summaries[summ], parameters[summ], ids[summ]
-            if 'Pk0' in summ:
-                x = preprocess_Pk(x, kmax, monopole=True)
-            elif 'Pk' in summ:
-                norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
-                if norm_key in summaries:
-                    x = preprocess_Pk(
-                        x, kmax, monopole=False, norm=summaries[norm_key])
+    kmin_list = exp.kmin if 'kmin' in exp else [0.]
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+            xs = []
+            # Handling the case where we want equilateral triangles only
+            for summ in exp.summary:
+                if "Eq" in summ:  # only for Bk/Qk
+                    summ = summ.replace("Eq", "")
+                    eq_bool = True
                 else:
-                    raise ValueError(
-                        f'Need monopole for normalization of {summ}')
-            elif 'Bk' in summ:
-                x = preprocess_Bk(x, kmax, log=True)
-            elif 'Qk' in summ:
-                x = preprocess_Bk(x, kmax, log=False)
-            else:
-                raise NotImplementedError  # TODO: implement other summaries
-            xs.append(x)
-        if not np.all([len(x) == len(xs[0]) for x in xs]):
-            raise ValueError(
-                f'Inconsistent lengths of summaries for {name}. Check that all '
-                'summaries have been computed for the same simulations.')
-        x = np.concatenate(xs, axis=-1)
+                    eq_bool = False
+                x, theta, id = summaries[summ], parameters[summ], ids[summ]
+                if 'Pk0' in summ:
+                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin)
+                elif 'Pk' in summ:
+                    norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
+                    if norm_key in summaries:
+                        x = preprocess_Pk(
+                            x, kmax, monopole=False, norm=summaries[norm_key],
+                            kmin=kmin)
+                    else:
+                        raise ValueError(
+                            f'Need monopole for normalization of {summ}')
+                elif 'Bk' in summ:
+                    x = preprocess_Bk(x, kmax, log=True,
+                                      equilateral_only=eq_bool, kmin=kmin)
+                elif 'Qk' in summ:
+                    x = preprocess_Bk(x, kmax, log=False,
+                                      equilateral_only=eq_bool, kmin=kmin)
+                else:
+                    raise NotImplementedError  # TODO: implement other summaries
+                xs.append(x)
+            if not np.all([len(x) == len(xs[0]) for x in xs]):
+                raise ValueError(
+                    f'Inconsistent lengths of summaries for {name}. Check that all '
+                    'summaries have been computed for the same simulations.')
+            x = np.concatenate(xs, axis=-1)
 
-        # split train/test
-        ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
-         (ids_train, ids_val, ids_test)) = split_train_val_test(
-            x, theta, id,
-            cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
-        logging.info(f'Split: {len(x_train)} training, '
-                     f'{len(x_val)} validation, {len(x_test)} testing')
+            # split train/test
+            ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
+             (ids_train, ids_val, ids_test)) = split_train_val_test(
+                x, theta, id,
+                cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
+            logging.info(f'Split: {len(x_train)} training, '
+                         f'{len(x_val)} validation, {len(x_test)} testing')
 
-        # save training/test data
-        logging.info(f'Saving training/test data to {exp_path}')
-        os.makedirs(exp_path, exist_ok=True)
-        np.save(join(exp_path, 'x_train.npy'), x_train)
-        np.save(join(exp_path, 'x_val.npy'), x_val)
-        np.save(join(exp_path, 'x_test.npy'), x_test)
-        np.save(join(exp_path, 'theta_train.npy'), theta_train)
-        np.save(join(exp_path, 'theta_val.npy'), theta_val)
-        np.save(join(exp_path, 'theta_test.npy'), theta_test)
-        np.save(join(exp_path, 'ids_train.npy'), ids_train)
-        np.save(join(exp_path, 'ids_val.npy'), ids_val)
-        np.save(join(exp_path, 'ids_test.npy'), ids_test)
+            # save training/test data
+            logging.info(f'Saving training/test data to {exp_path}')
+            os.makedirs(exp_path, exist_ok=True)
+            np.save(join(exp_path, 'x_train.npy'), x_train)
+            np.save(join(exp_path, 'x_val.npy'), x_val)
+            np.save(join(exp_path, 'x_test.npy'), x_test)
+            np.save(join(exp_path, 'theta_train.npy'), theta_train)
+            np.save(join(exp_path, 'theta_val.npy'), theta_val)
+            np.save(join(exp_path, 'theta_test.npy'), theta_test)
+            np.save(join(exp_path, 'ids_train.npy'), ids_train)
+            np.save(join(exp_path, 'ids_val.npy'), ids_val)
+            np.save(join(exp_path, 'ids_test.npy'), ids_test)
 
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
+
     suite_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
@@ -197,6 +214,9 @@ def main(cfg: DictConfig) -> None:
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+
+    if cfg.infer.halo or cfg.infer.galaxy:
+        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
 
     if cfg.infer.halo:
         logging.info('Running halo preprocessing...')

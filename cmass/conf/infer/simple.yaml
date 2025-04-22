@@ -17,35 +17,20 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 
 experiments:
   - summary: [Pk0]   # monopole
-    kmin: [0., 0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmin: [0., 0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [Pk0, Pk2, Pk4, Bk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0]   # z-space monopole
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4, zEqBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
