@@ -31,7 +31,7 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
-def load_summaries(suitepath, tracer, Nmax, a=None):
+def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
                       'mtng_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
@@ -231,7 +231,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.galaxy:
         logging.info('Running galaxies preprocessing...')
         summaries, parameters, ids = load_summaries(
-            suite_path, 'galaxy', cfg.infer.Nmax, a=cfg.nbody.af)
+            suite_path, 'galaxy', cfg.infer.Nmax, a=cfg.nbody.af,
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
@@ -241,7 +242,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.ngc_lightcone:
         logging.info('Running ngc_lightcone preprocessing...')
         summaries, parameters, ids = load_summaries(
-            suite_path, 'ngc_lightcone', cfg.infer.Nmax)
+            suite_path, 'ngc_lightcone', cfg.infer.Nmax,
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
@@ -251,7 +253,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.sgc_lightcone:
         logging.info('Running sgc_lightcone preprocessing...')
         summaries, parameters, ids = load_summaries(
-            suite_path, 'sgc_lightcone', cfg.infer.Nmax)
+            suite_path, 'sgc_lightcone', cfg.infer.Nmax,
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
@@ -261,7 +264,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.mtng_lightcone:
         logging.info('Running mtng_lightcone preprocessing...')
         summaries, parameters, ids = load_summaries(
-            suite_path, 'mtng_lightcone', cfg.infer.Nmax)
+            suite_path, 'mtng_lightcone', cfg.infer.Nmax,
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
