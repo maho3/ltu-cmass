@@ -222,64 +222,20 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.halo or cfg.infer.galaxy:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
 
-    if cfg.infer.halo:
-        logging.info('Running halo preprocessing...')
-        summaries, parameters, ids, names = load_summaries(
-            suite_path, 'halo', cfg.infer.Nmax, a=cfg.nbody.af)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              names, exp, cfg, save_path)
-    else:
-        logging.info('Skipping halo preprocessing...')
+    for tracer in ['halo', 'galaxy',
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+        if not getattr(cfg.infer, tracer):
+            logging.info(f'Skipping {tracer} preprocessing...')
+            continue
 
-    if cfg.infer.galaxy:
-        logging.info('Running galaxies preprocessing...')
+        logging.info(f'Running {tracer} preprocessing...')
         summaries, parameters, ids, names = load_summaries(
-            suite_path, 'galaxy', cfg.infer.Nmax, a=cfg.nbody.af,
+            suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
             only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
                               names, exp, cfg, save_path)
-    else:
-        logging.info('Skipping galaxy preprocessing...')
-
-    if cfg.infer.ngc_lightcone:
-        logging.info('Running ngc_lightcone preprocessing...')
-        summaries, parameters, ids, names = load_summaries(
-            suite_path, 'ngc_lightcone', cfg.infer.Nmax,
-            only_cosmo=cfg.infer.only_cosmo)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              names, exp, cfg, save_path)
-    else:
-        logging.info('Skipping ngc_lightcone preprocessing...')
-
-    if cfg.infer.sgc_lightcone:
-        logging.info('Running sgc_lightcone preprocessing...')
-        summaries, parameters, ids, names = load_summaries(
-            suite_path, 'sgc_lightcone', cfg.infer.Nmax,
-            only_cosmo=cfg.infer.only_cosmo)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              names, exp, cfg, save_path)
-    else:
-        logging.info('Skipping sgc_lightcone preprocessing...')
-
-    if cfg.infer.mtng_lightcone:
-        logging.info('Running mtng_lightcone preprocessing...')
-        summaries, parameters, ids, names = load_summaries(
-            suite_path, 'mtng_lightcone', cfg.infer.Nmax,
-            only_cosmo=cfg.infer.only_cosmo)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              names, exp, cfg, save_path)
-    else:
-        logging.info('Skipping mtng_lightcone preprocessing...')
 
 
 if __name__ == "__main__":

@@ -142,45 +142,16 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    if cfg.infer.halo:
-        logging.info('Running halo inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping halo inference...')
+    for tracer in ['halo', 'galaxy',
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+        if not getattr(cfg.infer, tracer):
+            logging.info(f'Skipping {tracer} validation...')
+            continue
 
-    if cfg.infer.galaxy:
-        logging.info('Running galaxies inference...')
+        logging.info(f'Running {tracer} validation...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping galaxy inference...')
-
-    if cfg.infer.ngc_lightcone:
-        logging.info('Running ngc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping ngc_lightcone inference...')
-
-    if cfg.infer.sgc_lightcone:
-        logging.info('Running sgc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping sgc_lightcone inference...')
-
-    if cfg.infer.mtng_lightcone:
-        logging.info('Running mtng_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping mtng_lightcone inference...')
 
 
 if __name__ == "__main__":
