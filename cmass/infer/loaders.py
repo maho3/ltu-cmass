@@ -14,7 +14,8 @@ def get_cosmo(source_path):
 def get_hod(diagfile):
     with h5py.File(diagfile, 'r') as f:
         hod_params = f.attrs['HOD_params'][:]
-    return hod_params
+        hod_names = f.attrs['HOD_names'][:]
+    return hod_params, hod_names
 
 
 def closest_a(lst, a):

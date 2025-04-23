@@ -94,7 +94,7 @@ def load_ensemble(exp_path, Nnets, weighted=True):
     return ensemble
 
 
-def run_experiment(exp, cfg, model_path, names):
+def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
@@ -103,7 +103,7 @@ def run_experiment(exp, cfg, model_path, names):
     for kmin in kmin_list:
         for kmax in kmax_list:
             logging.info(
-                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+                f'Running validation for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
         # load test data
@@ -111,6 +111,7 @@ def run_experiment(exp, cfg, model_path, names):
             logging.info(f'Loading test data from {exp_path}')
             x_test = np.load(join(exp_path, 'x_test.npy'))
             theta_test = np.load(join(exp_path, 'theta_test.npy'))
+            names = np.loadtxt(join(exp_path, 'param_names.txt'), dtype=str)
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}'
@@ -141,15 +142,11 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
-    hodnames = [r'$\alpha$', r'$\log M_0$', r'$\log M_1$',
-                r'$\log M_{\min}$', r'$\sigma_{\log M}$']  # TODO: load these from file?
-
     if cfg.infer.halo:
         logging.info('Running halo inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping halo inference...')
 
@@ -157,7 +154,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running galaxies inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping galaxy inference...')
 
@@ -165,7 +162,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running ngc_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping ngc_lightcone inference...')
 
@@ -173,7 +170,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running sgc_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping sgc_lightcone inference...')
 
@@ -181,7 +178,7 @@ def main(cfg: DictConfig) -> None:
         logging.info('Running mtng_lightcone inference...')
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
+            run_experiment(exp, cfg, save_path)
     else:
         logging.info('Skipping mtng_lightcone inference...')
 
