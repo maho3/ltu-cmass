@@ -9,10 +9,14 @@ from torch.utils.data import TensorDataset, DataLoader
 def split_experiments(exp_cfg):
     new_exps = []
     for exp in exp_cfg:
-        for kmax in exp.kmax:
-            new_exp = exp.copy()
-            new_exp.kmax = [kmax]
-            new_exps.append(new_exp)
+        kmin_list = exp.kmin if 'kmin' in exp else [0.]
+        kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+        for kmin in kmin_list:
+            for kmax in kmax_list:
+                new_exp = exp.copy()
+                new_exp.kmin = [kmin]
+                new_exp.kmax = [kmax]
+                new_exps.append(new_exp)
     return new_exps
 
 
