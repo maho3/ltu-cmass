@@ -111,11 +111,16 @@ def run_experiment(exp, cfg, model_path):
             logging.info(f'Loading test data from {exp_path}')
             x_test = np.load(join(exp_path, 'x_test.npy'))
             theta_test = np.load(join(exp_path, 'theta_test.npy'))
-            names = np.loadtxt(join(exp_path, 'param_names.txt'), dtype=str)
+
+            names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+            filepath = join(exp_path, 'hodprior.csv')
+            if (not cfg.infer.only_cosmo) and os.path.exists(filepath):
+                hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
+                names += hodprior[:, 0].astype('str').tolist()
         except FileNotFoundError:
             raise FileNotFoundError(
-                f'Could not find test data for {name} with kmax={kmax}'
-                '. Make sure to run cmass.infer.preprocess first.'
+                f'Could not find test data for {name} with kmax={kmax}.'
+                'Make sure to run cmass.infer.preprocess first.'
             )
         logging.info(f'Testing on {len(x_test)} examples')
 

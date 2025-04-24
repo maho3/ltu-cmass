@@ -4,6 +4,7 @@ from os.path import join
 import h5py
 import numpy as np
 from omegaconf import OmegaConf
+from cmass.bias.tools.hod import lookup_hod_model
 
 
 def get_cosmo(source_path):
@@ -11,11 +12,27 @@ def get_cosmo(source_path):
     return np.array(cfg.nbody.cosmo)
 
 
-def get_hod(diagfile):
+def get_hod_params(diagfile):
     with h5py.File(diagfile, 'r') as f:
         hod_params = f.attrs['HOD_params'][:]
-        hod_names = f.attrs['HOD_names'][:]
-    return hod_params, hod_names
+    return hod_params
+
+
+get_hod = get_hod_params  # for backwards compatibility
+
+
+def get_hod_model(diagfile):
+    with h5py.File(diagfile, 'r') as f:
+        cfg = OmegaConf.create(f.attrs['config'])
+    model = lookup_hod_model(
+        model=cfg.bias.hod.model if hasattr(
+            cfg.bias.hod, "model") else None,
+        assem_bias=cfg.bias.hod.assem_bias,
+        vel_assem_bias=cfg.bias.hod.vel_assem_bias,
+        zpivot=cfg.bias.hod.zpivot if hasattr(
+            cfg.bias.hod, "zpivot") else None
+    )
+    return model
 
 
 def closest_a(lst, a):

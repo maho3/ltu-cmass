@@ -14,7 +14,7 @@ from tqdm import tqdm
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
-from .loaders import get_cosmo, get_hod
+from .loaders import get_cosmo, get_hod_params, get_hod_model
 from .loaders import load_Pk, load_lc_Pk, load_Bk, load_lc_Bk
 from .loaders import preprocess_Pk, preprocess_Bk
 
@@ -77,17 +77,29 @@ def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
             if len(summ) > 0:
                 params = get_cosmo(sourcepath)
                 if (tracer != 'halo') & (not only_cosmo):  # add HOD params
-                    hodparams, _ = get_hod(diagfile)
+                    hodparams = get_hod_params(diagfile)
                     params = np.concatenate([params, hodparams], axis=0)
                 summlist.append(summ)
                 paramlist.append(params)
                 idlist.append(lhid)
 
     # get parameter names
-    names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
     if (tracer != 'halo') & (not only_cosmo):  # add HOD params
-        _, hodnames = get_hod(diagfile)
-        names += list(hodnames)
+        hodmodel = get_hod_model(diagfile)
+        names, lower, upper, sigma, distribution = (
+            hodmodel.parameters, hodmodel.lower_bound,
+            hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
+        )
+        # correct for unknowns
+        distribution = ['uniform'] * \
+            len(names) if distribution is None else distribution
+        sigma = [0.] * len(names) if sigma is None else sigma
+        hodprior = np.array(
+            list(zip(names, distribution, lower, upper, sigma)),
+            dtype=object
+        )
+    else:
+        hodprior = None
 
     # aggregate summaries
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
@@ -95,7 +107,7 @@ def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
             ' summaries')
-    return summaries, parameters, ids, names
+    return summaries, parameters, ids, hodprior
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
@@ -123,7 +135,7 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
             (ids_train, ids_val, ids_test))
 
 
-def run_preprocessing(summaries, parameters, ids, names, exp, cfg, model_path):
+def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
 
     # check that there's data
@@ -198,7 +210,10 @@ def run_preprocessing(summaries, parameters, ids, names, exp, cfg, model_path):
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
-            np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
+            if hodprior is not None:
+                np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
+                           delimiter=',', fmt='%s')
+            # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
 
 @timing_decorator
@@ -229,13 +244,13 @@ def main(cfg: DictConfig) -> None:
             continue
 
         logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, names = load_summaries(
+        summaries, parameters, ids, hodprior = load_summaries(
             suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
             only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
-                              names, exp, cfg, save_path)
+                              hodprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":

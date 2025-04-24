@@ -25,7 +25,7 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(cfg, theta=None):
+def prepare_prior(cfg, theta=None, hodprior=None):
     # define a prior
     if cfg.infer.prior.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -41,17 +41,15 @@ def prepare_prior(cfg, theta=None):
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
-        if theta.shape[-1] > 5:  # galaxy or lightcone
-            if cfg.bias.hod.model.lower() == 'zheng07':
-                # TODO: load these from cmass.bias.tools.hod?
-                hod_lims = np.array([
-                    [0.0, 1.5],  # alpha
-                    [13.0, 15.0],  # logM0
-                    [13.0, 15.0],  # logM1
-                    [12.0, 14.0],  # logMmin
-                    [0.1, 0.6]]  # sigma_logM
-                )
-                prior_lims = np.vstack([prior_lims, hod_lims])
+        if (theta.shape[-1] > 5) & (hodprior is not None):  # galaxy or lightcone
+            if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
+                raise NotImplementedError(
+                    "We don't know how to handle non-uniform HOD priors yet.")
+            hod_lims = hodprior[:, 2:4].astype(float)
+            prior_lims = np.vstack([prior_lims, hod_lims])
+        else:
+            raise ValueError('No HOD prior provided for quijote prior')
+
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
             high=prior_lims[:, 1],
@@ -62,7 +60,7 @@ def prepare_prior(cfg, theta=None):
     return prior
 
 
-def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
+def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior=None):
     start = time.time()
 
     # select the network configuration
@@ -70,7 +68,7 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    prior = prepare_prior(cfg, theta=theta_train)
+    prior = prepare_prior(cfg, theta=theta_train, hodprior=hodprior)
 
     # define an embedding network
     if mcfg.fcn_depth == 0:
@@ -182,6 +180,9 @@ def run_experiment(exp, cfg, model_path):
                 theta_val = np.load(join(exp_path, 'theta_val.npy'))
                 x_test = np.load(join(exp_path, 'x_test.npy'))
                 theta_test = np.load(join(exp_path, 'theta_test.npy'))
+                filepath = join(exp_path, 'hodprior.csv')
+                hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
+                            if os.path.exists(filepath) else None)
             except FileNotFoundError:
                 raise FileNotFoundError(
                     f'Could not find training/test data for {name} with '
@@ -198,7 +199,7 @@ def run_experiment(exp, cfg, model_path):
 
             # run inference
             posterior, history = run_inference(
-                x_train, theta_train, x_val, theta_val, cfg, out_dir)
+                x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior)
 
             # evaluate the posterior and save to file
             log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
