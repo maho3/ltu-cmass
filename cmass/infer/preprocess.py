@@ -14,7 +14,7 @@ from tqdm import tqdm
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
-from .loaders import get_cosmo, get_hod
+from .loaders import get_cosmo, get_hod_params, get_hod_model
 from .loaders import load_Pk, load_lc_Pk, load_Bk, load_lc_Bk
 from .loaders import preprocess_Pk, preprocess_Bk
 
@@ -31,7 +31,7 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
-def load_summaries(suitepath, tracer, Nmax, a=None):
+def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
                       'mtng_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
@@ -76,23 +76,38 @@ def load_summaries(suitepath, tracer, Nmax, a=None):
             # load parameters
             if len(summ) > 0:
                 params = get_cosmo(sourcepath)
-                if tracer != 'halo':  # add HOD params
-                    try:  # sometimes, HOD params not saved right
-                        params = np.concatenate(
-                            [params, get_hod(diagfile)], axis=0)
-                    except (OSError, KeyError):
-                        print(tracer)
-                        continue
+                if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+                    hodparams = get_hod_params(diagfile)
+                    params = np.concatenate([params, hodparams], axis=0)
                 summlist.append(summ)
                 paramlist.append(params)
                 idlist.append(lhid)
 
+    # get parameter names
+    if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+        hodmodel = get_hod_model(diagfile)
+        names, lower, upper, sigma, distribution = (
+            hodmodel.parameters, hodmodel.lower_bound,
+            hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
+        )
+        # correct for unknowns
+        distribution = ['uniform'] * \
+            len(names) if distribution is None else distribution
+        sigma = [0.] * len(names) if sigma is None else sigma
+        hodprior = np.array(
+            list(zip(names, distribution, lower, upper, sigma)),
+            dtype=object
+        )
+    else:
+        hodprior = None
+
+    # aggregate summaries
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
             ' summaries')
-    return summaries, parameters, ids
+    return summaries, parameters, ids, hodprior
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
@@ -120,7 +135,7 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
             (ids_train, ids_val, ids_test))
 
 
-def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
+def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
 
     # check that there's data
@@ -195,6 +210,10 @@ def run_preprocessing(summaries, parameters, ids, exp, cfg, model_path):
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
+            if hodprior is not None:
+                np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
+                           delimiter=',', fmt='%s')
+            # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
 
 @timing_decorator
@@ -218,55 +237,20 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.halo or cfg.infer.galaxy:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
 
-    if cfg.infer.halo:
-        logging.info('Running halo preprocessing...')
-        summaries, parameters, ids = load_summaries(
-            suite_path, 'halo', cfg.infer.Nmax, a=cfg.nbody.af)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
-    else:
-        logging.info('Skipping halo preprocessing...')
+    for tracer in ['halo', 'galaxy',
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+        if not getattr(cfg.infer, tracer):
+            logging.info(f'Skipping {tracer} preprocessing...')
+            continue
 
-    if cfg.infer.galaxy:
-        logging.info('Running galaxies preprocessing...')
-        summaries, parameters, ids = load_summaries(
-            suite_path, 'galaxy', cfg.infer.Nmax, a=cfg.nbody.af)
+        logging.info(f'Running {tracer} preprocessing...')
+        summaries, parameters, ids, hodprior = load_summaries(
+            suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
-    else:
-        logging.info('Skipping galaxy preprocessing...')
-
-    if cfg.infer.ngc_lightcone:
-        logging.info('Running ngc_lightcone preprocessing...')
-        summaries, parameters, ids = load_summaries(
-            suite_path, 'ngc_lightcone', cfg.infer.Nmax)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
-    else:
-        logging.info('Skipping ngc_lightcone preprocessing...')
-
-    if cfg.infer.sgc_lightcone:
-        logging.info('Running sgc_lightcone preprocessing...')
-        summaries, parameters, ids = load_summaries(
-            suite_path, 'sgc_lightcone', cfg.infer.Nmax)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
-    else:
-        logging.info('Skipping sgc_lightcone preprocessing...')
-
-    if cfg.infer.mtng_lightcone:
-        logging.info('Running mtng_lightcone preprocessing...')
-        summaries, parameters, ids = load_summaries(
-            suite_path, 'mtng_lightcone', cfg.infer.Nmax)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids, exp, cfg, save_path)
-    else:
-        logging.info('Skipping mtng_lightcone preprocessing...')
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            run_preprocessing(summaries, parameters, ids,
+                              hodprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":

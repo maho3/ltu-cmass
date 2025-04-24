@@ -13,7 +13,6 @@ The models themselves are described in `hod_models.py`.
 import logging
 import numpy as np
 from omegaconf import open_dict
-from .hod_models import Zheng07zdepCens, Zheng07zdepSats, Zheng07zinterpCens, Zheng07zinterpSats
 
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import halo_mass_to_halo_radius, NFWProfile
@@ -22,6 +21,28 @@ from .hod_models import (
     Zheng07, Leauthaud11, Zu_mandelbaum15,
     Zheng07zdep, Zheng07zinterp
 )
+
+
+def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=None):
+    if model is None:
+        return Zheng07()  # for backwards compatibility
+    elif model == "zheng07":
+        return Zheng07(assem_bias=assem_bias,
+                       vel_assem_bias=vel_assem_bias)
+    elif model == 'zheng07zdep':
+        return Zheng07zdep(assem_bias=assem_bias,
+                           vel_assem_bias=vel_assem_bias)
+    elif model == 'zheng07zinterp':
+        return Zheng07zinterp(zpivot, assem_bias=assem_bias,
+                              vel_assem_bias=vel_assem_bias)
+    elif model == 'leauthaud11':
+        return Leauthaud11()
+    elif model == "zu_mandelbaum15":
+        return Zu_mandelbaum15()
+    else:
+        raise NotImplementedError(
+            f'Model {model} not implemented.')
+
 
 def parse_hod(cfg):
     """
@@ -55,26 +76,20 @@ def parse_hod(cfg):
                     "vir."
                 )
                 cfg.bias.hod.mdef = "vir"
-                
-        if (cfg.bias.hod.assem_bias or cfg.bias.hod.vel_assem_bias) and (not cfg.bias.hod.model.startswith("zheng07")):
+
+        if ((cfg.bias.hod.assem_bias or cfg.bias.hod.vel_assem_bias) and
+                (not cfg.bias.hod.model.startswith("zheng07"))):
             raise NotImplementedError
 
         # Check model is available
-        if not hasattr(cfg.bias.hod, "model"):
-            model = Zheng07()  # for backwards compatibility
-        elif cfg.bias.hod.model == "zheng07":
-            model = Zheng07(assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
-        elif cfg.bias.hod.model == 'zheng07zdep':
-            model = Zheng07zdep(assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
-        elif cfg.bias.hod.model == 'zheng07zinterp':
-            model = Zheng07zinterp(cfg.bias.hod.zpivot, assem_bias=cfg.bias.hod.assem_bias,vel_assem_bias=cfg.bias.hod.vel_assem_bias,)
-        elif cfg.bias.hod.model == 'leauthaud11':
-            model = Leauthaud11()
-        elif cfg.bias.hod.model == "zu_mandelbaum15":
-            model = Zu_mandelbaum15()
-        else:
-            raise NotImplementedError(
-                f'Model {cfg.bias.hod.model} not implemented.')
+        model = lookup_hod_model(
+            model=cfg.bias.hod.model if hasattr(
+                cfg.bias.hod, "model") else None,
+            assem_bias=cfg.bias.hod.assem_bias,
+            vel_assem_bias=cfg.bias.hod.vel_assem_bias,
+            zpivot=cfg.bias.hod.zpivot if hasattr(
+                cfg.bias.hod, "zpivot") else None
+        )
 
         # Check if we're using default parameters
         if hasattr(cfg.bias.hod, "default_params"):
@@ -149,18 +164,21 @@ def build_HOD_model(
         hod_model (HODMockFactory): A HOD model object
             that can be used with Halotools.
     """
-    
+
     if (assem_bias or vel_assem_bias) and (not model.startswith("zheng07")):
         raise NotImplementedError
-    
+
     if model == "zheng07":
-        model = Zheng07(mass_def=mdef, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)
+        model = Zheng07(mass_def=mdef, assem_bias=assem_bias,
+                        vel_assem_bias=vel_assem_bias)
     elif model == "leauthaud11":
         model = Leauthaud11(mass_def=mdef, zf=zf)
     elif model == 'zheng07zdep':
-        model = Zheng07zdep(mass_def=mdef, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)    
+        model = Zheng07zdep(mass_def=mdef, assem_bias=assem_bias,
+                            vel_assem_bias=vel_assem_bias)
     elif model == 'zheng07zinterp':
-        model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot, assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)   
+        model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot,
+                               assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)
     elif model == "zu_mandelbaum15":
         model = Zu_mandelbaum15(mass_def=mdef)
     else:
@@ -198,7 +216,7 @@ def build_halo_catalog(
     '''
     mkey = f'halo_m{mdef}'
     rkey = f'halo_r{mdef}'
-    
+
     if radius is None:
         radius = halo_mass_to_halo_radius(mass, cosmo, redshift, mdef)
     if conc is None:
