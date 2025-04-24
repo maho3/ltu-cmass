@@ -41,14 +41,14 @@ def prepare_prior(cfg, theta=None, hodprior=None):
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
-        if (theta.shape[-1] > 5) & (hodprior is not None):  # galaxy or lightcone
+        if (theta.shape[-1] > 5):  # galaxy or lightcone
+            if hodprior is None:
+                raise ValueError('No HOD prior provided for quijote prior')
             if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
             prior_lims = np.vstack([prior_lims, hod_lims])
-        else:
-            raise ValueError('No HOD prior provided for quijote prior')
 
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
