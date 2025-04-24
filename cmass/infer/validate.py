@@ -39,7 +39,7 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     # Posterior coverage
     logging.info('Running posterior coverage...')
     metric = PosteriorCoverage(
-        num_samples=1000, sample_method='direct',
+        num_samples=2000, sample_method='direct',
         labels=names,
         plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
         out_dir=out_dir,
