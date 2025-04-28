@@ -21,20 +21,6 @@ def get_hod_params(diagfile):
 get_hod = get_hod_params  # for backwards compatibility
 
 
-def get_hod_model(diagfile):
-    with h5py.File(diagfile, 'r') as f:
-        cfg = OmegaConf.create(f.attrs['config'])
-    model = lookup_hod_model(
-        model=cfg.bias.hod.model if hasattr(
-            cfg.bias.hod, "model") else None,
-        assem_bias=cfg.bias.hod.assem_bias,
-        vel_assem_bias=cfg.bias.hod.vel_assem_bias,
-        zpivot=cfg.bias.hod.zpivot if hasattr(
-            cfg.bias.hod, "zpivot") else None
-    )
-    return model
-
-
 def closest_a(lst, a):
     lst = [float(el) for el in lst]
     lst = np.asarray(lst)
@@ -48,15 +34,17 @@ def load_Pk(diag_file, a):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            a = closest_a(list(f.keys()), a)
+            a = closest_a(f.keys(), a)
             a = f'{a:.6f}'
+            # load the summaries
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
                     for i in range(3):  # monopole, quadrupole, hexadecapole
                         summ[stat+str(2*i)] = {
                             'k': f[a][stat+'_k3D'][:],
                             'value': f[a][stat][:, i],
-                        }
+                            'nbar': f[a].attrs['nbar'],
+                            'a_loaded': a}
     except (OSError, KeyError):
         return {}
     return summ
@@ -68,12 +56,13 @@ def load_lc_Pk(diag_file):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
+            # load the summaries
             stat = 'Pk'
             for i in range(3):  # monopole, quadrupole, hexadecapole
                 summ[stat+str(2*i)] = {
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
-                }
+                    'nbar': f.attrs['nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -122,15 +111,17 @@ def load_Bk(diag_file, a):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            a = closest_a(list(f.keys()), a)
+            a = closest_a(f.keys(), a)
             a = f'{a:.6f}'
+            # load the summaries
             for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
                 if stat in f[a]:
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],
-                        }
+                            'nbar': f[a].attrs['nbar'],
+                            'a_loaded': a}
     except (OSError, KeyError):
         return {}
     return summ
@@ -142,13 +133,14 @@ def load_lc_Bk(diag_file):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
+            # load the summaries
             for stat in ['Bk', 'Qk']:
                 if stat in f:
                     for i in range(1):  # just monopole
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
-                            'value': f[stat][i, :]
-                        }
+                            'value': f[stat][i, :],
+                            'nbar': f.attrs['nbar']}
     except (OSError, KeyError):
         return {}
     return summ
