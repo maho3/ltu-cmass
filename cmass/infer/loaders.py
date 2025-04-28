@@ -4,7 +4,7 @@ from os.path import join
 import h5py
 import numpy as np
 from omegaconf import OmegaConf
-from cmass.bias.tools.hod import lookup_hod_model
+from cmass.bias.hod import lookup_hod_model
 
 
 def get_cosmo(source_path):
@@ -43,7 +43,7 @@ def load_Pk(diag_file, a):
                         summ[stat+str(2*i)] = {
                             'k': f[a][stat+'_k3D'][:],
                             'value': f[a][stat][:, i],
-                            'nbar': f[a].attrs['nbar'],
+                            'log10nbar': f[a].attrs['log10nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -62,7 +62,7 @@ def load_lc_Pk(diag_file):
                 summ[stat+str(2*i)] = {
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
-                    'nbar': f.attrs['nbar']}
+                    'log10nbar': f.attrs['log10nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -120,7 +120,7 @@ def load_Bk(diag_file, a):
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],
-                            'nbar': f[a].attrs['nbar'],
+                            'log10nbar': f[a].attrs['log10nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -140,7 +140,7 @@ def load_lc_Bk(diag_file):
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :],
-                            'nbar': f.attrs['nbar']}
+                            'log10nbar': f.attrs['log10nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -180,3 +180,70 @@ def preprocess_Bk(X, kmax, kmin=0., log=False, equilateral_only=False):
     Xout = Xout.reshape(len(Xout), -1)
 
     return Xout
+
+
+def _construct_hod_prior(configfile):
+    cfg = OmegaConf.load(configfile)
+    hodcfg = cfg.bias.hod
+    hodmodel = lookup_hod_model(
+        model=hodcfg.model if hasattr(hodcfg, "model") else None,
+        assem_bias=hodcfg.assem_bias if hasattr(
+            hodcfg, "assem_bias") else False,
+        vel_assem_bias=hodcfg.vel_assem_bias if hasattr(
+            hodcfg, "vel_assem_bias") else False,
+        zpivot=hodcfg.zpivot if hasattr(
+            hodcfg, "zpivot") else None
+    )
+    names, lower, upper, sigma, distribution = (
+        hodmodel.parameters, hodmodel.lower_bound,
+        hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
+    )
+    # correct for unknowns
+    distribution = ['uniform'] * \
+        len(names) if distribution is None else distribution
+    sigma = [0.] * len(names) if sigma is None else sigma
+    hodprior = np.array(
+        list(zip(names, distribution, lower, upper, sigma)),
+        dtype=object
+    )
+    return hodprior
+
+
+def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=False):
+    # specify paths to diagnostics
+    diagpath = join(sourcepath, 'diag')
+    if tracer == 'galaxy':
+        diagpath = join(diagpath, 'galaxies')  # oops
+    elif 'lightcone' in tracer:
+        diagpath = join(diagpath, f'{tracer}')
+    if not os.path.isdir(diagpath):
+        return [], []
+
+    # for each diagnostics file
+    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
+    summlist, paramlist = [], []
+    for f in filelist:
+        diagfile = join(diagpath, f)
+
+        # load summaries  # TODO: load other summaries
+        summ = {}
+        if 'lightcone' in tracer:
+            summ.update(load_lc_Pk(diagfile))
+            summ.update(load_lc_Bk(diagfile))
+        else:
+            summ.update(load_Pk(diagfile, a))
+            summ.update(load_Bk(diagfile, a))
+        if len(summ) == 0:
+            continue  # skip empty files
+
+        # load cosmo/hod parameters
+        params = get_cosmo(sourcepath)
+        if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+            hodparams = get_hod_params(diagfile)
+            params = np.concatenate([params, hodparams], axis=0)
+
+        # append to lists
+        summlist.append(summ)
+        paramlist.append(params)
+
+    return summlist, paramlist

@@ -222,6 +222,8 @@ def summarize_tracer(
 
         # Save number density of tracers
         out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+        out_attrs['log10nbar'] = \
+            np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
         out_attrs['high_res'] = high_res
 
         # Noise out positions (we do not probe less than Lnoise)
@@ -364,6 +366,8 @@ def summarize_lightcone(
     out_attrs = {}
     # Save number density of tracers
     out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+    out_attrs['log10nbar'] = \
+        np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
     out_attrs['high_res'] = high_res
 
     out_data = {}

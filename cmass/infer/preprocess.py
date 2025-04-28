@@ -14,9 +14,9 @@ from tqdm import tqdm
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
-from .loaders import get_cosmo, get_hod_params, lookup_hod_model
-from .loaders import load_Pk, load_lc_Pk, load_Bk, load_lc_Bk
-from .loaders import preprocess_Pk, preprocess_Bk
+from .loaders import (
+    preprocess_Pk, preprocess_Bk, _construct_hod_prior,
+    _load_single_simulation_summaries)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -29,73 +29,6 @@ def aggregate(summlist, paramlist, idlist):
             parameters[key].append(param)
             ids[key].append(id)
     return summaries, parameters, ids
-
-
-def _construct_hod_prior(configfile):
-    cfg = OmegaConf.load(configfile)
-    hodcfg = cfg.bias.hod
-    hodmodel = lookup_hod_model(
-        model=hodcfg.model if hasattr(hodcfg, "model") else None,
-        assem_bias=hodcfg.assem_bias if hasattr(
-            hodcfg, "assem_bias") else False,
-        vel_assem_bias=hodcfg.vel_assem_bias if hasattr(
-            hodcfg, "vel_assem_bias") else False,
-        zpivot=hodcfg.zpivot if hasattr(
-            hodcfg, "zpivot") else None
-    )
-    names, lower, upper, sigma, distribution = (
-        hodmodel.parameters, hodmodel.lower_bound,
-        hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
-    )
-    # correct for unknowns
-    distribution = ['uniform'] * \
-        len(names) if distribution is None else distribution
-    sigma = [0.] * len(names) if sigma is None else sigma
-    hodprior = np.array(
-        list(zip(names, distribution, lower, upper, sigma)),
-        dtype=object
-    )
-    return hodprior
-
-
-def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=False):
-    # specify paths to diagnostics
-    diagpath = join(sourcepath, 'diag')
-    if tracer == 'galaxy':
-        diagpath = join(diagpath, 'galaxies')  # oops
-    elif 'lightcone' in tracer:
-        diagpath = join(diagpath, f'{tracer}')
-    if not os.path.isdir(diagpath):
-        return [], []
-
-    # for each diagnostics file
-    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
-    summlist, paramlist = [], []
-    for f in filelist:
-        diagfile = join(diagpath, f)
-
-        # load summaries  # TODO: load other summaries
-        summ = {}
-        if 'lightcone' in tracer:
-            summ.update(load_lc_Pk(diagfile))
-            summ.update(load_lc_Bk(diagfile))
-        else:
-            summ.update(load_Pk(diagfile, a))
-            summ.update(load_Bk(diagfile, a))
-        if len(summ) == 0:
-            continue  # skip empty files
-
-        # load cosmo/hod parameters
-        params = get_cosmo(sourcepath)
-        if (tracer != 'halo') & (not only_cosmo):  # add HOD params
-            hodparams = get_hod_params(diagfile)
-            params = np.concatenate([params, hodparams], axis=0)
-
-        # append to lists
-        summlist.append(summ)
-        paramlist.append(params)
-
-    return summlist, paramlist
 
 
 def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
