@@ -366,8 +366,8 @@ def summarize_lightcone(
     if np.any(pos < 0) or np.any(pos > L):
         logging.error('Error! Some tracers outside of box!')
         raise ValueError(
-            f'position out of bounds: {np.min(pos, axis=0)} '
-            f'{np.max(pos, axis=0)}')
+            f'position out of bounds for {cap}_lightcone: '
+            f'{np.min(pos, axis=0)} {np.max(pos, axis=0)}')
 
     out_attrs = {}
     # Save number density of tracers
