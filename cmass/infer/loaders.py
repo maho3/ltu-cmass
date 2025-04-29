@@ -4,7 +4,7 @@ from os.path import join
 import h5py
 import numpy as np
 from omegaconf import OmegaConf
-from cmass.bias.hod import lookup_hod_model
+from cmass.bias.tools.hod import lookup_hod_model
 
 
 def get_cosmo(source_path):
