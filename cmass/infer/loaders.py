@@ -214,7 +214,7 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=Fal
     # specify paths to diagnostics
     diagpath = join(sourcepath, 'diag')
     if tracer == 'galaxy':
-        diagpath = join(diagpath, 'galaxies')  # oops
+        diagpath = join(diagpath, 'galaxies')
     elif 'lightcone' in tracer:
         diagpath = join(diagpath, f'{tracer}')
     if not os.path.isdir(diagpath):
