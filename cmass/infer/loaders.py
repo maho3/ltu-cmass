@@ -68,43 +68,6 @@ def load_lc_Pk(diag_file):
     return summ
 
 
-def preprocess_Pk(X, kmax, monopole=True, norm=None, kmin=0.):
-    if (not monopole) and (norm is None):
-        raise ValueError('norm must be provided when monopole is False')
-
-    Xout = []
-    for x in X:
-        k, value = x['k'], x['value']
-        # cut k
-        value = value[(kmin <= k) & (k <= kmax)]
-        Xout.append(value)
-    Xout = np.array(Xout)
-
-    if monopole:
-        # log transform
-        Xout = np.log(Xout)
-    else:
-        # compute monopole
-        Xnorm = []
-        for x in norm:
-            k, value = x['k'], x['value']
-            # cut k
-            value = value[(kmin <= k) & (k <= kmax)]
-            Xnorm.append(value)
-        Xnorm = np.array(Xnorm)
-
-        # normalize by the monopole
-        Xout /= Xnorm
-
-    # impute nans
-    Xout = np.nan_to_num(Xout, nan=0.0)
-
-    # flatten
-    Xout = Xout.reshape(len(Xout), -1)
-
-    return Xout
-
-
 def load_Bk(diag_file, a):
     if not os.path.exists(diag_file):
         return {}
@@ -146,40 +109,68 @@ def load_lc_Bk(diag_file):
     return summ
 
 
-def preprocess_Bk(X, kmax, kmin=0., log=False, equilateral_only=False):
+def _is_in_kminmax(k, kmin, kmax):
+    k = np.atleast_2d(k)
+    return np.all((kmin <= k) & (k <= kmax), axis=0)
 
-    Xout = []
-    for x in X:
-        k, value = x['k'], x['value']
 
-        # cut kmax and kmin
-        m = ~ np.any((k < kmin) | (kmax < k), axis=0)
-        value = value[m]
-        k = k[:, m]
+def _filter_Pk(X, kmin, kmax):
+    # filter kmin and kmax
+    return np.array(
+        [x['value'][_is_in_kminmax(x['k'], kmin, kmax)] for x in X])
 
-        if equilateral_only:
-            # equal wavevector components and error tolerance for safety
-            k1, k2, k3 = k
-            m = np.isclose(k1, k2) & np.isclose(k2, k3)
-            value = value[m]
-        else:
-            # check if k1 >= k2 + k3 for generic triangle configurations
-            k1, k2, k3 = k
-            m = (k1 < k2 + k3)
-            value = value[m]
 
-        if log:
-            value = np.log10(value)
-        Xout.append(value)
-    Xout = np.array(Xout)
+def _get_nbar(X):
+    return np.array([x['log10nbar'] for x in X]).reshape(-1, 1)
 
-    # impute nans
-    Xout = np.nan_to_num(Xout, nan=0.0)
 
-    # flatten
-    Xout = Xout.reshape(len(Xout), -1)
+def preprocess_Pk(data, kmax, monopole=True, norm=None, kmin=0., correct_shot=False):
+   # process Pk: filtering for k's, normalizing, and flattening
+    if not monopole and norm is None:
+        raise ValueError('norm must be provided when monopole is False')
 
-    return Xout
+    X = _filter_Pk(data, kmin, kmax)
+
+    if monopole:
+        X = np.log(X)
+    else:
+        Xnorm = _filter_Pk(norm, kmin, kmax)
+        X /= Xnorm
+
+    return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
+
+
+def _is_valid_triangle(k):
+    # Return mask of triangles satisfying triangle inequality: k1 < k2 + k3
+    k1, k2, k3 = k
+    return (k1 < k2 + k3) & (k2 < k1 + k3) & (k3 < k1 + k2)
+
+
+def _is_equilateral(k):
+    # Return mask of equilateral triangles
+    k1, k2, k3 = k
+    return np.isclose(k1, k2) & np.isclose(k2, k3)
+
+
+def _filter_Bk(X, kmin, kmax, equilateral_only=True):
+    if equilateral_only:
+        return np.array(
+            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_equilateral(x['k'])]
+             for x in X])
+    else:
+        return np.array(
+            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_valid_triangle(x['k'])]
+             for x in X])
+
+
+def preprocess_Bk(data, kmax, kmin=0., log=False, equilateral_only=False, correct_shot=False):
+    # process Bk: filtering for k's, normalizing, and flattening
+    X = _filter_Bk(data, kmin, kmax, equilateral_only)
+
+    if log:
+        X = np.log10(X)
+
+    return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
 
 
 def _construct_hod_prior(configfile):

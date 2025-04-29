@@ -124,7 +124,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                     eq_bool = False
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
                 if 'Pk0' in summ:
-                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin)
+                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 elif 'Pk' in summ:
                     norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
                     if norm_key in summaries:
@@ -136,10 +137,12 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                             f'Need monopole for normalization of {summ}')
                 elif 'Bk' in summ:
                     x = preprocess_Bk(x, kmax, log=True,
-                                      equilateral_only=eq_bool, kmin=kmin)
+                                      equilateral_only=eq_bool, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 elif 'Qk' in summ:
                     x = preprocess_Bk(x, kmax, log=False,
-                                      equilateral_only=eq_bool, kmin=kmin)
+                                      equilateral_only=eq_bool, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
