@@ -220,9 +220,11 @@ def summarize_tracer(
             vel = vel[mask]
             mass = mass[mask]
 
-            out_attrs['density'] = float(density)
-        else:
-            out_attrs['density'] = np.nan
+        # Save number density of tracers
+        out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+        out_attrs['log10nbar'] = \
+            np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
+        out_attrs['high_res'] = high_res
 
         # Noise out positions (we do not probe less than Lnoise)
         Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
@@ -361,6 +363,13 @@ def summarize_lightcone(
         logging.error('Error! Some tracers outside of box!')
         return False
 
+    out_attrs = {}
+    # Save number density of tracers
+    out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+    out_attrs['log10nbar'] = \
+        np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
+    out_attrs['high_res'] = high_res
+
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
@@ -400,7 +409,7 @@ def summarize_lightcone(
         )
         out_data.update(out)
 
-    save_group(outpath, out_data, None, None,
+    save_group(outpath, out_data, out_attrs, None,
                config, save_HOD=True)
     return True
 
