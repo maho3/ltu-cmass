@@ -120,19 +120,26 @@ def _filter_Pk(X, kmin, kmax):
         [x['value'][_is_in_kminmax(x['k'], kmin, kmax)] for x in X])
 
 
-def _get_nbar(X):
-    return np.array([x['log10nbar'] for x in X]).reshape(-1, 1)
+def _get_nbar(data):
+    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
+
+
+def signed_log(x, base=10):
+    # Compute the signed logarithm of x (for negative values)
+    return np.sign(x) * np.log1p(np.abs(x)) / np.log(base)
 
 
 def preprocess_Pk(data, kmax, monopole=True, norm=None, kmin=0., correct_shot=False):
-   # process Pk: filtering for k's, normalizing, and flattening
+    # process Pk: filtering for k's, normalizing, and flattening
     if not monopole and norm is None:
         raise ValueError('norm must be provided when monopole is False')
 
     X = _filter_Pk(data, kmin, kmax)
 
     if monopole:
-        X = np.log(X)
+        X = signed_log(X)
+        if correct_shot:
+            X /= np.sqrt(2 * np.pi)
     else:
         Xnorm = _filter_Pk(norm, kmin, kmax)
         X /= Xnorm
@@ -168,7 +175,7 @@ def preprocess_Bk(data, kmax, kmin=0., log=False, equilateral_only=False, correc
     X = _filter_Bk(data, kmin, kmax, equilateral_only)
 
     if log:
-        X = np.log10(X)
+        X = signed_log(X)
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
 
