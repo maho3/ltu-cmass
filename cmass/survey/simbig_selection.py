@@ -38,11 +38,11 @@ def _in_simbig_selection(ra, dec, z):
     assert len(ra) == len(dec) == len(z)
 
     # SIMBIG selection function (arxiv:2211.00660)
-    ramin, ramax = -25., 28.
+    ramin, ramax = -25. + 360, 28.
     decmin, decmax = - 6., np.inf
     zmin, zmax = 0.45, 0.6
-    return (
-        (ramin < ra) & (ra < ramax) &
+    return (  # ra check accounts for wrap-around
+        (((0 < ra) & (ra < ramax)) | (((ramin < ra) & (ra < 360)))) &
         (decmin < dec) & (dec < decmax) &
         (zmin < z) & (z < zmax)
     )
@@ -94,7 +94,6 @@ def main(cfg: DictConfig) -> None:
         attrs.pop(key, None)
 
     # Save the filtered lightcone
-    logging.info(f'Saving SimBIG lightcone to {outdir}')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
