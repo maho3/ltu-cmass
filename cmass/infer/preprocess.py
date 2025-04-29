@@ -14,9 +14,9 @@ from tqdm import tqdm
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
-from .loaders import get_cosmo, get_hod_params, get_hod_model
-from .loaders import load_Pk, load_lc_Pk, load_Bk, load_lc_Bk
-from .loaders import preprocess_Pk, preprocess_Bk
+from .loaders import (
+    preprocess_Pk, preprocess_Bk, _construct_hod_prior,
+    _load_single_simulation_summaries)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -46,67 +46,25 @@ def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
 
     # load summaries
     summlist, paramlist, idlist = [], [], []
-    Ntot = 0
     for lhid in tqdm(simpaths):
-        # specify paths to diagnostics
         sourcepath = join(suitepath, lhid)
-        diagpath = join(sourcepath, 'diag')
-        if tracer == 'galaxy':
-            diagpath = join(diagpath, 'galaxies')
-        elif 'lightcone' in tracer:
-            diagpath = join(diagpath, f'{tracer}')
-        if not os.path.isdir(diagpath):
-            continue
-
-        # for each diagnostics file
-        if tracer == 'halo':
-            filelist = ['halos.h5']
-        else:
-            filelist = os.listdir(diagpath)
-        Ntot += len(filelist)
-        for f in filelist:
-            diagfile = join(diagpath, f)
-            # load summaries  # TODO: load other summaries
-            if 'lightcone' in tracer:
-                summ = load_lc_Pk(diagfile)
-                summ.update(load_lc_Bk(diagfile))
-            else:
-                summ = load_Pk(diagfile, a)
-                summ.update(load_Bk(diagfile, a))
-            # load parameters
-            if len(summ) > 0:
-                params = get_cosmo(sourcepath)
-                if (tracer != 'halo') & (not only_cosmo):  # add HOD params
-                    hodparams = get_hod_params(diagfile)
-                    params = np.concatenate([params, hodparams], axis=0)
-                summlist.append(summ)
-                paramlist.append(params)
-                idlist.append(lhid)
+        summs, params = _load_single_simulation_summaries(
+            sourcepath, tracer, a=a, only_cosmo=only_cosmo)
+        summlist += summs
+        paramlist += params
+        idlist += [lhid] * len(summs)
 
     # get parameter names
+    hodprior = None
     if (tracer != 'halo') & (not only_cosmo):  # add HOD params
-        hodmodel = get_hod_model(diagfile)
-        names, lower, upper, sigma, distribution = (
-            hodmodel.parameters, hodmodel.lower_bound,
-            hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
-        )
-        # correct for unknowns
-        distribution = ['uniform'] * \
-            len(names) if distribution is None else distribution
-        sigma = [0.] * len(names) if sigma is None else sigma
-        hodprior = np.array(
-            list(zip(names, distribution, lower, upper, sigma)),
-            dtype=object
-        )
-    else:
-        hodprior = None
+        example_config_file = join(suitepath, simpaths[0], 'config.yaml')
+        hodprior = _construct_hod_prior(example_config_file)
 
-    # aggregate summaries
+    # aggregate summaries (merges all summaries into a single dict)
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
-            f'Successfully loaded {len(summaries[key])} / {Ntot} {key}'
-            ' summaries')
+            f'Successfully loaded {len(summaries[key])} {key} summaries')
     return summaries, parameters, ids, hodprior
 
 
@@ -156,8 +114,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                 f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
             xs = []
-            # Handling the case where we want equilateral triangles only
+
             for summ in exp.summary:
+                # Handle all the different summaries
                 if "Eq" in summ:  # only for Bk/Qk
                     summ = summ.replace("Eq", "")
                     eq_bool = True
@@ -165,7 +124,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                     eq_bool = False
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
                 if 'Pk0' in summ:
-                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin)
+                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 elif 'Pk' in summ:
                     norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
                     if norm_key in summaries:
@@ -177,10 +137,12 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                             f'Need monopole for normalization of {summ}')
                 elif 'Bk' in summ:
                     x = preprocess_Bk(x, kmax, log=True,
-                                      equilateral_only=eq_bool, kmin=kmin)
+                                      equilateral_only=eq_bool, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 elif 'Qk' in summ:
                     x = preprocess_Bk(x, kmax, log=False,
-                                      equilateral_only=eq_bool, kmin=kmin)
+                                      equilateral_only=eq_bool, kmin=kmin,
+                                      correct_shot=cfg.infer.correct_shot)
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)

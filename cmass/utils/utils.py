@@ -46,8 +46,10 @@ def save_cfg(source_path, cfg, field=None):
         if field is not None:
             cfg = OmegaConf.masked_copy(cfg, field)
             cfg = OmegaConf.merge(old_cfg, cfg)
-    os.remove(join(source_path, 'config.yaml'))
-    OmegaConf.save(cfg, join(source_path, 'config.yaml'))
+    filename = join(source_path, 'config.yaml')
+    if os.path.isfile(filename):
+        os.remove(filename)
+    OmegaConf.save(cfg, filename)
 
 
 def load_params(index, cosmofile):
