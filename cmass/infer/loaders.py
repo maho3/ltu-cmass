@@ -43,7 +43,7 @@ def load_Pk(diag_file, a):
                         summ[stat+str(2*i)] = {
                             'k': f[a][stat+'_k3D'][:],
                             'value': f[a][stat][:, i],
-                            'log10nbar': f[a].attrs['log10nbar'],
+                            'nbar': f[a].attrs['nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -62,7 +62,7 @@ def load_lc_Pk(diag_file):
                 summ[stat+str(2*i)] = {
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
-                    'log10nbar': f.attrs['log10nbar']}
+                    'nbar': f.attrs['nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -83,7 +83,7 @@ def load_Bk(diag_file, a):
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],
-                            'log10nbar': f[a].attrs['log10nbar'],
+                            'nbar': f[a].attrs['nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -103,7 +103,7 @@ def load_lc_Bk(diag_file):
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :],
-                            'log10nbar': f.attrs['log10nbar']}
+                            'nbar': f.attrs['nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -121,7 +121,7 @@ def _filter_Pk(X, kmin, kmax):
 
 
 def _get_nbar(data):
-    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
+    return np.array([x['nbar'] for x in data]).reshape(-1, 1)
 
 
 def signed_log(x, base=10):
@@ -137,9 +137,9 @@ def preprocess_Pk(data, kmax, monopole=True, norm=None, kmin=0., correct_shot=Fa
     X = _filter_Pk(data, kmin, kmax)
 
     if monopole:
-        X = signed_log(X)
         if correct_shot:
-            X /= np.sqrt(2 * np.pi)
+            X -= 1./_get_nbar(data)  # subtract shot noise
+        X = signed_log(X)
     else:
         Xnorm = _filter_Pk(norm, kmin, kmax)
         X /= Xnorm
@@ -173,6 +173,9 @@ def _filter_Bk(X, kmin, kmax, equilateral_only=True):
 def preprocess_Bk(data, kmax, kmin=0., log=False, equilateral_only=False, correct_shot=False):
     # process Bk: filtering for k's, normalizing, and flattening
     X = _filter_Bk(data, kmin, kmax, equilateral_only)
+
+    if correct_shot:  # Eq. 44 arxiv:1610.06585
+        pass  # not implemented because I'm not sure its right
 
     if log:
         X = signed_log(X)
