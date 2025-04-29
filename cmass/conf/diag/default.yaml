@@ -10,6 +10,7 @@ galaxy: false
 ngc: false
 sgc: false
 mtng: false
+simbig: false
 
 # number of threads for P(k) computation
 threads: -1  # -1 for all available threads
