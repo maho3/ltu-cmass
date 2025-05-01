@@ -33,7 +33,7 @@ def aggregate(summlist, paramlist, idlist):
 
 def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
-                      'mtng_lightcone']:
+                      'mtng_lightcone', 'simbig_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
 
     logging.info(f'Looking for {tracer} summaries at {suitepath}')
@@ -200,7 +200,8 @@ def main(cfg: DictConfig) -> None:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
 
     for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
+                   'simbig_lightcone']:
         if not getattr(cfg.infer, tracer):
             logging.info(f'Skipping {tracer} preprocessing...')
             continue
