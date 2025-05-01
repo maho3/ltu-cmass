@@ -14,21 +14,22 @@
 module restore cmass
 conda activate cmassrun
 
-exp_index=38
+# exp_index=2
 net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijote
-sim=nbody
-infer=default
+nbody=abacuslike
+sim=fastpm
+infer=simple
 
-halo=True
+halo=False
 galaxy=False
 ngc=False
 sgc=False
 mtng=False
+simbig=True
 
 extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu
@@ -38,9 +39,9 @@ extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
-suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
+suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 
-echo "Running inference with $suffix"
+echo "Running inference pipeline with $suffix"
 
-python -m cmass.infer.train $suffix net=tuning
+python -m cmass.infer.train $suffix net=mafonly

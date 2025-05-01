@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=38
+SLURM_ARRAY_TASK_ID=1
 
 module restore cmass
 conda activate cmassrun
@@ -22,13 +22,14 @@ cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=abacuslike
 sim=fastpm
-infer=default
+infer=simple
 
-halo=True
+halo=False
 galaxy=False
 ngc=False
 sgc=False
 mtng=False
+simbig=True
 
 extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu
@@ -38,9 +39,9 @@ device=cpu
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
-suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
+suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 
-echo "Running inference with $suffix"
+echo "Running inference pipeline with $suffix"
 
 python -m cmass.infer.validate $suffix

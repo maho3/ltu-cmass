@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=quijotelike_bias   # Job name
-#SBATCH --array=0-999         # Job array range for lhid
+#SBATCH --array=130-181         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=02:00:00         # Time limit
@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=88
+# SLURM_ARRAY_TASK_ID=130
 globoffset=0
 
 module restore cmass
@@ -23,12 +23,12 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
-nbody=quijote
-sim=nbody_leauthaud
-multisnapshot=False
+nbody=abacus1gpch
+sim=correct
+multisnapshot=True
 diag_from_scratch=True
 rm_galaxies=False
-extras="" # "meta.cosmofile=./params/abacus_cosmologies.txt"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="meta.cosmofile=./params/abacus_cosmologies.txt"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 # extras="$extras bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10"
 L=1000
 N=128
@@ -41,7 +41,7 @@ export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
 
-for offset in 0 1000; do
+for offset in 0; do #  1000; do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
@@ -68,7 +68,7 @@ for offset in 0 1000; do
             echo "File $file exists."
         else
             echo "File $file does not exist."
-            # python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
         fi
         python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
