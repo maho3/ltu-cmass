@@ -492,7 +492,8 @@ def main(cfg: DictConfig) -> None:
     for cap in ['ngc', 'sgc', 'mtng', 'simbig']:
         if cfg.diag.all or getattr(cfg.diag, f'{cap}'):
             done = summarize_lightcone(
-                source_path, cfg.nbody.L, cosmo,
+                source_path, cfg.nbody.L,
+                cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
                 cap=cap, high_res=cfg.diag.high_res,
                 threads=threads, from_scratch=from_scratch,
                 hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,

@@ -16,6 +16,7 @@ galaxy: False    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
 mtng_lightcone: False # whether to train on mtng_lightcone summaries
+simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
   - summary: [Pk0]   # monopole

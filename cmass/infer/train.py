@@ -223,7 +223,8 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone']:
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
+                   'simbig_lightcone']:
         if not getattr(cfg.infer, tracer):
             logging.info(f'Skipping {tracer} inference...')
             continue
