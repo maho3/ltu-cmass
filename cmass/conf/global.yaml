@@ -17,6 +17,7 @@ meta:
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
   # cosmofile: "./params/abacus_cosmologies.txt"      # for abacus-like
+  # cosmofile: "./params/abacus_custom_cosmologies.txt" # for new abacus-like
   # cosmofile: "./params/mtng_cosmologies.txt"        # for mtng-like
 
   # executables
