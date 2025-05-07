@@ -39,7 +39,7 @@ from .phase_space_models import (
 
 
 def truncated_gaussian(mean, std, lower, upper, size=1):
-    a, b = (lower - mean) / std, (upper - mean) / std  # Compute standardised bounds
+    a, b = (lower - mean) / std, (upper - mean) / std  # Compute bounds
     return truncnorm.rvs(a, b, loc=mean, scale=std, size=size)
 
 
@@ -81,6 +81,10 @@ class Hod_model:
         vel_assem_bias=False,
     ):
         self.parameters = parameters
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.distribution = distribution
+        self.sigma = sigma
 
         # Loop through parameters and initialise
         zipped = zip_longest(
@@ -143,7 +147,8 @@ class Hod_model:
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
                 _sigma = getattr(self, _param).sigma
-                sampled_param = float(truncated_gaussian(0, _sigma, _lower, _upper)[0])
+                sampled_param = float(
+                    truncated_gaussian(0, _sigma, _lower, _upper)[0])
             else:
                 raise NotImplementedError
             getattr(self, _param).value = sampled_param
@@ -250,7 +255,8 @@ class Zheng07(Hod_model):
                 "mean_occupation_satellites_assembias_param1",
             ]
         if vel_assem_bias:
-            pars += ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]
+            pars += ["eta_vb_centrals", "eta_vb_satellites",
+                     "conc_gal_bias_satellites"]
         low = [lower_bound[parameters.index(p)] for p in pars]
         up = [upper_bound[parameters.index(p)] for p in pars]
         sig = [sigma[parameters.index(p)] for p in pars]
@@ -425,9 +431,12 @@ class Zheng07zdep(Hod_model):
             "mean_occupation_centrals_assembias_param1",
             "mean_occupation_satellites_assembias_param1",
         ],
-        lower_bound=np.array([12.0, 0.1, 13.0, 13.0, 0.0, -30.0, -10.0, 0.0, 0.2, 0.2, -1, -1]),
-        upper_bound=np.array([14.0, 0.6, 15.0, 15.0, 1.5, 0.0, 0.0, 0.7, 2.0, 2.0, 1, 1]),
-        sigma=[None, None, None, None, None, None, None, None, None, None, 0.2, 0.2],
+        lower_bound=np.array(
+            [12.0, 0.1, 13.0, 13.0, 0.0, -30.0, -10.0, 0.0, 0.2, 0.2, -1, -1]),
+        upper_bound=np.array(
+            [14.0, 0.6, 15.0, 15.0, 1.5, 0.0, 0.0, 0.7, 2.0, 2.0, 1, 1]),
+        sigma=[None, None, None, None, None, None,
+               None, None, None, None, 0.2, 0.2],
         distribution=[
             "uniform",
             "uniform",
@@ -447,16 +456,18 @@ class Zheng07zdep(Hod_model):
         assem_bias=False,
         vel_assem_bias=False,
     ):
-        
+
         # Determine which parameters we need
-        pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha", "mucen", "musat"]
+        pars = ["logMmin", "sigma_logM", "logM0",
+                "logM1", "alpha", "mucen", "musat"]
         if assem_bias:
             pars += [
                 "mean_occupation_centrals_assembias_param1",
                 "mean_occupation_satellites_assembias_param1",
             ]
         if vel_assem_bias:
-            pars += ["eta_vb_centrals", "eta_vb_satellites", "conc_gal_bias_satellites"]
+            pars += ["eta_vb_centrals", "eta_vb_satellites",
+                     "conc_gal_bias_satellites"]
         low = [lower_bound[parameters.index(p)] for p in pars]
         up = [upper_bound[parameters.index(p)] for p in pars]
         sig = [sigma[parameters.index(p)] for p in pars]
@@ -944,7 +955,8 @@ class Leauthaud11(Hod_model):
     def set_occupation(
         self,
     ):
-        self.cenocc = Leauthaud11Cens(prim_haloprop_key=self.mass_key, redshift=self.zf)
+        self.cenocc = Leauthaud11Cens(
+            prim_haloprop_key=self.mass_key, redshift=self.zf)
         self.satocc = Leauthaud11Sats(
             prim_haloprop_key=self.mass_key,
             cenocc_model=self.cenocc,
@@ -1106,13 +1118,13 @@ class Zu_mandelbaum15(Hod_model):
 def logM_i(z, logM_i_pivot, mu_i_p, z_pivot):
     """
     Apply a linear dependence in a = 1 / (1 + z) to the logarithm of a mass variables
-    
+
     Args:
         :z (float): Cosmological redshift
         :logM_i_pivot (float): The value of the mass parameter at the pivot redshift
         :mu_i_p (float): Slope of the logmass-a relation
         :z_pivot (float): The pivot redshift
-        
+
     Returns:
         float: The log-mass variable at the requested cosmological redshift
     """
@@ -1140,7 +1152,8 @@ class Zheng07zdepCens(Zheng07Cens):
             self.param_dict["mucen"],
             self.param_dict["zpivot"],
         )
-        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) / self.param_dict["sigma_logM"]))
+        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) /
+                           self.param_dict["sigma_logM"]))
 
         return mean_ncen
 
@@ -1252,9 +1265,11 @@ class Zheng07zinterpCens(Zheng07Cens):
         yp = [self.param_dict[f"logMmin_z{i}"] for i in range(self.npivot)]
         logMmin = linear_interp_extrap(redshift, self.zpivot, yp)
 
-        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) / self.param_dict["sigma_logM"]))
+        mean_ncen = 0.5 * (1.0 + erf((logM - logMmin) /
+                           self.param_dict["sigma_logM"]))
 
         return mean_ncen
+
 
 class Zheng07zinterpSats(Zheng07Sats):
     # Params: logM0, logM1, alpha, musat, zpivot
@@ -1310,7 +1325,7 @@ class Zheng07zinterpSats(Zheng07Sats):
 
 class AssembiasZheng07zinterpCens(Zheng07zinterpCens, HeavisideAssembias):
     r"""Assembly-biased modulation of `Zheng07zinterpCens`."""
-    
+
     def __init__(self, zpivot, **kwargs):
 
         Zheng07zinterpCens.__init__(self, zpivot, **kwargs)
@@ -1325,7 +1340,7 @@ class AssembiasZheng07zinterpCens(Zheng07zinterpCens, HeavisideAssembias):
 
 class AssembiasZheng07zinterpSats(Zheng07zinterpSats, HeavisideAssembias):
     r"""Assembly-biased modulation of `Zheng07zinterpSats`."""
-    
+
     def __init__(self, zpivot, **kwargs):
 
         Zheng07zinterpSats.__init__(self, zpivot, **kwargs)
@@ -1340,7 +1355,7 @@ class AssembiasZheng07zinterpSats(Zheng07zinterpSats, HeavisideAssembias):
 
 class AssembiasZheng07zdepCens(Zheng07zdepCens, HeavisideAssembias):
     r"""Assembly-biased modulation of `Zheng07zdepCens`."""
-    
+
     def __init__(self, **kwargs):
 
         Zheng07zdepCens.__init__(self, **kwargs)
@@ -1352,9 +1367,10 @@ class AssembiasZheng07zdepCens(Zheng07zdepCens, HeavisideAssembias):
             **kwargs
         )
 
+
 class AssembiasZheng07zdepSats(Zheng07zdepSats, HeavisideAssembias):
     r"""Assembly-biased modulation of `Zheng07zdepSats`."""
-    
+
     def __init__(self, **kwargs):
 
         Zheng07zdepSats.__init__(self, **kwargs)

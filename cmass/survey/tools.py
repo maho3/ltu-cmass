@@ -331,3 +331,20 @@ def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
             f.create_dataset('galidx', data=galidx)    # Galaxy index
         if weight is not None:
             f.create_dataset('weight', data=weight)    # Weight
+
+
+def load_lightcone(indir, hod_seed=0, aug_seed=0, suffix=''):
+    """Load lightcone data from file."""
+    filename = f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5'
+    filepath = join(indir, filename)
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f'File {filepath} does not exist.')
+    with h5py.File(filepath, 'r') as f:
+        ra = f['ra'][...]                # Right ascension [deg]
+        dec = f['dec'][...]              # Declination [deg]
+        z = f['z'][...]                  # Redshift
+        galsnap = f['galsnap'][...]  # Snapshot index
+        galidx = f['galidx'][...]    # Galaxy index
+        weight = f['weight'][...] if 'weight' in f else None  # Weight
+        attrs = dict(f.attrs)
+    return ra, dec, z, galsnap, galidx, weight, attrs

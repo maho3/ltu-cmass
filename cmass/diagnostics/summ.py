@@ -220,9 +220,11 @@ def summarize_tracer(
             vel = vel[mask]
             mass = mass[mask]
 
-            out_attrs['density'] = float(density)
-        else:
-            out_attrs['density'] = np.nan
+        # Save number density of tracers
+        out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+        out_attrs['log10nbar'] = \
+            np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
+        out_attrs['high_res'] = high_res
 
         # Noise out positions (we do not probe less than Lnoise)
         Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
@@ -353,13 +355,26 @@ def summarize_lightcone(
     elif cap == 'mtng':
         pos += [100, 100, 100]
         L = 2000
+    elif cap == 'simbig':
+        # offset to center (min is about 850, -650, -175)
+        pos += [-650, 800, 250]
+        L = 2000
     else:
         raise ValueError
 
     # Check if all tracers are inside the box
     if np.any(pos < 0) or np.any(pos > L):
         logging.error('Error! Some tracers outside of box!')
-        return False
+        raise ValueError(
+            f'position out of bounds for {cap}_lightcone: '
+            f'{np.min(pos, axis=0)} {np.max(pos, axis=0)}')
+
+    out_attrs = {}
+    # Save number density of tracers
+    out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+    out_attrs['log10nbar'] = np.log10(
+        len(pos)) - 3 * np.log10(L)  # for numerical precision
+    out_attrs['high_res'] = high_res
 
     out_data = {}
     # Compute P(k)
@@ -400,7 +415,7 @@ def summarize_lightcone(
         )
         out_data.update(out)
 
-    save_group(outpath, out_data, None, None,
+    save_group(outpath, out_data, out_attrs, None,
                config, save_HOD=True)
     return True
 
@@ -474,42 +489,20 @@ def main(cfg: DictConfig) -> None:
         logging.info('Skipping galaxy diagnostics')
 
     # measure lightcone diagnostics
-    if cfg.diag.all or cfg.diag.ngc:
-        done = summarize_lightcone(
-            source_path, cfg.nbody.L, Planck18,
-            cap='ngc', high_res=cfg.diag.high_res,
-            threads=threads, from_scratch=from_scratch,
-            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
-            summaries=summaries,
-            config=cfg
-        )
-        all_done &= done
-    else:
-        logging.info('Skipping ngc_lightcone diagnostics')
-    if cfg.diag.all or cfg.diag.sgc:
-        done = summarize_lightcone(
-            source_path, cfg.nbody.L, Planck18,
-            cap='sgc', high_res=cfg.diag.high_res,
-            threads=threads, from_scratch=from_scratch,
-            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
-            summaries=summaries,
-            config=cfg
-        )
-        all_done &= done
-    else:
-        logging.info('Skipping sgc_lightcone diagnostics')
-    if cfg.diag.all or cfg.diag.mtng:
-        done = summarize_lightcone(
-            source_path, cfg.nbody.L, Planck18,
-            cap='mtng', high_res=cfg.diag.high_res,
-            threads=threads, from_scratch=from_scratch,
-            hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
-            summaries=summaries,
-            config=cfg
-        )
-        all_done &= done
-    else:
-        logging.info('Skipping mtng_lightcone diagnostics')
+    for cap in ['ngc', 'sgc', 'mtng', 'simbig']:
+        if cfg.diag.all or getattr(cfg.diag, f'{cap}'):
+            done = summarize_lightcone(
+                source_path, cfg.nbody.L,
+                cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
+                cap=cap, high_res=cfg.diag.high_res,
+                threads=threads, from_scratch=from_scratch,
+                hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+                summaries=summaries,
+                config=cfg
+            )
+            all_done &= done
+        else:
+            logging.info(f'Skipping {cap} lightcone diagnostics')
 
     if all_done:
         logging.info('All diagnostics computed successfully')

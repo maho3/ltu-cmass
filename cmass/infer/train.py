@@ -25,7 +25,7 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(cfg, theta=None):
+def prepare_prior(cfg, theta=None, hodprior=None):
     # define a prior
     if cfg.infer.prior.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -41,17 +41,15 @@ def prepare_prior(cfg, theta=None):
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
-        if theta.shape[-1] > 5:  # galaxy or lightcone
-            if cfg.bias.hod.model.lower() == 'zheng07':
-                # TODO: load these from cmass.bias.tools.hod?
-                hod_lims = np.array([
-                    [0.0, 1.5],  # alpha
-                    [13.0, 15.0],  # logM0
-                    [13.0, 15.0],  # logM1
-                    [12.0, 14.0],  # logMmin
-                    [0.1, 0.6]]  # sigma_logM
-                )
-                prior_lims = np.vstack([prior_lims, hod_lims])
+        if (theta.shape[-1] > 5):  # galaxy or lightcone
+            if hodprior is None:
+                raise ValueError('No HOD prior provided for quijote prior')
+            if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
+                raise NotImplementedError(
+                    "We don't know how to handle non-uniform HOD priors yet.")
+            hod_lims = hodprior[:, 2:4].astype(float)
+            prior_lims = np.vstack([prior_lims, hod_lims])
+
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
             high=prior_lims[:, 1],
@@ -62,7 +60,7 @@ def prepare_prior(cfg, theta=None):
     return prior
 
 
-def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
+def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior=None):
     start = time.time()
 
     # select the network configuration
@@ -70,7 +68,7 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir):
     logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    prior = prepare_prior(cfg, theta=theta_train)
+    prior = prepare_prior(cfg, theta=theta_train, hodprior=hodprior)
 
     # define an embedding network
     if mcfg.fcn_depth == 0:
@@ -163,43 +161,52 @@ def evaluate_posterior(posterior, x, theta):
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    for kmax in exp.kmax:
-        logging.info(f'Running inference for {name} with kmax={kmax}')
-        exp_path = join(model_path, f'kmax-{kmax}')
 
-        # load training/test data
-        try:
-            logging.info(f'Loading training/test data from {exp_path}')
-            x_train = np.load(join(exp_path, 'x_train.npy'))
-            theta_train = np.load(join(exp_path, 'theta_train.npy'))
-            x_val = np.load(join(exp_path, 'x_val.npy'))
-            theta_val = np.load(join(exp_path, 'theta_val.npy'))
-            x_test = np.load(join(exp_path, 'x_test.npy'))
-            theta_test = np.load(join(exp_path, 'theta_test.npy'))
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f'Could not find training/test data for {name} with kmax={kmax}'
-                '. Make sure to run cmass.infer.preprocess first.'
-            )
+    kmin_list = exp.kmin if 'kmin' in exp else [0.]
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-        logging.info(
-            f'Split: {len(x_train)} training, {len(x_val)} validation, '
-            f'{len(x_test)} testing')
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+            # load training/test data
+            try:
+                logging.info(f'Loading training/test data from {exp_path}')
+                x_train = np.load(join(exp_path, 'x_train.npy'))
+                theta_train = np.load(join(exp_path, 'theta_train.npy'))
+                x_val = np.load(join(exp_path, 'x_val.npy'))
+                theta_val = np.load(join(exp_path, 'theta_val.npy'))
+                x_test = np.load(join(exp_path, 'x_test.npy'))
+                theta_test = np.load(join(exp_path, 'theta_test.npy'))
+                filepath = join(exp_path, 'hodprior.csv')
+                hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
+                            if os.path.exists(filepath) else None)
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    f'Could not find training/test data for {name} with '
+                    f'kmin={kmin} and kmax={kmax}'
+                    '. Make sure to run cmass.infer.preprocess first.'
+                )
 
-        if cfg.infer.net_suffix is not None:
-            out_dir=join(exp_path, 'nets', cfg.infer.net_suffix, f'net-{cfg.infer.net_index}')
-        else:
-            out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
-        logging.info(f'Saving models to {out_dir}')
+            logging.info(
+                f'Split: {len(x_train)} training, {len(x_val)} validation, '
+                f'{len(x_test)} testing')
 
-        # run inference
-        posterior, history = run_inference(
-            x_train, theta_train, x_val, theta_val, cfg, out_dir)
+            if cfg.infer.net_suffix is not None:
+                out_dir=join(exp_path, 'nets', cfg.infer.net_suffix, f'net-{cfg.infer.net_index}')
+            else:
+                out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+            logging.info(f'Saving models to {out_dir}')
 
-        # evaluate the posterior and save to file
-        log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
-        with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-            f.write(f'{log_prob_test}\n')
+            # run inference
+            posterior, history = run_inference(
+                x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior)
+
+            # evaluate the posterior and save to file
+            log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
+            with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+                f.write(f'{log_prob_test}\n')
 
 
 @timing_decorator
@@ -218,45 +225,17 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    if cfg.infer.halo:
-        logging.info('Running halo inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo',cfg.sim, '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping halo inference...')
+    for tracer in ['halo', 'galaxy',
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
+                   'simbig_lightcone']:
+        if not getattr(cfg.infer, tracer):
+            logging.info(f'Skipping {tracer} inference...')
+            continue
 
-    if cfg.infer.galaxy:
-        logging.info('Running galaxies inference...')
+        logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping galaxy inference...')
-
-    if cfg.infer.ngc_lightcone:
-        logging.info('Running ngc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping ngc_lightcone inference...')
-
-    if cfg.infer.sgc_lightcone:
-        logging.info('Running sgc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping sgc_lightcone inference...')
-
-    if cfg.infer.mtng_lightcone:
-        logging.info('Running mtng_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
-    else:
-        logging.info('Skipping mtng_lightcone inference...')
 
 
 if __name__ == "__main__":

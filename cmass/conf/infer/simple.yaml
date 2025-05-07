@@ -1,16 +1,14 @@
 
-save_dir: /anvil/scratch/x-nchartier/cmass/abacuslike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
-net_type: maf # if not None, net_index is ignored; careful about backend, eg "gf" does not work with sbi
-N_type: 50 # we assume the "net_type"_"N_type".yaml exists (to change)
-net_index: 386     # index of network to use in cfg.net
-net_suffix: None # 15/02/2025, to separate my trainings by maf, gf, etc
+net_index: 0     # index of network to use in cfg.net
 device: cpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~
 Nmax: -1  # maximum number of simulations to load (-1 for all)
+
 correct_shot: true  # whether to correct for shot noise when normalizing
 
 halo: True      # whether to train on halo summaries
@@ -22,35 +20,20 @@ simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
   - summary: [Pk0]   # monopole
-    kmin: [0., 0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
-    kmin: [0., 0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [Pk0, Pk2, Pk4, Bk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0]   # z-space monopole
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
-  - summary: [zPk0, zPk2, zPk4, zEqBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-    kmin: [0.,0.02]
-    kmax: [0.1, 0.2, 0.3, 0.4, 0.5]
+    kmin: [0.]
+    kmax: [0.4]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
@@ -58,9 +41,9 @@ Nnets: 10  # number of best networks to ensemble
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
-only_cosmo: False  # only train on cosmological parameters (ignore HOD)
+only_cosmo: True  # only train on cosmological parameters (ignore HOD)
 
-prior: uniform  # prior to use for training (uniform, quijote)
+prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
