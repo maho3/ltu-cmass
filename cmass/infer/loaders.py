@@ -29,6 +29,7 @@ def closest_a(lst, a):
 
 def load_Pk(diag_file, a):
     if not os.path.exists(diag_file):
+        print("load Pk not exist")
         return {}
     summ = {}
     try:
@@ -44,7 +45,9 @@ def load_Pk(diag_file, a):
                             'value': f[a][stat][:, i],
                             'nbar': f[a].attrs['nbar'],
                             'a_loaded': a}
-    except (OSError, KeyError):
+    except (OSError, KeyError) as E:
+        print("except load Pk")
+        print(E)
         return {}
     return summ
 
