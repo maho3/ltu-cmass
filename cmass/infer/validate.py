@@ -39,7 +39,7 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     # Posterior coverage
     logging.info('Running posterior coverage...')
     metric = PosteriorCoverage(
-        num_samples=1000, sample_method='direct',
+        num_samples=2000, sample_method='direct',
         labels=names,
         plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
         out_dir=out_dir,
@@ -94,22 +94,33 @@ def load_ensemble(exp_path, Nnets, weighted=True):
     return ensemble
 
 
-def run_experiment(exp, cfg, model_path, names):
+def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    for kmax in exp.kmax:
-        logging.info(f'Running inference for {name} with kmax={kmax}')
-        exp_path = join(model_path, f'kmax-{kmax}')
+    kmin_list = exp.kmin if 'kmin' in exp else [0.]
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-        # load training/test data
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running validation for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+
+        # load test data
         try:
             logging.info(f'Loading test data from {exp_path}')
             x_test = np.load(join(exp_path, 'x_test.npy'))
             theta_test = np.load(join(exp_path, 'theta_test.npy'))
+
+            names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+            filepath = join(exp_path, 'hodprior.csv')
+            if (not cfg.infer.only_cosmo) and os.path.exists(filepath):
+                hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
+                names += hodprior[:, 0].astype('str').tolist()
         except FileNotFoundError:
             raise FileNotFoundError(
-                f'Could not find test data for {name} with kmax={kmax}'
-                '. Make sure to run cmass.infer.preprocess first.'
+                f'Could not find test data for {name} with kmax={kmax}.'
+                'Make sure to run cmass.infer.preprocess first.'
             )
         logging.info(f'Testing on {len(x_test)} examples')
 
@@ -136,49 +147,17 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    cosmonames = [r'$\Omega_m$', r'$\Omega_b$', r'$h$', r'$n_s$', r'$\sigma_8$']
-    hodnames = [r'$\alpha$', r'$\log M_0$', r'$\log M_1$',
-                r'$\log M_{\min}$', r'$\sigma_{\log M}$']  # TODO: load these from file?
+    for tracer in ['halo', 'galaxy',
+                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
+                   'simbig_lightcone']:
+        if not getattr(cfg.infer, tracer):
+            logging.info(f'Skipping {tracer} validation...')
+            continue
 
-    if cfg.infer.halo:
-        logging.info('Running halo inference...')
+        logging.info(f'Running {tracer} validation...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'halo', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames)
-    else:
-        logging.info('Skipping halo inference...')
-
-    if cfg.infer.galaxy:
-        logging.info('Running galaxies inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'galaxy', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
-    else:
-        logging.info('Skipping galaxy inference...')
-
-    if cfg.infer.ngc_lightcone:
-        logging.info('Running ngc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'ngc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
-    else:
-        logging.info('Skipping ngc_lightcone inference...')
-
-    if cfg.infer.sgc_lightcone:
-        logging.info('Running sgc_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'sgc_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
-    else:
-        logging.info('Skipping sgc_lightcone inference...')
-
-    if cfg.infer.mtng_lightcone:
-        logging.info('Running mtng_lightcone inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, 'mtng_lightcone', '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path, names=cosmonames+hodnames)
-    else:
-        logging.info('Skipping mtng_lightcone inference...')
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            run_experiment(exp, cfg, save_path)
 
 
 if __name__ == "__main__":

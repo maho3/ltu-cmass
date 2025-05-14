@@ -22,7 +22,7 @@ def _check(group, to_check):
     # checks that all to_check keys are in group or its subgroups
     saved_keys = list(group.keys())
 
-    # if group is empty
+    # check if empty
     if len(saved_keys) == 0:
         return False
 
@@ -204,15 +204,19 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
     fc = dk = kmax/kF/(Nbins+1/2)  # span kF to kmax
 
     result = BFast.Bk(
-        delta, L, fc, dk, Nbins, 'All', MAS=MAS,
+        delta, L, fc, dk, Nbins, triangle_type='All', MAS=MAS,
         fast=True, precision='float32', verbose=False,
-        file_path=cache_dir
+        file_path=cache_dir, open_triangles=False
     )
 
-    k123 = result[:, :3].T * kF
-    pk = result[:, 3:6].T
-    bk = result[:, 6:7].T
-    counts = result[7]  # number of triangles in each bin (not used)
+    # remove when k1 >= k2 + k3, because open_triangles=False doesn't do it
+    k123 = result[:, :3].T * kF  # k123
+    mask = k123[0] < k123[1] + k123[2]
+
+    k123 = k123[:, mask]
+    pk = result[mask, 3:6].T
+    bk = result[mask, 6:7].T
+    counts = result[mask, 7]  # number of triangles in each bin (not used)
     qk = calcQk_bfast(pk, bk)
 
     return k123, bk, qk, k123, pk

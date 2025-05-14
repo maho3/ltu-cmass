@@ -20,7 +20,7 @@ from astropy.constants import c
 from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
 
-from ..utils import timing_decorator, cosmo_to_astropy
+from ..utils import timing_decorator, cosmo_to_astropy, save_configuration_h5
 
 
 # cosmo functions
@@ -304,17 +304,24 @@ def load_galaxies(source_dir, a, seed):
                 'multi-snapshot ngc_lightcone.')
         pos = f[key]['pos'][...]  # comoving positions [Mpc/h]
         vel = f[key]['vel'][...]  # physical velocities [km/s]
-        hostid = f[key]['hostid'][...]
+        if 'hostid' in f[key]:
+            hostid = f[key]['hostid'][...]
+        else:  # not needed for simple survey selection
+            hostid = None
     return pos, vel, hostid
 
 
 def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
                    weight=None, hod_seed=0, aug_seed=0, suffix='',
-                   saturated=True):
+                   config=None, **kwargs):
     outfile = join(outdir, f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5')
     logging.info(f'Saving lightcone to {outfile}')
     with h5py.File(outfile, 'w') as f:
-        f.attrs['saturated'] = saturated
+        if config is not None:
+            save_configuration_h5(f, config, save_HOD=True)
+        for k, v in kwargs.items():
+            f.attrs[k] = v
+
         f.create_dataset('ra', data=ra)                # Right ascension [deg]
         f.create_dataset('dec', data=dec)              # Declination [deg]
         f.create_dataset('z', data=z)                  # Redshift
@@ -324,3 +331,20 @@ def save_lightcone(outdir, ra, dec, z, galsnap=None, galidx=None,
             f.create_dataset('galidx', data=galidx)    # Galaxy index
         if weight is not None:
             f.create_dataset('weight', data=weight)    # Weight
+
+
+def load_lightcone(indir, hod_seed=0, aug_seed=0, suffix=''):
+    """Load lightcone data from file."""
+    filename = f'hod{hod_seed:05}_aug{aug_seed:05}{suffix}.h5'
+    filepath = join(indir, filename)
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f'File {filepath} does not exist.')
+    with h5py.File(filepath, 'r') as f:
+        ra = f['ra'][...]                # Right ascension [deg]
+        dec = f['dec'][...]              # Declination [deg]
+        z = f['z'][...]                  # Redshift
+        galsnap = f['galsnap'][...]  # Snapshot index
+        galidx = f['galidx'][...]    # Galaxy index
+        weight = f['weight'][...] if 'weight' in f else None  # Weight
+        attrs = dict(f.attrs)
+    return ra, dec, z, galsnap, galidx, weight, attrs

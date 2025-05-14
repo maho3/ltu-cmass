@@ -12,28 +12,28 @@
 
 
 SLURM_ARRAY_TASK_ID=0
-export TQDM_DISABLE=0
+# export TQDM_DISABLE=0
 
 module restore cmass
 conda activate cmass
 
-exp_index=9
+exp_index=null
 net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-nbody=abacuslike
-sim=fastpm
-infer=default
+nbody=quijote
+sim=nbody_leauthaud
+infer=simple
 
 halo=False
-galaxy=False
+galaxy=True
 ngc=False
-sgc=True
+sgc=False
 mtng=False
 
-extras="nbody.zf=0.500015"
+extras="nbody.zf=0.5"
 device=cuda
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
@@ -42,6 +42,6 @@ suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lig
 suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference with $suffix"
-# python -m cmass.infer.preprocess $suffix
-python -m cmass.infer.train $suffix net=tuning
+python -m cmass.infer.preprocess $suffix
+# python -m cmass.infer.train $suffix net=tuning
 # python -m cmass.infer.validate $suffix
