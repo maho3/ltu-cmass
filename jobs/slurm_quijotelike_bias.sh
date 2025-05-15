@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=quijotelike_bias   # Job name
-#SBATCH --array=130-181         # Job array range for lhid
+#SBATCH --job-name=quijotefastpm_bias   # Job name
+#SBATCH --array=0-118         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=02:00:00         # Time limit
 #SBATCH --partition=shared      # Partition name
 #SBATCH --account=phy240043   # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=130
+# SLURM_ARRAY_TASK_ID=0
 globoffset=0
 
 module restore cmass
@@ -23,13 +23,15 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=5
 Naug=1
 
+# nbody=quijotelike
 nbody=abacus1gpch
-sim=correct
+sim=custom
 multisnapshot=True
 diag_from_scratch=True
-rm_galaxies=False
-extras="meta.cosmofile=./params/abacus_cosmologies.txt"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+rm_galaxies=True
+# extras= #"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 # extras="$extras bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10"
+extras="bias=zheng_biased  meta.cosmofile=./params/abacus_custom_cosmologies.txt" 
 L=1000
 N=128
 
@@ -57,11 +59,11 @@ for offset in 0; do #  1000; do
         echo "File $file does not exist."
         # python -m cmass.bias.rho_to_halo $postfix
     fi
-    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
-        hod_seed=$((lhid*10+i+1))
+        hod_seed=$((lhid*10+i))
         printf -v hod_str "%05d" $hod_seed
         file=$outdir/$lhid/galaxies/hod$hod_str.h5
         if [ -f $file ]; then
@@ -92,9 +94,9 @@ for offset in 0; do #  1000; do
             echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
             rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
-            # lightcone
-            echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
+            # # lightcone
+            # echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
+            # rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done
