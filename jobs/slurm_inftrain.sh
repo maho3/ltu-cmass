@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-99  # Array range
+#SBATCH --array=0-199  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -20,19 +20,19 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
+nbody=quijotelike
 sim=fastpm
 infer=simple
 
 halo=False
-galaxy=False
+galaxy=True
 ngc=False
 sgc=False
 mtng=False
-simbig=True
+simbig=False
 
-extras="nbody.zf=0.500015" # "nbody.zf=0.5" # 
-device=cpu
+extras="nbody.zf=0.5" # "nbody.zf=0.500015" # "nbody.zf=0.5" # 
+device="cpu"
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
