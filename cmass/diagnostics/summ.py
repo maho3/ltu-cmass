@@ -426,6 +426,10 @@ def summarize_lightcone(
         )
         out_data.update(out)
 
+    # Save n(z)
+    zbins = np.linspace(0.4, 0.7, 100)
+    out_data['nz'], out_data['nz_bins'] = np.histogram(rdz[:, -1], bins=zbins)
+
     save_group(outpath, out_data, out_attrs, None,
                config, save_HOD=True)
     return True
