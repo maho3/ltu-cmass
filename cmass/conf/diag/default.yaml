@@ -18,6 +18,9 @@ threads: -1  # -1 for all available threads
 # whether to compute summaries on a high resolution grid (~ 4 Mpc/h)
 high_res: true
 
+# whether to focus summaries at a specific redshift
+focus_z: null  # redshift to focus on (null for all redshifts)
+
 # which summaries to run
 summaries:
     - Pk             # power spectrum
