@@ -781,8 +781,8 @@ class Zheng07zinterp(Hod_model):
             pars = ["logMmin_z" + str(i) for i in range(npivot)]
             low = [None] * npivot
             up = [None] * npivot
-            loc = [12.8, 13.0, 13.2]
-            sig = [0.2, 0.15, 0.1]
+            loc = [12.83843, 13.05714, 13.25134]
+            sig = [0.24210, 0.19465, 0.13425]
             dist = ["norm"] * npivot
         else:
             raise NotImplementedError(
