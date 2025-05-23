@@ -140,6 +140,7 @@ def build_HOD_model(
     zpivot=None,
     assem_bias=False,
     vel_assem_bias=False,
+    custom_prior=None,
 ):
     """Build a HOD model from the given HOD parameters.
 
@@ -178,7 +179,9 @@ def build_HOD_model(
                             vel_assem_bias=vel_assem_bias)
     elif model == 'zheng07zinterp':
         model = Zheng07zinterp(mass_def=mdef, zpivot=zpivot,
-                               assem_bias=assem_bias, vel_assem_bias=vel_assem_bias)
+                               assem_bias=assem_bias,
+                               vel_assem_bias=vel_assem_bias,
+                               custom_prior=custom_prior)
     elif model == "zu_mandelbaum15":
         model = Zu_mandelbaum15(mass_def=mdef)
     else:

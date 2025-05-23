@@ -28,6 +28,9 @@ hod:
   assem_bias: True
   vel_assem_bias: True
 
+  # Whether to use a custom HOD prior, given an observed n(z)
+  custom_prior: mtng
+
   # Configure halo mass definition as stored in halo catalogs (e.g. vir, 200c)
   mdef: '200c'
 
