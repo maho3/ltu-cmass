@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=13
+SLURM_ARRAY_TASK_ID=13
 
 module restore cmass
 conda activate cmass
@@ -23,17 +23,17 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=1
 Naug=1
 
-nbody=abacus
-sim=custom
+nbody=abacuslike
+sim=fastpm
 multisnapshot=True
 diag_from_scratch=True
-rm_galaxies=True
-extras="diag.high_res=True bias=zheng_biased meta.cosmofile=./params/abacus_custom_cosmologies.txt" #  bias=zheng_biased 
+rm_galaxies=False
+extras="bias=zheng_biased diag.high_res=True diag.focus_z=0.5" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" #  bias=zheng_biased 
 L=2000
 N=256
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"

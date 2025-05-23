@@ -11,7 +11,7 @@
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
 # SLURM_ARRAY_TASK_ID=7
-# for i in {0..17}; do export SLURM_ARRAY_TASK_ID=$i; sh jobs/check_globus_sync.sh; done
+# for i in {0..21}; do export SLURM_ARRAY_TASK_ID=$i; sh jobs/check_globus_sync.sh; done
 # for i in {0..17}; do 
 #     export SLURM_ARRAY_TASK_ID=$i
 #     sh jobs/check_globus_sync.sh & 
