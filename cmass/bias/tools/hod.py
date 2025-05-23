@@ -47,7 +47,7 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
 def parse_hod(cfg):
     """
     Parse HOD parameters in the config file, and set them
-    in the `cfg` object
+    in the `cfg` object. TODO: IS THIS STILL NEEDED?
 
     Args:
         cfg (object)
