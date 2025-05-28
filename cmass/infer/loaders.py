@@ -24,6 +24,8 @@ get_hod = get_hod_params  # for backwards compatibility
 def closest_a(lst, a):
     lst = [float(el) for el in lst]
     lst = np.asarray(lst)
+    if len(lst) == 0:
+        return 0
     idx = (np.abs(lst - a)).argmin()
     return lst[idx]
 

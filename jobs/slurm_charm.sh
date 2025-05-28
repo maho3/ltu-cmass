@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=charm  # Job name
-# # SBATCH --array=133-181         # Job array range for lhid
+#SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=24:00:00         # Time limit
@@ -10,31 +10,37 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=98
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
-baseoffset=0
+# baseoffset=0
 
 module restore cmass
 conda activate cmassrun
 lhid=$((SLURM_ARRAY_TASK_ID + baseoffset))
+echo "lhid=$lhid"
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=mtng
+nbody=quijotelike
 sim=fastpm
 multisnapshot=True
-extras="meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
-L=3000
-N=384
-keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
-# keys_to_check=(0.666667)
+extras="nbody.matchIC=0 nbody.suite=quijotelike_nophase" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+L=1000
+N=128
+# keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
+keys_to_check=(0.666667)
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike_nophase/$sim/L$L-N$N
 echo "outdir=$outdir"
 
+
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
+
+
 # Loop through offsets and process files
-for offset in 0; do  # for offset in $(seq 0 200 800); do
+for offset in $(seq 0 200 1800); do
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5

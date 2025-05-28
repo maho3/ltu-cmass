@@ -12,25 +12,25 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2000
 
 module restore cmass
-conda activate cmass
+conda activate cmassrun
 lhid=$SLURM_ARRAY_TASK_ID
 
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass
+cd /home/x-mho1/git/ltu-cmass-run
 
 Nhod=5
 Naug=1
 
-nbody=mtnglike
-sim=fastpm
+nbody=quijote3gpch
+sim=nbody
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="" # "bias=zdep" #  hydra/job_logging=disabled"
+extras="diag.high_res=True" # "bias=zdep" #  hydra/job_logging=disabled"
 L=3000
 N=384
 

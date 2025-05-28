@@ -10,7 +10,7 @@
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file
 
 # SLURM_ARRAY_TASK_ID=10
-# for i in {0..18}; do export SLURM_ARRAY_TASK_ID=$i; sh jobs/check_globus_sync.sh; done
+# for i in {0..21}; do export SLURM_ARRAY_TASK_ID=$i; sh jobs/check_globus_sync.sh; done
 # for i in {0..17}; do 
 #     export SLURM_ARRAY_TASK_ID=$i
 #     sh jobs/check_globus_sync.sh & 
