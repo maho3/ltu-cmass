@@ -31,6 +31,7 @@ from .tools import (
 from .tools_pinocchio import (
     process_snapshot, save_pinocchio_nbody, process_halos, save_cfg_data)
 
+
 @timing_decorator
 def get_ICs(cfg, outdir):
 
@@ -58,6 +59,8 @@ def get_ICs(cfg, outdir):
         logging.info(command)
         os.system(command)
         ic = load_white_noise(path_to_ic, N, quijote=True)
+        if os.path.exists(path_to_ic):
+            os.remove(path_to_ic)  # remove the file
 
     # Convert to real space
     ic = np.fft.irfftn(ic, norm="ortho").astype(np.float32)
