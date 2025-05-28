@@ -23,7 +23,7 @@ from .hod_models import (
 )
 
 
-def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=None):
+def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=None, custom_prior=None):
     if model is None:
         return Zheng07()  # for backwards compatibility
     elif model == "zheng07":
@@ -34,7 +34,8 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
                            vel_assem_bias=vel_assem_bias)
     elif model == 'zheng07zinterp':
         return Zheng07zinterp(zpivot, assem_bias=assem_bias,
-                              vel_assem_bias=vel_assem_bias)
+                              vel_assem_bias=vel_assem_bias,
+                              custom_prior=custom_prior)
     elif model == 'leauthaud11':
         return Leauthaud11()
     elif model == "zu_mandelbaum15":
@@ -90,7 +91,9 @@ def parse_hod(cfg):
             assem_bias=cfg.bias.hod.assem_bias,
             vel_assem_bias=cfg.bias.hod.vel_assem_bias,
             zpivot=cfg.bias.hod.zpivot if hasattr(
-                cfg.bias.hod, "zpivot") else None
+                cfg.bias.hod, "zpivot") else None,
+            custom_prior=cfg.bias.hod.custom_prior if hasattr(
+                cfg.bias.hod, "custom_prior") else None,
         )
 
         # Check if we're using default parameters
