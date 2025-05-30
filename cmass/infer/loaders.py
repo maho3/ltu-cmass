@@ -46,6 +46,7 @@ def load_Pk(diag_file, a):
                             'k': f[a][stat+'_k3D'][:],
                             'value': f[a][stat][:, i],
                             'nbar': f[a].attrs['nbar'],
+                            'log10nbar': f[a].attrs['log10nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -64,7 +65,8 @@ def load_lc_Pk(diag_file):
                 summ[stat+str(2*i)] = {
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
-                    'nbar': f.attrs['nbar']}
+                    'nbar': f.attrs['nbar'],
+                    'log10nbar': f.attrs['log10nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -86,6 +88,7 @@ def load_Bk(diag_file, a):
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],
                             'nbar': f[a].attrs['nbar'],
+                            'log10nbar': f[a].attrs['log10nbar'],
                             'a_loaded': a}
     except (OSError, KeyError):
         return {}
@@ -105,7 +108,8 @@ def load_lc_Bk(diag_file):
                         summ[stat+str(2*i)] = {
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :],
-                            'nbar': f.attrs['nbar']}
+                            'nbar': f.attrs['nbar'],
+                            'log10nbar': f.attrs['log10nbar']}
     except (OSError, KeyError):
         return {}
     return summ
@@ -124,6 +128,10 @@ def _filter_Pk(X, kmin, kmax):
 
 def _get_nbar(data):
     return np.array([x['nbar'] for x in data]).reshape(-1, 1)
+
+
+def _get_log10nbar(data):
+    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
 
 
 def signed_log(x, base=10):

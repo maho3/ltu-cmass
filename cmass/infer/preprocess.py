@@ -16,7 +16,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
     preprocess_Pk, preprocess_Bk, _construct_hod_prior,
-    _load_single_simulation_summaries)
+    _load_single_simulation_summaries, _get_log10nbar)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -100,6 +100,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
     for summ in exp.summary:
         if "Eq" in summ:
             summ = summ.replace("Eq", "")
+        if summ == 'nbar':  # this comes for free with any summaries
+            continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
             return
@@ -117,12 +119,12 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
 
             for summ in exp.summary:
                 # Handle all the different summaries
-                if "Eq" in summ:  # only for Bk/Qk
-                    summ = summ.replace("Eq", "")
-                    eq_bool = True
-                else:
-                    eq_bool = False
+                if summ == 'nbar':
+                    continue  # we handle this separately
+                eq_bool = "Eq" in summ
+                summ = summ.replace("Eq", "") if eq_bool else summ
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
+                # Preprocess the summaries
                 if 'Pk0' in summ:
                     x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
                                       correct_shot=cfg.infer.correct_shot)
@@ -146,6 +148,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
+            if 'nbar' in exp.summary:  # add nbar
+                xs.append(_get_log10nbar(summaries['Pk0']))
+
             if not np.all([len(x) == len(xs[0]) for x in xs]):
                 raise ValueError(
                     f'Inconsistent lengths of summaries for {name}. Check that all '
