@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+SLURM_ARRAY_TASK_ID=2000
 globoffset=0
 
 module restore cmass
@@ -31,11 +31,11 @@ diag_from_scratch=True
 rm_galaxies=False
 # extras= #"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 # extras="$extras bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10"
-extras="bias=zheng_biased nbody.suite=quijotelike_nophase" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" 
+extras="bias=zheng_biased" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" 
 L=1000
 N=128
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike_nophase/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
@@ -43,7 +43,7 @@ export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
 
-for offset in 0 1000; do
+for offset in 0; do #  1000; do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
@@ -59,44 +59,44 @@ for offset in 0 1000; do
         echo "File $file does not exist."
         # python -m cmass.bias.rho_to_halo $postfix
     fi
-    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
-    # galaxies
-    for i in $(seq 0 $(($Nhod-1))); do
-        hod_seed=$((lhid*10+i))
-        printf -v hod_str "%05d" $hod_seed
-        file=$outdir/$lhid/galaxies/hod$hod_str.h5
-        if [ -f $file ]; then
-            echo "File $file exists."
-        else
-            echo "File $file does not exist."
-            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-        fi
-        # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+    # # galaxies
+    # for i in $(seq 0 $(($Nhod-1))); do
+    #     hod_seed=$((lhid*10+i))
+    #     printf -v hod_str "%05d" $hod_seed
+    #     file=$outdir/$lhid/galaxies/hod$hod_str.h5
+    #     if [ -f $file ]; then
+    #         echo "File $file exists."
+    #     else
+    #         echo "File $file does not exist."
+    #         python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+    #     fi
+    #     # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-        # # augments
-        # for aug_seed in $(seq 0 $(($Naug-1))); do
-        #     printf -v aug_str "%05d" $aug_seed
-        #     # lightcone
-        #     file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
-        #     if [ -f $file ]; then
-        #         echo "File $file exists."
-        #     else
-        #         echo "File $file does not exist."
-        #         python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-        #     fi
-        #     python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        # done
+    #     # # augments
+    #     # for aug_seed in $(seq 0 $(($Naug-1))); do
+    #     #     printf -v aug_str "%05d" $aug_seed
+    #     #     # lightcone
+    #     #     file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
+    #     #     if [ -f $file ]; then
+    #     #         echo "File $file exists."
+    #     #     else
+    #     #         echo "File $file does not exist."
+    #     #         python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+    #     #     fi
+    #     #     python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+    #     # done
 
-        # Trash collection
-        if [ $rm_galaxies = True ]; then
-            # galaxies
-            echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/galaxies/hod$hod_str.h5
+    #     # Trash collection
+    #     if [ $rm_galaxies = True ]; then
+    #         # galaxies
+    #         echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
+    #         rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
-            # # lightcone
-            # echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            # rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
-        fi
-    done
+    #         # # lightcone
+    #         # echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
+    #         # rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
+    #     fi
+    # done
 done

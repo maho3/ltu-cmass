@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-199  # Array range
+#SBATCH --array=0-99  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=38
+# SLURM_ARRAY_TASK_ID=0
 
 module restore cmass
 conda activate cmassrun
@@ -20,8 +20,8 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
-sim=fastpm
+nbody=mtnglike
+sim=fastpm_hodzbias
 infer=simple
 
 halo=False
@@ -31,7 +31,7 @@ sgc=False
 mtng=False
 simbig=False
 
-extras="nbody.zf=0.5" # "nbody.zf=0.500015" # "nbody.zf=0.5" # 
+extras="" # "nbody.zf=0.5" # 
 device="cpu"
 
 export TQDM_DISABLE=0
@@ -44,4 +44,4 @@ suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference pipeline with $suffix"
 
-python -m cmass.infer.train $suffix net=mafonly
+python -m cmass.infer.train $suffix net=nsfonly
