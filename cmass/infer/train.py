@@ -64,7 +64,7 @@ def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
     prior_name, mcfg,  # model config
     batch_size, learning_rate, stop_after_epochs, val_frac,
-    lr_decay_factor, lr_patience,
+    weight_decay, lr_decay_factor, lr_patience,
     backend, engine, device,
     hodprior=None, verbose=True
 ):
@@ -101,15 +101,16 @@ def run_training(
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
-    bs, lr = batch_size, learning_rate
-    bs = mcfg.batch_size if bs is None else bs
-    lr = mcfg.learning_rate if lr is None else lr
+    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
+    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
+    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
     train_args = {
         'learning_rate': lr,
         'stop_after_epochs': stop_after_epochs,
         'validation_fraction': val_frac,
         'lr_decay_factor': lr_decay_factor,
         'lr_patience': lr_patience,
+        'weight_decay': wd,
     }
 
     # setup data loaders
@@ -152,7 +153,7 @@ def plot_training_history(histories, out_dir):
         ax.plot(h['validation_log_probs'], label=f'Net {i}', lw=1)
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
-    f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
+    f.savefig(join(out_dir, 'loss.jpg'), dpi=100, bbox_inches='tight')
 
 
 def evaluate_posterior(posterior, x, theta):
@@ -218,6 +219,7 @@ def run_experiment(exp, cfg, model_path):
                 learning_rate=cfg.infer.learning_rate,
                 stop_after_epochs=cfg.infer.stop_after_epochs,
                 val_frac=cfg.infer.val_frac,
+                weight_decay=cfg.infer.weight_decay,
                 lr_decay_factor=cfg.infer.lr_decay_factor,
                 lr_patience=cfg.infer.lr_patience,
                 backend=cfg.infer.backend, engine=cfg.infer.engine,
