@@ -1,7 +1,6 @@
 """
 A script to train ML models on existing suites of simulations.
 """
-import optuna
 import time
 import yaml
 from omegaconf import DictConfig, OmegaConf
@@ -9,6 +8,7 @@ import hydra
 from os.path import join
 import logging
 
+from .preprocess import setup_optuna
 from .train import (load_preprocessed_data, run_training,
                     evaluate_posterior, plot_training_history)
 from ..nbody.tools import parse_nbody_config
@@ -118,16 +118,8 @@ def run_experiment(exp, cfg, model_path):
 
             # run hyperparameter optimization
             logging.info('Running hyperparameter optimization...')
-            sampler = optuna.samplers.TPESampler(
-                n_startup_trials=cfg.infer.n_startup_trials,
-            )
-            study = optuna.create_study(
-                sampler=sampler,
-                direction="maximize",
-                storage='sqlite:///'+join(exp_path, 'optuna_study.db'),
-                study_name=name,
-                load_if_exists=True
-            )
+            study = setup_optuna(
+                exp_path, name, cfg.infer.n_startup_trials)
             study.optimize(
                 lambda trial: objective(trial, cfg, x_train, theta_train,
                                         x_val, theta_val, x_test, theta_test,
