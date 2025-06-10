@@ -25,8 +25,8 @@ nbody=quijote
 sim=nonoise
 infer=simple
 
-halo=True
-galaxy=False
+halo=False
+galaxy=True
 ngc=False
 sgc=False
 mtng=False
