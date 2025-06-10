@@ -182,6 +182,9 @@ def run_experiment(exp, cfg, model_path):
                 filepath = join(exp_path, 'hodprior.csv')
                 hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
                             if os.path.exists(filepath) else None)
+
+                print(f'Loading HOD prior from {filepath}')
+                print(hodprior)
             except FileNotFoundError:
                 raise FileNotFoundError(
                     f'Could not find training/test data for {name} with '
@@ -224,6 +227,7 @@ def main(cfg: DictConfig) -> None:
     cfg.net = cfg.net[cfg.infer.net_index]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
+    print(model_dir)
 
     for tracer in ['halo', 'galaxy',
                    'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
@@ -234,7 +238,7 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer,cfg.sim, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
 
 

@@ -57,6 +57,7 @@ def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     hodprior = None
     if (tracer != 'halo') & (not only_cosmo):  # add HOD params
         example_config_file = join(suitepath, simpaths[0], 'config.yaml')
+        print("EXAMPLE CONFIG FILE:", example_config_file)
         hodprior = _construct_hod_prior(example_config_file)
 
     # aggregate summaries (merges all summaries into a single dict)
@@ -180,6 +181,11 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
+
+    print("Scale factor a =  ",cfg.nbody.af)
+    wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
+    summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stored, only to read
+
     suite_path = get_source_path(
         summ_dir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
@@ -208,7 +214,7 @@ def main(cfg: DictConfig) -> None:
             suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
             only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
                               hodprior, exp, cfg, save_path)
 
