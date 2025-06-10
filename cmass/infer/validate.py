@@ -70,7 +70,7 @@ def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
             axs[i].set_xscale('log')
     for j in range(i + 1, len(axs)):
         axs[j].axis('off')
-    f.savefig(join(exp_path, 'plot_hyperparam_dependence.png'),
+    f.savefig(join(exp_path, 'plot_hyperparam_dependence.jpg'),
               bbox_inches='tight', dpi=200)
 
 
