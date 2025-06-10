@@ -70,16 +70,7 @@ def objective(trial, cfg: DictConfig,
     with open(join(out_dir, 'timing.txt'), 'w') as f:
         f.write(f'{end - start:.3f}')
     with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-        yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
-
-    # plot training history
-    plot_training_history(histories, out_dir)
-
-    # Save the timing and metadata
-    with open(join(out_dir, 'timing.txt'), 'w') as f:
-        f.write(f'{end - start:.3f}')
-    with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-        yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+        yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
 
     # plot training history
     plot_training_history(histories, out_dir)
