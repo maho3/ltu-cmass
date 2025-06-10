@@ -98,13 +98,14 @@ def setup_optuna(exp_path, name, n_startup_trials):
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=n_startup_trials,
     )
-    _ = optuna.create_study(
+    study = optuna.create_study(
         sampler=sampler,
         direction="maximize",
         storage='sqlite:///'+join(exp_path, 'optuna_study.db'),
         study_name=name,
         load_if_exists=True
     )
+    return study
 
 
 def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
@@ -197,7 +198,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
-            setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator
