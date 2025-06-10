@@ -62,7 +62,7 @@ hyperprior:
   fcn_width: [16, 256]
   fcn_depth: [0, 4]
   batch_size: [32, 64, 128, 256]
-  learning_rate: [1e-6, 1e-2]
+  learning_rate: [5e-6, 1e-2]
   weight_decay: [1e-5, 1e-1]
 
 n_trials: 25  # number of trials for hyperparameter optimization

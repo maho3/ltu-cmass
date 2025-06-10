@@ -154,6 +154,7 @@ def plot_training_history(histories, out_dir):
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
     f.savefig(join(out_dir, 'loss.jpg'), dpi=100, bbox_inches='tight')
+    plt.close(f)
 
 
 def evaluate_posterior(posterior, x, theta):
