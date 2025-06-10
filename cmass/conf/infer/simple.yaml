@@ -57,9 +57,9 @@ lr_patience: 10  # learning rate decay patience
 # ~~ OPTUNA ARGS ~~
 hyperprior:
   model: ['nsf'] # , 'maf']
-  hidden_features: [16, 256]
+  hidden_features: [16, 512]
   num_transforms: [2, 8]
-  fcn_width: [16, 256]
+  fcn_width: [16, 512]
   fcn_depth: [0, 4]
   batch_size: [32, 64, 128, 256]
   learning_rate: [5e-6, 1e-2]

@@ -19,6 +19,7 @@ from ..nbody.tools import parse_nbody_config
 
 from ili.utils.ndes_pt import LampeEnsemble
 from ili.validation import PlotSinglePosterior, PosteriorCoverage
+import yaml
 
 
 def run_validation(posterior, x, theta, out_dir, names=None):
@@ -56,22 +57,24 @@ def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
     log_scales = ['hidden_features', 'fcn_width',
                   'learning_rate', 'weight_decay']
 
-    W = 3
+    W = 4
     H = len(hyperparams) // W + (len(hyperparams) % W > 0)
-    f, axs = plt.subplots(H, W, figsize=(15, 5 * H))
+    f, axs = plt.subplots(H, W, figsize=(5*W, 5*H))
     axs = axs.flatten() if H > 1 else [axs]
     for i, hp in enumerate(hyperparams):
         values = [mcfgs[j][hp] for j in range(len(mcfgs))]
-        axs[i].plot(values, log_probs, 'o')
+        axs[i].plot(values, log_probs, 'x', alpha=0.8)
         axs[i].set_xlabel(hp)
         axs[i].set_ylabel('Log Probability')
         if hp in log_scales:
             axs[i].set_xscale('log')
-    f.savefig(join(exp_path, 'hyperparam_dependence.png'), bbox_inches='tight',
-              dpi=200)
+    for j in range(i + 1, len(axs)):
+        axs[j].axis('off')
+    f.savefig(join(exp_path, 'plot_hyperparam_dependence.png'),
+              bbox_inches='tight', dpi=200)
 
 
-def load_ensemble(exp_path, Nnets, weighted=True, plot=False):
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True):
     # Load top Nnets architectures by test log prob
     net_dirs = os.listdir(join(exp_path, 'nets'))
 
@@ -85,7 +88,7 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=False):
             # Load model config from model_config.yaml
             model_config_path = join(exp_path, 'nets', n, 'model_config.yaml')
             with open(model_config_path, 'r') as f:
-                mcfgs.append(f.read())
+                mcfgs.append(yaml.safe_load(f))
         else:
             log_probs.append(-np.inf)
             mcfgs.append(None)
