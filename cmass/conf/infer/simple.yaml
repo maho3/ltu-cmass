@@ -62,8 +62,8 @@ prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
-batch_size: 64  # batch size
-learning_rate: 1e-3  # learning rate
+batch_size: null  # batch size
+learning_rate: null  # learning rate
 stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
@@ -72,10 +72,13 @@ lr_patience: 10  # learning rate decay patience
 # ~~ OPTUNA ARGS ~~
 hyperprior:
   model: ['nsf'] # , 'maf']
-  hidden_features: [4, 64]
-  num_transforms: [1, 8]
-  fcn_width: [4, 64]
+  hidden_features: [16, 256]
+  num_transforms: [2, 8]
+  fcn_width: [16, 256]
   fcn_depth: [0, 4]
+  batch_size: [32, 64, 128, 256]
+  learning_rate: [1e-6, 1e-2]
+  weight_decay: [1e-5, 1e-1]
 
-n_trials: 100  # number of trials for hyperparameter optimization
-keep_top_n_trials: 10      # number of best trials to keep
+n_trials: 25  # number of trials for hyperparameter optimization
+n_startup_trials: 20  # number of startup trials for hyperparameter optimization

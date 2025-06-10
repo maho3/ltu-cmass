@@ -17,44 +17,78 @@ from .tools import split_experiments
 
 
 def objective(trial, cfg: DictConfig,
-              x_train, theta_train, x_val, theta_val, hodprior):
+              x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              hodprior, exp_path):
+
+    trial_num = trial.number
+    out_dir = join(exp_path, 'nets', f'net-{trial_num}')
 
     # Sample hyperparameters
     hyperprior = cfg.infer.hyperprior
     model = trial.suggest_categorical("model", hyperprior.model)
     hidden_features = trial.suggest_int(
-        "hidden_features", *hyperprior.hidden_features, step=4)
+        "hidden_features", *hyperprior.hidden_features, log=True)
     num_transforms = trial.suggest_int(
-        "num_transforms", *hyperprior.num_transforms, step=1)
-    fcn_width = trial.suggest_int("fcn_width", *hyperprior.fcn_width, step=4)
-    fcn_depth = trial.suggest_int("fcn_depth", *hyperprior.fcn_depth, step=1)
-
+        "num_transforms", *hyperprior.num_transforms)
+    fcn_width = trial.suggest_int("fcn_width", *hyperprior.fcn_width, log=True)
+    fcn_depth = trial.suggest_int("fcn_depth", *hyperprior.fcn_depth)
+    batch_size = trial.suggest_categorical("batch_size", hyperprior.batch_size)
+    learning_rate = trial.suggest_float(
+        "learning_rate", *hyperprior.learning_rate, log=True)
+    weight_decay = trial.suggest_float(
+        "weight_decay", *hyperprior.weight_decay, log=True)
     mcfg = OmegaConf.create(dict(
         model=model,
         hidden_features=hidden_features,
         num_transforms=num_transforms,
         fcn_width=fcn_width,
         fcn_depth=fcn_depth,
-        batch_size=cfg.infer.batch_size,
-        learning_rate=cfg.infer.learning_rate,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        weight_decay=weight_decay
     ))
+
     # run training
-    posterior, _ = run_training(
-        x_train, theta_train, x_val, theta_val, out_dir=None,
+    start = time.time()
+    posterior, histories = run_training(
+        x_train, theta_train, x_val, theta_val, out_dir=out_dir,
         prior_name=cfg.infer.prior, mcfg=mcfg,
         batch_size=cfg.infer.batch_size,
         learning_rate=cfg.infer.learning_rate,
         stop_after_epochs=cfg.infer.stop_after_epochs,
         val_frac=cfg.infer.val_frac,
+        weight_decay=cfg.infer.weight_decay,
         lr_decay_factor=cfg.infer.lr_decay_factor,
         lr_patience=cfg.infer.lr_patience,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
         hodprior=hodprior, verbose=False
     )
+    end = time.time()
 
-    # evaluate the posterior
-    log_prob_test = evaluate_posterior(posterior, x_val, theta_val)
+    # Save the timing and metadata
+    with open(join(out_dir, 'timing.txt'), 'w') as f:
+        f.write(f'{end - start:.3f}')
+    with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+        yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+
+    # plot training history
+    plot_training_history(histories, out_dir)
+
+    # Save the timing and metadata
+    with open(join(out_dir, 'timing.txt'), 'w') as f:
+        f.write(f'{end - start:.3f}')
+    with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+        yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+
+    # plot training history
+    plot_training_history(histories, out_dir)
+
+    # evaluate the posterior and save to file
+    log_prob_test = evaluate_posterior(
+        posterior, x_test, theta_test)
+    with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+        f.write(f'{log_prob_test}\n')
 
     return log_prob_test
 
@@ -84,62 +118,29 @@ def run_experiment(exp, cfg, model_path):
 
             # run hyperparameter optimization
             logging.info('Running hyperparameter optimization...')
-            study = optuna.create_study(direction="maximize")
+            sampler = optuna.samplers.TPESampler(
+                n_startup_trials=cfg.infer.n_startup_trials,
+            )
+            study = optuna.create_study(
+                sampler=sampler,
+                direction="maximize",
+                storage='sqlite:///'+join(exp_path, 'optuna_study.db'),
+                study_name=name,
+                load_if_exists=True
+            )
             study.optimize(
                 lambda trial: objective(trial, cfg, x_train, theta_train,
-                                        x_val, theta_val, hodprior),
+                                        x_val, theta_val, x_test, theta_test,
+                                        hodprior, exp_path),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
-                timeout=7200,
-                show_progress_bar=True
+                timeout=60*60*4,  # 4 hours
+                show_progress_bar=False,
+                gc_after_trial=True
             )
             # NOTE: n_jobs>1 doesn't seem to speed things up much,
-            # It seems processes are fighting for threads. To be fixed later on.
-
-            # Get the best trials
-            top_trials = sorted(
-                study.trials, key=lambda t: t.value, reverse=True)[:cfg.infer.keep_top_n_trials]
-
-            # Run final training with the best hyperparameters (TODO: store trained models)
-            for i, trial in enumerate(top_trials):
-                logging.info(f'Net {i+1} hyperparameters: {trial.params}')
-                out_dir = join(exp_path, 'nets', f'net-{i}')
-
-                mcfg = {**trial.params, 'batch_size': cfg.infer.batch_size,
-                        'learning_rate': cfg.infer.learning_rate}
-                mcfg = OmegaConf.create(mcfg)
-
-                # run production training
-                start = time.time()
-                posterior, histories = run_training(
-                    x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                    prior_name=cfg.infer.prior, mcfg=mcfg,
-                    batch_size=cfg.infer.batch_size,
-                    learning_rate=cfg.infer.learning_rate,
-                    stop_after_epochs=cfg.infer.stop_after_epochs,
-                    val_frac=cfg.infer.val_frac,
-                    lr_decay_factor=cfg.infer.lr_decay_factor,
-                    lr_patience=cfg.infer.lr_patience,
-                    backend=cfg.infer.backend, engine=cfg.infer.engine,
-                    device=cfg.infer.device,
-                    hodprior=hodprior, verbose=False
-                )
-                end = time.time()
-
-                # Save the timing and metadata
-                with open(join(out_dir, 'timing.txt'), 'w') as f:
-                    f.write(f'{end - start:.3f}')
-                with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                    yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
-
-                # plot training history
-                plot_training_history(histories, out_dir)
-
-                # evaluate the posterior and save to file
-                log_prob_test = evaluate_posterior(
-                    posterior, x_test, theta_test)
-                with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-                    f.write(f'{log_prob_test}\n')
+            # It seems processes are fighting for threads.
+            # Instead, we parallelize via SLURM
 
 
 @timing_decorator
