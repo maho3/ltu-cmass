@@ -21,12 +21,12 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=mtnglike
-sim=fastpm_hodzbias
+nbody=quijote
+sim=nonoise
 infer=simple
 
-halo=False
-galaxy=True
+halo=True
+galaxy=False
 ngc=False
 sgc=False
 mtng=False
