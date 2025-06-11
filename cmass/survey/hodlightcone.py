@@ -64,6 +64,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid, noise_h
         if noise_hpos:
             Delta = BoxSize / Ngrid
             hpos += np.random.uniform(-Delta/2, Delta/2, size=hpos.shape)
+            hpos = np.mod(hpos, BoxSize)  # wrap around the box
 
         lightcone.add_snap(snap_idx, hpos, hvel)
 
