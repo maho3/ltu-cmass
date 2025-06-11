@@ -50,12 +50,13 @@ class Hod_parameter:
     """
 
     def __init__(
-        self, key, value=None, upper=None, lower=None, sigma=None, distribution=None
+        self, key, value=None, upper=None, lower=None, loc=None, sigma=None, distribution=None
     ):
         self.key = key
         self.value = value
         self.upper = upper
         self.lower = lower
+        self.loc = loc
         self.sigma = sigma
         setattr(
             self, "distribution", "uniform" if distribution is None else distribution
@@ -75,6 +76,7 @@ class Hod_model:
         lower_bound,
         upper_bound,
         distribution=None,
+        loc=None,
         sigma=None,
         mass_def="vir",
         assem_bias=False,
@@ -84,6 +86,7 @@ class Hod_model:
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.distribution = distribution
+        self.loc = loc
         self.sigma = sigma
 
         # Loop through parameters and initialise
@@ -92,11 +95,12 @@ class Hod_model:
             lower_bound,
             upper_bound,
             distribution or [],
+            loc or [],
             sigma or [],
             fillvalue=None,
         )
 
-        for _param, _lower, _upper, _dist, _sigma in zipped:
+        for _param, _lower, _upper, _dist, _loc, _sigma in zipped:
             setattr(
                 self,
                 _param,
@@ -104,6 +108,7 @@ class Hod_model:
                     key=_param,
                     lower=_lower,
                     upper=_upper,
+                    loc=_loc,
                     sigma=_sigma,
                     distribution=_dist,
                 ),
@@ -142,13 +147,15 @@ class Hod_model:
                 _upper = getattr(self, _param).upper
                 sampled_param = np.random.uniform(_lower, _upper)
             elif _dist == "norm":
-                sampled_param = np.random.normal(0, getattr(self, _param).sigma)
+                sampled_param = np.random.normal(
+                    getattr(self, _param).loc, getattr(self, _param).sigma)
             elif _dist == "truncnorm":
                 _lower = getattr(self, _param).lower
                 _upper = getattr(self, _param).upper
+                _loc = getattr(self, _param).loc
                 _sigma = getattr(self, _param).sigma
                 sampled_param = float(
-                    truncated_gaussian(0, _sigma, _lower, _upper)[0])
+                    truncated_gaussian(_loc, _sigma, _lower, _upper)[0])
             else:
                 raise NotImplementedError
             getattr(self, _param).value = sampled_param
@@ -229,6 +236,7 @@ class Zheng07(Hod_model):
         ],
         lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0, 0.0, 0.2, 0.2, -1, -1],
         upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5, 0.7, 2.0, 2.0, 1, 1],
+        location=[None, None, None, None, None, None, None, None, 0, 0],
         sigma=[None, None, None, None, None, None, None, None, 0.2, 0.2],
         distribution=[
             "uniform",
@@ -259,6 +267,7 @@ class Zheng07(Hod_model):
                      "conc_gal_bias_satellites"]
         low = [lower_bound[parameters.index(p)] for p in pars]
         up = [upper_bound[parameters.index(p)] for p in pars]
+        loc = [location[parameters.index(p)] for p in pars]
         sig = [sigma[parameters.index(p)] for p in pars]
         dist = [distribution[parameters.index(p)] for p in pars]
 
@@ -266,6 +275,7 @@ class Zheng07(Hod_model):
             parameters=pars,
             lower_bound=low,
             upper_bound=up,
+            loc=loc,
             sigma=sig,
             distribution=dist,
             mass_def=mass_def,
@@ -435,6 +445,8 @@ class Zheng07zdep(Hod_model):
             [12.0, 0.1, 13.0, 13.0, 0.0, -30.0, -10.0, 0.0, 0.2, 0.2, -1, -1]),
         upper_bound=np.array(
             [14.0, 0.6, 15.0, 15.0, 1.5, 0.0, 0.0, 0.7, 2.0, 2.0, 1, 1]),
+        location=[None, None, None, None, None, None,
+                  None, None, None, None, None, 0, 0],
         sigma=[None, None, None, None, None, None,
                None, None, None, None, 0.2, 0.2],
         distribution=[
@@ -470,6 +482,7 @@ class Zheng07zdep(Hod_model):
                      "conc_gal_bias_satellites"]
         low = [lower_bound[parameters.index(p)] for p in pars]
         up = [upper_bound[parameters.index(p)] for p in pars]
+        loc = [location[parameters.index(p)] for p in pars]
         sig = [sigma[parameters.index(p)] for p in pars]
         dist = [distribution[parameters.index(p)] for p in pars]
 
@@ -477,6 +490,7 @@ class Zheng07zdep(Hod_model):
             parameters=pars,
             lower_bound=low,
             upper_bound=up,
+            loc=loc,
             sigma=sig,
             distribution=dist,
             mass_def=mass_def,
@@ -646,6 +660,7 @@ class Zheng07zinterp(Hod_model):
         ],
         lower_bound=[12.0, 0.1, 13.0, 13.0, 0.0, 0.0, 0.2, 0.2, -1, -1],
         upper_bound=[14.0, 0.6, 15.0, 15.0, 1.5, 0.7, 2.0, 2.0, 1, 1],
+        location=[None, None, None, None, None, None, None, None, 0, 0],
         sigma=[None, None, None, None, None, None, None, None, 0.2, 0.2],
         distribution=[
             "uniform",
@@ -663,12 +678,14 @@ class Zheng07zinterp(Hod_model):
         mass_def="vir",
         assem_bias=False,
         vel_assem_bias=False,
+        custom_prior=None,
     ):
 
         # Obtain single mass parameter for each pivot point
         pars = []
         low = []
         up = []
+        loc = []
         sig = []
         dist = []
         self.zpivot = zpivot
@@ -681,11 +698,23 @@ class Zheng07zinterp(Hod_model):
         init_pars = ["logMmin", "sigma_logM", "logM0", "logM1", "alpha"]
         for p, v0, v1 in zip(init_pars, lower_bound, upper_bound):
             i = parameters.index(p)
-            if p in ["logMmin", "logM0", "logM1"]:
+            if p == "logMmin" and (custom_prior is not None):
+                _p = self._build_custom_prior(custom_prior, self.npivot)
+                pars += _p[0]
+                low += _p[1]
+                up += _p[2]
+                loc += _p[3]
+                sig += _p[4]
+                dist += _p[5]
+                if param_defaults is not None:
+                    defaults += [param_defaults[i]] * self.npivot
+
+            elif p in ["logMmin", "logM0", "logM1"]:
                 for j in range(self.npivot):
                     pars.append(p + "_z" + str(j))
                     low.append(v0)
                     up.append(v1)
+                    loc.append(location[i])
                     sig.append(sigma[i])
                     dist.append(distribution[i])
                     if param_defaults is not None:
@@ -694,6 +723,7 @@ class Zheng07zinterp(Hod_model):
                 pars.append(p)
                 low.append(v0)
                 up.append(v1)
+                loc.append(location[i])
                 sig.append(sigma[i])
                 dist.append(distribution[i])
                 if param_defaults is not None:
@@ -705,6 +735,7 @@ class Zheng07zinterp(Hod_model):
                 pars.append(p)
                 low.append(lower_bound[parameters.index(p)])
                 up.append(upper_bound[parameters.index(p)])
+                loc.append(location[parameters.index(p)])
                 sig.append(sigma[parameters.index(p)])
                 dist.append(distribution[parameters.index(p)])
         if vel_assem_bias:
@@ -712,6 +743,7 @@ class Zheng07zinterp(Hod_model):
                 pars.append(p)
                 low.append(lower_bound[parameters.index(p)])
                 up.append(upper_bound[parameters.index(p)])
+                loc.append(location[parameters.index(p)])
                 sig.append(sigma[parameters.index(p)])
                 dist.append(distribution[parameters.index(p)])
 
@@ -719,6 +751,7 @@ class Zheng07zinterp(Hod_model):
             parameters=pars,
             lower_bound=low,
             upper_bound=up,
+            loc=loc,
             sigma=sig,
             distribution=dist,
             mass_def=mass_def,
@@ -739,6 +772,22 @@ class Zheng07zinterp(Hod_model):
                 self.reid2014_cmass()
             else:
                 raise NotImplementedError
+
+    @staticmethod
+    def _build_custom_prior(custom_prior, npivot):
+        if custom_prior == 'mtng':
+            # MTNG prior
+            assert npivot == 3, "MTNG prior was only constrained for 3 pivot points"
+            pars = ["logMmin_z" + str(i) for i in range(npivot)]
+            low = [None] * npivot
+            up = [None] * npivot
+            loc = [12.83843, 13.05714, 13.25134]
+            sig = [0.24210, 0.19465, 0.13425]
+            dist = ["norm"] * npivot
+        else:
+            raise NotImplementedError(
+                f"Custom prior not implemented for {custom_prior}")
+        return pars, low, up, loc, sig, dist
 
     def set_occupation(self, **kwargs):
         if self.assem_bias:

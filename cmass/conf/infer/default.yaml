@@ -1,5 +1,5 @@
 
-save_dir: /anvil/scratch/x-nchartier/cmass/abacuslike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -82,3 +82,18 @@ stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
+
+
+# ~~ OPTUNA ARGS ~~
+hyperprior:
+  model: ['nsf'] # , 'maf']
+  hidden_features: [16, 512]
+  num_transforms: [2, 8]
+  fcn_width: [16, 512]
+  fcn_depth: [0, 4]
+  log2_batch_size: [5, 9]
+  learning_rate: [5e-6, 1e-2]
+  weight_decay: [1e-5, 1e-1]
+
+n_trials: 25  # number of trials for hyperparameter optimization
+n_startup_trials: 20  # number of startup trials for hyperparameter optimization

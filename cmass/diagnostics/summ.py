@@ -105,7 +105,7 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
 
 def summarize_rho(
     source_path, L,
-    threads=16, from_scratch=True,
+    threads=16, from_scratch=True, focus_z=None,
     summaries=['Pk'], config=None
 ):
     # check for file keys
@@ -115,6 +115,11 @@ def summarize_rho(
         return False
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
+
+    # Filter alist to only include the closest to a specified redshift
+    if focus_z is not None:
+        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
+        alist = [alist[i]]
 
     # check if diagnostics already computed, delete if from_scratch
     outpath = join(source_path, 'diag', 'rho.h5')
@@ -155,7 +160,7 @@ def summarize_rho(
 def summarize_tracer(
     source_path, L, cosmo,
     density=None, proxy=None, high_res=False,
-    threads=16, from_scratch=True,
+    threads=16, from_scratch=True, focus_z=None,
     type='halo', hod_seed=None,
     summaries=['Pk'],
     config=None
@@ -169,6 +174,11 @@ def summarize_tracer(
         return False
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
+
+    # Filter alist to only include the closest to a specified redshift
+    if focus_z is not None:
+        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
+        alist = [alist[i]]
 
     # check if diagnostics already computed
     if type == 'galaxy':
@@ -415,6 +425,10 @@ def summarize_lightcone(
         )
         out_data.update(out)
 
+    # Save n(z)
+    zbins = np.linspace(0.4, 0.7, 101)  # spacing in dz = 0.003
+    out_data['nz'], out_data['nz_bins'] = np.histogram(rdz[:, -1], bins=zbins)
+
     save_group(outpath, out_data, out_attrs, None,
                config, save_HOD=True)
     return True
@@ -450,6 +464,7 @@ def main(cfg: DictConfig) -> None:
         done = summarize_rho(
             source_path, cfg.nbody.L,
             threads=threads, from_scratch=from_scratch,
+            focus_z=cfg.diag.focus_z,
             summaries=summaries, config=cfg
         )
         all_done &= done
@@ -464,6 +479,7 @@ def main(cfg: DictConfig) -> None:
             proxy=cfg.diag.halo_proxy,
             high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
+            focus_z=cfg.diag.focus_z,
             type='halo',
             summaries=summaries,
             config=cfg
@@ -480,6 +496,7 @@ def main(cfg: DictConfig) -> None:
             proxy=cfg.diag.galaxy_proxy,
             high_res=cfg.diag.high_res,
             threads=threads, from_scratch=from_scratch,
+            focus_z=cfg.diag.focus_z,
             type='galaxy', hod_seed=cfg.bias.hod.seed,
             summaries=summaries,
             config=cfg
