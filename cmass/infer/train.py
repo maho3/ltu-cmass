@@ -25,14 +25,14 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(cfg, theta=None, hodprior=None):
+def prepare_prior(prior_name, device, theta=None, hodprior=None):
     # define a prior
-    if cfg.infer.prior.lower() == 'uniform':
+    if prior_name.lower() == 'uniform':
         prior = ili.utils.Uniform(
             low=theta.min(axis=0),
             high=theta.max(axis=0),
-            device=cfg.infer.device)
-    elif cfg.infer.prior.lower() == 'quijote':
+            device=device)
+    elif prior_name.lower() == 'quijote':
         # cosmology prior
         prior_lims = np.array([
             (0.1, 0.5),  # Omega_m
@@ -53,22 +53,30 @@ def prepare_prior(cfg, theta=None, hodprior=None):
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
             high=prior_lims[:, 1],
-            device=cfg.infer.device)
+            device=device)
     else:
         raise NotImplementedError
 
     return prior
 
 
-def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior=None):
+def run_training(
+    x_train, theta_train, x_val, theta_val, out_dir,
+    prior_name, mcfg,  # model config
+    batch_size, learning_rate, stop_after_epochs, val_frac,
+    weight_decay, lr_decay_factor, lr_patience,
+    backend, engine, device,
+    hodprior=None, verbose=True
+):
     start = time.time()
 
     # select the network configuration
-    mcfg = cfg.net
-    logging.info(f'Using network architecture: {mcfg}')
+    if verbose:
+        logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    prior = prepare_prior(cfg, theta=theta_train, hodprior=hodprior)
+    prior = prepare_prior(prior_name, device=device,
+                          theta=theta_train, hodprior=hodprior)
 
     # define an embedding network
     if mcfg.fcn_depth == 0:
@@ -80,12 +88,12 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior
         )
 
     # instantiate your neural networks to be used as an ensemble
-    if cfg.infer.backend == 'lampe':
+    if backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe
         extra_kwargs = {}
-    elif cfg.infer.backend == 'sbi':
+    elif backend == 'sbi':
         net_loader = ili.utils.load_nde_sbi
-        extra_kwargs = {'engine': cfg.infer.engine}
+        extra_kwargs = {'engine': engine}
     else:
         raise NotImplementedError
     kwargs = {k: v for k, v in mcfg.items() if k in [
@@ -93,49 +101,51 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
-    bs, lr = cfg.infer.batch_size, cfg.infer.learning_rate
-    bs = mcfg.batch_size if bs is None else bs
-    lr = mcfg.learning_rate if lr is None else lr
+    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
+    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
+    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
     train_args = {
         'learning_rate': lr,
-        'stop_after_epochs': cfg.infer.stop_after_epochs,
-        'validation_fraction': cfg.infer.val_frac,
-        'lr_decay_factor': cfg.infer.lr_decay_factor,
-        'lr_patience': cfg.infer.lr_patience,
+        'stop_after_epochs': stop_after_epochs,
+        'validation_fraction': val_frac,
+        'lr_decay_factor': lr_decay_factor,
+        'lr_patience': lr_patience,
+        'weight_decay': wd,
     }
 
     # setup data loaders
     train_loader = prepare_loader(
         x_train, theta_train,
-        device=cfg.infer.device,
+        device=device,
         batch_size=bs, shuffle=True)
     val_loader = prepare_loader(
         x_val, theta_val,
-        device=cfg.infer.device,
+        device=device,
         batch_size=bs, shuffle=False)
     loader = TorchLoader(train_loader, val_loader)
 
     # make output directory
-    os.makedirs(out_dir, exist_ok=True)
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
 
     # initialize the trainer
     runner = InferenceRunner.load(
-        backend=cfg.infer.backend,
-        engine=cfg.infer.engine,
+        backend=backend,
+        engine=engine,
         prior=prior,
         nets=nets,
-        device=cfg.infer.device,
+        device=device,
         train_args=train_args,
         out_dir=out_dir
     )
 
     # train the model
-    posterior, histories = runner(loader=loader)
+    posterior, histories = runner(loader=loader, verbose=verbose)
 
-    # save the model configuration
-    with open(join(out_dir, 'config.yaml'), 'w') as f:
-        yaml.dump({**kwargs, **train_args}, f)
+    return posterior, histories
 
+
+def plot_training_history(histories, out_dir):
     # Plot training history
     logging.info('Plotting training history...')
     f, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -143,19 +153,36 @@ def run_inference(x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior
         ax.plot(h['validation_log_probs'], label=f'Net {i}', lw=1)
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
-    f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
-
-    # Save the timing
-    end = time.time()
-    with open(join(out_dir, 'timing.txt'), 'w') as f:
-        f.write(f'{end - start:.3f}')
-
-    return posterior, histories
+    f.savefig(join(out_dir, 'loss.jpg'), dpi=100, bbox_inches='tight')
+    plt.close(f)
 
 
 def evaluate_posterior(posterior, x, theta):
     log_prob = posterior.log_prob(theta=theta, x=x)
     return log_prob.mean()
+
+
+def load_preprocessed_data(exp_path):
+    """
+    Load preprocessed data from the given experiment path.
+    """
+    try:
+        x_train = np.load(join(exp_path, 'x_train.npy'))
+        theta_train = np.load(join(exp_path, 'theta_train.npy'))
+        x_val = np.load(join(exp_path, 'x_val.npy'))
+        theta_val = np.load(join(exp_path, 'theta_val.npy'))
+        x_test = np.load(join(exp_path, 'x_test.npy'))
+        theta_test = np.load(join(exp_path, 'theta_test.npy'))
+        filepath = join(exp_path, 'hodprior.csv')
+        hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
+                    if os.path.exists(filepath) else None)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f'Could not find training/test data in {exp_path}. '
+            'Make sure to run cmass.infer.preprocess first.'
+        )
+
+    return x_train, theta_train, x_val, theta_val, x_test, theta_test, hodprior
 
 
 def run_experiment(exp, cfg, model_path):
@@ -168,27 +195,14 @@ def run_experiment(exp, cfg, model_path):
     for kmin in kmin_list:
         for kmax in kmax_list:
             logging.info(
-                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+                f'Running training for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
             # load training/test data
-            try:
-                logging.info(f'Loading training/test data from {exp_path}')
-                x_train = np.load(join(exp_path, 'x_train.npy'))
-                theta_train = np.load(join(exp_path, 'theta_train.npy'))
-                x_val = np.load(join(exp_path, 'x_val.npy'))
-                theta_val = np.load(join(exp_path, 'theta_val.npy'))
-                x_test = np.load(join(exp_path, 'x_test.npy'))
-                theta_test = np.load(join(exp_path, 'theta_test.npy'))
-                filepath = join(exp_path, 'hodprior.csv')
-                hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
-                            if os.path.exists(filepath) else None)
-            except FileNotFoundError:
-                raise FileNotFoundError(
-                    f'Could not find training/test data for {name} with '
-                    f'kmin={kmin} and kmax={kmax}'
-                    '. Make sure to run cmass.infer.preprocess first.'
-                )
+            (x_train, theta_train,
+             x_val, theta_val,
+             x_test, theta_test,
+             hodprior) = load_preprocessed_data(exp_path)
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -197,9 +211,32 @@ def run_experiment(exp, cfg, model_path):
             out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
             logging.info(f'Saving models to {out_dir}')
 
-            # run inference
-            posterior, history = run_inference(
-                x_train, theta_train, x_val, theta_val, cfg, out_dir, hodprior)
+            # run training
+            start = time.time()
+            posterior, histories = run_training(
+                x_train, theta_train, x_val, theta_val, out_dir=out_dir,
+                prior_name=cfg.infer.prior, mcfg=cfg.net,
+                batch_size=cfg.infer.batch_size,
+                learning_rate=cfg.infer.learning_rate,
+                stop_after_epochs=cfg.infer.stop_after_epochs,
+                val_frac=cfg.infer.val_frac,
+                weight_decay=cfg.infer.weight_decay,
+                lr_decay_factor=cfg.infer.lr_decay_factor,
+                lr_patience=cfg.infer.lr_patience,
+                backend=cfg.infer.backend, engine=cfg.infer.engine,
+                device=cfg.infer.device,
+                hodprior=hodprior
+            )
+            end = time.time()
+
+            # Save the timing and metadata
+            with open(join(out_dir, 'timing.txt'), 'w') as f:
+                f.write(f'{end - start:.3f}')
+            with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+                yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+
+            # plot training history
+            plot_training_history(histories, out_dir)
 
             # evaluate the posterior and save to file
             log_prob_test = evaluate_posterior(posterior, x_test, theta_test)

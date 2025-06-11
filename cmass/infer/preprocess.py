@@ -10,6 +10,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
+import optuna
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
@@ -91,6 +92,20 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
 
     return ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
             (ids_train, ids_val, ids_test))
+
+
+def setup_optuna(exp_path, name, n_startup_trials):
+    sampler = optuna.samplers.TPESampler(
+        n_startup_trials=n_startup_trials,
+    )
+    study = optuna.create_study(
+        sampler=sampler,
+        direction="maximize",
+        storage='sqlite:///'+join(exp_path, 'optuna_study.db'),
+        study_name=name,
+        load_if_exists=True
+    )
+    return study
 
 
 def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
@@ -181,6 +196,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
+
+            # initialize Optuna study (to avoid overwriting during parallelization)
+            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator
