@@ -14,14 +14,16 @@
 module restore cmass
 conda activate cmassrun
 
-exp_index=0
+# exp_index=9
 net_index=$SLURM_ARRAY_TASK_ID
+
+sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijote
-sim=nonoise
+nbody=abacuslike
+sim=fastpm_hodzbias
 infer=simple
 
 halo=False

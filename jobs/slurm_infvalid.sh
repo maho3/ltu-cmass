@@ -1,15 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=3,7,9  # Array range
+#SBATCH --array=0-9  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=9
 
 module restore cmass
 conda activate cmassrun
@@ -20,8 +20,8 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=mtnglike
-sim=fastpm_hodzbias
+nbody=pinocchio_quijote
+sim=pinocchio_nonoise
 infer=simple
 
 halo=False

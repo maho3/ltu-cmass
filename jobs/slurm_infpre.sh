@@ -21,8 +21,8 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijote
-sim=nonoise
+nbody=abacuslike
+sim=fastpm_hodzbias
 infer=simple
 
 halo=False
@@ -43,5 +43,3 @@ suffix="$suffix infer.device=$device $extras"
 
 echo "Running inference pipeline with $suffix"
 python -m cmass.infer.preprocess $suffix
-# python -m cmass.infer.train $suffix net=tuning
-# python -m cmass.infer.validate $suffix
