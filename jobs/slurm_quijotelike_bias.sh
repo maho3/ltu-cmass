@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=quijotelike_bias   # Job name
+#SBATCH --job-name=pinocchio_bias   # Job name
 #SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=145
+# SLURM_ARRAY_TASK_ID=143
 globoffset=0
 
 module restore cmass
@@ -24,18 +24,19 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=5
 Naug=1
 
-nbody=quijote
-sim=nbody_leauthaud
+nbody=pinocchio_quijote
+sim=pinocchio_nonoise
 multisnapshot=False
-diag_from_scratch=True
-rm_galaxies=False
-extras="bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+diag_from_scratch=False
+rm_galaxies=True
+extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
-N=128
+N=512
 
+export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
-outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
+outdir=/ocean/projects/phy240015p/mho1/cmass-ili/quijotelike/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
@@ -55,7 +56,7 @@ for offset in 0 1000; do
         echo "File $file does not exist."
         # python -m cmass.bias.rho_to_halo $postfix
     fi
-    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do

@@ -20,15 +20,15 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
+Nhod=1
 Naug=1
 
 nbody=mtnglike
-sim=fastpm
+sim=fastpm_hodzbias
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="diag.high_res=True"
+extras="diag.high_res=True bias=zheng_biased nbody.zf=0.500015 diag.focus_z=0.5"
 L=3000
 N=384
 
@@ -55,62 +55,62 @@ for offset in $(seq 0 100 2999); do
         echo "File $file does not exist."
         # python -m cmass.bias.rho_to_halo $postfix
     fi
-    python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
-    # # galaxies
-    # for i in $(seq 0 $(($Nhod-1))); do
-    #     hod_seed=$((lhid*10+i+1))
-    #     printf -v hod_str "%05d" $hod_seed
-    #     file=$outdir/$lhid/galaxies/hod$hod_str.h5
-    #     if [ -f $file ]; then
-    #         echo "File $file exists."
-    #     else
-    #         echo "File $file does not exist."
-    #         python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-    #     fi
-    #     # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+    # galaxies
+    for i in $(seq 0 $(($Nhod-1))); do
+        hod_seed=$((lhid*10+i+1))
+        printf -v hod_str "%05d" $hod_seed
 
-    #     # ngc_lightcone
-    #     for aug_seed in $(seq 0 $(($Naug-1))); do
-    #         printf -v aug_str "%05d" $aug_seed
-    #         # lightcone
-    #         file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
-    #         if [ -f $file ]; then
-    #             echo "File $file exists."
-    #         else
-    #             echo "File $file does not exist."
-    #             python -m cmass.survey.lightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-    #         fi
-    #         python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-    #     done
+        file=$outdir/$lhid/galaxies/hod$hod_str.h5
+        if [ -f $file ]; then
+            echo "File $file exists."
+        else
+            echo "File $file does not exist."
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+        fi
+        python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-    #     # mtng_lightcone
-    #     for aug_seed in $(seq 0 $(($Naug-1))); do
-    #         printf -v aug_str "%05d" $aug_seed
-    #         # lightcone
-    #         file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
-    #         if [ -f $file ]; then
-    #             echo "File $file exists."
-    #         else
-    #             echo "File $file does not exist."
-    #             python -m cmass.survey.mtng_selection $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-    #         fi
-    #         python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-    #     done
+        # # ngc_lightcone
+        # for aug_seed in $(seq 0 $(($Naug-1))); do
+        #     printf -v aug_str "%05d" $aug_seed
+        #     # lightcone
+        #     file=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+        #     if [ -f $file ]; then
+        #         echo "File $file exists."
+        #     else
+        #         echo "File $file does not exist."
+        #         python -m cmass.survey.lightcone $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     fi
+        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # done
 
-    #     # Trash collection
-    #     if [ $rm_galaxies = True ]; then
-    #         # galaxies
-    #         echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-    #         rm $outdir/$lhid/galaxies/hod$hod_str.h5
+        # for aug_seed in $(seq 0 $(($Naug-1))); do
+        #     printf -v aug_str "%05d" $aug_seed
+        #     # lightcone
+        #     file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+        #     if [ -f $file ]; then
+        #         echo "File $file exists."
+        #     else
+        #         echo "File $file does not exist."
+        #         python -m cmass.survey.hodlightcone survey.geometry=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     fi
+        #     python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # done
 
-    #         # ngc_lightcone
-    #         echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-    #         rm $outdir/$lhid/ngc_lightcone/hod${hod_str}_aug*.h5
+        # Trash collection
+        if [ $rm_galaxies = True ]; then
+            # galaxies
+            echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
+            rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
-    #         # lightcone
-    #         echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-    #         rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
-    #     fi
-    # done
+            # ngc_lightcone
+            echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
+            rm $outdir/$lhid/ngc_lightcone/hod${hod_str}_aug*.h5
+
+            # lightcone
+            echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
+            rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
+        fi
+    done
 done
