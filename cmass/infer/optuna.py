@@ -32,7 +32,8 @@ def objective(trial, cfg: DictConfig,
         "num_transforms", *hyperprior.num_transforms)
     fcn_width = trial.suggest_int("fcn_width", *hyperprior.fcn_width, log=True)
     fcn_depth = trial.suggest_int("fcn_depth", *hyperprior.fcn_depth)
-    batch_size = trial.suggest_categorical("batch_size", hyperprior.batch_size)
+    batch_size = int(2**trial.suggest_int(
+        "log2_batch_size", *hyperprior.log2_batch_size))
     learning_rate = trial.suggest_float(
         "learning_rate", *hyperprior.learning_rate, log=True)
     weight_decay = trial.suggest_float(

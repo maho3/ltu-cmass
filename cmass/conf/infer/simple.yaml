@@ -61,7 +61,7 @@ hyperprior:
   num_transforms: [2, 8]
   fcn_width: [16, 512]
   fcn_depth: [0, 4]
-  batch_size: [32, 64, 128, 256]
+  log2_batch_size: [5, 9]
   learning_rate: [5e-6, 1e-2]
   weight_decay: [1e-5, 1e-1]
 
