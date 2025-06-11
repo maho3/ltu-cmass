@@ -11,6 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 import pickle
 import scipy
+import matplotlib.pyplot as plt
 
 from .tools import split_experiments, load_posterior
 from ..utils import timing_decorator
@@ -18,6 +19,7 @@ from ..nbody.tools import parse_nbody_config
 
 from ili.utils.ndes_pt import LampeEnsemble
 from ili.validation import PlotSinglePosterior, PosteriorCoverage
+import yaml
 
 
 def run_validation(posterior, x, theta, out_dir, names=None):
@@ -48,24 +50,57 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     metric(posterior, x, theta.to('cpu'))
 
 
-def load_ensemble(exp_path, Nnets, weighted=True):
+def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
+    hyperparams = ['hidden_features', 'num_transforms',
+                   'fcn_width', 'fcn_depth', 'batch_size',
+                   'learning_rate', 'weight_decay']
+    log_scales = ['hidden_features', 'fcn_width', 'batch_size',
+                  'learning_rate', 'weight_decay']
+
+    W = 4
+    H = len(hyperparams) // W + (len(hyperparams) % W > 0)
+    f, axs = plt.subplots(H, W, figsize=(5*W, 5*H))
+    axs = axs.flatten() if H > 1 else [axs]
+    for i, hp in enumerate(hyperparams):
+        values = [mcfgs[j][hp] for j in range(len(mcfgs))]
+        axs[i].plot(values, log_probs, 'x', alpha=0.8)
+        axs[i].set_xlabel(hp)
+        axs[i].set_ylabel('Log Probability')
+        if hp in log_scales:
+            axs[i].set_xscale('log')
+    for j in range(i + 1, len(axs)):
+        axs[j].axis('off')
+    f.savefig(join(exp_path, 'plot_hyperparam_dependence.jpg'),
+              bbox_inches='tight', dpi=200)
+
+
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True):
     # Load top Nnets architectures by test log prob
     net_dirs = os.listdir(join(exp_path, 'nets'))
 
-    log_probs = []
+    log_probs, mcfgs = [], []
     for n in net_dirs:
         log_prob_file = join(exp_path, 'nets', n, 'log_prob_test.txt')
         if os.path.exists(log_prob_file):
             with open(log_prob_file, 'r') as f:
                 log_prob = float(f.read().strip())
             log_probs.append(log_prob)
+            # Load model config from model_config.yaml
+            model_config_path = join(exp_path, 'nets', n, 'model_config.yaml')
+            with open(model_config_path, 'r') as f:
+                mcfgs.append(yaml.safe_load(f))
         else:
             log_probs.append(-np.inf)
+            mcfgs.append(None)
 
     # Remove nets that did not converge
     mask = np.isfinite(log_probs)
     net_dirs = np.array(net_dirs)[mask]
     log_probs = np.array(log_probs)[mask]
+    mcfgs = np.array(mcfgs)[mask]
+
+    if plot:
+        plot_hyperparameter_dependence(log_probs, mcfgs, exp_path)
 
     logging.info(f'Found {len(log_probs)} converged nets.')
     if len(log_probs) == 0:

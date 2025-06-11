@@ -176,7 +176,6 @@ def summarize_tracer(
         alist = list(f.keys())
 
     # Filter alist to only include the closest to a specified redshift
-    print('yo', focus_z)
     if focus_z is not None:
         i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
         alist = [alist[i]]
