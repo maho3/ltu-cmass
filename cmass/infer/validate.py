@@ -52,9 +52,9 @@ def run_validation(posterior, x, theta, out_dir, names=None):
 
 def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
     hyperparams = ['hidden_features', 'num_transforms',
-                   'fcn_width', 'fcn_depth', 'log2_batch_size',
+                   'fcn_width', 'fcn_depth', 'batch_size',
                    'learning_rate', 'weight_decay']
-    log_scales = ['hidden_features', 'fcn_width',
+    log_scales = ['hidden_features', 'fcn_width', 'batch_size',
                   'learning_rate', 'weight_decay']
 
     W = 4
