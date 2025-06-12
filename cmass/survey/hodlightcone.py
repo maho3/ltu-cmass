@@ -37,7 +37,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
-from .tools import save_lightcone
+from .tools import save_lightcone, in_simbig_selection
 from .hodtools import HODEngine
 from ..bias.apply_hod import load_snapshot
 from ..bias.tools.hod import parse_hod
@@ -89,6 +89,7 @@ def check_saturation(z, nz_dir, zmin, zmax, geometry):
     elif geometry == 'mtng':
         cap = 'MTNG'
     else:
+        return False  # SIMBIG hasn't been calculated yet
         raise ValueError(geometry)
 
     filepath = join(
@@ -135,6 +136,10 @@ def main(cfg: DictConfig) -> None:
     elif geometry == 'mtng':
         maskobs = None
         remap_case = 2
+    elif geometry == 'simbig':
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=False)
+        remap_case = 4
     else:
         raise ValueError(
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
@@ -173,6 +178,13 @@ def main(cfg: DictConfig) -> None:
         lightcone, source_path, snap_times, 
         cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_pos)
 
+    # If SIMBIG, apply selection
+    if geometry == 'simbig':
+        logging.info('Applying SIMBIG selection...')
+        m = in_simbig_selection(ra, dec, z)
+        ra, dec, z = ra[m], dec[m], z[m]
+        galsnap, galidx = galsnap[m], galidx[m]
+
     # Check if n(z) is saturated
     saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
 
@@ -183,6 +195,8 @@ def main(cfg: DictConfig) -> None:
         outdir = join(source_path, 'sgc_lightcone')
     elif geometry == 'mtng':
         outdir = join(source_path, 'mtng_lightcone')
+    elif geometry == 'simbig':
+        outdir = join(source_path, 'simbig_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
