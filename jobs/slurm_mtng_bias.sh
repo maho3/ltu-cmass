@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=74
+# SLURM_ARRAY_TASK_ID=88
 
 module restore cmass
 conda activate cmass
@@ -20,13 +20,13 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=1
+Nhod=5
 Naug=1
 
 nbody=mtnglike
 sim=fastpm_hodzbias
 multisnapshot=False
-diag_from_scratch=True
+diag_from_scratch=False
 rm_galaxies=True
 extras="diag.high_res=True bias=zheng_biased nbody.zf=0.500015 diag.focus_z=0.5"
 L=3000
