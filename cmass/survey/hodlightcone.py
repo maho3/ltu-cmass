@@ -37,7 +37,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
-from .tools import save_lightcone
+from .tools import save_lightcone, in_simbig_selection
 from .hodtools import HODEngine
 from ..bias.apply_hod import load_snapshot
 from ..bias.tools.hod import parse_hod
@@ -129,7 +129,8 @@ def main(cfg: DictConfig) -> None:
         maskobs = None
         remap_case = 2
     elif geometry == 'simbig':
-        maskobs = None
+        maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
+                          veto=True, is_north=False)
         remap_case = 4
     else:
         raise ValueError(
@@ -167,6 +168,13 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Stitching snapshots a={snap_times}')
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times)
+
+    # If SIMBIG, apply selection
+    if geometry == 'simbig':
+        logging.info('Applying SIMBIG selection...')
+        m = in_simbig_selection(ra, dec, z)
+        ra, dec, z = ra[m], dec[m], z[m]
+        galsnap, galidx = galsnap[m], galidx[m]
 
     # Check if n(z) is saturated
     saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
