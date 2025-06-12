@@ -54,11 +54,19 @@ def split_galsnap_galidx(gid):
     return np.divmod(gid, 2**((gid.itemsize-1)*8))
 
 
-def stitch_lightcone(lightcone, source_path, snap_times):
+def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid, noise_hpos):
     # Load snapshots
     for snap_idx, a in enumerate(snap_times):
         logging.info(f'Loading snapshot at a={a:.6f}...')
         hpos, hvel, _, _ = load_snapshot(source_path, a)
+        
+        # Uniformly noise the halos positons in the voxel
+        if noise_hpos:
+            Delta = BoxSize / Ngrid
+            logging.info(f'Applying uniform position noise for voxel size {Delta} Mpc/h')
+            hpos += np.random.uniform(-Delta/2, Delta/2, size=hpos.shape)
+            hpos = np.mod(hpos, BoxSize)  # wrap around the box
+
         lightcone.add_snap(snap_idx, hpos, hvel)
 
     # Run lightcone
@@ -162,7 +170,8 @@ def main(cfg: DictConfig) -> None:
 
     logging.info(f'Stitching snapshots a={snap_times}')
     ra, dec, z, galsnap, galidx = stitch_lightcone(
-        lightcone, source_path, snap_times)
+        lightcone, source_path, snap_times, 
+        cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_pos)
 
     # Check if n(z) is saturated
     saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
