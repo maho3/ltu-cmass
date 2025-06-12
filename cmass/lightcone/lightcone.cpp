@@ -67,15 +67,20 @@ namespace Geometry
                         { 1, 1, 0,
                           0, 0, 1,
                           1, 0, 0, },
+                        // 1.4142 1.0000 0.7071 (for SIMBIG)
+                        { 1, 1, 0,
+                          0, 0, 1,
+                          1, 0, 0, },
                       };
 
-    // get from the quadrant ra=[-90,90], dec=[0,90] to the NGC footprint
+    // get from the quadrant ra=[-90,90], dec=[0,90] to the obs footprint
     // we only need a rotation around the y-axis I believe
     const double alpha[] = {
         97.0 * M_PI / 180.0,  // NGC
         97.0 * M_PI / 180.0,  // NGC
         0,  // MTNG
         -30 * M_PI / 180.0,  // SGC
+        -5 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
 
     const double beta[] = {
@@ -83,6 +88,7 @@ namespace Geometry
         6.0,  // NGC
         0,  // MTNG
         0,  // SGC
+        0,  // SIMBIG
     }; // rotation around z-axis, in degrees
 
     // in units of L1, L2, L3
@@ -91,6 +97,7 @@ namespace Geometry
         {0.5, -0.058, 0.0}, // NGC
         {0.0, 0.0, 0.0}, // MTNG
         {0.5, -0.058, 0.0}, // SGC
+        {0.45, 0.03, -1.15}, // SIMBIG
     };
 }
 

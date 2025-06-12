@@ -81,6 +81,7 @@ def check_saturation(z, nz_dir, zmin, zmax, geometry):
     elif geometry == 'mtng':
         cap = 'MTNG'
     else:
+        return False  # SIMBIG hasn't been calculated yet
         raise ValueError(geometry)
 
     filepath = join(
@@ -127,6 +128,9 @@ def main(cfg: DictConfig) -> None:
     elif geometry == 'mtng':
         maskobs = None
         remap_case = 2
+    elif geometry == 'simbig':
+        maskobs = None
+        remap_case = 4
     else:
         raise ValueError(
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
@@ -174,6 +178,8 @@ def main(cfg: DictConfig) -> None:
         outdir = join(source_path, 'sgc_lightcone')
     elif geometry == 'mtng':
         outdir = join(source_path, 'mtng_lightcone')
+    elif geometry == 'simbig':
+        outdir = join(source_path, 'simbig_lightcone')
     os.makedirs(outdir, exist_ok=True)
     save_lightcone(
         outdir,
