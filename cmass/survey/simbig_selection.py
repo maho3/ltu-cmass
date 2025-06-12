@@ -1,4 +1,6 @@
 """
+~~~ DEPRECATED IN EXCHANGE FOR THE SIMBIG CONFIG IN HODLIGHTCONE.PY ~~~
+
 Ingests SGC lightcones and filters them to match the SIMBIG selection function
 as defined in arxiv:2211.00660
 
@@ -30,22 +32,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
-from .tools import save_lightcone, load_lightcone
+from .tools import save_lightcone, load_lightcone, in_simbig_selection
 from ..bias.tools.hod import parse_hod
-
-
-def _in_simbig_selection(ra, dec, z):
-    assert len(ra) == len(dec) == len(z)
-
-    # SIMBIG selection function (arxiv:2211.00660)
-    ramin, ramax = -25. + 360, 28.
-    decmin, decmax = - 6., np.inf
-    zmin, zmax = 0.45, 0.6
-    return (  # ra check accounts for wrap-around
-        (((0 < ra) & (ra < ramax)) | (((ramin < ra) & (ra < 360)))) &
-        (decmin < dec) & (dec < decmax) &
-        (zmin < z) & (z < zmax)
-    )
 
 
 def _mask(x, m):
@@ -82,7 +70,7 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Loaded {len(ra)} galaxies from the SGC lightcone.')
 
     # Apply the SIMBIG selection function
-    mask = _in_simbig_selection(ra, dec, z)
+    mask = in_simbig_selection(ra, dec, z)
     ra, dec, z, galsnap, galidx = \
         map(_mask, (ra, dec, z, galsnap, galidx), (mask,) * 5)
     logging.info(
