@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=143
+SLURM_ARRAY_TASK_ID=663
 globoffset=0
 
 module restore cmass
@@ -24,23 +24,23 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=5
 Naug=1
 
-nbody=pinocchio_quijote
-sim=pinocchio_nonoise
+nbody=quijote
+sim=nonoise
 multisnapshot=False
 diag_from_scratch=False
-rm_galaxies=True
+rm_galaxies=False
 extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
-N=512
+N=128
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
-outdir=/ocean/projects/phy240015p/mho1/cmass-ili/quijotelike/$sim/L$L-N$N
+outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in 0 1000; do
+for offset in 0; do #  1000; do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
@@ -56,34 +56,34 @@ for offset in 0 1000; do
         echo "File $file does not exist."
         # python -m cmass.bias.rho_to_halo $postfix
     fi
-    python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
         hod_seed=$((lhid*10+i+1))
         printf -v hod_str "%05d" $hod_seed
-        file=$outdir/$lhid/galaxies/hod$hod_str.h5
-        if [ -f $file ]; then
-            echo "File $file exists."
-        else
-            echo "File $file does not exist."
-            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-        fi
-        python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
 
-        # # augments
-        # for aug_seed in $(seq 0 $(($Naug-1))); do
-        #     printf -v aug_str "%05d" $aug_seed
-        #     # lightcone
-        #     file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
-        #     if [ -f $file ]; then
-        #         echo "File $file exists."
-        #     else
-        #         echo "File $file does not exist."
-        #         python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-        #     fi
-        #     python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        # done
+        # file=$outdir/$lhid/galaxies/hod$hod_str.h5
+        # if [ -f $file ]; then
+        #     echo "File $file exists."
+        # else
+        #     echo "File $file does not exist."
+        #     python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+        # fi
+        # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            # lightcone
+            file=$outdir/$lhid/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f $file ]; then
+                echo "File $file exists."
+            else
+                echo "File $file does not exist."
+                python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+            fi
+            python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        done
 
         # Trash collection
         if [ $rm_galaxies = True ]; then
