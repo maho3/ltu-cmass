@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=pinocchio_bias   # Job name
+#SBATCH --job-name=quinn_bias   # Job name
 #SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=663
+# SLURM_ARRAY_TASK_ID=663
 globoffset=0
 
 module restore cmass
@@ -28,22 +28,23 @@ nbody=quijote
 sim=nonoise
 multisnapshot=False
 diag_from_scratch=False
-rm_galaxies=False
+rm_galaxies=True
+noise_uniform=False
 extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
 N=128
 
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in 0; do #  1000; do
+for offset in 0 1000; do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
-    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
+    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid bias.hod.noise_uniform=$noise_uniform multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
 
     # density
     # python -m cmass.diagnostics.summ diag.density=True $postfix 
@@ -93,7 +94,7 @@ for offset in 0; do #  1000; do
 
             # lightcone
             echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
+            rm $outdir/$lhid/simbig_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done
