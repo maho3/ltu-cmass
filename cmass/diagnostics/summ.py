@@ -19,7 +19,7 @@ from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
 from .tools import store_summary, check_existing
-from ..survey.tools import sky_to_xyz
+from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
 import datetime
 
 
@@ -236,9 +236,19 @@ def summarize_tracer(
             np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
         out_attrs['high_res'] = high_res
 
-        # Noise out positions (we do not probe less than Lnoise)
-        Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-        pos += np.random.randn(*pos.shape) * Lnoise
+        # Noise in-voxel
+        if config.bias.hod.noise_uniform:
+            delta = L / config.nbody.N
+            pos += np.random.uniform(-delta/2, delta/2, size=pos.shape)
+            pos = np.mod(pos, L)
+
+        # Get unit vectors and add noise along each direction
+        # RSDs are applied along the 0th axis
+        r_hat, e_phi, e_theta = np.identity(3)
+        noise = np.random.randn(*pos.shape)
+        pos += r_hat * noise[:, 0] * config.diag.noise.radial
+        pos += e_phi * noise[:, 1] * config.diag.noise.transverse
+        pos += e_theta * noise[:, 2] * config.diag.noise.transverse
 
         # Compute P(k)
         out_data = {}
@@ -345,9 +355,12 @@ def summarize_lightcone(
     # convert to comoving
     pos = sky_to_xyz(rdz, cosmo)
 
-    # Noise out positions (we do not probe less than Lnoise)
-    Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-    pos += np.random.randn(*pos.shape) * Lnoise
+    # Get unit vectors and add noise along each direction
+    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
+    noise = np.random.randn(*pos.shape)
+    pos += r_hat * noise[:, 0] * config.diag.noise.radial
+    pos += e_phi * noise[:, 1] * config.diag.noise.transverse
+    pos += e_theta * noise[:, 2] * config.diag.noise.transverse
 
     # convert to float32
     pos = pos.astype(np.float32)
