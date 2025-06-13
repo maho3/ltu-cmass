@@ -67,4 +67,4 @@ hod:
     # mean_occupation_satellites_assembias_param1: 1.0 # assembly bias parameter for satellites
 
   # Whether to noise the positions of the galaxies in the voxel
-  noise_pos: True
+  noise_uniform: True

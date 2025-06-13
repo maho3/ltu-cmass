@@ -54,4 +54,4 @@ hod:
   #   alpha: 1.0       # slope of the power-law mass function
 
   # Whether to noise the positions of the galaxies
-  noise_pos: True
+  noise_uniform: True
