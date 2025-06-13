@@ -246,9 +246,9 @@ def summarize_tracer(
         # RSDs are applied along the 0th axis
         r_hat, e_phi, e_theta = np.identity(3)
         noise = np.random.randn(*pos.shape)
-        pos += r_hat * noise[:, 0] * config.diag.noise.radial
-        pos += e_phi * noise[:, 1] * config.diag.noise.transverse
-        pos += e_theta * noise[:, 2] * config.diag.noise.transverse
+        pos += r_hat * noise[:, 0, None] * config.diag.noise.radial
+        pos += e_phi * noise[:, 1, None] * config.diag.noise.transverse
+        pos += e_theta * noise[:, 2, None] * config.diag.noise.transverse
 
         # Compute P(k)
         out_data = {}
@@ -358,9 +358,9 @@ def summarize_lightcone(
     # Get unit vectors and add noise along each direction
     r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
     noise = np.random.randn(*pos.shape)
-    pos += r_hat * noise[:, 0] * config.diag.noise.radial
-    pos += e_phi * noise[:, 1] * config.diag.noise.transverse
-    pos += e_theta * noise[:, 2] * config.diag.noise.transverse
+    pos += r_hat * noise[:, 0, None] * config.diag.noise.radial
+    pos += e_phi * noise[:, 1, None] * config.diag.noise.transverse
+    pos += e_theta * noise[:, 2, None] * config.diag.noise.transverse
 
     # convert to float32
     pos = pos.astype(np.float32)
