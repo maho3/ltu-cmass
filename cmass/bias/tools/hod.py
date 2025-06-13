@@ -132,10 +132,10 @@ def parse_hod(cfg):
             if v is None:
                 raise ValueError(f'Parameter {k} is None. Make sure to '
                                  'set default parameters or hod.seed>0.')
-            
+
         # Check if we need to noise the positions of the galaxies
-        if hasattr(cfg.bias.hod, "noise_hpos"):
-            cfg.bias.hod.noise_hpos = bool(cfg.bias.hod.noise_hpos)
+        if hasattr(cfg.bias.hod, "noise_uniform"):
+            cfg.bias.hod.noise_uniform = bool(cfg.bias.hod.noise_uniform)
 
     return cfg
 
