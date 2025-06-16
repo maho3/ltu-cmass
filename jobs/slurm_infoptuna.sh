@@ -22,16 +22,16 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm_hodzbias
-infer=simple
+nbody=quijotelike
+sim=fastpm_nonoise
+infer=lightcone # simple
 
 halo=False
-galaxy=True
+galaxy=False
 ngc=False
 sgc=False
 mtng=False
-simbig=False
+simbig=True
 
 extras="" # "nbody.zf=0.5" # 
 device="cpu"

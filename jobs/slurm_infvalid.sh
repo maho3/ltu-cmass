@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-9  # Array range
+#SBATCH --array=0-5  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -20,16 +20,16 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=pinocchio_quijote
-sim=pinocchio_nonoise
-infer=simple
+nbody=quijotelike
+sim=fastpm_nonoise
+infer=lightcone # simple
 
 halo=False
-galaxy=True
+galaxy=False
 ngc=False
 sgc=False
 mtng=False
-simbig=False
+simbig=True
 
 extras="" # nbody.zf=0.500015" # "nbody.zf=0.5" # 
 device=cpu

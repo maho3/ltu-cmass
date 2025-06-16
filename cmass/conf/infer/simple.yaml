@@ -81,4 +81,4 @@ hyperprior:
   weight_decay: [1e-5, 1e-1]
 
 n_trials: 25  # number of trials for hyperparameter optimization
-n_startup_trials: 20  # number of startup trials for hyperparameter optimization
+n_startup_trials: 50  # number of startup trials for hyperparameter optimization
