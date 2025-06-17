@@ -14,7 +14,7 @@
 module restore cmass
 conda activate cmassrun
 
-# exp_index=9
+# exp_index=0
 net_index=$SLURM_ARRAY_TASK_ID
 
 sleep $net_index  # to stagger the start of each job
@@ -23,7 +23,7 @@ sleep $net_index  # to stagger the start of each job
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_nonoise
+sim=fastpm_varnoise
 infer=lightcone # simple
 
 halo=False
@@ -43,6 +43,8 @@ suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
+# suffix="$suffix infer.val_frac=0 infer.test_frac=1"
+suffix="$suffix infer.prior=uniform infer.include_noise=True"
 
 echo "Running inference pipeline with $suffix"
 
