@@ -44,7 +44,8 @@ Nnets: 10  # number of best networks to ensemble
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
-only_cosmo: True  # only train on cosmological parameters (ignore HOD)
+include_hod: False    # whether to infer HOD parameters
+include_noise: False  # whether to infer noise parameters
 
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)

@@ -18,6 +18,12 @@ def get_hod_params(diagfile):
     return hod_params
 
 
+def get_noise_params(diagfile):
+    with h5py.File(diagfile, 'r') as f:
+        noise_params = [f.attrs['noise_radial'], f.attrs['noise_transverse']]
+    return np.array(noise_params)
+
+
 get_hod = get_hod_params  # for backwards compatibility
 
 
@@ -224,7 +230,8 @@ def _construct_hod_prior(configfile):
     return hodprior
 
 
-def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=False):
+def _load_single_simulation_summaries(sourcepath, tracer, a=None,
+                                      include_hod=True, include_noise=False):
     # specify paths to diagnostics
     diagpath = join(sourcepath, 'diag')
     if tracer == 'galaxy':
@@ -253,9 +260,13 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=Fal
 
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
-        if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+        if (tracer != 'halo') & (include_hod):  # add HOD params
             hodparams = get_hod_params(diagfile)
             params = np.concatenate([params, hodparams], axis=0)
+
+        if include_noise:  # add noise params
+            noise_params = get_noise_params(diagfile)
+            params = np.concatenate([params, noise_params], axis=0)
 
         # append to lists
         summlist.append(summ)
