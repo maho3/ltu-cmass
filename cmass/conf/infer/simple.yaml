@@ -43,13 +43,16 @@ experiments:
   - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+  - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+  - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+  - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
     kmax: [0.4]
 

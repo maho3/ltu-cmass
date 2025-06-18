@@ -113,7 +113,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
 
     # check that there's data
     for summ in exp.summary:
-        for tag in ["Eq", "Sq", "Ss"]:
+        for tag in ["Eq", "Sq", "Ss", "Is"]:
             if tag in summ:
                 summ = summ.replace(tag, "")
         if summ == 'nbar':  # this comes for free with any summaries
@@ -140,7 +140,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                 eq_bool = "Eq" in summ
                 sq_bool = "Sq" in summ
                 ss_bool = "Ss" in summ
-                for tag in ["Eq", "Sq", "Ss"]:
+                is_bool = "Is" in summ
+                for tag in ["Eq", "Sq", "Ss",  "Is"]:
                     summ = summ.replace(tag, "")
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
                 # Preprocess the summaries
@@ -156,18 +157,16 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                     else:
                         raise ValueError(
                             f'Need monopole for normalization of {summ}')
-                elif 'Bk' in summ:
-                    x = preprocess_Bk(x, kmin=kmin, kmax=kmax, log=True,
-                                      equilateral_only=eq_bool,
-                                      squeezed_only=sq_bool,
-                                      subsampled_only=ss_bool,
-                                      correct_shot=cfg.infer.correct_shot)
-                elif 'Qk' in summ:
-                    x = preprocess_Bk(x, kmin=kmin, kmax=kmax, log=False,
-                                      equilateral_only=eq_bool,
-                                      squeezed_only=sq_bool,
-                                      subsampled_only=ss_bool,
-                                      correct_shot=cfg.infer.correct_shot)
+                elif ('Bk' in summ) or ('Qk' in summ):
+                    x = preprocess_Bk(
+                        x, kmin=kmin, kmax=kmax,
+                        log='Bk' in summ,
+                        equilateral_only=eq_bool,
+                        squeezed_only=sq_bool,
+                        subsampled_only=ss_bool,
+                        isoceles_only=is_bool,
+                        correct_shot=cfg.infer.correct_shot
+                    )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
