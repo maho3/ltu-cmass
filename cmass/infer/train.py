@@ -68,8 +68,6 @@ def run_training(
     backend, engine, device,
     hodprior=None, verbose=True
 ):
-    start = time.time()
-
     # select the network configuration
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
@@ -104,13 +102,15 @@ def run_training(
     bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
     lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
     wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
+    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
+    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
     train_args = {
         'learning_rate': lr,
         'stop_after_epochs': stop_after_epochs,
         'validation_fraction': val_frac,
-        'lr_decay_factor': lr_decay_factor,
-        'lr_patience': lr_patience,
         'weight_decay': wd,
+        'lr_decay_factor': lrdf,
+        'lr_patience': lrp
     }
 
     # setup data loaders
