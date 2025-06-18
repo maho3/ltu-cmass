@@ -398,6 +398,8 @@ def summarize_lightcone(
     out_attrs['log10nbar'] = np.log10(
         len(pos)) - 3 * np.log10(L)  # for numerical precision
     out_attrs['high_res'] = high_res
+    out_attrs['noise_radial'] = config.diag.noise.radial
+    out_attrs['noise_transverse'] = config.diag.noise.transverse
 
     out_data = {}
     # Compute P(k)
@@ -452,6 +454,13 @@ def summarize_lightcone(
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+
+    # Use hod_seed to index radial/transverse noise (TODO: remove this!!)
+    np.random.seed(cfg.bias.hod.seed)
+    Lnoise = cfg.nbody.L / cfg.nbody.N / np.sqrt(3)
+    cfg.diag.noise.radial = np.random.uniform(0, Lnoise)
+    cfg.diag.noise.transverse = np.random.uniform(0, Lnoise)
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(

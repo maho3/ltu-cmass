@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=quinn_bias   # Job name
+#SBATCH --job-name=fastvn_bias   # Job name
 #SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
@@ -24,12 +24,13 @@ cd /jet/home/mho1/git/ltu-cmass
 Nhod=5
 Naug=1
 
-nbody=quijote
-sim=nonoise
+nbody=quijotelike
+sim=fastpm_varnoise
+noise_uniform=True
+
 multisnapshot=False
 diag_from_scratch=False
 rm_galaxies=True
-noise_uniform=False
 extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
 N=128
