@@ -58,27 +58,6 @@ experiments:
   - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
-    kmax: [0.4]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
@@ -113,5 +92,5 @@ hyperprior:
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
 
-n_trials: 25  # number of trials for hyperparameter optimization
+n_trials: 50  # number of trials for hyperparameter optimization
 n_startup_trials: 50  # number of startup trials for hyperparameter optimization
