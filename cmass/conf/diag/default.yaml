@@ -39,6 +39,7 @@ galaxy_proxy: null  # property for abundance matching (null for no abundance mat
 
 # Noise (Mpc/h) to apply radially and transversely to the tracer positions
 noise:
+    random: False  # whether to set noise scales randomly
     radial: 0.0  # radial noise in Mpc/h
     transverse: 0.0  # transverse noise in Mpc/h
 

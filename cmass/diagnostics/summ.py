@@ -457,11 +457,14 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
 
-    # Use hod_seed to index radial/transverse noise (TODO: remove this!!)
-    np.random.seed(cfg.bias.hod.seed)
-    Lnoise = cfg.nbody.L / cfg.nbody.N / np.sqrt(3)
-    cfg.diag.noise.radial = np.random.uniform(0, Lnoise)
-    cfg.diag.noise.transverse = np.random.uniform(0, Lnoise)
+    # Use hod_seed to index radial/transverse noise (TODO: make more elegant)
+    if cfg.diag.noise.random:
+        np.random.seed(cfg.bias.hod.seed)
+
+        # Uniformly distributed from [0, Lnoise]
+        Lnoise = cfg.nbody.L / cfg.nbody.N / np.sqrt(3)
+        cfg.diag.noise.radial = np.random.uniform(0, Lnoise)
+        cfg.diag.noise.transverse = np.random.uniform(0, Lnoise)
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
