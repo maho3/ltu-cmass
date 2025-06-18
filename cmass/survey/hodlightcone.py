@@ -126,6 +126,13 @@ def main(cfg: DictConfig) -> None:
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
     geometry = geometry.lower()
 
+    # check if noise_uniform, then the sim is FastPM
+    if cfg.bias.hod.noise_uniform and ('fastpm' not in cfg.nbody.sim):
+        raise ValueError(
+            'noise_uniform is only supported for CHARM simulations. '
+            'Please either set cfg.bias.hod.noise_uniform=False, use a CHARM '
+            'sim, or disable this warning.')
+
     # Load mask
     if geometry == 'ngc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
