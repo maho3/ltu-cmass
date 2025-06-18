@@ -34,6 +34,24 @@ experiments:
   - summary: [zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
     kmin: [0.]
     kmax: [0.4]
+  - summary: [nbar, zPk0]   # z-space monopole
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+    kmin: [0.]
+    kmax: [0.4]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
