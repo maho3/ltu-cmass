@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=fastvn_bias   # Job name
-#SBATCH --array=0-999         # Job array range for lhid
+#SBATCH --job-name=quijote_bias   # Job name
+#SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
 #SBATCH --gpus=v100:1     # Number of GPUs
-#SBATCH --time=04:00:00         # Time limit
+#SBATCH --time=08:00:00         # Time limit
 #SBATCH --partition=GPU-shared      # Partition name
 #SBATCH --account=phy240015p   # Account name
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
@@ -26,10 +26,13 @@ Naug=1
 
 nbody=quijotelike
 sim=fastpm_varnoise
-noise_uniform=True
+noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise_gaussian_random=True  # whether to add random Gaussian noise to the galaxy distribution (overwrites below arguments)
+noise_radial=0.0            # radial position noise [Mpc/h]
+noise_transverse=0.0        # transverse position noise [Mpc/h]
 
 multisnapshot=False
-diag_from_scratch=False
+diag_from_scratch=True
 rm_galaxies=True
 extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
@@ -42,23 +45,14 @@ outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in 0 1000; do
+for offset in $(seq 0 100 1999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
 
-    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid bias.hod.noise_uniform=$noise_uniform multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
-
-    # density
-    # python -m cmass.diagnostics.summ diag.density=True $postfix 
-
-    # halos
-    file=$outdir/$lhid/halos.h5
-    if [ -f $file ]; then
-        echo "File $file exists."
-    else
-        echo "File $file does not exist."
-        # python -m cmass.bias.rho_to_halo $postfix
-    fi
-    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
+    postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
+    postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
+    postfix="$postfix diag.noise.random=$noise_gaussian_random diag.noise.radial=$noise_radial diag.noise.transverse=$noise_transverse"
+    postfix="$postfix $extras"
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do

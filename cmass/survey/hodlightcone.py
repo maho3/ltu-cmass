@@ -127,7 +127,7 @@ def main(cfg: DictConfig) -> None:
     geometry = geometry.lower()
 
     # check if noise_uniform, then the sim is FastPM
-    if cfg.bias.hod.noise_uniform and ('fastpm' not in cfg.nbody.sim):
+    if cfg.bias.hod.noise_uniform and ('fastpm' not in cfg.sim):
         raise ValueError(
             'noise_uniform is only supported for CHARM simulations. '
             'Please either set cfg.bias.hod.noise_uniform=False, use a CHARM '
