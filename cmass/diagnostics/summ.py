@@ -235,6 +235,8 @@ def summarize_tracer(
         out_attrs['log10nbar'] = \
             np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
         out_attrs['high_res'] = high_res
+        out_attrs['noise_radial'] = config.diag.noise.radial
+        out_attrs['noise_transverse'] = config.diag.noise.transverse
 
         # Noise in-voxel
         if config.bias.hod.noise_uniform:
