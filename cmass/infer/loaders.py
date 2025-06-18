@@ -173,16 +173,49 @@ def _is_valid_triangle(k):
     return (k1 < k2 + k3) & (k2 < k1 + k3) & (k3 < k1 + k2)
 
 
+def _is_squeezed(k):
+    # Return mask of squeezed triangles: k1 < k2 + k3 and k1 < 0.5 * (k2 + k3)
+    k1, k2, k3 = k
+    return np.isclose(k1, k2) & (k3 < k2)
+
+
+def _is_isoceles(k):
+    # Return mask of isoceles triangles
+    k1, k2, k3 = k
+    return np.isclose(k1, k2) | np.isclose(k2, k3) | np.isclose(k1, k3)
+
+
 def _is_equilateral(k):
     # Return mask of equilateral triangles
     k1, k2, k3 = k
     return np.isclose(k1, k2) & np.isclose(k2, k3)
 
 
-def _filter_Bk(X, kmin, kmax, equilateral_only=True):
-    if equilateral_only:
+def _is_subsampled(k):
+    # Return mask where only every 5th k is True
+    return np.arange(len(k[0])) % 5 == 0
+
+
+def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
+               subsampled=False, isoceles=False):
+    if sum([equilateral, squeezed, subsampled]) > 1:
+        raise ValueError(
+            "Only one of equilateral, squeezed, or subsampled can be True.")
+    if equilateral:
         return np.array(
             [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_equilateral(x['k'])]
+             for x in X])
+    elif squeezed:
+        return np.array(
+            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_squeezed(x['k'])]
+             for x in X])
+    elif subsampled:
+        return np.array(
+            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_subsampled(x['k'])]
+             for x in X])
+    elif isoceles:
+        return np.array(
+            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_isoceles(x['k'])]
              for x in X])
     else:
         return np.array(
@@ -190,9 +223,13 @@ def _filter_Bk(X, kmin, kmax, equilateral_only=True):
              for x in X])
 
 
-def preprocess_Bk(data, kmax, kmin=0., log=False, equilateral_only=False, correct_shot=False):
+def preprocess_Bk(data, kmax, kmin=0., log=False,
+                  equilateral_only=False, squeezed_only=False,
+                  subsampled_only=False, isoceles_only=False,
+                  correct_shot=False):
     # process Bk: filtering for k's, normalizing, and flattening
-    X = _filter_Bk(data, kmin, kmax, equilateral_only)
+    X = _filter_Bk(data, kmin, kmax, equilateral_only,
+                   squeezed_only, subsampled_only, isoceles_only)
 
     if correct_shot:  # Eq. 44 arxiv:1610.06585
         pass  # not implemented because I'm not sure its right
