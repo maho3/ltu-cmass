@@ -40,6 +40,10 @@ def objective(trial, cfg: DictConfig,x_train, theta_train,
         "learning_rate", *hyperprior.learning_rate, log=True)
     weight_decay = trial.suggest_float(
         "weight_decay", *hyperprior.weight_decay, log=True)
+    lr_patience = trial.suggest_int(
+        "lr_patience", *hyperprior.lr_patience)
+    lr_decay_factor = trial.suggest_float(
+        "lr_decay_factor", *hyperprior.lr_decay_factor, log=True)
     mcfg = OmegaConf.create(dict(
         model=model,
         hidden_features=hidden_features,
@@ -49,7 +53,9 @@ def objective(trial, cfg: DictConfig,x_train, theta_train,
 
         batch_size=batch_size,
         learning_rate=learning_rate,
-        weight_decay=weight_decay
+        weight_decay=weight_decay,
+        lr_patience=lr_patience,
+        lr_decay_factor=lr_decay_factor
     ))
 
     # run training
@@ -57,14 +63,13 @@ def objective(trial, cfg: DictConfig,x_train, theta_train,
     posterior, histories = run_training(
         x_train, theta_train, x_val, theta_val, out_dir=out_dir,
         prior_name=cfg.infer.prior, mcfg=mcfg,
-        batch_size=cfg.infer.batch_size,
-        learning_rate=cfg.infer.learning_rate,
+        batch_size=None,
+        learning_rate=None,
         stop_after_epochs=cfg.infer.stop_after_epochs,
         val_frac=cfg.infer.val_frac,
-
-        weight_decay=cfg.infer.weight_decay,
-        lr_decay_factor=cfg.infer.lr_decay_factor,
-        lr_patience=cfg.infer.lr_patience,
+        weight_decay=None,
+        lr_decay_factor=None,
+        lr_patience=None,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
         hodprior=hodprior, verbose=False
