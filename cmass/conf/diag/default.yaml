@@ -34,13 +34,32 @@ summaries:
 halo_density: 1e-4  # number density in h^3/Mpc^3. null for no abundance matching
 halo_proxy: mass  # property for abundance matching (null for no abundance matching)
 
+# Note, we don't have a mass proxy for galaxies, so we can't use abundance matching
 galaxy_density: null  # number density in h^3/Mpc^3. null for no abundance matching
 galaxy_proxy: null  # property for abundance matching (null for no abundance matching)
 
 # Noise (Mpc/h) to apply radially and transversely to the tracer positions
 noise:
-    random: False  # whether to set noise scales randomly
-    radial: 0.0  # radial noise in Mpc/h
-    transverse: 0.0  # transverse noise in Mpc/h
+    # Fixed values
+    dist: Fixed
+    params:
+        radial: 0.0      # radial noise in Mpc/h
+        transverse: 0.0  # transverse noise in Mpc/h
 
-# Note, we don't have a mass proxy for galaxies, so we can't use abundance matching
+    # # Uniform
+    # dist: Uniform
+    # params:
+    #     a: 0.0
+    #     b: 4.5105  # (1000/128) / sqrt(3)
+
+    # # Reciprocal (Jeffreys prior)
+    # dist: Reciprocal
+    # params:
+    #     a: 0.1
+    #     b: 4.5105  # (1000/128) / sqrt(3)
+    
+    # # Exponential
+    # dist: Exponential
+    # params:
+    #     scale: 0.979  # (99% of the noise is below 4.5105 Mpc/h)
+
