@@ -19,6 +19,7 @@ from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
 from .tools import store_summary, check_existing
+from .tools import parse_noise
 from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
 import datetime
 
@@ -457,14 +458,12 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
 
-    # Use hod_seed to index radial/transverse noise (TODO: make more elegant)
-    if cfg.diag.noise.random:
-        np.random.seed(cfg.bias.hod.seed)
-
-        # Uniformly distributed from [0, Lnoise]
-        Lnoise = cfg.nbody.L / cfg.nbody.N / np.sqrt(3)
-        cfg.diag.noise.radial = np.random.uniform(0, Lnoise)
-        cfg.diag.noise.transverse = np.random.uniform(0, Lnoise)
+    # parse noise (seeded by lhid and hod seed)
+    noise_seed = int(cfg.nbody.lhid*1e6 + cfg.bias.hod.seed)
+    cfg.diag.noise.radial, cfg.diag.noise.transverse = \
+        parse_noise(seed=noise_seed,
+                    dist=cfg.diag.noise.dist,
+                    params=cfg.diag.noise.params)
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 

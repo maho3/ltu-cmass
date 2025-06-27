@@ -322,3 +322,24 @@ def store_summary(
         group.create_dataset(dataset_key, data=coord_value.values)
     summary_key = summary_name if not use_rsd else f'z{summary_name}'
     group.create_dataset(summary_key, data=summary_dataset.values)
+
+
+def parse_noise(
+    seed, dist, params
+):
+    np.random.seed(seed)
+    if dist == 'Fixed':
+        return params['radial'], params['transverse']
+    elif dist == 'Uniform':
+        a = params['a']
+        b = params['b']
+        return np.random.uniform(a, b, size=2)
+    elif dist == 'Reciprocal':
+        a = np.log(params['a'])
+        b = np.log(params['b'])
+        return np.exp(np.random.uniform(a, b, size=2))
+    elif dist == 'Exponential':
+        scale = params['scale']
+        return np.random.exponential(scale, size=2)
+    else:
+        raise NotImplementedError(f'Noise distribution {dist} not implemented')
