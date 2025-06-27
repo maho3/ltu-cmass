@@ -160,7 +160,7 @@ def summarize_rho(
 
 def summarize_tracer(
     source_path, L, cosmo,
-    density=None, proxy=None, high_res=False,
+    density=None, proxy=None, high_res=False, use_ngp=False,
     threads=16, from_scratch=True, focus_z=None,
     type='halo', hod_seed=None,
     summaries=['Pk'],
@@ -235,7 +235,8 @@ def summarize_tracer(
         out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
         out_attrs['log10nbar'] = \
             np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
-        out_attrs['high_res'] = high_res
+        out_attrs['high_res'] = high_res and not use_ngp
+        out_attrs['noise_dist'] = config.diag.noise.dist
         out_attrs['noise_radial'] = config.diag.noise.radial
         out_attrs['noise_transverse'] = config.diag.noise.transverse
 
@@ -256,7 +257,7 @@ def summarize_tracer(
         # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
-            N, MAS = get_mesh_resolution(L, high_res)
+            N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
@@ -275,8 +276,8 @@ def summarize_tracer(
             )
             out_data.update(out)
         # Compute B(k)
-        if 'Bk' in summaries:
-            N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
+        if 'Bk' in summaries:   # high-res takes too much memory
+            N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
             MAS = 'TSC'
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
@@ -325,7 +326,7 @@ def summarize_tracer(
 
 def summarize_lightcone(
     source_path, L, cosmo,
-    cap='ngc', high_res=False,
+    cap='ngc', high_res=False, use_ngp=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
     summaries=['Pk'],
@@ -400,14 +401,15 @@ def summarize_lightcone(
     out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
     out_attrs['log10nbar'] = np.log10(
         len(pos)) - 3 * np.log10(L)  # for numerical precision
-    out_attrs['high_res'] = high_res
+    out_attrs['high_res'] = high_res and not use_ngp
+    out_attrs['noise_dist'] = config.diag.noise.dist
     out_attrs['noise_radial'] = config.diag.noise.radial
     out_attrs['noise_transverse'] = config.diag.noise.transverse
 
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        N, MAS = get_mesh_resolution(L, high_res)
+        N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
@@ -416,8 +418,8 @@ def summarize_lightcone(
         )
         out_data.update(out)
     # Compute B(k)
-    if 'Bk' in summaries:
-        N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
+    if 'Bk' in summaries:  # high-res takes too much memory
+        N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
         MAS = 'TSC'
         if config is not None:
             cache_dir = join(config.meta.wdir, 'scratch', 'cache')
@@ -504,6 +506,7 @@ def main(cfg: DictConfig) -> None:
             density=cfg.diag.halo_density,
             proxy=cfg.diag.halo_proxy,
             high_res=cfg.diag.high_res,
+            use_ngp=cfg.diag.use_ngp,
             threads=threads, from_scratch=from_scratch,
             focus_z=cfg.diag.focus_z,
             type='halo',
@@ -521,6 +524,7 @@ def main(cfg: DictConfig) -> None:
             density=cfg.diag.galaxy_density,
             proxy=cfg.diag.galaxy_proxy,
             high_res=cfg.diag.high_res,
+            use_ngp=cfg.diag.use_ngp,
             threads=threads, from_scratch=from_scratch,
             focus_z=cfg.diag.focus_z,
             type='galaxy', hod_seed=cfg.bias.hod.seed,
@@ -537,7 +541,9 @@ def main(cfg: DictConfig) -> None:
             done = summarize_lightcone(
                 source_path, cfg.nbody.L,
                 cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
-                cap=cap, high_res=cfg.diag.high_res,
+                cap=cap,
+                high_res=cfg.diag.high_res,
+                use_ngp=cfg.diag.use_ngp,
                 threads=threads, from_scratch=from_scratch,
                 hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
                 summaries=summaries,
