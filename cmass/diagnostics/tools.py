@@ -89,10 +89,13 @@ def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
     return pos
 
 
-def get_mesh_resolution(L, high_res=False):
+def get_mesh_resolution(L, high_res=False, use_ngp=False):
 
     # set mesh resolution
-    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
+    if use_ngp:  # Forcing NGP meshing at 128 cells per 1000 Mpc/h
+        N = (L//1000)*128
+        MAS = 'NGP'
+    elif high_res:  # high resolution at 256 cells per 1000 Mpc/h
         N = (L//1000)*256
         MAS = 'TSC'
     else:  # fixed resolution at 128 cells per 1000 Mpc/h
