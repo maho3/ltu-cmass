@@ -332,17 +332,18 @@ def parse_noise(
 ):
     np.random.seed(seed)
     if dist == 'Fixed':
-        return params['radial'], params['transverse']
+        radial, transverse = params['radial'], params['transverse']
     elif dist == 'Uniform':
         a = params['a']
         b = params['b']
-        return np.random.uniform(a, b, size=2)
+        radial, transverse = np.random.uniform(a, b, size=2)
     elif dist == 'Reciprocal':
         a = np.log(params['a'])
         b = np.log(params['b'])
-        return np.exp(np.random.uniform(a, b, size=2))
+        radial, transverse = np.exp(np.random.uniform(a, b, size=2))
     elif dist == 'Exponential':
         scale = params['scale']
-        return np.random.exponential(scale, size=2)
+        radial, transverse = np.random.exponential(scale, size=2)
     else:
         raise NotImplementedError(f'Noise distribution {dist} not implemented')
+    return float(radial), float(transverse)

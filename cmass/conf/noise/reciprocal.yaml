@@ -3,3 +3,6 @@ dist: Reciprocal
 params:
     a: 0.1
     b: 4.5105  # (1000/128) / sqrt(3)
+
+radial: 0.0
+transverse: 0.0
