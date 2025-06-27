@@ -462,10 +462,10 @@ def main(cfg: DictConfig) -> None:
 
     # parse noise (seeded by lhid and hod seed)
     noise_seed = int(cfg.nbody.lhid*1e6 + cfg.bias.hod.seed)
-    cfg.diag.noise.radial, cfg.diag.noise.transverse = \
+    cfg.noise.radial, cfg.noise.transverse = \
         parse_noise(seed=noise_seed,
-                    dist=cfg.diag.noise.dist,
-                    params=cfg.diag.noise.params)
+                    dist=cfg.noise.dist,
+                    params=cfg.noise.params)
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
