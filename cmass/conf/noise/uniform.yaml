@@ -1,0 +1,5 @@
+# Uniform
+dist: Uniform
+params:
+    a: 0.0
+    b: 4.5105  # (1000/128) / sqrt(3)
