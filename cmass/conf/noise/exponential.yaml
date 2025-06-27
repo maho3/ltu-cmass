@@ -1,0 +1,4 @@
+# Exponential
+dist: Exponential
+params:
+    scale: 0.979  # (99% of the noise is below 4.5105 Mpc/h)
