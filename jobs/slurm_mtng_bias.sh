@@ -10,7 +10,9 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=88
+set -e
+
+# SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmass
@@ -20,25 +22,23 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
-Naug=1
+# Nhod=5
+# Naug=1
 
-nbody=mtnglike
-sim=fastpm_hodzbias_varnoise
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise_gaussian_random=True  # whether to add random Gaussian noise to the galaxy distribution (overwrites below arguments)
-noise_radial=0.0            # radial position noise [Mpc/h]
-noise_transverse=0.0        # transverse position noise [Mpc/h]
+# nbody=mtnglike
+# sim=fastpm_recnoise
+# noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+# noise=reciprocal
 
-multisnapshot=False
-diag_from_scratch=False
-rm_galaxies=True
-extras="bias=zheng_biased nbody.zf=0.500015 diag.focus_z=0.5"
-L=3000
-N=384
+# multisnapshot=False
+# diag_from_scratch=False
+# rm_galaxies=True
+# extras="bias=zhenginterp_biased nbody.zf=0.500015 diag.focus_z=0.5"
+# L=3000
+# N=384
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
@@ -50,7 +50,7 @@ for offset in $(seq 0 100 2999); do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
     postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
-    postfix="$postfix diag.noise.random=$noise_gaussian_random diag.noise.radial=$noise_radial diag.noise.transverse=$noise_transverse"
+    postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
     
 
@@ -84,9 +84,9 @@ for offset in $(seq 0 100 2999); do
 
         # Trash collection
         if [ $rm_galaxies = True ]; then
-            # galaxies
-            echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/galaxies/hod$hod_str.h5
+            # # galaxies
+            # echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
+            # rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
             # ngc_lightcone
             echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"

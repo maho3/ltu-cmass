@@ -10,7 +10,9 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=48
+set -e
+
+# SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmass
@@ -20,25 +22,23 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
-Naug=1
+# Nhod=5
+# Naug=1
 
-nbody=abacuslike
-sim=fastpm_hodzbias_varnoise
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise_gaussian_random=True  # whether to add random Gaussian noise to the galaxy distribution (overwrites below arguments)
-noise_radial=0.0            # radial position noise [Mpc/h]
-noise_transverse=0.0        # transverse position noise [Mpc/h]
+# nbody=abacuslike
+# sim=fastpm_recnoise
+# noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+# noise=reciprocal
 
-multisnapshot=False
-diag_from_scratch=True
-rm_galaxies=True
-extras="bias=zheng_biased diag.focus_z=0.5 nbody.zf=0.500015" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" #  bias=zheng_biased 
-L=2000
-N=256
+# multisnapshot=False
+# diag_from_scratch=True
+# rm_galaxies=True
+# extras="bias=zhenginterp_biased diag.focus_z=0.5 nbody.zf=0.500015" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" #  bias=zheng_biased 
+# L=2000
+# N=256
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
@@ -50,7 +50,7 @@ for offset in $(seq 0 100 1999); do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
     postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
-    postfix="$postfix diag.noise.random=$noise_gaussian_random diag.noise.radial=$noise_radial diag.noise.transverse=$noise_transverse"
+    postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
     
     # galaxies
@@ -80,32 +80,32 @@ for offset in $(seq 0 100 1999); do
             python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
-        for aug_seed in $(seq 0 $(($Naug-1))); do
-            printf -v aug_str "%05d" $aug_seed
-            # lightcone
-            file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
-            if [ -f $file ]; then
-                echo "File $file exists."
-            else
-                echo "File $file does not exist."
-                python -m cmass.survey.hodlightcone survey.geometry=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            fi
-            python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        done
+        # for aug_seed in $(seq 0 $(($Naug-1))); do
+        #     printf -v aug_str "%05d" $aug_seed
+        #     # lightcone
+        #     file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+        #     if [ -f $file ]; then
+        #         echo "File $file exists."
+        #     else
+        #         echo "File $file does not exist."
+        #         python -m cmass.survey.hodlightcone survey.geometry=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     fi
+        #     python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # done
 
         # Trash collection
         if [ $rm_galaxies = True ]; then
-            # galaxies
-            echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/galaxies/hod$hod_str.h5
+            # # galaxies
+            # echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
+            # rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
-            # ngc_lightcone
+            # sgc_lightcone
             echo "Removing sgc_lightcone for lhid=$lhid hod_seed=$hod_seed"
             rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
 
-            # lightcone
-            echo "Removing mtng_lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
+            # # lightcone
+            # echo "Removing mtng_lightcone for lhid=$lhid hod_seed=$hod_seed"
+            # rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done
