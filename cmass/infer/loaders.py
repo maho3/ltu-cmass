@@ -141,7 +141,6 @@ def _get_log10nbar(data):
         np.array([x['log10nbar'] for x in data]).reshape(-1, 1),
         10, axis=-1
     )  # repeat for more visibility
-    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
 
 
 def signed_log(x, base=10):
