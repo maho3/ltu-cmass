@@ -89,10 +89,13 @@ def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
     return pos
 
 
-def get_mesh_resolution(L, high_res=False):
+def get_mesh_resolution(L, high_res=False, use_ngp=False):
 
     # set mesh resolution
-    if high_res:  # high resolution at 256 cells per 1000 Mpc/h
+    if use_ngp:  # Forcing NGP meshing at 128 cells per 1000 Mpc/h
+        N = (L//1000)*128
+        MAS = 'NGP'
+    elif high_res:  # high resolution at 256 cells per 1000 Mpc/h
         N = (L//1000)*256
         MAS = 'TSC'
     else:  # fixed resolution at 128 cells per 1000 Mpc/h
@@ -322,3 +325,25 @@ def store_summary(
         group.create_dataset(dataset_key, data=coord_value.values)
     summary_key = summary_name if not use_rsd else f'z{summary_name}'
     group.create_dataset(summary_key, data=summary_dataset.values)
+
+
+def parse_noise(
+    seed, dist, params
+):
+    np.random.seed(seed)
+    if dist == 'Fixed':
+        radial, transverse = params['radial'], params['transverse']
+    elif dist == 'Uniform':
+        a = params['a']
+        b = params['b']
+        radial, transverse = np.random.uniform(a, b, size=2)
+    elif dist == 'Reciprocal':
+        a = np.log(params['a'])
+        b = np.log(params['b'])
+        radial, transverse = np.exp(np.random.uniform(a, b, size=2))
+    elif dist == 'Exponential':
+        scale = params['scale']
+        radial, transverse = np.random.exponential(scale, size=2)
+    else:
+        raise NotImplementedError(f'Noise distribution {dist} not implemented')
+    return float(radial), float(transverse)

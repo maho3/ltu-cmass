@@ -7,6 +7,7 @@ defaults:
   - survey: default
   # - filter: random  # not default
   - diag: default
+  - noise: fixed
   - infer: default
   - net: default
   - _self_
