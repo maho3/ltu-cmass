@@ -21,13 +21,13 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm_hodzbias
-infer=simple  # lightcone
+nbody=mtnglike
+sim=fastpm_recnoise_ngp
+infer=lightcone  # simple
 
 halo=False
-galaxy=True
-ngc=False
+galaxy=False
+ngc=True
 sgc=False
 mtng=False
 simbig=False

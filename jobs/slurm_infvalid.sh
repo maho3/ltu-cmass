@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=9,10  # Array range
+#SBATCH --array=0-6  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -20,13 +20,13 @@ net_index=0
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm_hodzbias
-infer=simple  # lightcone
+nbody=mtnglike
+sim=fastpm_recnoise
+infer=lightcone # simple
 
 halo=False
-galaxy=True
-ngc=False
+galaxy=False
+ngc=True
 sgc=False
 mtng=False
 simbig=False

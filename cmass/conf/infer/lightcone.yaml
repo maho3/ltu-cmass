@@ -19,19 +19,31 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  - summary: [Pk0]   # monopole
+  # - summary: [Pk0]   # monopole
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  - summary: [nbar, Pk0]   # z-space monopole
     kmin: [0.]
     kmax: [0.4]
-  - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
+  - summary: [nbar, Pk0, Pk2, Pk4]   # z-space monopole
     kmin: [0.]
     kmax: [0.4]
-  - summary: [Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  - summary: [nbar, Pk0, Pk2, Pk4, EqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, Pk0]   # monopole
+  - summary: [nbar, Pk0, Pk2, Pk4, SqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
+  - summary: [nbar, Pk0, Pk2, Pk4, SsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, Pk0, Pk2, Pk4, IsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
     kmin: [0.]
     kmax: [0.4]
   - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
@@ -68,6 +80,8 @@ hyperprior:
   log2_batch_size: [5, 9]
   learning_rate: [5e-6, 1e-2]
   weight_decay: [1e-5, 1e-1]
+  lr_patience: [5, 20]
+  lr_decay_factor: [0.1, 0.9]
 
-n_trials: 25  # number of trials for hyperparameter optimization
+n_trials: 50  # number of trials for hyperparameter optimization
 n_startup_trials: 50  # number of startup trials for hyperparameter optimization
