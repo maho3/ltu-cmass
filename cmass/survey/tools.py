@@ -82,6 +82,46 @@ def sky_to_xyz(rdz, cosmo):
 
     return pos.value.T
 
+
+def sky_to_unit_vectors(ra_deg, dec_deg):
+    """Converts sky coordinates (ra_deg, dec_deg) to unit vectors in cartesian coordinates.
+    
+    Args:
+        ra_deg (array): Right ascension in degrees.
+        dec_deg (array): Declination in degrees.
+
+    Returns:
+        r_hat (array): Unit radial vector in cartesian coordinates.
+        e_phi (array): Unit vector along increasing RA (constant Dec).
+        e_theta (array): Unit vector along increasing Dec (constant RA).
+    """
+
+    ra = np.deg2rad(ra_deg)
+    dec = np.deg2rad(dec_deg)
+
+    # Unit radial vector r_hat
+    r_hat = np.stack([
+        np.cos(dec) * np.cos(ra),
+        np.cos(dec) * np.sin(ra),
+        np.sin(dec)
+    ], axis=-1)  # shape (N, 3)
+
+    # Along increasing RA (constant Dec) — e_phi
+    e_phi = np.stack([
+        -np.sin(ra),
+        np.cos(ra),
+        np.zeros_like(ra)
+    ], axis=-1)  # shape (N, 3)
+
+    # Along increasing Dec (constant RA) — e_theta
+    e_theta = np.stack([
+        -np.sin(dec) * np.cos(ra),
+        -np.sin(dec) * np.sin(ra),
+        np.cos(dec)
+    ], axis=-1)  # shape (N, 3)
+
+    return r_hat, e_phi, e_theta
+
 # Geometry functions
 
 
