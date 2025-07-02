@@ -24,6 +24,8 @@ get_hod = get_hod_params  # for backwards compatibility
 def closest_a(lst, a):
     lst = [float(el) for el in lst]
     lst = np.asarray(lst)
+    if len(lst) == 0:
+        return 0
     idx = (np.abs(lst - a)).argmin()
     return lst[idx]
 
@@ -129,7 +131,10 @@ def _get_nbar(data):
 
 
 def _get_log10nbar(data):
-    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
+    return np.repeat(
+        np.array([x['log10nbar'] for x in data]).reshape(-1, 1),
+        10, axis=-1
+    )  # repeat for more visibility
 
 
 def signed_log(x, base=10):
