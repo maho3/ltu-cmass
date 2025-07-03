@@ -54,7 +54,7 @@ for offset in $(seq 0 100 1999); do
     postfix="$postfix $extras"
     
     # galaxies
-    for i in $(seq 0 $(($Nhod-1))); do
+    for i in $(seq 5 $(($Nhod+4))); do
         hod_seed=$((lhid*10+i+1))
         printf -v hod_str "%05d" $hod_seed
         # file=$outdir/$lhid/galaxies/hod$hod_str.h5

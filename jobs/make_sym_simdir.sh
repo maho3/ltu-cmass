@@ -2,13 +2,21 @@
 
 set -e
 
-SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/quijotelike/fastpm"
-SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/quijotelike/fastpm_expnoise"
+SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/quijote/nbody"
+SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/quijote/nbody_nonoise_ngp"
 SUBDIR="L1000-N128"
 N=1999
 
 mkdir -p "$SIM2/$SUBDIR"
 cd "$SIM2/$SUBDIR"
+
+echo "Source:      $SIM1/$SUBDIR"
+echo "Destination: $SIM2/$SUBDIR"
+read -p "Are you sure you want to create symbolic links for $((N+1)) simulations from the above source to destination? (y/n): " confirm
+if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+  echo "Aborted."
+  exit 1
+fi
 
 for i in $(seq 0 "$N"); do
   (
