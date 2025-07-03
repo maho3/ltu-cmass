@@ -18,7 +18,7 @@ from .tools import split_experiments
 
 def objective(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, exp_path):
+              hodprior, noiseprior, exp_path):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -69,7 +69,7 @@ def objective(trial, cfg: DictConfig,
         lr_patience=None,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
-        hodprior=hodprior, verbose=False
+        hodprior=hodprior, noiseprior=noiseprior, verbose=False
     )
     end = time.time()
 
@@ -108,7 +108,7 @@ def run_experiment(exp, cfg, model_path):
             (x_train, theta_train,
              x_val, theta_val,
              x_test, theta_test,
-             hodprior) = load_preprocessed_data(exp_path)
+             hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -121,7 +121,7 @@ def run_experiment(exp, cfg, model_path):
             study.optimize(
                 lambda trial: objective(trial, cfg, x_train, theta_train,
                                         x_val, theta_val, x_test, theta_test,
-                                        hodprior, exp_path),
+                                        hodprior, noiseprior, exp_path),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
                 timeout=60*60*4,  # 4 hours
