@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior,
+    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar)
 
 
@@ -32,7 +32,8 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
-def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
+def load_summaries(suitepath, tracer, Nmax, a=None,
+                   include_hod=False, include_noise=False):
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
                       'mtng_lightcone', 'simbig_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
@@ -50,23 +51,27 @@ def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
         summs, params = _load_single_simulation_summaries(
-            sourcepath, tracer, a=a, only_cosmo=only_cosmo)
+            sourcepath, tracer, a=a,
+            include_hod=include_hod, include_noise=include_noise)
         summlist += summs
         paramlist += params
         idlist += [lhid] * len(summs)
 
-    # get parameter names
-    hodprior = None
-    if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+    # get and save hod/noise priors
+    hodprior, noiseprior = None, None
+    if (tracer != 'halo') & include_hod:  # add HOD params
         example_config_file = join(suitepath, simpaths[0], 'config.yaml')
         hodprior = _construct_hod_prior(example_config_file)
+    if include_noise:
+        noiseprior = _construct_noise_prior(
+            join(suitepath, simpaths[0]), tracer)
 
     # aggregate summaries (merges all summaries into a single dict)
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} {key} summaries')
-    return summaries, parameters, ids, hodprior
+    return summaries, parameters, ids, hodprior, noiseprior
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
@@ -108,13 +113,15 @@ def setup_optuna(exp_path, name, n_startup_trials):
     return study
 
 
-def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
+def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
+                      exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
 
     # check that there's data
     for summ in exp.summary:
-        if "Eq" in summ:
-            summ = summ.replace("Eq", "")
+        for tag in ["Eq", "Sq", "Ss", "Is"]:
+            if tag in summ:
+                summ = summ.replace(tag, "")
         if summ == 'nbar':  # this comes for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
@@ -137,7 +144,11 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                 if summ == 'nbar':
                     continue  # we handle this separately
                 eq_bool = "Eq" in summ
-                summ = summ.replace("Eq", "") if eq_bool else summ
+                sq_bool = "Sq" in summ
+                ss_bool = "Ss" in summ
+                is_bool = "Is" in summ
+                for tag in ["Eq", "Sq", "Ss",  "Is"]:
+                    summ = summ.replace(tag, "")
                 x, theta, id = summaries[summ], parameters[summ], ids[summ]
                 # Preprocess the summaries
                 if 'Pk0' in summ:
@@ -152,14 +163,16 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
                     else:
                         raise ValueError(
                             f'Need monopole for normalization of {summ}')
-                elif 'Bk' in summ:
-                    x = preprocess_Bk(x, kmax, log=True,
-                                      equilateral_only=eq_bool, kmin=kmin,
-                                      correct_shot=cfg.infer.correct_shot)
-                elif 'Qk' in summ:
-                    x = preprocess_Bk(x, kmax, log=False,
-                                      equilateral_only=eq_bool, kmin=kmin,
-                                      correct_shot=cfg.infer.correct_shot)
+                elif ('Bk' in summ) or ('Qk' in summ):
+                    x = preprocess_Bk(
+                        x, kmin=kmin, kmax=kmax,
+                        log='Bk' in summ,
+                        equilateral_only=eq_bool,
+                        squeezed_only=sq_bool,
+                        subsampled_only=ss_bool,
+                        isoceles_only=is_bool,
+                        correct_shot=cfg.infer.correct_shot
+                    )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
@@ -183,6 +196,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
+            with open(join(exp_path, 'config.yaml'), 'w') as f:
+                OmegaConf.save(cfg, f)
             np.save(join(exp_path, 'x_train.npy'), x_train)
             np.save(join(exp_path, 'x_val.npy'), x_val)
             np.save(join(exp_path, 'x_test.npy'), x_test)
@@ -195,6 +210,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
             if hodprior is not None:
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')
+            if noiseprior is not None:
+                with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
+                    OmegaConf.save(noiseprior, f)
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
@@ -230,13 +248,14 @@ def main(cfg: DictConfig) -> None:
             continue
 
         logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, hodprior = load_summaries(
+        summaries, parameters, ids, hodprior, noiseprior = load_summaries(
             suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
-            only_cosmo=cfg.infer.only_cosmo)
+            include_hod=cfg.infer.include_hod,
+            include_noise=cfg.infer.include_noise)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
-                              hodprior, exp, cfg, save_path)
+                              hodprior, noiseprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":

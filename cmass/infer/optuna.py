@@ -18,7 +18,7 @@ from .tools import split_experiments
 
 def objective(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, exp_path):
+              hodprior, noiseprior, exp_path):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -38,6 +38,10 @@ def objective(trial, cfg: DictConfig,
         "learning_rate", *hyperprior.learning_rate, log=True)
     weight_decay = trial.suggest_float(
         "weight_decay", *hyperprior.weight_decay, log=True)
+    lr_patience = trial.suggest_int(
+        "lr_patience", *hyperprior.lr_patience)
+    lr_decay_factor = trial.suggest_float(
+        "lr_decay_factor", *hyperprior.lr_decay_factor, log=True)
     mcfg = OmegaConf.create(dict(
         model=model,
         hidden_features=hidden_features,
@@ -46,7 +50,9 @@ def objective(trial, cfg: DictConfig,
         fcn_depth=fcn_depth,
         batch_size=batch_size,
         learning_rate=learning_rate,
-        weight_decay=weight_decay
+        weight_decay=weight_decay,
+        lr_patience=lr_patience,
+        lr_decay_factor=lr_decay_factor
     ))
 
     # run training
@@ -54,16 +60,16 @@ def objective(trial, cfg: DictConfig,
     posterior, histories = run_training(
         x_train, theta_train, x_val, theta_val, out_dir=out_dir,
         prior_name=cfg.infer.prior, mcfg=mcfg,
-        batch_size=cfg.infer.batch_size,
-        learning_rate=cfg.infer.learning_rate,
+        batch_size=None,
+        learning_rate=None,
         stop_after_epochs=cfg.infer.stop_after_epochs,
         val_frac=cfg.infer.val_frac,
-        weight_decay=cfg.infer.weight_decay,
-        lr_decay_factor=cfg.infer.lr_decay_factor,
-        lr_patience=cfg.infer.lr_patience,
+        weight_decay=None,
+        lr_decay_factor=None,
+        lr_patience=None,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
-        hodprior=hodprior, verbose=False
+        hodprior=hodprior, noiseprior=noiseprior, verbose=False
     )
     end = time.time()
 
@@ -102,7 +108,7 @@ def run_experiment(exp, cfg, model_path):
             (x_train, theta_train,
              x_val, theta_val,
              x_test, theta_test,
-             hodprior) = load_preprocessed_data(exp_path)
+             hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -115,7 +121,7 @@ def run_experiment(exp, cfg, model_path):
             study.optimize(
                 lambda trial: objective(trial, cfg, x_train, theta_train,
                                         x_val, theta_val, x_test, theta_test,
-                                        hodprior, exp_path),
+                                        hodprior, noiseprior, exp_path),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
                 timeout=60*60*4,  # 4 hours

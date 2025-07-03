@@ -1,17 +1,18 @@
 #!/bin/bash
-#SBATCH --job-name=pinocchio_bias   # Job name
-#SBATCH --array=0-999         # Job array range for lhid
+#SBATCH --job-name=quijote_bias   # Job name
+#SBATCH --array=0-99        # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
 #SBATCH --gpus=v100:1     # Number of GPUs
-#SBATCH --time=04:00:00         # Time limit
+#SBATCH --time=08:00:00         # Time limit
 #SBATCH --partition=GPU-shared      # Partition name
 #SBATCH --account=phy240015p   # Account name
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=663
-globoffset=0
+set -e
+
+# SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmass
@@ -21,17 +22,20 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
-Naug=1
+# Nhod=5
+# Naug=1
 
-nbody=quijote
-sim=nonoise
-multisnapshot=False
-diag_from_scratch=False
-rm_galaxies=False
-extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-L=1000
-N=128
+# nbody=quijotelike
+# sim=fastpm_recnoise
+# noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+# noise=fixed
+
+# multisnapshot=False
+# diag_from_scratch=True
+# rm_galaxies=True
+# extras="bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+# L=1000
+# N=128
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"
@@ -40,23 +44,14 @@ outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in 0; do #  1000; do
-    lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
+for offset in $(seq 0 100 1999); do
+    lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
-    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
-
-    # density
-    # python -m cmass.diagnostics.summ diag.density=True $postfix 
-
-    # halos
-    file=$outdir/$lhid/halos.h5
-    if [ -f $file ]; then
-        echo "File $file exists."
-    else
-        echo "File $file does not exist."
-        # python -m cmass.bias.rho_to_halo $postfix
-    fi
-    # python -m cmass.diagnostics.summ diag.halo=True $postfix 
+    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
+    postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
+    postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
+    postfix="$postfix noise=$noise"
+    postfix="$postfix $extras"
 
     # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
@@ -88,12 +83,12 @@ for offset in 0; do #  1000; do
         # Trash collection
         if [ $rm_galaxies = True ]; then
             # galaxies
-            echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/galaxies/hod$hod_str.h5
+            # echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
+            # rm $outdir/$lhid/galaxies/hod$hod_str.h5
 
             # lightcone
             echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
+            rm $outdir/$lhid/simbig_lightcone/hod${hod_str}_aug*.h5
         fi
     done
 done

@@ -11,6 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 import pickle
 import scipy
+import shutil
 import matplotlib.pyplot as plt
 
 from .tools import split_experiments, load_posterior
@@ -74,7 +75,7 @@ def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
               bbox_inches='tight', dpi=200)
 
 
-def load_ensemble(exp_path, Nnets, weighted=True, plot=True):
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     # Load top Nnets architectures by test log prob
     net_dirs = os.listdir(join(exp_path, 'nets'))
 
@@ -92,8 +93,9 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True):
         else:
             log_probs.append(-np.inf)
             mcfgs.append(None)
+            if clean:
+                shutil.rmtree(join(exp_path, 'nets', n))
 
-    # Remove nets that did not converge
     mask = np.isfinite(log_probs)
     net_dirs = np.array(net_dirs)[mask]
     log_probs = np.array(log_probs)[mask]
@@ -114,6 +116,12 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True):
         model_path = join(exp_path, 'nets', net_dirs[i], 'posterior.pkl')
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
+
+    if clean:   # Remove net directories that are not in top_nets
+        keep_set = set([net_dirs[i] for i in top_nets])
+        for n in net_dirs:
+            if n not in keep_set:
+                shutil.rmtree(join(exp_path, 'nets', n))
 
     if weighted:
         ensemble_logprobs = log_probs[top_nets]
@@ -149,9 +157,11 @@ def run_experiment(exp, cfg, model_path):
 
             names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
             filepath = join(exp_path, 'hodprior.csv')
-            if (not cfg.infer.only_cosmo) and os.path.exists(filepath):
+            if cfg.infer.include_hod and os.path.exists(filepath):
                 hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
+            if cfg.infer.include_noise:
+                names += ['noise_radial', 'noise_transverse']
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}.'
@@ -160,7 +170,8 @@ def run_experiment(exp, cfg, model_path):
         logging.info(f'Testing on {len(x_test)} examples')
 
         # load trained posterior
-        posterior_ensemble = load_ensemble(exp_path, cfg.infer.Nnets)
+        posterior_ensemble = load_ensemble(exp_path, cfg.infer.Nnets,
+                                           clean=cfg.infer.clean_models)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)

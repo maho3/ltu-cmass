@@ -65,3 +65,6 @@ hod:
     # conc_gal_bias_satellites: 1.0  # concentration bias for satellites
     # mean_occupation_centrals_assembias_param1: 1.0 # assembly bias parameter for centrals
     # mean_occupation_satellites_assembias_param1: 1.0 # assembly bias parameter for satellites
+
+  # Whether to noise the positions of the galaxies in the voxel
+  noise_uniform: True
