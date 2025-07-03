@@ -32,8 +32,7 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
-def load_summaries(suitepath, tracer, Nmax, a=None,
-                   include_hod=False, include_noise=False):
+def load_summaries(suitepath, tracer, Nmax, a=None, only_cosmo=False):
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
                       'mtng_lightcone', 'simbig_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
@@ -51,15 +50,14 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
     for lhid in tqdm(simpaths):
         sourcepath = join(suitepath, lhid)
         summs, params = _load_single_simulation_summaries(
-            sourcepath, tracer, a=a,
-            include_hod=include_hod, include_noise=include_noise)
+            sourcepath, tracer, a=a, only_cosmo=only_cosmo)
         summlist += summs
         paramlist += params
         idlist += [lhid] * len(summs)
 
     # get parameter names
     hodprior = None
-    if (tracer != 'halo') & include_hod:  # add HOD params
+    if (tracer != 'halo') & (not only_cosmo):  # add HOD params
         example_config_file = join(suitepath, simpaths[0], 'config.yaml')
         hodprior = _construct_hod_prior(example_config_file)
 
@@ -243,8 +241,7 @@ def main(cfg: DictConfig) -> None:
         logging.info(f'Running {tracer} preprocessing...')
         summaries, parameters, ids, hodprior = load_summaries(
             suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
-            include_hod=cfg.infer.include_hod,
-            include_noise=cfg.infer.include_noise)
+            only_cosmo=cfg.infer.only_cosmo)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,

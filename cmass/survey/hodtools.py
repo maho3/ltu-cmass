@@ -16,10 +16,6 @@ class HODEngine():
             z = np.full(len(hlo_idx), z)
 
         # Load snapshot
-        # Note that we do not need to noise the halos' positons here (even if
-        # cfg.bias.hod.noise_uniform is set to True), since we return the
-        # difference between the galaxy's position and that of the host halo,
-        # so the noise will cancel out.
         hpos, hvel, hmass, hmeta = load_snapshot(self.simdir, a)
         print('loaded')
 

@@ -1,8 +1,0 @@
-# Fixed values of noise
-dist: Fixed
-params:
-    radial: 0.0      # radial noise in Mpc/h
-    transverse: 0.0  # transverse noise in Mpc/h
-
-radial: 0.0
-transverse: 0.0

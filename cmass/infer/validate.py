@@ -157,11 +157,9 @@ def run_experiment(exp, cfg, model_path):
 
             names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
             filepath = join(exp_path, 'hodprior.csv')
-            if cfg.infer.include_hod and os.path.exists(filepath):
+            if (not cfg.infer.only_cosmo) and os.path.exists(filepath):
                 hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
-            if cfg.infer.include_noise:
-                names += ['noise_radial', 'noise_transverse']
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}.'
