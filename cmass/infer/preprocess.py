@@ -190,6 +190,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
+            with open(join(exp_path, 'config.yaml'), 'w') as f:
+                OmegaConf.save(cfg, f)
             np.save(join(exp_path, 'x_train.npy'), x_train)
             np.save(join(exp_path, 'x_val.npy'), x_val)
             np.save(join(exp_path, 'x_test.npy'), x_test)
