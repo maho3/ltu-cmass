@@ -282,7 +282,7 @@ def _construct_noise_prior(sourcepath, tracer):
         noisedist = f.attrs['noise_dist'] if 'noise_dist' in f.attrs else None
     if noisedist is None:
         raise ValueError(
-            f'No noise distribution found in {f}.')
+            f'No noise distribution found in {join(diagpath, filelist[0])}.')
 
     # this is a terrible hack to find the config files
     codepath = os.path.abspath(__file__)
