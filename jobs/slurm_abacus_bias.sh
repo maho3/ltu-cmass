@@ -54,58 +54,50 @@ for offset in $(seq 0 100 1999); do
     postfix="$postfix $extras"
     
     # galaxies
-    for i in $(seq 5 $(($Nhod+4))); do
+    for i in $(seq 0 $(($Nhod-1))); do
         hod_seed=$((lhid*10+i+1))
         printf -v hod_str "%05d" $hod_seed
-        # file=$outdir/$lhid/galaxies/hod$hod_str.h5
-        # if [ -f $file ]; then
-        #     echo "File $file exists."
-        # else
-        #     echo "File $file does not exist."
-        #     python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-        # fi
-        # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
+        if [ -f "$diag_file" ]; then
+            echo "Diag file $diag_file exists."
+        else
+            echo "Diag file $diag_file does not exist."
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+        fi
 
         # sgc_lightcone
         for aug_seed in $(seq 0 $(($Naug-1))); do
             printf -v aug_str "%05d" $aug_seed
-            # lightcone
-            file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
-            if [ -f $file ]; then
-                echo "File $file exists."
+            diag_file=$outdir/$lhid/diag/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f "$diag_file" ]; then
+                echo "Diag file $diag_file exists."
             else
-                echo "File $file does not exist."
+                echo "Diag file $diag_file does not exist."
                 python -m cmass.survey.hodlightcone survey.geometry=sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+                python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
             fi
-            python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
         done
 
-        # for aug_seed in $(seq 0 $(($Naug-1))); do
-        #     printf -v aug_str "%05d" $aug_seed
-        #     # lightcone
-        #     file=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
-        #     if [ -f $file ]; then
-        #         echo "File $file exists."
-        #     else
-        #         echo "File $file does not exist."
-        #         python -m cmass.survey.hodlightcone survey.geometry=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-        #     fi
-        #     python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        # done
-
-        # Trash collection
-        if [ $rm_galaxies = True ]; then
-            # # galaxies
-            # echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-            # rm $outdir/$lhid/galaxies/hod$hod_str.h5
-
-            # sgc_lightcone
-            echo "Removing sgc_lightcone for lhid=$lhid hod_seed=$hod_seed"
-            rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
-
-            # # lightcone
-            # echo "Removing mtng_lightcone for lhid=$lhid hod_seed=$hod_seed"
-            # rm $outdir/$lhid/mtng_lightcone/hod${hod_str}_aug*.h5
-        fi
+        # mtng_lightcone
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            diag_file=$outdir/$lhid/diag/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f "$diag_file" ]; then
+                echo "Diag file $diag_file exists."
+            else
+                echo "Diag file $diag_file does not exist."
+                python -m cmass.survey.hodlightcone survey.geometry=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+                python -m cmass.diagnostics.summ diag.mtng=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            fi
+        done
     done
+
+    # Trash collection
+    if [ "$rm_galaxies" = "True" ]; then
+        echo "Removing galaxy and lightcone directories for lhid=$lhid"
+        rm -rf "$outdir/$lhid/galaxies"
+        rm -rf "$outdir/$lhid/sgc_lightcone"
+        rm -rf "$outdir/$lhid/mtng_lightcone"
+    fi
 done
