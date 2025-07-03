@@ -54,11 +54,11 @@ for offset in $(seq 0 100 2999); do
     postfix="$postfix $extras"
     
 
-    # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
         hod_seed=$((lhid*10+i+1))
         printf -v hod_str "%05d" $hod_seed
 
+        # # galaxies
         # diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
         # if [ -f "$diag_file" ]; then
         #     echo "Diag file $diag_file exists."

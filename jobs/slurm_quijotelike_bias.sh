@@ -53,11 +53,11 @@ for offset in $(seq 0 100 1999); do
     postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
 
-    # galaxies
     for i in $(seq 0 $(($Nhod-1))); do
         hod_seed=$((lhid*10+i+1))
         printf -v hod_str "%05d" $hod_seed
 
+        # # galaxies
         # diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
         # if [ -f "$diag_file" ]; then
         #     echo "Diag file $diag_file exists."
@@ -67,6 +67,7 @@ for offset in $(seq 0 100 1999); do
         #     python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
         # fi
 
+        # simbig_lightcone
         for aug_seed in $(seq 0 $(($Naug-1))); do
             printf -v aug_str "%05d" $aug_seed
             # lightcone
