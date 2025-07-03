@@ -18,6 +18,9 @@ threads: -1  # -1 for all available threads
 # whether to compute summaries on a high resolution grid (~ 4 Mpc/h)
 high_res: true
 
+# whether to use NGP meshing (forces high_res to false)
+use_ngp: false
+
 # whether to focus summaries at a specific redshift
 focus_z: null  # redshift to focus on (null for all redshifts)
 
@@ -34,7 +37,6 @@ summaries:
 halo_density: 1e-4  # number density in h^3/Mpc^3. null for no abundance matching
 halo_proxy: mass  # property for abundance matching (null for no abundance matching)
 
+# Note, we don't have a mass proxy for galaxies, so we can't use abundance matching
 galaxy_density: null  # number density in h^3/Mpc^3. null for no abundance matching
 galaxy_proxy: null  # property for abundance matching (null for no abundance matching)
-
-# Note, we don't have a mass proxy for galaxies, so we can't use abundance matching
