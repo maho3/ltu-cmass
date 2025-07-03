@@ -57,9 +57,7 @@ def parse_nbody_config(cfg):
 
     if cfg.nbody.quijote:
         logging.info('Matching ICs to Quijote')
-        if cfg.nbody.L != 1000:
-            warnings.warn("The size of cfg.nbody.L is not 1000, "
-                          "which may cause inconsistencies with Quijote.")
+        assert cfg.nbody.L == 1000  # enforce same size of quijote
 
     return cfg
 
@@ -142,7 +140,7 @@ def save_transfer(savedir, rho):
         f.create_dataset('rho', data=rho)
 
 
-@timing_decorator
+@ timing_decorator
 def save_nbody(savedir, a, rho, fvel, ppos, pvel, mode='w'):
     os.makedirs(savedir, exist_ok=True)
     savefile = join(savedir, 'nbody.h5')

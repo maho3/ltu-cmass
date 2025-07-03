@@ -5,31 +5,31 @@
 #SBATCH -p shared # the default queue is "shared" queue
 #SBATCH --nodes=1
 #SBATCH --ntasks=32 
-#SBATCH --time=1:00:00
-#SBATCH --job-name pinocchio
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --time=20:00:00
+#SBATCH --job-name pinocchio_quijote_0
+#SBATCH --output=/anvil/scratch/x-dbartlett/cmass/quijotelike/pinocchio/pinocchio_log_%j.out
+#SBATCH --error=/anvil/scratch/x-dbartlett/cmass/quijotelike/pinocchio/pinocchio_log_%j.err
 
 module purge 
-module restore pinocchio
+module restore cmass_env
 module list 
-conda activate cmassrun
+conda activate cmass
 
 # Print the hostname of the compute node on which this job is running.
 hostname
 
 # Change to correct directory
-cd /home/x-mho1/git/ltu-cmass-run
+cd /home/x-dbartlett/ltu-cmass
 pwd
 
 # Define the range for lhid
 start_lhid=0
-end_lhid=1
+end_lhid=499
 
 # Loop over lhid from start_lhid to end_lhid
 for lhid in $(seq $start_lhid $end_lhid)
 do
-  python -m cmass.nbody.pinocchio nbody=pinocchio nbody.lhid=$lhid
+  python -m cmass.nbody.pinocchio nbody=pinocchio_quijote nbody.lhid=$lhid 
 done
 
 exit 0
