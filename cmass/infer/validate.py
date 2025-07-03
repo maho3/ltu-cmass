@@ -117,9 +117,8 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
 
-    # Remove nets that are not in top_nets if clean is True
-    if clean:
-        keep_set = set(net_dirs[top_nets])
+    if clean:   # Remove net directories that are not in top_nets
+        keep_set = set([net_dirs[i] for i in top_nets])
         for n in net_dirs:
             if n not in keep_set:
                 shutil.rmtree(join(exp_path, 'nets', n))
