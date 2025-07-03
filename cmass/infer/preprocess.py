@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior,
+    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar)
 
 
@@ -57,18 +57,21 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
         paramlist += params
         idlist += [lhid] * len(summs)
 
-    # get parameter names
-    hodprior = None
+    # get and save hod/noise priors
+    hodprior, noiseprior = None, None
     if (tracer != 'halo') & include_hod:  # add HOD params
         example_config_file = join(suitepath, simpaths[0], 'config.yaml')
         hodprior = _construct_hod_prior(example_config_file)
+    if include_noise:
+        noiseprior = _construct_noise_prior(
+            join(suitepath, simpaths[0]), tracer)
 
     # aggregate summaries (merges all summaries into a single dict)
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} {key} summaries')
-    return summaries, parameters, ids, hodprior
+    return summaries, parameters, ids, hodprior, noiseprior
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
@@ -110,7 +113,8 @@ def setup_optuna(exp_path, name, n_startup_trials):
     return study
 
 
-def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path):
+def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
+                      exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
 
     # check that there's data
@@ -206,6 +210,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, exp, cfg, model_path
             if hodprior is not None:
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')
+            if noiseprior is not None:
+                with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
+                    OmegaConf.save(noiseprior, f)
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
@@ -241,14 +248,14 @@ def main(cfg: DictConfig) -> None:
             continue
 
         logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, hodprior = load_summaries(
+        summaries, parameters, ids, hodprior, noiseprior = load_summaries(
             suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
             include_hod=cfg.infer.include_hod,
             include_noise=cfg.infer.include_noise)
         for exp in cfg.infer.experiments:
             save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
-                              hodprior, exp, cfg, save_path)
+                              hodprior, noiseprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":
