@@ -16,7 +16,7 @@ from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior,
+    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar)
 
 
@@ -63,8 +63,8 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
         example_config_file = join(suitepath, simpaths[0], 'config.yaml')
         hodprior = _construct_hod_prior(example_config_file)
     if include_noise:
-        example_config_file = join(suitepath, simpaths[0], 'config.yaml')
-        noiseprior = example_config_file.noise
+        noiseprior = _construct_noise_prior(
+            join(suitepath, simpaths[0]), tracer)
 
     # aggregate summaries (merges all summaries into a single dict)
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
