@@ -266,6 +266,38 @@ def _construct_hod_prior(configfile):
     return hodprior
 
 
+def _construct_noise_prior(sourcepath, tracer):
+    """
+    This goes into a diagnostic file, reads the noise_dist from the attributes,
+    and returns a noise prior. This is kind of a hack, because our current 
+    diagnostics don't save the prior params, just the distribution.
+
+    TODO: fix this hack
+    """
+    diagpath = join(sourcepath, 'diag')
+    if tracer == 'galaxy':
+        diagpath = join(diagpath, 'galaxies')
+    elif 'lightcone' in tracer:
+        diagpath = join(diagpath, f'{tracer}')
+    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
+    with h5py.File(join(diagpath, filelist[0]), 'r') as f:
+        noisedist = f.attrs['noise_dist'] if 'noise_dist' in f.attrs else None
+    if noisedist is None:
+        raise ValueError(
+            f'No noise distribution found in {f}.')
+
+    # this is a terrible hack to find the config files
+    codepath = os.path.abspath(__file__)
+    confpath = join(os.path.dirname(os.path.dirname(codepath)), 'conf', 'noise')
+    filepath = join(confpath, noisedist.lower()+'.yaml')
+    try:
+        noiseprior = OmegaConf.load(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f'Noise prior configuration file not found: {filepath}')
+    return noiseprior
+
+
 def _load_single_simulation_summaries(sourcepath, tracer, a=None,
                                       include_hod=True, include_noise=False):
     # specify paths to diagnostics

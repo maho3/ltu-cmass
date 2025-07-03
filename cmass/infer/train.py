@@ -44,7 +44,7 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
         if ((hodprior is not None) or (noiseprior is not None)) and (theta.shape[-1] == 5):
             raise ValueError(
                 'HOD or noise priors provided, but theta has only 5 parameters.'
-                ' infer_hod or infer_noise might not be set correctly.')
+                ' include_hod or include_noise might not be set correctly.')
         if hodprior is not None:
             if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
                 raise NotImplementedError(
