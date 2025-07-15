@@ -3,10 +3,10 @@ set -e
 cd /jet/home/mho1/git/ltu-cmass
 
 
-seriesname="NO"
+seriesname="4"
 
 # --- Fixed, global variables ---
-Nhod=1
+Nhod=10
 Naug=1
 multisnapshot=False
 diag_from_scratch=True
@@ -15,12 +15,12 @@ noise=fixed
 TQDM_DISABLE=0
 
 # Define a base set of extras common to all jobs
-common_extras="diag.use_ngp=True bias=zhenginterp_biased diag.focus_z=0.5 hydra/job_logging=disabled"
-
+common_extras="bias=zhenginterp_biased diag.focus_z=0.5 hydra/job_logging=disabled"
+common_extras="$common_extras noise.params.radial=4 noise.params.transverse=4"
 
 # # --- Quijote ---
 # nbody=quijote
-# sim=nbody_nonoise_ngp
+# sim=nbody_6noise
 # L=1000
 # N=128
 # noise_uniform_invoxel=False
@@ -33,7 +33,7 @@ common_extras="diag.use_ngp=True bias=zhenginterp_biased diag.focus_z=0.5 hydra/
 
 # --- Abacus ---
 nbody=abacus
-sim=custom_nonoise_ngp
+sim=custom_4noise
 L=2000
 N=256
 noise_uniform_invoxel=False
@@ -46,12 +46,25 @@ sbatch --job-name="${seriesname}_ababias" \
 
 # # --- Quijote 3 Gpc/h ---
 # nbody=quijote3gpch
-# sim=nbody_nonoise
+# sim=nbody_4noise
 # L=3000
 # N=384
 # noise_uniform_invoxel=False
-# job_extras="$common_extras nbody.zf=0.500015"
+# job_extras="$common_extras nbody.zf=0.5"
 
-# sbatch --job-name="${seriesname}_mtngbias" \
+# sbatch --job-name="${seriesname}_qui3bias" \
 #        --export=Nhod=$Nhod,Naug=$Naug,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
 #        ./jobs/slurm_mtng_bias.sh
+
+
+# --- MTNG 3 Gpc/h ---
+nbody=mtng
+sim=nbody_4noise
+L=3000
+N=384
+noise_uniform_invoxel=False
+job_extras="$common_extras nbody.zf=0.500015"
+
+sbatch --job-name="${seriesname}_mtngbias" \
+       --export=Nhod=$Nhod,Naug=$Naug,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
+       ./jobs/slurm_mtng_bias.sh

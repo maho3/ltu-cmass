@@ -67,18 +67,18 @@ for offset in $(seq 0 100 1999); do
         #     python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
         # fi
 
-        # # sgc_lightcone
-        # for aug_seed in $(seq 0 $(($Naug-1))); do
-        #     printf -v aug_str "%05d" $aug_seed
-        #     diag_file=$outdir/$lhid/diag/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
-        #     if [ -f "$diag_file" ]; then
-        #         echo "Diag file $diag_file exists."
-        #     else
-        #         echo "Diag file $diag_file does not exist."
-        #         python -m cmass.survey.hodlightcone survey.geometry=sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-        #         python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        #     fi
-        # done
+        # sgc_lightcone
+        for aug_seed in $(seq 0 $(($Naug-1))); do
+            printf -v aug_str "%05d" $aug_seed
+            diag_file=$outdir/$lhid/diag/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ -f "$diag_file" ]; then
+                echo "Diag file $diag_file exists."
+            else
+                echo "Diag file $diag_file does not exist."
+                python -m cmass.survey.hodlightcone survey.geometry=sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+                python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            fi
+        done
 
         # mtng_lightcone
         for aug_seed in $(seq 0 $(($Naug-1))); do

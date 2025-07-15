@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mtnglike_bias   # Job name
 #SBATCH --array=0-99         # Job array range for lhid
+# # SBATCH --array=0         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
 #SBATCH --gpus=v100-32:1     # Number of GPUs
@@ -27,15 +28,15 @@ cd /jet/home/mho1/git/ltu-cmass
 
 # nbody=mtnglike
 # sim=fastpm_recnoise
-# noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-# noise=reciprocal
-
-# multisnapshot=False
-# diag_from_scratch=False
-# rm_galaxies=True
-# extras="bias=zhenginterp_biased nbody.zf=0.500015 diag.focus_z=0.5"
 # L=3000
 # N=384
+# noise_uniform_invoxel=True
+# noise=reciprocal
+
+# multisnapshot=True
+# diag_from_scratch=False
+# rm_galaxies=False
+# extras="bias=zhenginterp_biased"  # nbody.zf=0.500015 diag.focus_z=0.5 noise.params.radial=4 noise.params.transverse=4"
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"
@@ -44,6 +45,7 @@ outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
+# for offset in 0; do 
 for offset in $(seq 0 100 2999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
