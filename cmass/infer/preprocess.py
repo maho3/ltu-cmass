@@ -17,7 +17,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
     preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
-    _load_single_simulation_summaries, _get_log10nbar)
+    _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -122,7 +122,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
         for tag in ["Eq", "Sq", "Ss", "Is"]:
             if tag in summ:
                 summ = summ.replace(tag, "")
-        if summ == 'nbar':  # this comes for free with any summaries
+        if summ in ['nbar', 'nz']:  # these come for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
@@ -141,8 +141,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
             for summ in exp.summary:
                 # Handle all the different summaries
-                if summ == 'nbar':
-                    continue  # we handle this separately
+                if summ in ['nbar', 'nz']:
+                    continue  # we handle these separately
                 eq_bool = "Eq" in summ
                 sq_bool = "Sq" in summ
                 ss_bool = "Ss" in summ
@@ -176,6 +176,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
+            if 'nz' in exp.summary:  # add n(z)
+                xs.append(_get_log10nz(summaries['Pk0']))
             if 'nbar' in exp.summary:  # add nbar
                 xs.append(_get_log10nbar(summaries['Pk0']))
 
