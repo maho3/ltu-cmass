@@ -111,6 +111,9 @@ def parse_hod(cfg):
 
                 # If 0, don't change default values
                 if cfg.bias.hod.seed > 0:
+                    # Make a different seed for each lhid
+                    cfg.bias.hod.seed = int(
+                        cfg.bias.hod.seed + cfg.nbody.lhid*1e6)
                     # Set numpy seed
                     np.random.seed(cfg.bias.hod.seed)
 
