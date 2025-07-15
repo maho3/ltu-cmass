@@ -17,7 +17,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
     preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
-    _load_single_simulation_summaries, _get_log10nbar, _get_nz)
+    _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -177,7 +177,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
             if 'nz' in exp.summary:  # add n(z)
-                xs.append(_get_nz(summaries['Pk0']))
+                xs.append(_get_log10nz(summaries['Pk0']))
             if 'nbar' in exp.summary:  # add nbar
                 xs.append(_get_log10nbar(summaries['Pk0']))
 

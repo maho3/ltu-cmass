@@ -147,7 +147,7 @@ def _get_log10nbar(data):
     )  # repeat for more visibility
 
 
-def _get_nz(data):
+def _get_log10nz(data):
     """
     Extracts n(z) values from each data entry and bins them into 3 coarse bins
     with edges at [0.4, 0.5, 0.6, 0.7]. Returns a 2D array of shape (len(data), 3).
@@ -167,7 +167,7 @@ def _get_nz(data):
     # repeat for more visibility
     num_repeat = 5
     binned_nz = np.repeat(binned_nz, num_repeat, axis=-1)
-    return binned_nz  # shape: (num_entries, num_bins*num_repeat)
+    return np.log10(binned_nz)  # shape: (num_entries, num_bins*num_repeat)
 
 
 def signed_log(x, base=10):
