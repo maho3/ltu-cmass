@@ -169,7 +169,8 @@ def _get_log10nz(data):
     # repeat for more visibility
     num_repeat = 5
     binned_nz = np.repeat(binned_nz, num_repeat, axis=-1)
-    return np.log10(binned_nz)  # shape: (num_entries, num_bins*num_repeat)
+    binned_nz_logged = np.where(binned_nz == 0, -1, np.log10(binned_nz))
+    return binned_nz_logged  # shape: (num_entries, num_bins*num_repeat)
 
 
 def signed_log(x, base=10):
