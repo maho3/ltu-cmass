@@ -11,13 +11,14 @@ from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
 import optuna
+import multiprocessing
 
 from ..utils import get_source_path, timing_decorator
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
     preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
-    _load_single_simulation_summaries, _get_log10nbar)
+    _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
 def aggregate(summlist, paramlist, idlist):
@@ -32,45 +33,73 @@ def aggregate(summlist, paramlist, idlist):
     return summaries, parameters, ids
 
 
+def _load_summaries_worker(lhid, suitepath, tracer, a,
+                           include_hod, include_noise):
+    """
+    Helper function to load data for a single simulation.
+    """
+    sourcepath = join(suitepath, lhid)
+    summs, params = _load_single_simulation_summaries(
+        sourcepath, tracer, a=a,
+        include_hod=include_hod, include_noise=include_noise
+    )
+    ids = [lhid] * len(summs)
+    return summs, params, ids
+
+
 def load_summaries(suitepath, tracer, Nmax, a=None,
                    include_hod=False, include_noise=False):
+    """
+    Loads summaries from a suite of simulations in parallel.
+    """
     if tracer not in ['halo', 'galaxy', 'ngc_lightcone', 'sgc_lightcone',
                       'mtng_lightcone', 'simbig_lightcone']:
         raise ValueError(f'Unknown tracer: {tracer}')
 
     logging.info(f'Looking for {tracer} summaries at {suitepath}')
 
-    # get list of simulation paths
     simpaths = os.listdir(suitepath)
-    simpaths.sort(key=lambda x: int(x))  # sort by lhid
+    simpaths.sort(key=lambda x: int(x))
     if Nmax >= 0:
         simpaths = simpaths[:Nmax]
 
-    # load summaries
+    # Create a list of arguments for each worker task
+    tasks = [(lhid, suitepath, tracer, a, include_hod, include_noise)
+             for lhid in simpaths]
+
+    # Use available CPUs, but no more than 16
+    num_processes = min(os.cpu_count(), 16)
+
+    # Load summaries in parallel
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        async_results = [
+            pool.apply_async(_load_summaries_worker, args=task) for task in tasks
+        ]
+        results = [res.get() for res in tqdm(async_results)]
+
+    # Unpack the parallel results into flat lists
     summlist, paramlist, idlist = [], [], []
-    for lhid in tqdm(simpaths):
-        sourcepath = join(suitepath, lhid)
-        summs, params = _load_single_simulation_summaries(
-            sourcepath, tracer, a=a,
-            include_hod=include_hod, include_noise=include_noise)
-        summlist += summs
-        paramlist += params
-        idlist += [lhid] * len(summs)
+    for s_chunk, p_chunk, id_chunk in results:
+        summlist.extend(s_chunk)
+        paramlist.extend(p_chunk)
+        idlist.extend(id_chunk)
 
-    # get and save hod/noise priors
+    # Get and save hod/noise priors from the first simulation
     hodprior, noiseprior = None, None
-    if (tracer != 'halo') & include_hod:  # add HOD params
-        example_config_file = join(suitepath, simpaths[0], 'config.yaml')
-        hodprior = _construct_hod_prior(example_config_file)
-    if include_noise:
-        noiseprior = _construct_noise_prior(
-            join(suitepath, simpaths[0]), tracer)
+    if simpaths:
+        if (tracer != 'halo') and include_hod:
+            example_config_file = join(suitepath, simpaths[0], 'config.yaml')
+            hodprior = _construct_hod_prior(example_config_file)
+        if include_noise:
+            noiseprior = _construct_noise_prior(
+                join(suitepath, simpaths[0]), tracer)
 
-    # aggregate summaries (merges all summaries into a single dict)
+    # Aggregate summaries into a single dictionary
     summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} {key} summaries')
+
     return summaries, parameters, ids, hodprior, noiseprior
 
 
@@ -122,7 +151,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
         for tag in ["Eq", "Sq", "Ss", "Is"]:
             if tag in summ:
                 summ = summ.replace(tag, "")
-        if summ == 'nbar':  # this comes for free with any summaries
+        if summ in ['nbar', 'nz']:  # these come for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
             logging.warning(f'No data for {exp.summary}. Skipping...')
@@ -141,8 +170,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
             for summ in exp.summary:
                 # Handle all the different summaries
-                if summ == 'nbar':
-                    continue  # we handle this separately
+                if summ in ['nbar', 'nz']:
+                    continue  # we handle these separately
                 eq_bool = "Eq" in summ
                 sq_bool = "Sq" in summ
                 ss_bool = "Ss" in summ
@@ -176,6 +205,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append(x)
+            if 'nz' in exp.summary:  # add n(z)
+                xs.append(_get_log10nz(summaries['Pk0']))
             if 'nbar' in exp.summary:  # add nbar
                 xs.append(_get_log10nbar(summaries['Pk0']))
 
