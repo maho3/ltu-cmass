@@ -70,7 +70,10 @@ def load_lc_Pk(diag_file):
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
                     'nbar': f.attrs['nbar'],
-                    'log10nbar': f.attrs['log10nbar']}
+                    'log10nbar': f.attrs['log10nbar'],
+                    'nz': f['nz'][:],
+                    'nz_bins': f['nz_bins'][:],
+                }
     except (OSError, KeyError):
         return {}
     return summ
@@ -113,7 +116,10 @@ def load_lc_Bk(diag_file):
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :],
                             'nbar': f.attrs['nbar'],
-                            'log10nbar': f.attrs['log10nbar']}
+                            'log10nbar': f.attrs['log10nbar'],
+                            'nz': f['nz'][:],
+                            'nz_bins': f['nz_bins'][:]
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -139,6 +145,29 @@ def _get_log10nbar(data):
         np.array([x['log10nbar'] for x in data]).reshape(-1, 1),
         10, axis=-1
     )  # repeat for more visibility
+
+
+def _get_nz(data):
+    """
+    Extracts n(z) values from each data entry and bins them into 3 coarse bins
+    with edges at [0.4, 0.5, 0.6, 0.7]. Returns a 2D array of shape (len(data), 3).
+    """
+    num_bins = 3
+    bin_edges = np.linspace(0.4, 0.7, num_bins + 1)
+    binned_nz = np.empty((len(data), num_bins))
+    for i, entry in enumerate(data):
+        nz_values = entry['nz']
+        nz_bin_edges = entry['nz_bins']
+        nz_bin_centers = 0.5 * (nz_bin_edges[:-1] + nz_bin_edges[1:])
+        # Assign each bin center to a coarse bin
+        coarse_bin_indices = np.digitize(nz_bin_centers, bin_edges) - 1
+        # Sum n(z) values in each coarse bin
+        for j in range(num_bins):
+            binned_nz[i, j] = np.sum(nz_values[coarse_bin_indices == j])
+    # repeat for more visibility
+    num_repeat = 5
+    binned_nz = np.repeat(binned_nz, num_repeat, axis=-1)
+    return binned_nz  # shape: (num_entries, num_bins*num_repeat)
 
 
 def signed_log(x, base=10):
