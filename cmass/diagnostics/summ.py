@@ -517,6 +517,9 @@ def main(cfg: DictConfig) -> None:
     else:
         logging.info('Skipping halo diagnostics')
 
+    # Save with original hod_seed (parse_hod modifies it to lhid*1e6 + hod_seed)
+    hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+
     # measure galaxy diagnostics
     if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
@@ -527,7 +530,7 @@ def main(cfg: DictConfig) -> None:
             use_ngp=cfg.diag.use_ngp,
             threads=threads, from_scratch=from_scratch,
             focus_z=cfg.diag.focus_z,
-            type='galaxy', hod_seed=cfg.bias.hod.seed,
+            type='galaxy', hod_seed=hod_seed,
             summaries=summaries,
             config=cfg
         )
@@ -545,7 +548,7 @@ def main(cfg: DictConfig) -> None:
                 high_res=cfg.diag.high_res,
                 use_ngp=cfg.diag.use_ngp,
                 threads=threads, from_scratch=from_scratch,
-                hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+                hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
                 summaries=summaries,
                 config=cfg
             )
