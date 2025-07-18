@@ -1,0 +1,14 @@
+# for loading / running real CMASS NGC data
+suite: real_data
+
+# General parameters
+L: 2000           # Mpc/h
+N: 256           # meshgrid resolution
+lhid: 0        # latin hypercube id
+
+
+matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
+zi: 20            # initial redshift (for grav solver)
+zf: 0.5           # final redshift
+
+# OTHER PARAMS IGNORED
