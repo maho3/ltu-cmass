@@ -38,7 +38,7 @@ from omegaconf import DictConfig, OmegaConf
 from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, in_simbig_selection
-from .hodtools import HODEngine
+from .hodtools import HODEngine, randoms_engine
 from ..bias.apply_hod import load_snapshot
 from ..bias.tools.hod import parse_hod
 
@@ -55,11 +55,17 @@ def split_galsnap_galidx(gid):
 
 
 def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
-                     noise_uniform):
+                     noise_uniform, use_randoms=False):
     # Load snapshots
     for snap_idx, a in enumerate(snap_times):
         logging.info(f'Loading snapshot at a={a:.6f}...')
-        hpos, hvel, _, _ = load_snapshot(source_path, a)
+        if not use_randoms:
+            hpos, hvel, _, _ = load_snapshot(source_path, a)
+        else:
+            nbar_randoms = 3e-4  # number density of CMASS
+            Nrandoms = int(nbar_randoms * BoxSize**3)
+            hpos = np.random.rand(Nrandoms, 3) * BoxSize
+            hvel = np.zeros_like(hpos)
 
         # Uniformly noise the halos positons in the voxel
         if noise_uniform:
@@ -127,6 +133,20 @@ def main(cfg: DictConfig) -> None:
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
     geometry = geometry.lower()
 
+    # check if noise_uniform, then the sim is FastPM
+    if cfg.bias.hod.noise_uniform and ('fastpm' not in cfg.sim):
+        raise ValueError(
+            'noise_uniform is only supported for CHARM simulations. '
+            'Please either set cfg.bias.hod.noise_uniform=False, use a CHARM '
+            'sim, or disable this warning.')
+
+    # throw a big warning if we're generating randoms
+    if cfg.survey.randoms:
+        logging.warning(
+            'Generating uniform randoms. This is not for generating training '
+            'training data, but for generating randoms for the lightcone. '
+        )
+
     # Load mask
     if geometry == 'ngc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
@@ -173,13 +193,17 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Setup HOD model function
-    hod_fct = HODEngine(cfg, snap_times, source_path)
+    if not cfg.survey.randoms:
+        hod_fct = HODEngine(cfg, snap_times, source_path)
+    else:
+        hod_fct = randoms_engine  # for constructing randoms
     lightcone.set_hod(hod_fct)
 
     logging.info(f'Stitching snapshots a={snap_times}')
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times,
-        cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_uniform)
+        cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_uniform,
+        use_randoms=cfg.survey.randoms)
 
     # If SIMBIG, apply selection
     if geometry == 'simbig':
