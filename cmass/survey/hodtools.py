@@ -50,7 +50,8 @@ def randoms_engine(snap_idx, hlo_idx, z):
     A dummy engine for randoms, which returns 0 dpos, dvel, and the basic
     host id
     """
-    dgpos = np.zeros((len(hlo_idx), 3))
-    dgvel = np.zeros((len(hlo_idx), 3))
-    ghost = hlo_idx
+    print(f'Generating randoms for snap_idx={snap_idx}')
+    dgpos = np.zeros((len(hlo_idx), 3)).astype(np.float64)
+    dgvel = np.zeros((len(hlo_idx), 3)).astype(np.float64)
+    ghost = np.arange(len(hlo_idx), dtype=np.uint64)
     return ghost, dgpos, dgvel

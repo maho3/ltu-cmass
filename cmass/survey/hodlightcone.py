@@ -143,7 +143,7 @@ def main(cfg: DictConfig) -> None:
     # throw a big warning if we're generating randoms
     if cfg.survey.randoms:
         logging.warning(
-            'Generating uniform randoms. This is not for generating training '
+            'Generating uniform randoms. This is not for generating '
             'training data, but for generating randoms for the lightcone. '
         )
 
