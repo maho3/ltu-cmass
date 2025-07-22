@@ -62,7 +62,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 3e-4  # number density of CMASS
+            nbar_randoms = 3e-5  # number density of CMASS
             Nrandoms = int(nbar_randoms * BoxSize**3)
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
@@ -228,7 +228,10 @@ def main(cfg: DictConfig) -> None:
         galsnap, galidx = galsnap[m], galidx[m]
 
     # Check if n(z) is saturated
-    saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+    if cfg.survey.nomask:
+        saturated = False
+    else:
+        saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
 
     # Save
     if geometry == 'ngc':

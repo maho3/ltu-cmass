@@ -79,7 +79,7 @@ namespace Geometry
         97.0 * M_PI / 180.0,  // NGC
         97.0 * M_PI / 180.0,  // NGC
         0,  // MTNG
-        -30 * M_PI / 180.0,  // SGC
+        15 * M_PI / 180.0,  // SGC
         15 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
 
@@ -87,19 +87,19 @@ namespace Geometry
         6.0,  // NGC
         6.0,  // NGC
         0,  // MTNG
-        0,  // SGC
+        3,  // SGC
         3,  // SIMBIG
     }; // rotation around z-axis, in degrees
 
-    // in units of L1, L2, L3
-    // NOTE: These are deprecated and dont do anything as of July-22-2025
-    const double origin[][3] = {
-        {0.5, -0.058, 0.0}, // NGC
-        {0.5, -0.058, 0.0}, // NGC
-        {0.0, 0.0, 0.0}, // MTNG
-        {0.5, -0.058, 0.0}, // SGC
-        {1, 1, 1}, // SIMBIG
-    };
+    // // in units of L1, L2, L3
+    // // NOTE: These are deprecated and dont do anything as of July-22-2025
+    // const double origin[][3] = {
+    //     {0.5, -0.058, 0.0}, // NGC
+    //     {0.5, -0.058, 0.0}, // NGC
+    //     {0.0, 0.0, 0.0}, // MTNG
+    //     {0.5, -0.058, 0.0}, // SGC
+    //     {1, 1, 1}, // SIMBIG
+    // };
 }
 
 namespace Numbers
