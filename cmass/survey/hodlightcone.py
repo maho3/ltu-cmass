@@ -179,6 +179,17 @@ def main(cfg: DictConfig) -> None:
         zmin, zmax = cfg.survey.z_range
     else:
         zmin, zmax = 0.4, 0.7
+
+    # If no mask mode, do not mask the lightcone (for testing only!)
+    if cfg.survey.nomask:
+        logging.warning(
+            'No mask mode is enabled. This will not apply any survey mask '
+            'or selection effects. Use with caution, only for testing purposes.'
+        )
+        maskobs = None
+        zmin, zmax = 0, 2.0
+
+    # Setup lightcone
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
@@ -210,7 +221,7 @@ def main(cfg: DictConfig) -> None:
         use_randoms=cfg.survey.randoms)
 
     # If SIMBIG, apply selection
-    if geometry == 'simbig':
+    if geometry == 'simbig' and not cfg.survey.nomask:
         logging.info('Applying SIMBIG selection...')
         m = in_simbig_selection(ra, dec, z)
         ra, dec, z = ra[m], dec[m], z[m]

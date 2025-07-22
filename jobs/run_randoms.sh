@@ -16,12 +16,12 @@ sim=randoms
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=fixed
 diag_from_scratch=True
-extras="survey.randoms=True"
+extras="survey.randoms=True survey.nomask=True"
 
 L=1000
 N=128
-lhid=2
-hod_seed=1
+lhid=0
+hod_seed=0
 aug_seed=0
 
 postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
