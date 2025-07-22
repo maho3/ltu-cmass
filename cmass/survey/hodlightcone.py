@@ -187,7 +187,7 @@ def main(cfg: DictConfig) -> None:
             'or selection effects. Use with caution, only for testing purposes.'
         )
         maskobs = None
-        zmin, zmax = 0, 2.0
+        zmin, zmax = 0.0, 1.1  # midpoint is the same
 
     # Setup lightcone
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order

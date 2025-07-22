@@ -80,7 +80,7 @@ namespace Geometry
         97.0 * M_PI / 180.0,  // NGC
         0,  // MTNG
         -30 * M_PI / 180.0,  // SGC
-        -5 * M_PI / 180.0,  // SIMBIG
+        0,  // SIMBIG
     }; // rotation around y-axis
 
     const double beta[] = {
@@ -97,7 +97,7 @@ namespace Geometry
         {0.5, -0.058, 0.0}, // NGC
         {0.0, 0.0, 0.0}, // MTNG
         {0.5, -0.058, 0.0}, // SGC
-        {0.45, 0.03, -1.15}, // SIMBIG
+        {1, 1, 1}, // SIMBIG
     };
 }
 
@@ -581,6 +581,26 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     // h km/s/Mpc
     const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
 
+    // Calculate comoving distance to the middle redshift.
+    double z_mid = 0.5 * (zmin + zmax);
+    double chi_mid;
+    comoving(1, &z_mid, &chi_mid, Omega_m);
+
+    double scaled_offset[3] = {1, 1, 1};
+
+    // Calculate its magnitude.
+    double mag = std::hypot(scaled_offset[0], scaled_offset[1], scaled_offset[2]);
+
+    // Now, normalize and scale the vector in-place.
+    if (mag > 1e-9) {
+        for (int kk=0; kk<3; ++kk) {
+            scaled_offset[kk] = (scaled_offset[kk] / mag) * chi_mid;
+        }
+    } else { // If the vector is zero, the offset is zero.
+        for (int kk=0; kk<3; ++kk) {
+            scaled_offset[kk] = 0.0;
+        }
+    }
     #pragma omp parallel
     {
         // the accelerator is non-const upon evaluation
@@ -590,7 +610,8 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
         #pragma omp for schedule (dynamic, 1024)
         for (size_t jj=0; jj<Nhlo; ++jj)
         {
-            for (int kk=0; kk<3; ++kk) los[kk] = xhlo[3*jj+kk] - Geometry::origin[remap_case][kk]*BoxSize*Li[kk];
+            // Move the center of the sim box to the middle redshift of the lightcone
+            for (int kk=0; kk<3; ++kk) los[kk] = xhlo[3*jj+kk] + scaled_offset[kk] - Li[kk] * BoxSize / 2.0;
             double chi = std::hypot(los[0], los[1], los[2]);
 
             double vhloproj = (los[0]*vhlo[3*jj+0]+los[1]*vhlo[3*jj+1]+los[2]*vhlo[3*jj+2])
