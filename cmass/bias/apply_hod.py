@@ -153,8 +153,12 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    # Save with original hod_seed (parse_hod modifies it to lhid*1e6 + hod_seed)
-    hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+    # Save with original hod_seed
+    if cfg.bias.hod.seed == 0:
+        hod_seed = cfg.bias.hod.seed
+    else:
+        # (parse_hod modifies it to lhid*1e6 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
 
     # Setup save directory
     source_path = get_source_path(
