@@ -80,7 +80,7 @@ namespace Geometry
         97.0 * M_PI / 180.0,  // NGC
         0,  // MTNG
         -30 * M_PI / 180.0,  // SGC
-        0,  // SIMBIG
+        15 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
 
     const double beta[] = {
@@ -88,10 +88,11 @@ namespace Geometry
         6.0,  // NGC
         0,  // MTNG
         0,  // SGC
-        0,  // SIMBIG
+        3,  // SIMBIG
     }; // rotation around z-axis, in degrees
 
     // in units of L1, L2, L3
+    // NOTE: These are deprecated and dont do anything as of July-22-2025
     const double origin[][3] = {
         {0.5, -0.058, 0.0}, // NGC
         {0.5, -0.058, 0.0}, // NGC
@@ -582,11 +583,16 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
 
     // Calculate comoving distance to the middle redshift.
-    double z_mid = 0.5 * (zmin + zmax);
+    double z_mid = (zmin * 0.55 + zmax * 0.45);
     double chi_mid;
     comoving(1, &z_mid, &chi_mid, Omega_m);
 
-    double scaled_offset[3] = {1, 1, 1};
+    // Project so that the largest (x-y) plane faces the observer
+    double scaled_offset[3] = {0, 0, 1};  
+
+    if (verbose) {
+        std::printf("Li: %.6f %.6f %.6f\n", Li[0], Li[1], Li[2]);
+    }
 
     // Calculate its magnitude.
     double mag = std::hypot(scaled_offset[0], scaled_offset[1], scaled_offset[2]);
@@ -690,7 +696,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
             // discard galaxies falling out at the edges
             if (chi>chi_bounds[0] && chi<chi_bounds[Nsnaps]) [[likely]]
             {
-                // rotate the line of sight into the NGC footprint and transpose the axes into
+                // rotate the line of sight into the footprint and transpose the axes into
                 // canonical order
                 double x1, x2, x3;
                 x1 = std::cos(Geometry::alpha[remap_case]) * los[2] - std::sin(Geometry::alpha[remap_case]) * los[1];
