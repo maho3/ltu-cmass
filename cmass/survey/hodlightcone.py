@@ -126,8 +126,12 @@ def main(cfg: DictConfig) -> None:
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid
     )
-    # Save with original hod_seed (parse_hod modifies it to lhid*1e6 + hod_seed)
-    hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+    # Save with original hod_seed
+    if cfg.bias.hod.seed == 0:
+        hod_seed = cfg.bias.hod.seed
+    else:
+        # (parse_hod modifies it to lhid*1e6 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
