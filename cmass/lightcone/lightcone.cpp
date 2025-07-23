@@ -77,8 +77,8 @@ namespace Geometry
     // we only need a rotation around the y-axis I believe
     const double alpha[] = {
         0,  // MTNG
-        15 * M_PI / 180.0,  // NGC
-        15 * M_PI / 180.0,  // NGC
+        35 * M_PI / 180.0,  // NGC
+        35 * M_PI / 180.0,  // NGC
         15 * M_PI / 180.0,  // SGC
         15 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
@@ -708,6 +708,7 @@ void Lightcone::choose_galaxies (int snap_idx, size_t Ngal,
                 double ra = phi/M_PI*180.0;
                 if (ra<0.0) ra += 360.0;
                 ra += Geometry::beta[remap_case];
+                if (ra>=360.0) ra -= 360.0;
 
                 galid_t galid;
 
