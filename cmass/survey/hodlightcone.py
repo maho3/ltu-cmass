@@ -156,17 +156,21 @@ def main(cfg: DictConfig) -> None:
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=True)
         remap_case = 0
+        zmid = 0.45
     elif geometry == 'sgc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=False)
         remap_case = 3
+        zmid = 0.55
     elif geometry == 'mtng':
         maskobs = None
         remap_case = 2
+        zmid = 0.55
     elif geometry == 'simbig':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=False)
         remap_case = 4
+        zmid = 0.55
     else:
         raise ValueError(
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
@@ -199,6 +203,7 @@ def main(cfg: DictConfig) -> None:
         Omega_m=cfg.nbody.cosmo[0],
         zmin=zmin,
         zmax=zmax,
+        zmid=zmid,  # to set the offset of the simulation box
         snap_times=snap_times,
         verbose=True,
         augment=aug_seed,

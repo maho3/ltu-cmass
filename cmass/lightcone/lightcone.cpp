@@ -76,16 +76,16 @@ namespace Geometry
     // get from the quadrant ra=[-90,90], dec=[0,90] to the obs footprint
     // we only need a rotation around the y-axis I believe
     const double alpha[] = {
-        97.0 * M_PI / 180.0,  // NGC
-        97.0 * M_PI / 180.0,  // NGC
+        15 * M_PI / 180.0,  // NGC
+        15 * M_PI / 180.0,  // NGC
         0,  // MTNG
         15 * M_PI / 180.0,  // SGC
         15 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
 
     const double beta[] = {
-        6.0,  // NGC
-        6.0,  // NGC
+        180,  // NGC
+        180,  // NGC
         0,  // MTNG
         3,  // SGC
         3,  // SIMBIG
@@ -191,7 +191,7 @@ struct Lightcone
 {
     const char *boss_dir;
     const Mask *mask;
-    const double BoxSize, Omega_m, zmin, zmax;
+    const double BoxSize, Omega_m, zmin, zmax, zmid;
     const int remap_case;
     const bool do_downsample, verbose;
     const unsigned augment;
@@ -220,7 +220,7 @@ struct Lightcone
 
     Lightcone (const Mask *mask_,
                // HOD_fct_t hod_fct_,
-               double Omega_m_, double zmin_, double zmax_,
+               double Omega_m_, double zmin_, double zmax_, double zmid_,
                const std::vector<double> &snap_times_,
                const char *boss_dir_=nullptr, 
                double BoxSize_=3e3, int remap_case_=0,
@@ -229,7 +229,7 @@ struct Lightcone
         mask{mask_},
         is_north{is_north_},
         // hod_fct{hod_fct_},
-        Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_},
+        Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_}, zmid{zmid_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
         boss_dir{boss_dir_}, do_downsample(boss_dir_),
         BoxSize{BoxSize_}, remap_case{remap_case_},
@@ -393,13 +393,14 @@ PYBIND11_MODULE(lc, m)
         .def(pyb::init<const char *, bool, bool>(), "boss_dir"_a, pyb::kw_only(), "veto"_a=true, "is_north"_a=true);
 
     pyb::class_<Lightcone> (m, "Lightcone")
-        .def(pyb::init<const Mask *, double, double, double, const std::vector<double>&,
+        .def(pyb::init<const Mask *, double, double, double, double, 
+                       const std::vector<double>&,
                        const char *,
                        double, int,
                        bool, unsigned, 
                        unsigned long,
                        bool>(),
-            "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "snap_times"_a,
+            "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "zmid"_a, "snap_times"_a,
             pyb::kw_only(),
             "boss_dir"_a=nullptr,
             "BoxSize"_a=3e3, "remap_case"_a=0,
@@ -583,9 +584,9 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     const double H_ = Hz(snap_redshifts[snap_idx], Omega_m);
 
     // Calculate comoving distance to the middle redshift.
-    double z_mid = (zmin * 0.55 + zmax * 0.45);
     double chi_mid;
-    comoving(1, &z_mid, &chi_mid, Omega_m);
+    double zmid_local = zmid;
+    comoving(1, &zmid_local, &chi_mid, Omega_m);
 
     // Project so that the largest (x-y) plane faces the observer
     double scaled_offset[3] = {0, 0, 1};  
