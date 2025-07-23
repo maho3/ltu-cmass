@@ -15,3 +15,6 @@ fix_nz: False
 
 # For randoms creation only (will not load any correct data!)
 randoms: False
+
+# For turning off all masking (only for testing footprint coverage!)
+nomask: False
