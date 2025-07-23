@@ -62,7 +62,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 3e-4  # number density of CMASS
+            nbar_randoms = 3e-5  # number density of CMASS
             Nrandoms = int(nbar_randoms * BoxSize**3)
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
@@ -155,18 +155,22 @@ def main(cfg: DictConfig) -> None:
     if geometry == 'ngc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=True)
-        remap_case = 0
+        remap_case = 1
+        zmid = 0.45
     elif geometry == 'sgc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=False)
         remap_case = 3
+        zmid = 0.55
     elif geometry == 'mtng':
         maskobs = None
-        remap_case = 2
+        remap_case = 0
+        zmid = 0.55
     elif geometry == 'simbig':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=False)
         remap_case = 4
+        zmid = 0.55
     else:
         raise ValueError(
             'Invalid geometry {geometry}. Choose from NGC, SGC, or MTNG.')
@@ -179,6 +183,17 @@ def main(cfg: DictConfig) -> None:
         zmin, zmax = cfg.survey.z_range
     else:
         zmin, zmax = 0.4, 0.7
+
+    # If no mask mode, do not mask the lightcone (for testing only!)
+    if cfg.survey.nomask:
+        logging.warning(
+            'No mask mode is enabled. This will not apply any survey mask '
+            'or selection effects. Use with caution, only for testing purposes.'
+        )
+        maskobs = None
+        zmin, zmax = 0.0, 1.1  # midpoint is the same
+
+    # Setup lightcone
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
@@ -188,6 +203,7 @@ def main(cfg: DictConfig) -> None:
         Omega_m=cfg.nbody.cosmo[0],
         zmin=zmin,
         zmax=zmax,
+        zmid=zmid,  # to set the offset of the simulation box
         snap_times=snap_times,
         verbose=True,
         augment=aug_seed,
@@ -210,14 +226,17 @@ def main(cfg: DictConfig) -> None:
         use_randoms=cfg.survey.randoms)
 
     # If SIMBIG, apply selection
-    if geometry == 'simbig':
+    if geometry == 'simbig' and not cfg.survey.nomask:
         logging.info('Applying SIMBIG selection...')
         m = in_simbig_selection(ra, dec, z)
         ra, dec, z = ra[m], dec[m], z[m]
         galsnap, galidx = galsnap[m], galidx[m]
 
     # Check if n(z) is saturated
-    saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+    if cfg.survey.nomask:
+        saturated = False
+    else:
+        saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
 
     # Save
     if geometry == 'ngc':
