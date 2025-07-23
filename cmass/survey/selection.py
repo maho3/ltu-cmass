@@ -37,7 +37,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
-    BOSS_angular, BOSS_veto, BOSS_redshift, BOSS_fiber,
+    apply_mask,
     save_lightcone, load_galaxies)
 from ..utils import get_source_path, timing_decorator, save_cfg
 from ..nbody.tools import parse_nbody_config
@@ -75,35 +75,6 @@ def move_to_footprint(pos, vel, mid_rdz, cosmo, L):
     pos += mid_xyz
 
     return pos, vel
-
-
-@timing_decorator
-def apply_mask(rdz, wdir, is_North, fibermode=0):
-    logging.info('Applying redshift cut...')
-    mask = BOSS_redshift(rdz[:, -1])
-    rdz = rdz[mask]
-    logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
-
-    logging.info('Applying angular mask...')
-    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir, is_North=is_North)
-    rdz = rdz[inpoly]
-    logging.info(f'Removed {len(inpoly)-len(rdz)}/{len(inpoly)} galaxies')
-
-    logging.info('Applying veto mask...')
-    inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
-    rdz = rdz[~inveto]
-    logging.info(f'Removed {len(inveto)-len(rdz)}/{len(inveto)} galaxies')
-
-    if fibermode != 0:
-        logging.info('Applying fiber collisions...')
-        mask = BOSS_fiber(
-            *rdz[:, :-1].T,
-            sep=0.01722,  # ang. sep. for CMASS in deg
-            mode=fibermode)
-        rdz = rdz[mask]
-        logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
-
-    return rdz
 
 
 @timing_decorator

@@ -27,3 +27,6 @@ boss_dir: "${meta.wdir}/obs/"  # path to observational masks
 
 # For randoms creation only (will not load any correct data!)
 randoms: False
+
+# For turning off all masking (only for testing footprint coverage!)
+nomask: False
