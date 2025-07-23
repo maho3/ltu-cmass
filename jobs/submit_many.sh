@@ -6,7 +6,7 @@ cd /jet/home/mho1/git/ltu-cmass
 seriesname="REC"
 
 # --- Fixed, global variables ---
-Nhod=20
+Nhod=1
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
@@ -17,17 +17,18 @@ TQDM_DISABLE=0
 common_extras="bias=zhenginterp_biased diag.focus_z=0.5 hydra/job_logging=disabled"
 
 
-# --- Quijotelike ---
-nbody=quijotelike
-sim=fastpm_recnoise
-L=1000
-N=128
-noise_uniform_invoxel=True
-job_extras="$common_extras" # This job has no special extras
+# NOTE: Not run anymore because abacuslike does simbig_lightcone
+# # --- Quijotelike ---
+# nbody=quijotelike
+# sim=fastpm_recnoise
+# L=1000
+# N=128
+# noise_uniform_invoxel=True
+# job_extras="$common_extras" # This job has no special extras
 
-sbatch --job-name="${seriesname}_quibias" \
-       --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
-       ./jobs/slurm_quijotelike_bias.sh
+# sbatch --job-name="${seriesname}_quibias" \
+#        --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
+#        ./jobs/slurm_quijotelike_bias.sh
 
 
 # --- Abacuslike ---

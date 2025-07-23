@@ -10,7 +10,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-set -e
+# set -e
 
 # SLURM_ARRAY_TASK_ID=663
 
@@ -69,6 +69,16 @@ for offset in $(seq 0 100 1999); do
         aug_seed=$hod_seed
         printf -v aug_str "%05d" $aug_seed
 
+        # simbig_lightcone
+        diag_file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+        if [ -f "$diag_file" ]; then
+            echo "Diag file $diag_file exists."
+        else
+            echo "Diag file $diag_file does not exist."
+            python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+            python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        fi
+
         # sgc_lightcone
         diag_file=$outdir/$lhid/diag/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
         if [ -f "$diag_file" ]; then
@@ -94,6 +104,7 @@ for offset in $(seq 0 100 1999); do
     if [ "$rm_galaxies" = "True" ]; then
         echo "Removing galaxy and lightcone directories for lhid=$lhid"
         rm -rf "$outdir/$lhid/galaxies"
+        rm -rf "$outdir/$lhid/simbig_lightcone"
         rm -rf "$outdir/$lhid/sgc_lightcone"
         rm -rf "$outdir/$lhid/mtng_lightcone"
     fi

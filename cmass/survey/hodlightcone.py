@@ -232,6 +232,12 @@ def main(cfg: DictConfig) -> None:
         ra, dec, z = ra[m], dec[m], z[m]
         galsnap, galidx = galsnap[m], galidx[m]
 
+    # If MTNG, apply MTNG selection
+    if geometry == 'mtng':
+        m = (ra >= 0) & (ra < 90) & (dec >= 0) & (dec < 90)
+        ra, dec, z = ra[m], dec[m], z[m]
+        galsnap, galidx = galsnap[m], galidx[m]
+
     # Check if n(z) is saturated
     if cfg.survey.nomask:
         saturated = False

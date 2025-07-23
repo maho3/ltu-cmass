@@ -11,7 +11,7 @@
 #SBATCH --output=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/ocean/projects/phy240015p/mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-set -e
+# set -e
 
 # SLURM_ARRAY_TASK_ID=663
 
