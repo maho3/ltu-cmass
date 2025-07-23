@@ -155,7 +155,7 @@ def main(cfg: DictConfig) -> None:
     if geometry == 'ngc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
                           veto=True, is_north=True)
-        remap_case = 0
+        remap_case = 1
         zmid = 0.45
     elif geometry == 'sgc':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,
@@ -164,7 +164,7 @@ def main(cfg: DictConfig) -> None:
         zmid = 0.55
     elif geometry == 'mtng':
         maskobs = None
-        remap_case = 2
+        remap_case = 0
         zmid = 0.55
     elif geometry == 'simbig':
         maskobs = lc.Mask(boss_dir=cfg.survey.boss_dir,

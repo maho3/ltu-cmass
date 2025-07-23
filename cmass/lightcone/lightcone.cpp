@@ -50,7 +50,12 @@ static constexpr auto pyb_arr_style = pyb::array::c_style | pyb::array::forcecas
 namespace Geometry
 {
     int remaps[][9] =
-                      { // 1.4142 1.0000 0.7071 (for NGC)
+                      { // 1.0000 1.0000 1.0000
+                        // trivial case, for no remapping (also for MTNG)
+                        { 1, 0, 0,
+                          0, 1, 0,
+                          0, 0, 1 },
+                        // 1.4142 1.0000 0.7071 (for NGC)
                         { 1, 1, 0,
                           0, 0, 1,
                           1, 0, 0, },
@@ -58,11 +63,6 @@ namespace Geometry
                         { 1, 1, 1,
                           1, 0, 0,
                           0, 1, 0, },
-                        // 1.0000 1.0000 1.0000
-                        // trivial case, for no remapping (also for MTNG)
-                        { 1, 0, 0,
-                          0, 1, 0,
-                          0, 0, 1 },
                         // 1.4142 1.0000 0.7071 (for SGC)
                         { 1, 1, 0,
                           0, 0, 1,
@@ -76,17 +76,17 @@ namespace Geometry
     // get from the quadrant ra=[-90,90], dec=[0,90] to the obs footprint
     // we only need a rotation around the y-axis I believe
     const double alpha[] = {
-        15 * M_PI / 180.0,  // NGC
-        15 * M_PI / 180.0,  // NGC
         0,  // MTNG
+        15 * M_PI / 180.0,  // NGC
+        15 * M_PI / 180.0,  // NGC
         15 * M_PI / 180.0,  // SGC
         15 * M_PI / 180.0,  // SIMBIG
     }; // rotation around y-axis
 
     const double beta[] = {
-        180,  // NGC
-        180,  // NGC
         0,  // MTNG
+        180,  // NGC
+        180,  // NGC
         3,  // SGC
         3,  // SIMBIG
     }; // rotation around z-axis, in degrees
@@ -589,7 +589,7 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     comoving(1, &zmid_local, &chi_mid, Omega_m);
 
     // Initialize offset vector based on remap case.
-    const double val = (remap_case == 2) ? 1.0 : 0.0;
+    const double val = (remap_case == 0) ? 1.0 : 0.0;
     double scaled_offset[3] = {val, val, 1.0};
 
     if (verbose) {
