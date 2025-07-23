@@ -588,25 +588,21 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     double zmid_local = zmid;
     comoving(1, &zmid_local, &chi_mid, Omega_m);
 
-    // Project so that the largest (x-y) plane faces the observer
-    double scaled_offset[3] = {0, 0, 1};  
+    // Initialize offset vector based on remap case.
+    const double val = (remap_case == 2) ? 1.0 : 0.0;
+    double scaled_offset[3] = {val, val, 1.0};
 
     if (verbose) {
         std::printf("Li: %.6f %.6f %.6f\n", Li[0], Li[1], Li[2]);
     }
 
-    // Calculate its magnitude.
-    double mag = std::hypot(scaled_offset[0], scaled_offset[1], scaled_offset[2]);
+    // Calculate magnitude and define a scale factor.
+    const double mag = std::hypot(scaled_offset[0], scaled_offset[1], scaled_offset[2]);
+    const double scale_factor = (mag > 1e-9) ? chi_mid / mag : 0.0;
 
-    // Now, normalize and scale the vector in-place.
-    if (mag > 1e-9) {
-        for (int kk=0; kk<3; ++kk) {
-            scaled_offset[kk] = (scaled_offset[kk] / mag) * chi_mid;
-        }
-    } else { // If the vector is zero, the offset is zero.
-        for (int kk=0; kk<3; ++kk) {
-            scaled_offset[kk] = 0.0;
-        }
+    // Normalize and scale the vector in-place.
+    for (int kk = 0; kk < 3; ++kk) {
+        scaled_offset[kk] *= scale_factor;
     }
     #pragma omp parallel
     {
