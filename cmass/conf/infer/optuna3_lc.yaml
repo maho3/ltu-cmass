@@ -1,0 +1,66 @@
+
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+
+# ~~ GLOBAL ARGS ~~
+exp_index: null  # index of experiment to run (null for all)
+net_type: nsf # if not None, net_index is ignored; careful about backend, eg "gf" does not work with sbi
+N_type: 50 # we assume the "net_type"_"N_type".yaml exists (to change)
+net_index: 386     # index of network to use in cfg.net
+net_suffix: None # 15/02/2025, to separate my trainings by maf, gf, etc
+device: cpu  # cpu or cuda
+
+# ~~ EXPERIMENT ARGS ~~
+Nmax: -1  # maximum number of simulations to load (-1 for all)
+correct_shot: true  # whether to correct for shot noise when normalizing
+
+halo: False      # whether to train on halo summaries
+galaxy: False    # whether to train on galaxy summaries
+ngc_lightcone: False # whether to train on ngc_lightcone summaries
+sgc_lightcone: False # whether to train on sgc_lightcone summaries
+mtng_lightcone: False # whether to train on mtng_lightcone summaries
+simbig_lightcone: False # whether to train on simbig_lightcone summaries
+
+experiments:
+  - summary: [nbar, Pk0, Pk2, Pk4, SqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
+    kmin: [0.02]
+    kmax: [0.3, 0.4]
+  - summary: [nbar, Pk0, Pk2, Pk4, EqQk0,SqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
+    kmin: [0.02]
+    kmax: [0.3, 0.4]
+
+# ~~ TRAINING ARGS ~~
+Nnets: 10  # number of best networks to ensemble
+
+val_frac: 0.1  # fraction of data to use for validation
+test_frac: 0.1  # fraction of data to use for testing
+seed: 0  # random seed for train/val/test split
+only_cosmo: True  # only train on cosmological parameters (ignore HOD)
+include_hod: False  # whether to infer HOD parameters
+include_noise: False  # whether to infer noise parameters
+
+prior: uniform  # prior to use for training (uniform, quijote)
+backend: lampe # backend to use for training (sbi/lampe/pydelfi)
+engine: NPE    # engine to use for training (NPE/NLE/NRE)
+
+batch_size: null  # batch size
+learning_rate: null  # learning rate
+stop_after_epochs: 50  # stop early after this many epochs
+weight_decay: null  # weight decay
+lr_decay_factor: null  # learning rate decay factor
+lr_patience: null  # learning rate decay patience
+
+# ~~ OPTUNA ARGS ~~
+hyperprior:
+  model: ['nsf'] # , 'maf']
+  hidden_features: [16, 512]
+  num_transforms: [2, 8]
+  fcn_width: [16, 512]
+  fcn_depth: [0, 4]
+  log2_batch_size: [5, 9]
+  learning_rate: [5e-6, 1e-2]
+  weight_decay: [1e-5, 1e-1]
+  lr_patience: [5, 20]
+  lr_decay_factor: [0.1, 0.9]
+
+n_trials: 50  # number of trials for hyperparameter optimization
+n_startup_trials: 50  # number of startup trials for hyperparameter optimization
