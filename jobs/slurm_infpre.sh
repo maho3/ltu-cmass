@@ -21,16 +21,27 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=mtnglike
-sim=fastpm_recnoise
+nbody=abacuslike
+sim=fastpm_recnoise_1hod
 infer=lightcone  # simple  #
 
 halo=False
 galaxy=False
-ngc=True
-sgc=False
-mtng=False
-simbig=False
+ngc=False
+sgc=True
+mtng=True
+simbig=True
+
+# nbody=quijote
+# sim=nbody
+# infer=simple  # simple  #
+
+# halo=False
+# galaxy=True
+# ngc=False
+# sgc=False
+# mtng=False
+# simbig=False
 
 extras="nbody.zf=0.5" # hydra/job_logging=disabled" # "nbody.zf=0.500015" # 
 device=cpu
@@ -40,7 +51,7 @@ suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=True"
+suffix="$suffix infer.include_noise=False"
 
 echo "Running inference pipeline with $suffix"
 python -m cmass.infer.preprocess $suffix

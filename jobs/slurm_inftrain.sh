@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-99  # Array range
+#SBATCH --array=0-14  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -20,16 +20,16 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijote
-sim=nonoise
-infer=simple
+nbody=abacuslike
+sim=fastpm_recnoise
+infer=lightcone  # simple  #
 
-halo=True
+halo=False
 galaxy=False
 ngc=False
 sgc=False
 mtng=False
-simbig=False
+simbig=True
 
 extras="" # "nbody.zf=0.5" # 
 device="cpu"
