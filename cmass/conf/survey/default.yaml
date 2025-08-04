@@ -12,3 +12,9 @@ z_range: [0.4, 0.7]
 # For lightcone extrapolation
 boss_dir: "${meta.wdir}/obs/"  # path to observational masks
 fix_nz: False
+
+# For randoms creation only (will not load any correct data!)
+randoms: False
+
+# For turning off all masking (only for testing footprint coverage!)
+nomask: False

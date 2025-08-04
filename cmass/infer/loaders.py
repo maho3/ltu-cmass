@@ -17,6 +17,11 @@ def get_hod_params(diagfile):
         hod_params = f.attrs['HOD_params'][:]
     return hod_params
 
+def get_noise_params(diagfile):
+    with h5py.File(diagfile, 'r') as f:
+        noise_params = [f.attrs['noise_radial'], f.attrs['noise_transverse']]
+    return np.array(noise_params)
+
 get_hod = get_hod_params  # for backwards compatibility
 
 
@@ -66,7 +71,10 @@ def load_lc_Pk(diag_file):
                     'k': f[stat+'_k3D'][:],
                     'value': f[stat][:, i],
                     'nbar': f.attrs['nbar'],
-                    'log10nbar': f.attrs['log10nbar']}
+                    'log10nbar': f.attrs['log10nbar'],
+                    'nz': f['nz'][:],
+                    'nz_bins': f['nz_bins'][:],
+                }
     except (OSError, KeyError):
         return {}
     return summ
@@ -110,7 +118,10 @@ def load_lc_Bk(diag_file):
                             'k': f['Bk_k123'][:],
                             'value': f[stat][i, :],
                             'nbar': f.attrs['nbar'],
-                            'log10nbar': f.attrs['log10nbar']}
+                            'log10nbar': f.attrs['log10nbar'],
+                            'nz': f['nz'][:],
+                            'nz_bins': f['nz_bins'][:]
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -130,7 +141,34 @@ def _get_nbar(data):
 
 
 def _get_log10nbar(data):
-    return np.array([x['log10nbar'] for x in data]).reshape(-1, 1)
+    return np.repeat(
+        np.array([x['log10nbar'] for x in data]).reshape(-1, 1),
+        10, axis=-1
+    )  # repeat for more visibility
+
+
+def _get_log10nz(data):
+    """
+    Extracts n(z) values from each data entry and bins them into 3 coarse bins
+    with edges at [0.4, 0.5, 0.6, 0.7]. Returns a 2D array of shape (len(data), 3).
+    """
+    num_bins = 3
+    bin_edges = np.linspace(0.4, 0.7, num_bins + 1)
+    binned_nz = np.empty((len(data), num_bins))
+    for i, entry in enumerate(data):
+        nz_values = entry['nz']
+        nz_bin_edges = entry['nz_bins']
+        nz_bin_centers = 0.5 * (nz_bin_edges[:-1] + nz_bin_edges[1:])
+        # Assign each bin center to a coarse bin
+        coarse_bin_indices = np.digitize(nz_bin_centers, bin_edges) - 1
+        # Sum n(z) values in each coarse bin
+        for j in range(num_bins):
+            binned_nz[i, j] = np.sum(nz_values[coarse_bin_indices == j])
+    # repeat for more visibility
+    num_repeat = 5
+    binned_nz = np.repeat(binned_nz, num_repeat, axis=-1)
+    binned_nz_logged = np.where(binned_nz == 0, -1, np.log10(binned_nz))
+    return binned_nz_logged  # shape: (num_entries, num_bins*num_repeat)
 
 
 def signed_log(x, base=10):
@@ -256,7 +294,39 @@ def _construct_hod_prior(configfile):
     return hodprior
 
 
-def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=False):
+def _construct_noise_prior(sourcepath, tracer):
+    """
+    This goes into a diagnostic file, reads the noise_dist from the attributes,
+    and returns a noise prior. This is kind of a hack, because our current
+    diagnostics don't save the prior params, just the distribution.
+    TODO: fix this hack
+    """
+    diagpath = join(sourcepath, 'diag')
+    if tracer == 'galaxy':
+        diagpath = join(diagpath, 'galaxies')
+    elif 'lightcone' in tracer:
+        diagpath = join(diagpath, f'{tracer}')
+    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
+    with h5py.File(join(diagpath, filelist[0]), 'r') as f:
+        noisedist = f.attrs['noise_dist'] if 'noise_dist' in f.attrs else None
+    if noisedist is None:
+        raise ValueError(
+            f'No noise distribution found in {join(diagpath, filelist[0])}.')
+
+    # this is a terrible hack to find the config files
+    codepath = os.path.abspath(__file__)
+    confpath = join(os.path.dirname(os.path.dirname(codepath)), 'conf', 'noise')
+    filepath = join(confpath, noisedist.lower()+'.yaml')
+    try:
+        noiseprior = OmegaConf.load(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f'Noise prior configuration file not found: {filepath}')
+    return noiseprior
+
+
+def _load_single_simulation_summaries(sourcepath, tracer, a=None,
+                                      include_hod=True, include_noise=False):
     # specify paths to diagnostics
     diagpath = join(sourcepath, 'diag')
     if tracer == 'galaxy':
@@ -285,9 +355,13 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None, only_cosmo=Fal
 
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
-        if (tracer != 'halo') & (not only_cosmo):  # add HOD params
+        if (tracer != 'halo') & (include_hod):  # add HOD params
             hodparams = get_hod_params(diagfile)
             params = np.concatenate([params, hodparams], axis=0)
+
+        if include_noise:  # add noise params
+            noise_params = get_noise_params(diagfile)
+            params = np.concatenate([params, noise_params], axis=0)
 
         # append to lists
         summlist.append(summ)

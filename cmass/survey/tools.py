@@ -82,6 +82,46 @@ def sky_to_xyz(rdz, cosmo):
 
     return pos.value.T
 
+
+def sky_to_unit_vectors(ra_deg, dec_deg):
+    """Converts sky coordinates (ra_deg, dec_deg) to unit vectors in cartesian coordinates.
+
+    Args:
+        ra_deg (array): Right ascension in degrees.
+        dec_deg (array): Declination in degrees.
+
+    Returns:
+        r_hat (array): Unit radial vector in cartesian coordinates.
+        e_phi (array): Unit vector along increasing RA (constant Dec).
+        e_theta (array): Unit vector along increasing Dec (constant RA).
+    """
+
+    ra = np.deg2rad(ra_deg)
+    dec = np.deg2rad(dec_deg)
+
+    # Unit radial vector r_hat
+    r_hat = np.stack([
+        np.cos(dec) * np.cos(ra),
+        np.cos(dec) * np.sin(ra),
+        np.sin(dec)
+    ], axis=-1)  # shape (N, 3)
+
+    # Along increasing RA (constant Dec) — e_phi
+    e_phi = np.stack([
+        -np.sin(ra),
+        np.cos(ra),
+        np.zeros_like(ra)
+    ], axis=-1)  # shape (N, 3)
+
+    # Along increasing Dec (constant RA) — e_theta
+    e_theta = np.stack([
+        -np.sin(dec) * np.cos(ra),
+        -np.sin(dec) * np.sin(ra),
+        np.cos(dec)
+    ], axis=-1)  # shape (N, 3)
+
+    return r_hat, e_phi, e_theta
+
 # Geometry functions
 
 
@@ -262,6 +302,35 @@ def BOSS_area(wdir='./data'):
     boss_poly = pymangle.Mangle(f_poly)
     area = np.sum(boss_poly.areas * boss_poly.weights)  # deg^2
     return area
+
+
+@timing_decorator
+def apply_mask(rdz, wdir, is_North, fibermode=0):
+    logging.info('Applying redshift cut...')
+    mask = BOSS_redshift(rdz[:, -1])
+    rdz = rdz[mask]
+    logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
+
+    logging.info('Applying angular mask...')
+    inpoly = BOSS_angular(*rdz[:, :-1].T, wdir=wdir, is_North=is_North)
+    rdz = rdz[inpoly]
+    logging.info(f'Removed {len(inpoly)-len(rdz)}/{len(inpoly)} galaxies')
+
+    logging.info('Applying veto mask...')
+    inveto = BOSS_veto(*rdz[:, :-1].T, wdir=wdir)
+    rdz = rdz[~inveto]
+    logging.info(f'Removed {len(inveto)-len(rdz)}/{len(inveto)} galaxies')
+
+    if fibermode != 0:
+        logging.info('Applying fiber collisions...')
+        mask = BOSS_fiber(
+            *rdz[:, :-1].T,
+            sep=0.01722,  # ang. sep. for CMASS in deg
+            mode=fibermode)
+        rdz = rdz[mask]
+        logging.info(f'Removed {len(mask)-len(rdz)}/{len(mask)} galaxies')
+
+    return rdz
 
 
 def in_simbig_selection(ra, dec, z):

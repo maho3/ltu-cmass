@@ -153,6 +153,13 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
+    # Save with original hod_seed
+    if cfg.bias.hod.seed == 0:
+        hod_seed = cfg.bias.hod.seed
+    else:
+        # (parse_hod modifies it to lhid*1e6 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+
     # Setup save directory
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -160,7 +167,7 @@ def main(cfg: DictConfig) -> None:
     )
     save_path = join(source_path, 'galaxies')
     os.makedirs(save_path, exist_ok=True)
-    save_file = join(save_path, f'hod{cfg.bias.hod.seed:05}.h5')
+    save_file = join(save_path, f'hod{hod_seed:05}.h5')
     logging.info(f'Saving to {save_file}...')
 
     # Delete existing outputs

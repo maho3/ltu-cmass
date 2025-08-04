@@ -48,8 +48,8 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
 def parse_hod(cfg):
     """
     Parse HOD parameters in the config file, and set them
-    in the `cfg` object. 
-    TODO: IS THIS STILL NEEDED? 
+    in the `cfg` object.
+    TODO: IS THIS STILL NEEDED?
     MATT: It is, but there's probably a more elegant way to code this
 
     Args:
@@ -111,6 +111,9 @@ def parse_hod(cfg):
 
                 # If 0, don't change default values
                 if cfg.bias.hod.seed > 0:
+                    # Make a different seed for each lhid
+                    cfg.bias.hod.seed = int(
+                        cfg.bias.hod.seed + cfg.nbody.lhid*1e6)
                     # Set numpy seed
                     np.random.seed(cfg.bias.hod.seed)
 
@@ -132,6 +135,10 @@ def parse_hod(cfg):
             if v is None:
                 raise ValueError(f'Parameter {k} is None. Make sure to '
                                  'set default parameters or hod.seed>0.')
+
+        # Check if we need to noise the positions of the galaxies
+        if hasattr(cfg.bias.hod, "noise_uniform"):
+            cfg.bias.hod.noise_uniform = bool(cfg.bias.hod.noise_uniform)
 
     return cfg
 

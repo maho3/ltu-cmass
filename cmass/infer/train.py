@@ -25,7 +25,7 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(prior_name, device, theta=None, hodprior=None):
+def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None):
     # define a prior
     if prior_name.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -41,14 +41,31 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None):
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
-        if (theta.shape[-1] > 5):  # galaxy or lightcone
-            if hodprior is None:
-                raise ValueError('No HOD prior provided for quijote prior')
+        if ((hodprior is not None) or (noiseprior is not None)) and (theta.shape[-1] == 5):
+            raise ValueError(
+                'HOD or noise priors provided, but theta has only 5 parameters.'
+                ' include_hod or include_noise might not be set correctly.')
+        if hodprior is not None:
             if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
             prior_lims = np.vstack([prior_lims, hod_lims])
+        if noiseprior is not None:
+            if noiseprior.dist == 'Fixed':
+                low, high = -np.inf, np.inf
+            elif noiseprior.dist == 'Uniform':
+                low, high = noiseprior.params.a, noiseprior.params.b
+            elif noiseprior.dist == 'Reciprocal':
+                low, high = noiseprior.params.a, noiseprior.params.b
+            elif noiseprior.dist == 'Exponential':
+                low, high = 0, np.inf
+            else:
+                raise NotImplementedError(
+                    f'Noise prior distribution {noiseprior.dist} not '
+                    'implemented.')
+            noise_lims = np.array([[low, high]]*2)
+            prior_lims = np.vstack([prior_lims, noise_lims])
 
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
@@ -66,7 +83,7 @@ def run_training(
     batch_size, learning_rate, stop_after_epochs, val_frac,
     weight_decay, lr_decay_factor, lr_patience,
     backend, engine, device,
-    hodprior=None, verbose=True
+    hodprior=None, noiseprior=None, verbose=True
 ):
     # select the network configuration
     if verbose:
@@ -74,7 +91,8 @@ def run_training(
 
     # define a prior
     prior = prepare_prior(prior_name, device=device,
-                          theta=theta_train, hodprior=hodprior)
+                          theta=theta_train,
+                          hodprior=hodprior, noiseprior=noiseprior)
 
     # define an embedding network
     if mcfg.fcn_depth == 0:
@@ -177,13 +195,17 @@ def load_preprocessed_data(exp_path):
         filepath = join(exp_path, 'hodprior.csv')
         hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
                     if os.path.exists(filepath) else None)
+        filepath = join(exp_path, 'noiseprior.yaml')
+        noiseprior = (OmegaConf.load(filepath)
+                      if os.path.exists(filepath) else None)
     except FileNotFoundError:
         raise FileNotFoundError(
             f'Could not find training/test data in {exp_path}. '
             'Make sure to run cmass.infer.preprocess first.'
         )
 
-    return x_train, theta_train, x_val, theta_val, x_test, theta_test, hodprior
+    return (x_train, theta_train, x_val, theta_val, x_test, theta_test,
+            hodprior, noiseprior)
 
 
 def run_experiment(exp, cfg, model_path):
@@ -203,7 +225,7 @@ def run_experiment(exp, cfg, model_path):
             (x_train, theta_train,
              x_val, theta_val,
              x_test, theta_test,
-             hodprior) = load_preprocessed_data(exp_path)
+             hodprior, noiseprior) = load_preprocessed_data(exp_path)
             
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -229,7 +251,7 @@ def run_experiment(exp, cfg, model_path):
                 lr_patience=cfg.infer.lr_patience,
                 backend=cfg.infer.backend, engine=cfg.infer.engine,
                 device=cfg.infer.device,
-                hodprior=hodprior
+                hodprior=hodprior, noiseprior=noiseprior,
             )
             end = time.time()
 

@@ -19,7 +19,8 @@ from ..bias.apply_hod import parse_hod
 from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
 from .tools import calcPk, calcBk_bfast, get_mesh_resolution
 from .tools import store_summary, check_existing
-from ..survey.tools import sky_to_xyz
+from .tools import parse_noise
+from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
 import datetime
 
 
@@ -159,7 +160,7 @@ def summarize_rho(
 
 def summarize_tracer(
     source_path, L, cosmo,
-    density=None, proxy=None, high_res=False,
+    density=None, proxy=None, high_res=False, use_ngp=False,
     threads=16, from_scratch=True, focus_z=None,
     type='halo', hod_seed=None,
     summaries=['Pk'],
@@ -234,16 +235,29 @@ def summarize_tracer(
         out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
         out_attrs['log10nbar'] = \
             np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
-        out_attrs['high_res'] = high_res
+        out_attrs['high_res'] = high_res and not use_ngp
+        out_attrs['noise_dist'] = config.noise.dist
+        out_attrs['noise_radial'] = config.noise.radial
+        out_attrs['noise_transverse'] = config.noise.transverse
 
-        # Noise out positions (we do not probe less than Lnoise)
-        Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-        pos += np.random.randn(*pos.shape) * Lnoise
+        # Noise in-voxel
+        if config.bias.hod.noise_uniform:
+            delta = L / config.nbody.N
+            pos += np.random.uniform(-delta/2, delta/2, size=pos.shape)
+            pos = np.mod(pos, L)
+
+        # Get unit vectors and add noise along each direction
+        # RSDs are applied along the 0th axis
+        r_hat, e_phi, e_theta = np.identity(3)
+        noise = np.random.randn(*pos.shape)
+        pos += r_hat * noise[:, 0, None] * config.noise.radial
+        pos += e_phi * noise[:, 1, None] * config.noise.transverse
+        pos += e_theta * noise[:, 2, None] * config.noise.transverse
 
         # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
-            N, MAS = get_mesh_resolution(L, high_res)
+            N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
@@ -262,8 +276,8 @@ def summarize_tracer(
             )
             out_data.update(out)
         # Compute B(k)
-        if 'Bk' in summaries:
-            N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
+        if 'Bk' in summaries:   # high-res takes too much memory
+            N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
             MAS = 'TSC'
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
@@ -312,7 +326,7 @@ def summarize_tracer(
 
 def summarize_lightcone(
     source_path, L, cosmo,
-    cap='ngc', high_res=False,
+    cap='ngc', high_res=False, use_ngp=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
     summaries=['Pk'],
@@ -345,9 +359,12 @@ def summarize_lightcone(
     # convert to comoving
     pos = sky_to_xyz(rdz, cosmo)
 
-    # Noise out positions (we do not probe less than Lnoise)
-    Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
-    pos += np.random.randn(*pos.shape) * Lnoise
+    # Get unit vectors and add noise along each direction
+    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
+    noise = np.random.randn(*pos.shape)
+    pos += r_hat * noise[:, 0, None] * config.noise.radial
+    pos += e_phi * noise[:, 1, None] * config.noise.transverse
+    pos += e_theta * noise[:, 2, None] * config.noise.transverse
 
     # convert to float32
     pos = pos.astype(np.float32)
@@ -384,12 +401,15 @@ def summarize_lightcone(
     out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
     out_attrs['log10nbar'] = np.log10(
         len(pos)) - 3 * np.log10(L)  # for numerical precision
-    out_attrs['high_res'] = high_res
+    out_attrs['high_res'] = high_res and not use_ngp
+    out_attrs['noise_dist'] = config.noise.dist
+    out_attrs['noise_radial'] = config.noise.radial
+    out_attrs['noise_transverse'] = config.noise.transverse
 
     out_data = {}
     # Compute P(k)
     if 'Pk' in summaries:
-        N, MAS = get_mesh_resolution(L, high_res)
+        N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
@@ -398,8 +418,8 @@ def summarize_lightcone(
         )
         out_data.update(out)
     # Compute B(k)
-    if 'Bk' in summaries:
-        N, MAS = get_mesh_resolution(L, high_res=False)  # No high-res
+    if 'Bk' in summaries:  # high-res takes too much memory
+        N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
         MAS = 'TSC'
         if config is not None:
             cache_dir = join(config.meta.wdir, 'scratch', 'cache')
@@ -439,6 +459,14 @@ def summarize_lightcone(
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+
+    # parse noise (seeded by lhid and hod seed)
+    noise_seed = int(cfg.nbody.lhid*1e6 + cfg.bias.hod.seed)
+    cfg.noise.radial, cfg.noise.transverse = \
+        parse_noise(seed=noise_seed,
+                    dist=cfg.noise.dist,
+                    params=cfg.noise.params)
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     source_path = get_source_path(
@@ -478,6 +506,7 @@ def main(cfg: DictConfig) -> None:
             density=cfg.diag.halo_density,
             proxy=cfg.diag.halo_proxy,
             high_res=cfg.diag.high_res,
+            use_ngp=cfg.diag.use_ngp,
             threads=threads, from_scratch=from_scratch,
             focus_z=cfg.diag.focus_z,
             type='halo',
@@ -488,6 +517,13 @@ def main(cfg: DictConfig) -> None:
     else:
         logging.info('Skipping halo diagnostics')
 
+    # Save with original hod_seed
+    if cfg.bias.hod.seed == 0:
+        hod_seed = cfg.bias.hod.seed
+    else:
+        # (parse_hod modifies it to lhid*1e6 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+
     # measure galaxy diagnostics
     if cfg.diag.all or cfg.diag.galaxy:
         done = summarize_tracer(
@@ -495,9 +531,10 @@ def main(cfg: DictConfig) -> None:
             density=cfg.diag.galaxy_density,
             proxy=cfg.diag.galaxy_proxy,
             high_res=cfg.diag.high_res,
+            use_ngp=cfg.diag.use_ngp,
             threads=threads, from_scratch=from_scratch,
             focus_z=cfg.diag.focus_z,
-            type='galaxy', hod_seed=cfg.bias.hod.seed,
+            type='galaxy', hod_seed=hod_seed,
             summaries=summaries,
             config=cfg
         )
@@ -511,9 +548,11 @@ def main(cfg: DictConfig) -> None:
             done = summarize_lightcone(
                 source_path, cfg.nbody.L,
                 cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
-                cap=cap, high_res=cfg.diag.high_res,
+                cap=cap,
+                high_res=cfg.diag.high_res,
+                use_ngp=cfg.diag.use_ngp,
                 threads=threads, from_scratch=from_scratch,
-                hod_seed=cfg.bias.hod.seed, aug_seed=cfg.survey.aug_seed,
+                hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
                 summaries=summaries,
                 config=cfg
             )

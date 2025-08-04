@@ -16,8 +16,11 @@ class HODEngine():
             z = np.full(len(hlo_idx), z)
 
         # Load snapshot
+        # Note that we do not need to noise the halos' positons here (even if
+        # cfg.bias.hod.noise_uniform is set to True), since we return the
+        # difference between the galaxy's position and that of the host halo,
+        # so the noise will cancel out.
         hpos, hvel, hmass, hmeta = load_snapshot(self.simdir, a)
-        print('loaded')
 
         # Only keep those selected for the lightcone
         hpos = hpos[hlo_idx]
@@ -40,3 +43,15 @@ class HODEngine():
         dgvel = dgvel.astype(np.float64)
 
         return ghost, dgpos, dgvel
+
+
+def randoms_engine(snap_idx, hlo_idx, z):
+    """
+    A dummy engine for randoms, which returns 0 dpos, dvel, and the basic
+    host id
+    """
+    print(f'Generating randoms for snap_idx={snap_idx}')
+    dgpos = np.zeros((len(hlo_idx), 3)).astype(np.float64)
+    dgvel = np.zeros((len(hlo_idx), 3)).astype(np.float64)
+    ghost = np.arange(len(hlo_idx), dtype=np.uint64)
+    return ghost, dgpos, dgvel
