@@ -521,8 +521,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.bias.hod.seed == 0:
         hod_seed = cfg.bias.hod.seed
     else:
-        # (parse_hod modifies it to lhid*1e6 + hod_seed)
-        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+        # (parse_hod modifies it to lhid*1e4 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e4)
 
     # measure galaxy diagnostics
     if cfg.diag.all or cfg.diag.galaxy:
