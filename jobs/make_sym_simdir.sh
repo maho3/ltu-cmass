@@ -2,9 +2,9 @@
 
 set -e
 
-SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/quijote/nbody"
-SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/quijote/nbody_nonoise_ngp"
-SUBDIR="L1000-N128"
+SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/fastpm"
+SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/fastpm_recnoise_rot"
+SUBDIR="L2000-N256"
 N=1999
 
 mkdir -p "$SIM2/$SUBDIR"

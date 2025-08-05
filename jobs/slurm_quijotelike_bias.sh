@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=quijote_bias   # Job name
+#SBATCH --job-name=qui_bias   # Job name
 #SBATCH --array=0-99        # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
@@ -22,22 +22,22 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-# Nhod=5
+Nhod=5
 
-# nbody=quijotelike
-# sim=fastpm_recnoise
-# noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-# noise=fixed
+nbody=quijotelike
+sim=fastpm_recnoise
+noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise=reciprocal
 
-# multisnapshot=False
-# diag_from_scratch=True
-# rm_galaxies=True
-# extras="bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-# L=1000
-# N=128
+multisnapshot=False
+diag_from_scratch=True
+rm_galaxies=True
+extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+L=1000
+N=128
 
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
@@ -52,38 +52,47 @@ for offset in $(seq 0 100 1999); do
     postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
 
+    # halos
+    diag_file=$outdir/$lhid/diag/halos.h5
+    if [ -f "$diag_file" ]; then
+        echo "Diag file $diag_file exists."
+    else
+        echo "Diag file $diag_file does not exist."
+        python -m cmass.diagnostics.summ $postfix diag.halo=True
+    fi
+
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed
 
-        # # galaxies
-        # diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
-        # if [ -f "$diag_file" ]; then
-        #     echo "Diag file $diag_file exists."
-        # else
-        #     echo "Diag file $diag_file does not exist."
-        #     python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-        #     python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
-        # fi
-
-        # set aug_seed the same as hod_seed for simplicity
-        aug_seed=$hod_seed
-        printf -v aug_str "%05d" $aug_seed
-
-        # simbig_lightcone
-        diag_file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # galaxies
+        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
         if [ -f "$diag_file" ]; then
             echo "Diag file $diag_file exists."
         else
             echo "Diag file $diag_file does not exist."
-            python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
         fi
+
+        # # set aug_seed the same as hod_seed for simplicity
+        # aug_seed=$hod_seed
+        # printf -v aug_str "%05d" $aug_seed
+
+        # # simbig_lightcone
+        # diag_file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # if [ -f "$diag_file" ]; then
+        #     echo "Diag file $diag_file exists."
+        # else
+        #     echo "Diag file $diag_file does not exist."
+        #     python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # fi
     done
 
     # Trash collection
     if [ "$rm_galaxies" = "True" ]; then
         echo "Removing galaxy and lightcone directories for lhid=$lhid"
         rm -rf "$outdir/$lhid/galaxies"
-        rm -rf "$outdir/$lhid/simbig_lightcone"
+        # rm -rf "$outdir/$lhid/simbig_lightcone"
     fi
 done
