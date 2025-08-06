@@ -26,37 +26,38 @@ import datetime
 
 
 def run_pylians(
-    field, summaries,
-    box_size, axis, num_threads, use_rsd,
+    field, box_size, axis, num_threads, use_rsd,
     MAS='CIC', cache_dir=None
 ):
     # Only for power spectrum
-    accept_summaries = ['Pk', 'Bk']
+    pfx = 'z' if use_rsd else ''
+    k, Pk = calcPk(field, box_size, axis=axis,
+                   MAS=MAS, threads=num_threads)
+    out = {
+        pfx+'Pk_k3D': k,
+        pfx+'Pk': Pk
+    }
+    return out
 
-    for summary_name in summaries:
-        pfx = 'z' if use_rsd else ''
-        if summary_name == 'Pk':
-            k, Pk = calcPk(field, box_size, axis=axis,
-                           MAS=MAS, threads=num_threads)
-            out = {
-                pfx+'Pk_k3D': k,
-                pfx+'Pk': Pk
-            }
-        elif summary_name == 'Bk':
-            k123, Bk, Qk, k, Pk = calcBk_bfast(
-                field, box_size, axis=axis,
-                MAS=MAS, threads=num_threads,
-                cache_dir=cache_dir)
-            out = {
-                pfx+'Bk_k123': k123,
-                pfx+'Bk': Bk,
-                pfx+'Qk': Qk,
-                pfx+'bPk_k3D': k123,
-                pfx+'bPk': Pk
-            }
-        elif summary_name not in accept_summaries:
-            logging.error(f'{summary_name} not yet implemented in Pylians')
-            continue
+
+def run_bfast(
+    field, box_size, axis, num_threads, use_rsd,
+    MAS='CIC', cache_dir=None
+):
+    # Only for bispectrum
+    pfx = 'z' if use_rsd else ''
+    k123, Bk, Qk, k, Pk = calcBk_bfast(
+        field, box_size, axis=axis,
+        MAS=MAS, threads=num_threads,
+        cache_dir=cache_dir
+    )
+    out = {
+        pfx+'Bk_k123': k123,
+        pfx+'Bk': Bk,
+        pfx+'Qk': Qk,
+        pfx+'bPk_k3D': k123,
+        pfx+'bPk': Pk
+    }
     return out
 
 
@@ -139,7 +140,7 @@ def summarize_rho(
         out_data = {}
         if 'Pk' in summaries:
             out = run_pylians(
-                rho, ['Pk'], L, axis=0, MAS='CIC',
+                rho, L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
@@ -148,8 +149,8 @@ def summarize_rho(
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
             else:
                 cache_dir = None
-            out = run_pylians(
-                rho, ['Bk'], L, axis=0, MAS='CIC',
+            out = run_bfast(
+                rho, L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False,
                 cache_dir=cache_dir
             )
@@ -263,7 +264,7 @@ def summarize_tracer(
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
-                field, ['Pk'], L, axis=0, MAS=MAS,
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
@@ -272,7 +273,7 @@ def summarize_tracer(
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
                         axis=0).astype(np.float32)
             out = run_pylians(
-                field, ['Pk'], L, axis=0, MAS=MAS,
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
@@ -287,8 +288,8 @@ def summarize_tracer(
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_pylians(
-                field, ['Bk'], L, axis=0, MAS=MAS,
+            out = run_bfast(
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=False,
                 cache_dir=cache_dir
             )
@@ -297,8 +298,8 @@ def summarize_tracer(
             # redshift space
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
                         axis=0).astype(np.float32)
-            out = run_pylians(
-                field, ['Bk'], L, axis=0, MAS=MAS,
+            out = run_bfast(
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=True,
                 cache_dir=cache_dir
             )
@@ -422,7 +423,7 @@ def summarize_lightcone(
         if config.diag.survey_backend == 'pylians':
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
-                field, ['Pk'], L, axis=0, MAS=MAS,
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=False
             )
         elif config.diag.survey_backend == 'pypower':
@@ -441,8 +442,8 @@ def summarize_lightcone(
             cache_dir = None
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_pylians(
-            field, ['Bk'], L, axis=0, MAS=MAS,
+        out = run_bfast(
+            field, L, axis=0, MAS=MAS,
             num_threads=threads, use_rsd=False,
             cache_dir=cache_dir
         )
