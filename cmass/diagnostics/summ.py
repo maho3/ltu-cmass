@@ -419,11 +419,17 @@ def summarize_lightcone(
     if 'Pk' in summaries:
         N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
-        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_pylians(
-            field, ['Pk'], L, axis=0, MAS=MAS,
-            num_threads=threads, use_rsd=False
-        )
+        if config.diag.survey_backend == 'pylians':
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            out = run_pylians(
+                field, ['Pk'], L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
+        elif config.diag.survey_backend == 'pypower':
+            pass
+        else:
+            raise ValueError(
+                f'Unknown survey backend: {config.diag.survey_backend}')
         out_data.update(out)
     # Compute B(k)
     if 'Bk' in summaries:  # high-res takes too much memory
