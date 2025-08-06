@@ -11,6 +11,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import h5py
 from astropy.cosmology import Planck18
+from scipy.spatial.transform import Rotation as R
 
 from ..utils import (
     get_source_path, timing_decorator, cosmo_to_astropy, save_configuration_h5)
@@ -369,6 +370,13 @@ def summarize_lightcone(
     # convert to float32
     pos = pos.astype(np.float32)
 
+    # rotate pos so that line of sight is along 0th axis
+    v1 = np.mean(pos, axis=0)
+    v2 = np.array([1, 0, 0])
+    rotation, _ = R.align_vectors([v2], [v1])
+    pos = rotation.apply(pos).astype(np.float32)
+
+    # TODO: recalibrate offsets and box sizes
     if cap == 'ngc':
         # offset to center (min is about -1870, -1750, -120)
         pos += [2000, 1800, 250]
@@ -379,9 +387,9 @@ def summarize_lightcone(
         pos += [-600, 1400, 400]
         # set length scale of grid (range is about 1750, 3350, 1900)
         L = 2750
-    elif cap == 'mtng':
-        pos += [100, 100, 100]
-        L = 2000
+    elif cap == 'mtng':  # recalibrated
+        pos += [100, 1400, 1400]
+        L = 3000
     elif cap == 'simbig':
         # offset to center (min is about 850, -650, -175)
         pos += [-650, 800, 250]
@@ -461,7 +469,7 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
 
     # parse noise (seeded by lhid and hod seed)
-    noise_seed = int(cfg.nbody.lhid*1e6 + cfg.bias.hod.seed)
+    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
     cfg.noise.radial, cfg.noise.transverse = \
         parse_noise(seed=noise_seed,
                     dist=cfg.noise.dist,
