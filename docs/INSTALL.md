@@ -32,7 +32,7 @@ conda activate cmass
 Install cmass and its dependencies (in [setup.cfg](../setup.cfg)) automatically using:
 ```bash
 cd ltu-cmass
-pip install -e .
+pip install -e '.[full]'
 ```
 Now, the `cmass` package should be accessible in your Python environment. You can test this by running 
 ```bash
@@ -164,3 +164,4 @@ We include various additional functionality beyond the minimal working example a
 - [Building and running lightcone extrapolation](./options/LIGHTCONE.md)
 - [Building and running the PINOCCHIO simulator](./options/PINOCCHIO.md)
 - [Filtering and weighting galaxy positions](./options/FILTERING.md)
+- [Installing pypower](./options/PYPOWER.md)

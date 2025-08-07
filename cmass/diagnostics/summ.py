@@ -11,6 +11,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import h5py
 from astropy.cosmology import Planck18
+from scipy.spatial.transform import Rotation as R
 
 from ..utils import (
     get_source_path, timing_decorator, cosmo_to_astropy, save_configuration_h5)
@@ -25,37 +26,36 @@ import datetime
 
 
 def run_pylians(
-    field, summaries,
-    box_size, axis, num_threads, use_rsd,
-    MAS='CIC', cache_dir=None
+    field, box_size, axis, num_threads, use_rsd, MAS='CIC'
 ):
     # Only for power spectrum
-    accept_summaries = ['Pk', 'Bk']
+    pfx = 'z' if use_rsd else ''
+    k, Pk = calcPk(field, box_size, axis=axis,
+                   MAS=MAS, threads=num_threads)
+    out = {
+        pfx+'Pk_k3D': k,
+        pfx+'Pk': Pk
+    }
+    return out
 
-    for summary_name in summaries:
-        pfx = 'z' if use_rsd else ''
-        if summary_name == 'Pk':
-            k, Pk = calcPk(field, box_size, axis=axis,
-                           MAS=MAS, threads=num_threads)
-            out = {
-                pfx+'Pk_k3D': k,
-                pfx+'Pk': Pk
-            }
-        elif summary_name == 'Bk':
-            k123, Bk, Qk, k, Pk = calcBk_bfast(
-                field, box_size, axis=axis,
-                MAS=MAS, threads=num_threads,
-                cache_dir=cache_dir)
-            out = {
-                pfx+'Bk_k123': k123,
-                pfx+'Bk': Bk,
-                pfx+'Qk': Qk,
-                pfx+'bPk_k3D': k123,
-                pfx+'bPk': Pk
-            }
-        elif summary_name not in accept_summaries:
-            logging.error(f'{summary_name} not yet implemented in Pylians')
-            continue
+
+def run_bfast(
+    field, box_size, axis, num_threads, use_rsd, MAS='CIC', cache_dir=None
+):
+    # Only for bispectrum
+    pfx = 'z' if use_rsd else ''
+    k123, Bk, Qk, k, Pk = calcBk_bfast(
+        field, box_size, axis=axis,
+        MAS=MAS, threads=num_threads,
+        cache_dir=cache_dir
+    )
+    out = {
+        pfx+'Bk_k123': k123,
+        pfx+'Bk': Bk,
+        pfx+'Qk': Qk,
+        pfx+'bPk_k3D': k123,
+        pfx+'bPk': Pk
+    }
     return out
 
 
@@ -104,16 +104,8 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
             save_configuration_h5(f, config, save_HOD=save_HOD)
 
 
-def summarize_rho(
-    source_path, L,
-    threads=16, from_scratch=True, focus_z=None,
-    summaries=['Pk'], config=None
-):
-    # check for file keys
-    filename = join(source_path, 'nbody.h5')
-    if not os.path.isfile(filename):
-        logging.error(f'rho file {filename} not found')
-        return False
+def _get_snapshot_alist(filename, focus_z=None):
+    # load data file and get keys
     with h5py.File(filename, 'r') as f:
         alist = list(f.keys())
 
@@ -121,6 +113,20 @@ def summarize_rho(
     if focus_z is not None:
         i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
         alist = [alist[i]]
+    return alist
+
+
+def summarize_rho(
+    source_path, L,
+    threads=16, from_scratch=True, focus_z=None,
+    summaries=['Pk'], config=None
+):
+    # get source file
+    filename = join(source_path, 'nbody.h5')
+    if not os.path.isfile(filename):
+        logging.error(f'File not found: {filename}')
+        return False
+    alist = _get_snapshot_alist(filename, focus_z=focus_z)
 
     # check if diagnostics already computed, delete if from_scratch
     outpath = join(source_path, 'diag', 'rho.h5')
@@ -128,27 +134,30 @@ def summarize_rho(
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute diagnostics and save
+    logging.info(f'Computing diagnostics to save to: {outpath}')
     for a in alist:
         logging.info(f'Processing density field a={a}')
+        # Load
         with h5py.File(filename, 'r') as f:
             rho = f[a]['rho'][...].astype(np.float32)
+
+        # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
             out = run_pylians(
-                rho, ['Pk'], L, axis=0, MAS='CIC',
+                rho, L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
         if 'Bk' in summaries:
+            cache_dir = None
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
-            else:
-                cache_dir = None
-            out = run_pylians(
-                rho, ['Bk'], L, axis=0, MAS='CIC',
+
+            out = run_bfast(
+                rho, L, axis=0, MAS='CIC',
                 num_threads=threads, use_rsd=False,
                 cache_dir=cache_dir
             )
@@ -166,20 +175,13 @@ def summarize_tracer(
     summaries=['Pk'],
     config=None
 ):
+    # get source file
     postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
-
-    # check for file keys
     filename = join(source_path, postfix)
     if not os.path.isfile(filename):
         logging.error(f'File not found: {filename}')
         return False
-    with h5py.File(filename, 'r') as f:
-        alist = list(f.keys())
-
-    # Filter alist to only include the closest to a specified redshift
-    if focus_z is not None:
-        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
-        alist = [alist[i]]
+    alist = _get_snapshot_alist(filename, focus_z=focus_z)
 
     # check if diagnostics already computed
     if type == 'galaxy':
@@ -189,12 +191,12 @@ def summarize_tracer(
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
-    logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
 
     # compute diagnostics and save
+    logging.info(f'Computing diagnostics to save to: {outpath}')
     for a in alist:
         z = 1/float(a) - 1
         logging.info(f'Processing {type} catalog a={a}')
@@ -210,7 +212,6 @@ def summarize_tracer(
         pos %= L  # Ensure all tracers inside box
 
         # Mask out low mass tracers (to match number density)
-        out_attrs = {}
         if density is not None:
             if proxy is None:
                 logging.warning(
@@ -231,7 +232,8 @@ def summarize_tracer(
             vel = vel[mask]
             mass = mass[mask]
 
-        # Save number density of tracers
+        # Save metadata
+        out_attrs = {}
         out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
         out_attrs['log10nbar'] = \
             np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
@@ -262,7 +264,7 @@ def summarize_tracer(
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
-                field, ['Pk'], L, axis=0, MAS=MAS,
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
@@ -271,23 +273,22 @@ def summarize_tracer(
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
                         axis=0).astype(np.float32)
             out = run_pylians(
-                field, ['Pk'], L, axis=0, MAS=MAS,
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
         # Compute B(k)
-        if 'Bk' in summaries:   # high-res takes too much memory
+        if 'Bk' in summaries:
+            # high-res takes too much memory
             N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
-            MAS = 'TSC'
+            cache_dir = None
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
-            else:
-                cache_dir = None
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_pylians(
-                field, ['Bk'], L, axis=0, MAS=MAS,
+            out = run_bfast(
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=False,
                 cache_dir=cache_dir
             )
@@ -296,8 +297,8 @@ def summarize_tracer(
             # redshift space
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
                         axis=0).astype(np.float32)
-            out = run_pylians(
-                field, ['Bk'], L, axis=0, MAS=MAS,
+            out = run_bfast(
+                field, L, axis=0, MAS=MAS,
                 num_threads=threads, use_rsd=True,
                 cache_dir=cache_dir
             )
@@ -324,17 +325,31 @@ def summarize_tracer(
     return True
 
 
+def _center_box(pos, boxpad=1.5):
+    """
+    Finds a box_size which contains all points, and centers the points
+    in a box of size box_size*boxpad. NOTE: no longer do this manually.
+    """
+    voxel_size = 1000/128
+    pos_max, pos_min = np.max(pos, axis=0), np.min(pos, axis=0)
+    box_size = pos_max - pos_min
+    box_size *= boxpad
+    box_size = np.ceil(box_size / voxel_size) * voxel_size
+    center = (pos_max + pos_min) / 2
+    pos += (box_size/2 - center)
+    return pos, box_size
+
+
 def summarize_lightcone(
-    source_path, L, cosmo,
+    source_path, cosmo,
     cap='ngc', high_res=False, use_ngp=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
     summaries=['Pk'],
     config=None
 ):
+    # get source file
     postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
-
-    # check for file keys
     filename = join(source_path, postfix)
     if not os.path.isfile(filename):
         logging.error(f'File not found: {filename}')
@@ -347,6 +362,8 @@ def summarize_lightcone(
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
+
+    # compute diagnostics and save
     logging.info(f'Computing diagnostics to save to: {outpath}')
 
     # Load
@@ -366,28 +383,14 @@ def summarize_lightcone(
     pos += e_phi * noise[:, 1, None] * config.noise.transverse
     pos += e_theta * noise[:, 2, None] * config.noise.transverse
 
-    # convert to float32
-    pos = pos.astype(np.float32)
+    # rotate pos so that line of sight is along 0th axis
+    v1 = np.mean(pos, axis=0)
+    v2 = np.array([1, 0, 0])
+    rotation, _ = R.align_vectors([v2], [v1])
+    pos = rotation.apply(pos).astype(np.float32)
 
-    if cap == 'ngc':
-        # offset to center (min is about -1870, -1750, -120)
-        pos += [2000, 1800, 250]
-        # set length scale of grid (range is about 1750, 3350, 1900)
-        L = 3500
-    elif cap == 'sgc':
-        # offset to center (min is about 800, -1275, -375)
-        pos += [-600, 1400, 400]
-        # set length scale of grid (range is about 1750, 3350, 1900)
-        L = 2750
-    elif cap == 'mtng':
-        pos += [100, 100, 100]
-        L = 2000
-    elif cap == 'simbig':
-        # offset to center (min is about 850, -650, -175)
-        pos += [-650, 800, 250]
-        L = 2000
-    else:
-        raise ValueError
+    # Center the box
+    pos, L = _center_box(pos, boxpad=1.5)
 
     # Check if all tracers are inside the box
     if np.any(pos < 0) or np.any(pos > L):
@@ -396,8 +399,8 @@ def summarize_lightcone(
             f'position out of bounds for {cap}_lightcone: '
             f'{np.min(pos, axis=0)} {np.max(pos, axis=0)}')
 
+    # Save metadata
     out_attrs = {}
-    # Save number density of tracers
     out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
     out_attrs['log10nbar'] = np.log10(
         len(pos)) - 3 * np.log10(L)  # for numerical precision
@@ -410,25 +413,29 @@ def summarize_lightcone(
     # Compute P(k)
     if 'Pk' in summaries:
         N, MAS = get_mesh_resolution(L, high_res, use_ngp)
-
-        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_pylians(
-            field, ['Pk'], L, axis=0, MAS=MAS,
-            num_threads=threads, use_rsd=False
-        )
+        if config.diag.survey_backend == 'pylians':
+            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+            out = run_pylians(
+                field, L, axis=0, MAS=MAS,
+                num_threads=threads, use_rsd=False
+            )
+        elif config.diag.survey_backend == 'pypower':
+            pass
+        else:
+            raise ValueError(
+                f'Unknown survey backend: {config.diag.survey_backend}')
         out_data.update(out)
     # Compute B(k)
-    if 'Bk' in summaries:  # high-res takes too much memory
+    if 'Bk' in summaries:
+        # high-res takes too much memory
         N, MAS = get_mesh_resolution(L, high_res=False, use_ngp=use_ngp)
-        MAS = 'TSC'
+        cache_dir = None
         if config is not None:
             cache_dir = join(config.meta.wdir, 'scratch', 'cache')
-        else:
-            cache_dir = None
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_pylians(
-            field, ['Bk'], L, axis=0, MAS=MAS,
+        out = run_bfast(
+            field, L, axis=0, MAS=MAS,
             num_threads=threads, use_rsd=False,
             cache_dir=cache_dir
         )
@@ -461,7 +468,7 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
 
     # parse noise (seeded by lhid and hod seed)
-    noise_seed = int(cfg.nbody.lhid*1e6 + cfg.bias.hod.seed)
+    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
     cfg.noise.radial, cfg.noise.transverse = \
         parse_noise(seed=noise_seed,
                     dist=cfg.noise.dist,
@@ -546,7 +553,7 @@ def main(cfg: DictConfig) -> None:
     for cap in ['ngc', 'sgc', 'mtng', 'simbig']:
         if cfg.diag.all or getattr(cfg.diag, f'{cap}'):
             done = summarize_lightcone(
-                source_path, cfg.nbody.L,
+                source_path,
                 cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
                 cap=cap,
                 high_res=cfg.diag.high_res,
