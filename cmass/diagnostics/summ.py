@@ -12,6 +12,7 @@ from omegaconf import DictConfig, OmegaConf
 import h5py
 from astropy.cosmology import Planck18
 from scipy.spatial.transform import Rotation as R
+import subprocess
 
 from ..utils import (
     get_source_path, timing_decorator, cosmo_to_astropy, save_configuration_h5)
@@ -332,7 +333,7 @@ def _center_box(pos, boxpad=1.5):
     """
     voxel_size = 1000/128
     pos_max, pos_min = np.max(pos, axis=0), np.min(pos, axis=0)
-    box_size = pos_max - pos_min
+    box_size = np.max(pos_max - pos_min)
     box_size *= boxpad
     box_size = np.ceil(box_size / voxel_size) * voxel_size
     center = (pos_max + pos_min) / 2
@@ -340,7 +341,7 @@ def _center_box(pos, boxpad=1.5):
     return pos, box_size
 
 
-def summarize_lightcone(
+def summarize_lightcone_pylians(
     source_path, cosmo,
     cap='ngc', high_res=False, use_ngp=False,
     threads=16, from_scratch=True,
@@ -402,8 +403,8 @@ def summarize_lightcone(
     # Save metadata
     out_attrs = {}
     out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
-    out_attrs['log10nbar'] = np.log10(
-        len(pos)) - 3 * np.log10(L)  # for numerical precision
+    out_attrs['log10nbar'] = \
+        np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
     out_attrs['high_res'] = high_res and not use_ngp
     out_attrs['noise_dist'] = config.noise.dist
     out_attrs['noise_radial'] = config.noise.radial
@@ -413,17 +414,11 @@ def summarize_lightcone(
     # Compute P(k)
     if 'Pk' in summaries:
         N, MAS = get_mesh_resolution(L, high_res, use_ngp)
-        if config.diag.survey_backend == 'pylians':
-            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_pylians(
-                field, L, axis=0, MAS=MAS,
-                num_threads=threads, use_rsd=False
-            )
-        elif config.diag.survey_backend == 'pypower':
-            pass
-        else:
-            raise ValueError(
-                f'Unknown survey backend: {config.diag.survey_backend}')
+        field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+        out = run_pylians(
+            field, L, axis=0, MAS=MAS,
+            num_threads=threads, use_rsd=False
+        )
         out_data.update(out)
     # Compute B(k)
     if 'Bk' in summaries:
@@ -459,6 +454,71 @@ def summarize_lightcone(
     save_group(outpath, out_data, out_attrs, None,
                config, save_HOD=True)
     return True
+
+
+def summarize_lightcone_pypower(
+    source_path, cosmo,
+    cap='ngc', high_res=False, use_ngp=False,
+    threads=16, from_scratch=True,
+    hod_seed=None, aug_seed=None,
+    # summaries=['Pk'],
+    cfg=None
+):
+    """Builds a command and launches the MPI job."""
+    # --- 1. Define Paths and Parameters ---
+    # get source file
+    postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
+    data_file = join(source_path, postfix)
+
+    # get randoms file
+    if cap in ['simbig', 'sgc', 'mtng']:
+        randoms_path = get_source_path(
+            cfg.meta.wdir, 'abacus', 'randoms',
+            2000, 256, 0)
+    elif cap == 'ngc':
+        randoms_path = get_source_path(
+            cfg.meta.wdir, 'mtng', 'randoms',
+            3000, 384, 0)
+    else:
+        raise ValueError(f'Unknown cap: {cap}.')
+
+    randoms_file = join(randoms_path, f'{cap}_lightcone',
+                        f'hod{0:05}_aug{0:05}.h5')
+
+    output_filename = 'pk_poles.npz'
+    n_processes = threads
+
+    # --- 2. Construct the Command ---
+    command = [
+        'mpirun', '-n', str(n_processes),
+        'python -m cmass.diagnostics.pypower',
+        '--data-file', data_file,
+        '--randoms-file', randoms_file,
+        '--output-file', output_filename,
+        # --- Power Spectrum Parameters ---
+        '--use-fkp',
+        '--resampler', 'ngp' if use_ngp else 'tsc',
+        '--boxpad', '1.2',
+        '--noise-radial', str(config.noise.radial),
+        '--noise-transverse', str(config.noise.transverse)
+    ]
+
+    print("\n" + "-"*50)
+    print(f"Launching MPI job with command:\n{' '.join(command)}")
+    print("-"*50 + "\n")
+
+    # --- 3. Execute the Command ---
+    try:
+        subprocess.run(command, check=True)
+        print("\n" + "-"*50)
+        print("MPI job completed successfully.")
+        print("-"*50 + "\n")
+    except FileNotFoundError:
+        print("Error: 'mpirun' command not found.")
+        print("Please ensure that an MPI implementation (like Open MPI) is "
+              "installed and in your system's PATH.")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred during the MPI job: {e}")
 
 
 @timing_decorator
@@ -552,17 +612,35 @@ def main(cfg: DictConfig) -> None:
     # measure lightcone diagnostics
     for cap in ['ngc', 'sgc', 'mtng', 'simbig']:
         if cfg.diag.all or getattr(cfg.diag, f'{cap}'):
-            done = summarize_lightcone(
-                source_path,
-                cosmo=Planck18,  # Diagnostics for lightcone stats use fiducial cosmology
-                cap=cap,
-                high_res=cfg.diag.high_res,
-                use_ngp=cfg.diag.use_ngp,
-                threads=threads, from_scratch=from_scratch,
-                hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                summaries=summaries,
-                config=cfg
-            )
+            if config.diag.survey_backend == 'pylians':
+                done = summarize_lightcone_pylians(
+                    source_path,
+                    # Diagnostics for lightcone stats use fiducial cosmology
+                    cosmo=Planck18,
+                    cap=cap,
+                    high_res=cfg.diag.high_res,
+                    use_ngp=cfg.diag.use_ngp,
+                    threads=threads, from_scratch=from_scratch,
+                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                    summaries=summaries,
+                    config=cfg
+                )
+            elif config.diag.survey_backend == 'pypower':
+                done = summarize_lightcone_pypower(
+                    source_path,
+                    # Diagnostics for lightcone stats use fiducial cosmology
+                    cosmo=Planck18,
+                    cap=cap,
+                    high_res=cfg.diag.high_res,
+                    use_ngp=cfg.diag.use_ngp,
+                    threads=threads, from_scratch=from_scratch,
+                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                    summaries=summaries,
+                    config=cfg
+                )
+            else:
+                raise ValueError(
+                    f'Unknown survey backend: {cfg.diag.survey_backend}')
             all_done &= done
         else:
             logging.info(f'Skipping {cap} lightcone diagnostics')
