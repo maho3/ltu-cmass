@@ -33,7 +33,7 @@ summaries:
     - Bk             # bispectrum
     # - Density Split  # density split statistics
 
-survey_backend: pypower  # backend for survey computations (pylians or pypower)
+survey_backend: pylians  # backend for survey computations (pylians or pypower)
 
 # whether to use abundance matching to affix number density
 halo_density: 1e-4  # number density in h^3/Mpc^3. null for no abundance matching
