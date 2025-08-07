@@ -12,7 +12,7 @@
 
 set -e
 
-# SLURM_ARRAY_TASK_ID=663
+SLURM_ARRAY_TASK_ID=0
 
 module restore cmass
 conda activate cmass
@@ -36,14 +36,14 @@ extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nb
 L=1000
 N=128
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 outdir=/ocean/projects/phy240015p/mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 100 1999); do
+for offset in 0; do # $(seq 0 100 1999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
@@ -74,25 +74,25 @@ for offset in $(seq 0 100 1999); do
             python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
         fi
 
-        # # set aug_seed the same as hod_seed for simplicity
-        # aug_seed=$hod_seed
-        # printf -v aug_str "%05d" $aug_seed
+        # set aug_seed the same as hod_seed for simplicity
+        aug_seed=$hod_seed
+        printf -v aug_str "%05d" $aug_seed
 
-        # # simbig_lightcone
-        # diag_file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
-        # if [ -f "$diag_file" ]; then
-        #     echo "Diag file $diag_file exists."
-        # else
-        #     echo "Diag file $diag_file does not exist."
-        #     python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-        #     python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-        # fi
+        # simbig_lightcone
+        diag_file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+        if [ -f "$diag_file" ]; then
+            echo "Diag file $diag_file exists."
+        else
+            echo "Diag file $diag_file does not exist."
+            python -m cmass.survey.hodlightcone survey.geometry=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+            python -m cmass.diagnostics.summ diag.simbig=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        fi
     done
 
     # Trash collection
     if [ "$rm_galaxies" = "True" ]; then
         echo "Removing galaxy and lightcone directories for lhid=$lhid"
         rm -rf "$outdir/$lhid/galaxies"
-        # rm -rf "$outdir/$lhid/simbig_lightcone"
+        rm -rf "$outdir/$lhid/simbig_lightcone"
     fi
 done
