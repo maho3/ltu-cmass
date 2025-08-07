@@ -18,12 +18,14 @@ from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import (
-    MA, MAz, get_box_catalogue, get_box_catalogue_rsd,
-    calcPk, calcBk_bfast, get_mesh_resolution,
-    store_summary, check_existing, parse_noise,
-    _get_snapshot_alist
+    get_mesh_resolution, noise_positions, store_summary, check_existing,
+    parse_noise, _get_snapshot_alist
 )
-from .io import save_group
+from .calculations import (
+    MA, MAz, calcPk, calcBk_bfast,
+    get_box_catalogue, get_box_catalogue_rsd  # not used
+)
+from .tools import save_group
 from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
 
 
@@ -220,11 +222,9 @@ def summarize_tracer(
 
         # Get unit vectors and add noise along each direction
         # RSDs are applied along the 0th axis
-        r_hat, e_phi, e_theta = np.identity(3)
-        noise = np.random.randn(*pos.shape)
-        pos += r_hat * noise[:, 0, None] * config.noise.radial
-        pos += e_phi * noise[:, 1, None] * config.noise.transverse
-        pos += e_theta * noise[:, 2, None] * config.noise.transverse
+        pos = noise_positions(pos, 0, 0,
+                              config.noise.radial,
+                              config.noise.transverse)
 
         # Compute P(k)
         out_data = {}
@@ -426,28 +426,35 @@ def summarize_lightcone_pylians(
 
 
 def summarize_lightcone_pypower(
-    source_path, cosmo,
+    source_path,
     cap='ngc', high_res=False, use_ngp=False,
     threads=16, from_scratch=True,
     hod_seed=None, aug_seed=None,
-    # summaries=['Pk'],
+    summaries=['Pk'],
     cfg=None
 ):
     """Builds a command and launches the MPI job."""
+
     # --- 1. Define Paths and Parameters ---
     # get source file
     postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
     data_file = join(source_path, postfix)
 
+    # check if diagnostics already computed
+    os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    outpath = join(source_path, 'diag', postfix)
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
+    if len(summaries) == 0:
+        logging.info('All diagnostics already saved. Skipping...')
+        return True
+
     # get randoms file
     if cap in ['simbig', 'sgc', 'mtng']:
         randoms_path = get_source_path(
-            cfg.meta.wdir, 'abacus', 'randoms',
-            2000, 256, 0)
+            cfg.meta.wdir, 'abacus', 'randoms', 2000, 256, 0)
     elif cap == 'ngc':
         randoms_path = get_source_path(
-            cfg.meta.wdir, 'mtng', 'randoms',
-            3000, 384, 0)
+            cfg.meta.wdir, 'mtng', 'randoms', 3000, 384, 0)
     else:
         raise ValueError(f'Unknown cap: {cap}.')
 
@@ -457,10 +464,13 @@ def summarize_lightcone_pypower(
     output_filename = 'pk_poles.npz'
     n_processes = threads
 
+    codedir = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), '..', '..'))
+
     # --- 2. Construct the Command ---
     command = [
         # --- Setup Environment ---
-        'cd /jet/home/mho1/git/ltu-cmass ;',
+        f'cd {codedir} ;',
         'module purge; module restore pmesh; conda activate pmesh;',
         # --- Run the Python Script ---
         'mpirun', '-n', str(n_processes),
@@ -470,6 +480,7 @@ def summarize_lightcone_pypower(
         '--output-file', output_filename,
         # --- Power Spectrum Parameters ---
         '--use-fkp',
+        '--high-res' if high_res else '',
         '--resampler', 'ngp' if use_ngp else 'tsc',
         '--boxpad', '1.2',
         '--noise-radial', str(cfg.noise.radial),
@@ -599,12 +610,10 @@ def main(cfg: DictConfig) -> None:
             elif cfg.diag.survey_backend == 'pypower':
                 done = summarize_lightcone_pypower(
                     source_path,
-                    # Diagnostics for lightcone stats use fiducial cosmology
-                    cosmo=Planck18,
                     cap=cap,
                     high_res=cfg.diag.high_res,
                     use_ngp=cfg.diag.use_ngp,
-                    threads=1, from_scratch=from_scratch,
+                    threads=threads, from_scratch=from_scratch,
                     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
                     cfg=cfg
                 )

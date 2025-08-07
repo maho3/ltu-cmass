@@ -1,44 +1,19 @@
-import numpy as np
+
+
+import os
 import h5py
 import argparse
-import os
+import numpy as np
 from mpi4py import MPI
 from pypower import CatalogFFTPower, setup_logging
 from astropy.cosmology import Planck18 as cosmo
-from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.spatial.transform import Rotation as R
 
-# --- Utility Functions ---
-
-
-def sky_to_xyz(rdz, cosmology):
-    """Converts sky coordinates (ra, dec, z) to Cartesian coordinates."""
-    ra, dec, z = np.asarray(rdz).T
-    coords = SkyCoord(ra=ra*u.deg, dec=dec*u.deg,
-                      distance=cosmology.comoving_distance(z))
-    pos = coords.cartesian.xyz.to_value(u.Mpc) * cosmology.h
-    return pos.T
-
-
-def sky_to_unit_vectors(ra, dec):
-    """Converts RA and Dec to Cartesian unit vectors."""
-    ra_rad = np.deg2rad(ra)
-    dec_rad = np.deg2rad(dec)
-    r_hat = np.array([
-        np.cos(dec_rad) * np.cos(ra_rad),
-        np.cos(dec_rad) * np.sin(ra_rad),
-        np.sin(dec_rad)
-    ]).T
-    e_phi = np.array([-np.sin(ra_rad), np.cos(ra_rad), np.zeros_like(ra_rad)]).T
-    e_theta = np.array([
-        -np.sin(dec_rad) * np.cos(ra_rad),
-        -np.sin(dec_rad) * np.sin(ra_rad),
-        np.cos(dec_rad)
-    ]).T
-    return r_hat, e_phi, e_theta
+from .tools import noise_positions
+from ..survey.tools import sky_to_xyz
 
 
 def get_nofz(z, fsky, cosmo):
@@ -81,17 +56,6 @@ def _center_box(data_pos, randoms_pos, boxpad=1.0):
     return data_pos_centered, randoms_pos_centered, new_box_size
 
 
-def _noise_positions(pos, ra, dec,
-                     noise_radial, noise_transverse):
-    """Applies observational noise to positions."""
-    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
-    noise = np.random.randn(*pos.shape)
-    pos += r_hat * noise[:, 0, None] * noise_radial
-    pos += e_phi * noise[:, 1, None] * noise_transverse
-    pos += e_theta * noise[:, 2, None] * noise_transverse
-    return pos
-
-
 def preprocess_lightcone_catalogs(
         data_rdz, randoms_rdz,
         noise_radial, noise_transverse, boxpad):
@@ -103,10 +67,10 @@ def preprocess_lightcone_catalogs(
     # Add observational noise
     if noise_radial > 0 or noise_transverse > 0:
         print("Applying observational noise...")
-        data_pos = _noise_positions(
+        data_pos = noise_positions(
             data_pos, data_rdz[:, 0], data_rdz[:, 1],
             noise_radial, noise_transverse)
-        randoms_pos = _noise_positions(
+        randoms_pos = noise_positions(
             randoms_pos, randoms_rdz[:, 0], randoms_rdz[:, 1],
             noise_radial, noise_transverse)
 
@@ -158,6 +122,7 @@ def main():
     parser.add_argument('--randoms-file', required=True)
     parser.add_argument('--output-file', required=True)
     parser.add_argument('--use-fkp', action='store_true')
+    parser.add_argument('--high-res', action='store_true')
     parser.add_argument('--resampler', type=str, default='tsc')
     parser.add_argument('--boxpad', type=float, default=1.5)
     parser.add_argument('--noise-radial', type=float, default=0.0)
@@ -206,6 +171,10 @@ def main():
 
         data_pos, randoms_pos = data_pos.T, randoms_pos.T
 
+    cellsize = 1000 / 128  # Voxel Size
+    if args.high_res:
+        cellsize /= 2.0
+
     result = CatalogFFTPower(
         data_positions1=data_pos,
         data_weights1=data_weights,
@@ -217,7 +186,7 @@ def main():
         mpiroot=0,
         resampler=args.resampler,
         interlacing=interlacing,
-        cellsize=1000/128,
+        cellsize=cellsize,
         boxpad=args.boxpad,
         los=los,
         position_type=position_type,
