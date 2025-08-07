@@ -41,6 +41,18 @@ def _check(group, to_check):
     return True
 
 
+def _get_snapshot_alist(filename, focus_z=None):
+    # load data file and get keys
+    with h5py.File(filename, 'r') as f:
+        alist = list(f.keys())
+
+    # Filter alist to only include the closest to a specified redshift
+    if focus_z is not None:
+        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
+        alist = [alist[i]]
+    return alist
+
+
 def check_existing(file, summaries, from_scratch=False, rsd=False):
     if not os.path.isfile(file):
         return summaries

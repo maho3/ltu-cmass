@@ -14,16 +14,17 @@ from astropy.cosmology import Planck18
 from scipy.spatial.transform import Rotation as R
 import subprocess
 
-from ..utils import (
-    get_source_path, timing_decorator, cosmo_to_astropy, save_configuration_h5)
+from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
-from .tools import MA, MAz, get_box_catalogue, get_box_catalogue_rsd
-from .tools import calcPk, calcBk_bfast, get_mesh_resolution
-from .tools import store_summary, check_existing
-from .tools import parse_noise
+from .tools import (
+    MA, MAz, get_box_catalogue, get_box_catalogue_rsd,
+    calcPk, calcBk_bfast, get_mesh_resolution,
+    store_summary, check_existing, parse_noise,
+    _get_snapshot_alist
+)
+from .io import save_group
 from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
-import datetime
 
 
 def run_pylians(
@@ -83,38 +84,6 @@ def run_summarizer(
         store_summary(
             zbox_catalogue, group, summ,
             box_size, grid_size, threads, use_rsd=True)
-
-
-def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
-    logging.info(f'Saving {len(data)} datasets to {file}')
-    with h5py.File(file, 'a') as f:
-        if a is not None:
-            group = f.require_group(a)
-        else:
-            group = f
-        if attrs is not None:
-            for key, value in attrs.items():
-                group.attrs[key] = value
-            group.attrs['timestamp'] = datetime.datetime.now().isoformat()
-        for key, value in data.items():
-            if key in group:
-                del group[key]
-            group.create_dataset(key, data=value)
-
-        if config is not None:
-            save_configuration_h5(f, config, save_HOD=save_HOD)
-
-
-def _get_snapshot_alist(filename, focus_z=None):
-    # load data file and get keys
-    with h5py.File(filename, 'r') as f:
-        alist = list(f.keys())
-
-    # Filter alist to only include the closest to a specified redshift
-    if focus_z is not None:
-        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
-        alist = [alist[i]]
-    return alist
 
 
 def summarize_rho(
@@ -490,6 +459,10 @@ def summarize_lightcone_pypower(
 
     # --- 2. Construct the Command ---
     command = [
+        # --- Setup Environment ---
+        'cd /jet/home/mho1/git/ltu-cmass ;',
+        'module purge; module restore pmesh; conda activate pmesh;',
+        # --- Run the Python Script ---
         'mpirun', '-n', str(n_processes),
         'python -m cmass.diagnostics.pypower',
         '--data-file', data_file,
@@ -499,26 +472,24 @@ def summarize_lightcone_pypower(
         '--use-fkp',
         '--resampler', 'ngp' if use_ngp else 'tsc',
         '--boxpad', '1.2',
-        '--noise-radial', str(config.noise.radial),
-        '--noise-transverse', str(config.noise.transverse)
+        '--noise-radial', str(cfg.noise.radial),
+        '--noise-transverse', str(cfg.noise.transverse)
     ]
-
-    print("\n" + "-"*50)
-    print(f"Launching MPI job with command:\n{' '.join(command)}")
-    print("-"*50 + "\n")
+    logging.info(f"Launching MPI job with command:\n{' '.join(command)}")
 
     # --- 3. Execute the Command ---
     try:
-        subprocess.run(command, check=True)
-        print("\n" + "-"*50)
-        print("MPI job completed successfully.")
-        print("-"*50 + "\n")
+        subprocess.run(command, check=True, shell=True)
+        logging.info(
+            f'MPI job completed successfully. Output saved to {output_filename}')
     except FileNotFoundError:
-        print("Error: 'mpirun' command not found.")
-        print("Please ensure that an MPI implementation (like Open MPI) is "
-              "installed and in your system's PATH.")
+        logging.error(
+            "mpirun command not found. Please check your MPI installation.")
+        return False
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred during the MPI job: {e}")
+        logging.error(f"An error occurred during the MPI job: {e}")
+        return False
+    return True
 
 
 @timing_decorator
@@ -612,7 +583,7 @@ def main(cfg: DictConfig) -> None:
     # measure lightcone diagnostics
     for cap in ['ngc', 'sgc', 'mtng', 'simbig']:
         if cfg.diag.all or getattr(cfg.diag, f'{cap}'):
-            if config.diag.survey_backend == 'pylians':
+            if cfg.diag.survey_backend == 'pylians':
                 done = summarize_lightcone_pylians(
                     source_path,
                     # Diagnostics for lightcone stats use fiducial cosmology
@@ -625,7 +596,7 @@ def main(cfg: DictConfig) -> None:
                     summaries=summaries,
                     config=cfg
                 )
-            elif config.diag.survey_backend == 'pypower':
+            elif cfg.diag.survey_backend == 'pypower':
                 done = summarize_lightcone_pypower(
                     source_path,
                     # Diagnostics for lightcone stats use fiducial cosmology
@@ -633,10 +604,9 @@ def main(cfg: DictConfig) -> None:
                     cap=cap,
                     high_res=cfg.diag.high_res,
                     use_ngp=cfg.diag.use_ngp,
-                    threads=threads, from_scratch=from_scratch,
+                    threads=1, from_scratch=from_scratch,
                     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                    summaries=summaries,
-                    config=cfg
+                    cfg=cfg
                 )
             else:
                 raise ValueError(

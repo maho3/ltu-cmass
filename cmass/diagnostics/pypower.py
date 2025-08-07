@@ -68,22 +68,23 @@ def get_nofz(z, fsky, cosmo):
     return nofz
 
 
-def _center_box(pos_data, pos_randoms, boxpad=1.0):
+def _center_box(data_pos, randoms_pos, boxpad=1.0):
     """Shifts both data and randoms to be in a box starting at 0."""
-    pos_combined = np.vstack([pos_data, pos_randoms])
+    pos_combined = np.vstack([data_pos, randoms_pos])
     pos_min = np.min(pos_combined, axis=0)
     pos_max = np.max(pos_combined, axis=0)
     box_size_dims = (pos_max - pos_min) * boxpad
     new_box_size = np.max(box_size_dims)
     shift = pos_min - (new_box_size - (pos_max - pos_min)) / 2.0
-    pos_data_centered = pos_data - shift
-    pos_randoms_centered = pos_randoms - shift
-    return pos_data_centered, pos_randoms_centered, new_box_size
+    data_pos_centered = data_pos - shift
+    randoms_pos_centered = randoms_pos - shift
+    return data_pos_centered, randoms_pos_centered, new_box_size
 
 
-def _noise_positions(pos, noise_radial, noise_transverse,
-                     r_hat, e_phi, e_theta):
+def _noise_positions(pos, ra, dec,
+                     noise_radial, noise_transverse):
     """Applies observational noise to positions."""
+    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
     noise = np.random.randn(*pos.shape)
     pos += r_hat * noise[:, 0, None] * noise_radial
     pos += e_phi * noise[:, 1, None] * noise_transverse
@@ -92,51 +93,49 @@ def _noise_positions(pos, noise_radial, noise_transverse,
 
 
 def preprocess_lightcone_catalogs(
-        data_ra, data_dec, data_z,
-        randoms_ra, randoms_dec, randoms_z,
+        data_rdz, randoms_rdz,
         noise_radial, noise_transverse, boxpad):
     """Loads, transforms, and prepares data and randoms catalogs."""
     # Convert to comoving coordinates
-    pos_data = sky_to_xyz(
-        np.vstack([data_ra, data_dec, data_z]).T, cosmo)
-    pos_randoms = sky_to_xyz(
-        np.vstack([randoms_ra, randoms_dec, randoms_z]).T, cosmo)
+    data_pos = sky_to_xyz(data_rdz, cosmo)
+    randoms_pos = sky_to_xyz(randoms_rdz, cosmo)
 
     # Add observational noise
     if noise_radial > 0 or noise_transverse > 0:
         print("Applying observational noise...")
-        r_hat, e_phi, e_theta = sky_to_unit_vectors(data_ra, data_dec)
-        pos_data = _noise_positions(
-            pos_data, noise_radial, noise_transverse, r_hat, e_phi, e_theta)
-        pos_randoms = _noise_positions(
-            pos_randoms, noise_radial, noise_transverse, r_hat, e_phi, e_theta)
+        data_pos = _noise_positions(
+            data_pos, data_rdz[:, 0], data_rdz[:, 1],
+            noise_radial, noise_transverse)
+        randoms_pos = _noise_positions(
+            randoms_pos, randoms_rdz[:, 0], randoms_rdz[:, 1],
+            noise_radial, noise_transverse)
 
     # Rotate positions so that the mean line-of-sight is along the x-axis
     print("Rotating box...")
-    mean_los = np.mean(pos_data, axis=0)
+    mean_los = np.mean(data_pos, axis=0)
     target_los = np.array([1, 0, 0])
     rotation, _ = R.align_vectors([target_los], [mean_los])
-    pos_data = rotation.apply(pos_data)
-    pos_randoms = rotation.apply(pos_randoms)
+    data_pos = rotation.apply(data_pos)
+    randoms_pos = rotation.apply(randoms_pos)
 
     # Center the box and determine the new boxsize
     print("Centering box...")
-    pos_data, pos_randoms, boxsize = _center_box(
-        pos_data, pos_randoms, boxpad=boxpad)
+    data_pos, randoms_pos, boxsize = _center_box(
+        data_pos, randoms_pos, boxpad=boxpad)
 
     # Final type casting
-    pos_data = pos_data.astype(np.float32)
-    pos_randoms = pos_randoms.astype(np.float32)
+    data_pos = data_pos.astype(np.float32)
+    randoms_pos = randoms_pos.astype(np.float32)
 
     print(f"Final box size is {boxsize:.2f} Mpc/h")
-    if np.any(pos_data < 0) or np.any(pos_data > boxsize):
+    if np.any(data_pos < 0) or np.any(data_pos > boxsize):
         raise ValueError(
             "Error! Some data tracers are outside the computed box!")
-    if np.any(pos_randoms < 0) or np.any(pos_randoms > boxsize):
+    if np.any(randoms_pos < 0) or np.any(randoms_pos > boxsize):
         raise ValueError(
             "Error! Some random tracers are outside the computed box!")
 
-    return pos_data, pos_randoms, boxsize
+    return data_pos, randoms_pos, boxsize
 
 
 def compute_fkp_weights(z, fsky, cosmology, P0=20000):
@@ -172,7 +171,7 @@ def main():
     kmin, kmax, dk = 0.0, 0.5, 0.00314
     kedges = np.arange(kmin, kmax, dk)
 
-    pos_data, weights_data, pos_randoms, weights_randoms, boxsize = None, None, None, None, None
+    data_pos, data_weights, randoms_pos, randoms_weights, boxsize = None, None, None, None, None
 
     if rank == 0:
         data_filename = args.data_file
@@ -183,40 +182,42 @@ def main():
                 f"Data file not found: {data_filename}")
         with h5py.File(data_filename, 'r') as f:
             data_rdz = \
-                np.concatenate([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+                np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
 
         if not os.path.isfile(randoms_filename):
             raise FileNotFoundError(
                 f"Randoms file not found: {randoms_filename}")
         with h5py.File(randoms_filename, 'r') as f:
             randoms_rdz = \
-                np.concatenate([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+                np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
 
-        pos_data, pos_randoms, boxsize = preprocess_lightcone_catalogs(
+        data_pos, randoms_pos, boxsize = preprocess_lightcone_catalogs(
             data_rdz, randoms_rdz,
             args.noise_radial, args.noise_transverse, args.boxpad
         )
         if args.use_fkp:
-            weights_data = compute_fkp_weights(
+            data_weights = compute_fkp_weights(
                 data_rdz[:, 2], fsky=0.25, cosmology=cosmo, P0=20000)
-            weights_randoms = compute_fkp_weights(
+            randoms_weights = compute_fkp_weights(
                 randoms_rdz[:, 2], fsky=0.25, cosmology=cosmo, P0=20000)
         else:
-            weights_data = np.ones(len(pos_data), dtype=np.float32)
-            weights_randoms = np.ones(len(pos_randoms), dtype=np.float32)
+            data_weights = np.ones(len(data_pos), dtype=np.float32)
+            randoms_weights = np.ones(len(randoms_pos), dtype=np.float32)
+
+        data_pos, randoms_pos = data_pos.T, randoms_pos.T
 
     result = CatalogFFTPower(
-        data_positions1=pos_data,
-        data_weights1=weights_data,
-        randoms_positions1=pos_randoms,
-        randoms_weights1=weights_randoms,
+        data_positions1=data_pos,
+        data_weights1=data_weights,
+        randoms_positions1=randoms_pos,
+        randoms_weights1=randoms_weights,
         boxsize=boxsize,
         edges=kedges,
         mpicomm=comm,
         mpiroot=0,
         resampler=args.resampler,
         interlacing=interlacing,
-        cellsize=args.cellsize,
+        cellsize=1000/128,
         boxpad=args.boxpad,
         los=los,
         position_type=position_type,
