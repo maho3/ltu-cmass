@@ -43,19 +43,6 @@ def get_nofz(z, fsky, cosmo):
     return nofz
 
 
-def _center_box(data_pos, randoms_pos, boxpad=1.0):
-    """Shifts both data and randoms to be in a box starting at 0."""
-    pos_combined = np.vstack([data_pos, randoms_pos])
-    pos_min = np.min(pos_combined, axis=0)
-    pos_max = np.max(pos_combined, axis=0)
-    box_size_dims = (pos_max - pos_min) * boxpad
-    new_box_size = np.max(box_size_dims)
-    shift = pos_min - (new_box_size - (pos_max - pos_min)) / 2.0
-    data_pos_centered = data_pos - shift
-    randoms_pos_centered = randoms_pos - shift
-    return data_pos_centered, randoms_pos_centered, new_box_size
-
-
 def preprocess_lightcone_catalogs(
         data_rdz, randoms_rdz,
         noise_radial, noise_transverse, boxpad):
@@ -64,9 +51,12 @@ def preprocess_lightcone_catalogs(
     data_pos = sky_to_xyz(data_rdz, cosmo)
     randoms_pos = sky_to_xyz(randoms_rdz, cosmo)
 
+    # Measure box size
+    boxsize = np.max(np.max(randoms_pos, axis=0) - np.min(randoms_pos, axis=0))
+    boxsize *= boxpad
+
     # Add observational noise
     if noise_radial > 0 or noise_transverse > 0:
-        print("Applying observational noise...")
         data_pos = noise_positions(
             data_pos, data_rdz[:, 0], data_rdz[:, 1],
             noise_radial, noise_transverse)
@@ -74,27 +64,9 @@ def preprocess_lightcone_catalogs(
             randoms_pos, randoms_rdz[:, 0], randoms_rdz[:, 1],
             noise_radial, noise_transverse)
 
-    # Rotate positions so that the mean line-of-sight is along the x-axis
-    mean_los = np.mean(data_pos, axis=0)
-    target_los = np.array([1, 0, 0])
-    rotation, _ = R.align_vectors([target_los], [mean_los])
-    data_pos = rotation.apply(data_pos)
-    randoms_pos = rotation.apply(randoms_pos)
-
-    # Center the box and determine the new boxsize
-    data_pos, randoms_pos, boxsize = _center_box(
-        data_pos, randoms_pos, boxpad=boxpad)
-
     # Final type casting
     data_pos = data_pos.astype(np.float32)
     randoms_pos = randoms_pos.astype(np.float32)
-
-    if np.any(data_pos < 0) or np.any(data_pos > boxsize):
-        raise ValueError(
-            "Error! Some data tracers are outside the computed box!")
-    if np.any(randoms_pos < 0) or np.any(randoms_pos > boxsize):
-        raise ValueError(
-            "Error! Some random tracers are outside the computed box!")
 
     return data_pos, randoms_pos, boxsize
 
@@ -192,8 +164,8 @@ def main():
 
     kf = 2 * np.pi / boxsize
     # Ncells = boxsize // cellsize
-    # knyq = np.pi * Ncells / boxsize    # not used, kmax is fixed at 0.5
-    kedges = np.arange(0, 0.5, kf)
+    # knyq = np.pi * Ncells / boxsize    # not used, kmax is fixed
+    kedges = np.arange(0, 0.41, kf)
 
     # --- Step 1: Create the Mesh ---
     # This step handles painting the catalogs onto a 3D grid.
@@ -235,7 +207,9 @@ def main():
         'Pk': Pk,
     }
 
-    # TODO: add Bk
+    # # --- Step 3: Calculate the Bispectrum ---
+    # field = mesh.to_mesh(field='fkp', dtype=np.float32, compensate=True)
+    # TODO: Update this section to calculate the bispectrum (solve jax versioning)
 
     # Save metadata
     out_attrs = {}
