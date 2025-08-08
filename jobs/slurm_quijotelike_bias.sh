@@ -12,7 +12,7 @@
 
 set -e
 
-SLURM_ARRAY_TASK_ID=0
+SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmass
@@ -22,19 +22,19 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
+Nhod=1
 
-nbody=quijotelike
-sim=fastpm_recnoise
+nbody=abacuslike
+sim=fastpm_recnoise_rot
 noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
-rm_galaxies=True
-extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-L=1000
-N=128
+rm_galaxies=False
+extras="nbody.zf=0.500015 diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+L=2000
+N=256
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"
@@ -64,15 +64,15 @@ for offset in 0; do # $(seq 0 100 1999); do
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed
 
-        # galaxies
-        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
-        if [ -f "$diag_file" ]; then
-            echo "Diag file $diag_file exists."
-        else
-            echo "Diag file $diag_file does not exist."
-            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
-        fi
+        # # galaxies
+        # diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
+        # if [ -f "$diag_file" ]; then
+        #     echo "Diag file $diag_file exists."
+        # else
+        #     echo "Diag file $diag_file does not exist."
+        #     python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+        #     python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+        # fi
 
         # set aug_seed the same as hod_seed for simplicity
         aug_seed=$hod_seed
