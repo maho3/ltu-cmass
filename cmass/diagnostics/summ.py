@@ -14,7 +14,10 @@ from astropy.cosmology import Planck18
 from scipy.spatial.transform import Rotation as R
 import subprocess
 
-from ..utils import get_source_path, timing_decorator, cosmo_to_astropy
+from ..utils import (
+    get_source_path, timing_decorator, cosmo_to_astropy,
+    save_configuration_h5
+)
 from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import (
@@ -461,7 +464,7 @@ def summarize_lightcone_pypower(
     randoms_file = join(randoms_path, f'{cap}_lightcone',
                         f'hod{0:05}_aug{0:05}.h5')
 
-    n_processes = min(threads, 64)  # Limit to 64 processes
+    n_processes = min(threads, 8)  # Limit to 64 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
@@ -478,10 +481,11 @@ def summarize_lightcone_pypower(
         --data-file {data_file} \
         --randoms-file {randoms_file} \
         --output-file {outpath} \
+        --cap {cap} \
         --use-fkp \
         {'--high-res' if high_res else ''} \
         --resampler {'ngp' if use_ngp else 'tsc'} \
-        --boxpad 1.2 \
+        --boxpad 1.5 \
         --noise-radial {cfg.noise.radial} \
         --noise-transverse {cfg.noise.transverse}
     """
@@ -517,6 +521,9 @@ def summarize_lightcone_pypower(
             logging.error(e.stderr)
 
         return False
+
+    with h5py.File(outpath, 'a') as f:
+        save_configuration_h5(f, cfg, save_HOD=True)
     return True
 
 
