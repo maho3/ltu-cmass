@@ -10,7 +10,7 @@ from astropy.cosmology import Planck18 as cosmo
 from astropy import units as u
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
-from scipy.spatial.transform import Rotation as R
+# from scipy.spatial.transform import Rotation as R
 
 from .tools import noise_positions, save_group
 from ..survey.tools import sky_to_xyz
@@ -52,6 +52,7 @@ def preprocess_lightcone_catalogs(
     randoms_pos = sky_to_xyz(randoms_rdz, cosmo)
 
     # Measure box size
+    # Done on static randoms to ensure consistent box size
     boxsize = np.max(np.max(randoms_pos, axis=0) - np.min(randoms_pos, axis=0))
     boxsize *= boxpad
 
@@ -71,12 +72,13 @@ def preprocess_lightcone_catalogs(
     return data_pos, randoms_pos, boxsize
 
 
-def compute_fkp_weights(z, fsky, cosmology, P0=20000):
+def compute_fkp_weights(z, fsky, cosmology, P0=10000, nofz=None):
     """Computes the FKP weights for a given redshift distribution."""
-    nofz = get_nofz(z, fsky, cosmology)
+    if nofz is None:
+        nofz = get_nofz(z, fsky, cosmology)
     n = nofz(z)
     weights = 1.0 / (1.0 + n * P0)
-    return weights
+    return weights, nofz
 
 
 def _get_fsky(cap):
@@ -117,6 +119,7 @@ def main():
     los = 'endpoint'
     position_type = 'xyz'
     ells = (0, 2, 4)
+    P0 = 1e4
 
     data_pos, data_weights, randoms_pos, randoms_weights = \
         None, None, None, None
@@ -146,10 +149,10 @@ def main():
         )
         if args.use_fkp:
             fsky = _get_fsky(args.cap)
-            data_weights = compute_fkp_weights(
-                data_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=20000)
-            randoms_weights = compute_fkp_weights(
-                randoms_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=20000)
+            data_weights, nofz = compute_fkp_weights(
+                data_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=P0)
+            randoms_weights, _ = compute_fkp_weights(
+                randoms_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=P0, nofz=nofz)
         else:
             data_weights = np.ones(len(data_pos), dtype=np.float32)
             randoms_weights = np.ones(len(randoms_pos), dtype=np.float32)
@@ -216,7 +219,7 @@ def main():
     out_attrs['nbar'] = len(data_pos) / boxsize**3
     out_attrs['log10nbar'] = \
         np.log10(len(data_pos)) - 3 * np.log10(boxsize)
-    out_attrs['high_res'] = args.high_res and args.resampler == 'ngp'
+    out_attrs['high_res'] = args.high_res and args.resampler == 'tsc'
     out_attrs['noise_radial'] = args.noise_radial
     out_attrs['noise_transverse'] = args.noise_transverse
 
