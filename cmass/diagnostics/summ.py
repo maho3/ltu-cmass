@@ -464,7 +464,8 @@ def summarize_lightcone_pypower(
     randoms_file = join(randoms_path, f'{cap}_lightcone',
                         f'hod{0:05}_aug{0:05}.h5')
 
-    n_processes = min(threads, 8)  # Limit to 64 processes
+    # Limit the number of processes to avoid overloading the system
+    n_processes = min(threads, 16)  # Limit to 16 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
