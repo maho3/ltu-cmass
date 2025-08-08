@@ -461,44 +461,61 @@ def summarize_lightcone_pypower(
     randoms_file = join(randoms_path, f'{cap}_lightcone',
                         f'hod{0:05}_aug{0:05}.h5')
 
-    output_filename = 'pk_poles.npz'
-    n_processes = threads
+    n_processes = min(threads, 64)  # Limit to 64 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
 
     # --- 2. Construct the Command ---
-    command = [
-        # --- Setup Environment ---
-        f'cd {codedir} ;',
-        'module purge; module restore pmesh; conda activate pmesh;',
-        # --- Run the Python Script ---
-        'mpirun', '-n', str(n_processes),
-        'python -m cmass.diagnostics.pypower',
-        '--data-file', data_file,
-        '--randoms-file', randoms_file,
-        '--output-file', output_filename,
-        # --- Power Spectrum Parameters ---
-        '--use-fkp',
-        '--high-res' if high_res else '',
-        '--resampler', 'ngp' if use_ngp else 'tsc',
-        '--boxpad', '1.2',
-        '--noise-radial', str(cfg.noise.radial),
-        '--noise-transverse', str(cfg.noise.transverse)
-    ]
-    logging.info(f"Launching MPI job with command:\n{' '.join(command)}")
+    command_string = f"""
+    cd {codedir}
+    module purge
+    module restore pmesh
+    source /opt/packages/anaconda3-2024.10-1/bin/activate
+    conda activate pmesh
+    which python
+    mpirun -n {n_processes} python -m cmass.diagnostics.pypower \
+        --data-file {data_file} \
+        --randoms-file {randoms_file} \
+        --output-file {outpath} \
+        --use-fkp \
+        {'--high-res' if high_res else ''} \
+        --resampler {'ngp' if use_ngp else 'tsc'} \
+        --boxpad 1.2 \
+        --noise-radial {cfg.noise.radial} \
+        --noise-transverse {cfg.noise.transverse}
+    """
+    logging.info(f"Launching MPI job with command:\n{command_string}")
 
     # --- 3. Execute the Command ---
     try:
-        subprocess.run(command, check=True, shell=True)
+        result = subprocess.run(
+            command_string,
+            check=True,
+            shell=True,
+            capture_output=True,
+            text=True,
+            executable='/bin/bash',
+            env=os.environ
+        )
+        if result.stdout:
+            logging.info("MPI job stdout:\n" + result.stdout)
         logging.info(
-            f'MPI job completed successfully. Output saved to {output_filename}')
+            f'MPI job completed successfully. Output saved to {outpath}')
     except FileNotFoundError:
         logging.error(
             "mpirun command not found. Please check your MPI installation.")
         return False
     except subprocess.CalledProcessError as e:
-        logging.error(f"An error occurred during the MPI job: {e}")
+        logging.error(
+            f"An error occurred during the MPI job (Exit Code: {e.returncode})")
+        if e.stdout:
+            logging.error("--- Standard Output ---")
+            logging.error(e.stdout)
+        if e.stderr:
+            logging.error("--- Standard Error ---")
+            logging.error(e.stderr)
+
         return False
     return True
 

@@ -12,7 +12,7 @@ from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.spatial.transform import Rotation as R
 
-from .tools import noise_positions
+from .tools import noise_positions, save_group
 from ..survey.tools import sky_to_xyz
 
 
@@ -133,10 +133,9 @@ def main():
     los = 'endpoint'
     position_type = 'xyz'
     ells = (0, 2, 4)
-    kmin, kmax, dk = 0.0, 0.5, 0.00314
-    kedges = np.arange(kmin, kmax, dk)
 
-    data_pos, data_weights, randoms_pos, randoms_weights, boxsize = None, None, None, None, None
+    data_pos, data_weights, randoms_pos, randoms_weights = \
+        None, None, None, None
 
     if rank == 0:
         data_filename = args.data_file
@@ -171,9 +170,16 @@ def main():
 
         data_pos, randoms_pos = data_pos.T, randoms_pos.T
 
+    boxsize = comm.bcast(boxsize if rank == 0 else None, root=0)
+
     cellsize = 1000 / 128  # Voxel Size
     if args.high_res:
         cellsize /= 2.0
+
+    Ncells = boxsize // cellsize
+    kf = 2 * np.pi / boxsize
+    knyq = np.pi * Ncells / boxsize
+    kedges = np.arange(0, knyq, kf)
 
     result = CatalogFFTPower(
         data_positions1=data_pos,
@@ -187,7 +193,6 @@ def main():
         resampler=args.resampler,
         interlacing=interlacing,
         cellsize=cellsize,
-        boxpad=args.boxpad,
         los=los,
         position_type=position_type,
         ells=ells
@@ -200,9 +205,23 @@ def main():
         Pk2 = poles(ell=2, complex=False)
         Pk4 = poles(ell=4, complex=False)
 
-        np.savez(args.output_file, k=k, Pk0=Pk0,
-                 Pk2=Pk2, Pk4=Pk4, boxsize=boxsize)
-        print(f"Power spectrum multipoles saved to {args.output_file}")
+        Pk = np.stack([Pk0, Pk2, Pk4], axis=-1)
+        out = {
+            'Pk_k3D': k,
+            'Pk': Pk,
+        }
+        out_attrs = {}
+        out_attrs['nbar'] = len(data_pos) / boxsize**3
+        out_attrs['log10nbar'] = \
+            np.log10(len(data_pos)) - 3 * np.log10(boxsize)
+        out_attrs['high_res'] = args.high_res and args.resampler == 'ngp'
+        out_attrs['noise_radial'] = args.noise_radial
+        out_attrs['noise_transverse'] = args.noise_transverse
+
+        save_group(
+            args.output_file, out,
+            attrs=out_attrs
+        )
 
 
 if __name__ == '__main__':
