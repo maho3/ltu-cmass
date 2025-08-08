@@ -641,6 +641,19 @@ def main(cfg: DictConfig) -> None:
                     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
                     cfg=cfg
                 )
+                # Bk is still done with old code (TODO: update)
+                done &= summarize_lightcone_pylians(
+                    source_path,
+                    # Diagnostics for lightcone stats use fiducial cosmology
+                    cosmo=Planck18,
+                    cap=cap,
+                    high_res=cfg.diag.high_res,
+                    use_ngp=cfg.diag.use_ngp,
+                    threads=threads, from_scratch=from_scratch,
+                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                    summaries=['Bk'],
+                    config=cfg
+                )
             else:
                 raise ValueError(
                     f'Unknown survey backend: {cfg.diag.survey_backend}')
