@@ -113,7 +113,7 @@ def parse_hod(cfg):
                 if cfg.bias.hod.seed > 0:
                     # Make a different seed for each lhid
                     cfg.bias.hod.seed = int(
-                        cfg.bias.hod.seed + cfg.nbody.lhid*1e6)
+                        cfg.bias.hod.seed + cfg.nbody.lhid*1e4)
                     # Set numpy seed
                     np.random.seed(cfg.bias.hod.seed)
 

@@ -62,7 +62,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 3e-5  # number density of CMASS
+            nbar_randoms = 10*3e-4  # 10x number density of CMASS
             Nrandoms = int(nbar_randoms * BoxSize**3)
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
@@ -130,8 +130,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.bias.hod.seed == 0:
         hod_seed = cfg.bias.hod.seed
     else:
-        # (parse_hod modifies it to lhid*1e6 + hod_seed)
-        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+        # (parse_hod modifies it to lhid*1e4 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e4)
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
