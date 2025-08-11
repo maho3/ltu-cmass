@@ -28,7 +28,7 @@ N=128
 hod_seed=0
 aug_seed=0
 
-for lhid in {0..8}; do
+for lhid in 0; do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed"
     postfix="$postfix diag.from_scratch=$diag_from_scratch"
@@ -55,7 +55,7 @@ N=256
 hod_seed=0
 aug_seed=0
 
-for lhid in {0..8}; do
+for lhid in 0; do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed"
     postfix="$postfix diag.from_scratch=$diag_from_scratch"
@@ -83,7 +83,7 @@ N=384
 hod_seed=0
 aug_seed=0
 
-for lhid in {0..8}; do
+for lhid in 0; do
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed"
     postfix="$postfix diag.from_scratch=$diag_from_scratch"
