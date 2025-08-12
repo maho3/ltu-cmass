@@ -131,6 +131,8 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
 def setup_optuna(exp_path, name, n_startup_trials):
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=n_startup_trials,
+        multivariate=True,
+        constant_liar=True,
     )
     study = optuna.create_study(
         sampler=sampler,
