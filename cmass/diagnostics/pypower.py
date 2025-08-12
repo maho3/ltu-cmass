@@ -110,7 +110,7 @@ def main():
     parser.add_argument('--use-fkp', action='store_true')
     parser.add_argument('--high-res', action='store_true')
     parser.add_argument('--resampler', type=str, default='tsc')
-    parser.add_argument('--boxpad', type=float, default=1.5)
+    parser.add_argument('--boxpad', type=float, default=1.1)
     parser.add_argument('--noise-radial', type=float, default=0.0)
     parser.add_argument('--noise-transverse', type=float, default=0.0)
     args = parser.parse_args()
@@ -216,9 +216,12 @@ def main():
 
     # Save metadata
     out_attrs = {}
-    out_attrs['nbar'] = len(data_pos) / boxsize**3
+    Ngalaxies = data_pos.shape[1]
+    out_attrs['Ngalaxies'] = Ngalaxies
+    out_attrs['boxsize'] = boxsize
+    out_attrs['nbar'] = Ngalaxies / boxsize**3
     out_attrs['log10nbar'] = \
-        np.log10(len(data_pos)) - 3 * np.log10(boxsize)
+        np.log10(Ngalaxies) - 3 * np.log10(boxsize)
     out_attrs['high_res'] = args.high_res and args.resampler == 'tsc'
     out_attrs['noise_radial'] = args.noise_radial
     out_attrs['noise_transverse'] = args.noise_transverse
