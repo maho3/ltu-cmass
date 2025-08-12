@@ -209,9 +209,12 @@ def summarize_tracer(
 
         # Save metadata
         out_attrs = {}
-        out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+        Ngalaxies = pos.shape[0]
+        out_attrs['Ngalaxies'] = Ngalaxies
+        out_attrs['boxsize'] = L
+        out_attrs['nbar'] = Ngalaxies / L**3  # Number density (h/Mpc)^3
         out_attrs['log10nbar'] = \
-            np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
+            np.log10(Ngalaxies) - 3 * np.log10(L)  # for numerical precision
         out_attrs['high_res'] = high_res and not use_ngp
         out_attrs['noise_dist'] = config.noise.dist
         out_attrs['noise_radial'] = config.noise.radial
@@ -363,7 +366,7 @@ def summarize_lightcone_pylians(
     pos = rotation.apply(pos).astype(np.float32)
 
     # Center the box
-    pos, L = _center_box(pos, boxpad=1.5)
+    pos, L = _center_box(pos, boxpad=1.1)
 
     # Check if all tracers are inside the box
     if np.any(pos < 0) or np.any(pos > L):
@@ -374,9 +377,12 @@ def summarize_lightcone_pylians(
 
     # Save metadata
     out_attrs = {}
-    out_attrs['nbar'] = len(pos) / L**3  # Number density (h/Mpc)^3
+    Ngalaxies = pos.shape[0]
+    out_attrs['Ngalaxies'] = Ngalaxies
+    out_attrs['boxsize'] = L
+    out_attrs['nbar'] = Ngalaxies / L**3  # Number density (h/Mpc)^3
     out_attrs['log10nbar'] = \
-        np.log10(len(pos)) - 3 * np.log10(L)  # for numerical precision
+        np.log10(Ngalaxies) - 3 * np.log10(L)  # for numerical precision
     out_attrs['high_res'] = high_res and not use_ngp
     out_attrs['noise_dist'] = config.noise.dist
     out_attrs['noise_radial'] = config.noise.radial
@@ -457,7 +463,7 @@ def summarize_lightcone_pypower(
             cfg.meta.wdir, 'abacus', 'randoms', 2000, 256, 0)
     elif cap == 'ngc':
         randoms_path = get_source_path(
-            cfg.meta.wdir, 'mtng', 'randoms', 3000, 384, 0)
+            cfg.meta.wdir, 'quijote3gpch', 'randoms', 3000, 384, 0)
     else:
         raise ValueError(f'Unknown cap: {cap}.')
 
@@ -486,7 +492,7 @@ def summarize_lightcone_pypower(
         --use-fkp \
         {'--high-res' if high_res else ''} \
         --resampler {'ngp' if use_ngp else 'tsc'} \
-        --boxpad 1.5 \
+        --boxpad 1.1 \
         --noise-radial {cfg.noise.radial} \
         --noise-transverse {cfg.noise.transverse}
     """
@@ -520,7 +526,6 @@ def summarize_lightcone_pypower(
         if e.stderr:
             logging.error("--- Standard Error ---")
             logging.error(e.stderr)
-
         return False
 
     with h5py.File(outpath, 'a') as f:
