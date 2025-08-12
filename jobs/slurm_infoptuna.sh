@@ -23,15 +23,15 @@ sleep $net_index  # to stagger the start of each job
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=abacuslike
-sim=fastpm_recnoise_1hod
+sim=fastpm_recnoise_rot
 infer=lightcone  # simple  #
 
 halo=False
 galaxy=False
 ngc=False
-sgc=True
+sgc=False
 mtng=False
-simbig=False
+simbig=True
 
 # nbody=quijote
 # sim=nbody

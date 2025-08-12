@@ -22,7 +22,7 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=abacuslike
-sim=fastpm_recnoise_1hod
+sim=fastpm_recnoise_rot
 infer=lightcone  # simple  #
 
 halo=False
