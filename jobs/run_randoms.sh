@@ -41,7 +41,7 @@ done
 
 
 
-echo "~~~ GENERATE SGC/MTNG RANDOMS ~~~"
+echo "~~~ GENERATE SIMBIG/SGC/MTNG RANDOMS ~~~"
 
 nbody=abacus
 sim=randoms

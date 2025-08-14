@@ -471,7 +471,7 @@ def summarize_lightcone_pypower(
                         f'hod{0:05}_aug{0:05}.h5')
 
     # Limit the number of processes to avoid overloading the system
-    n_processes = min(threads, 16)  # Limit to 16 processes
+    n_processes = min(threads, 8)  # Limit to 8 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
@@ -480,8 +480,8 @@ def summarize_lightcone_pypower(
     command_string = f"""
     cd {codedir}
     module purge
-    module restore pmesh
-    source /opt/packages/anaconda3-2024.10-1/bin/activate
+    module restore cmass
+    source /apps/anvil/external/apps/conda/2024.02/bin/activate
     conda activate pmesh
     which python
     mpirun -n {n_processes} python -m cmass.diagnostics.pypower \
@@ -647,19 +647,19 @@ def main(cfg: DictConfig) -> None:
                     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
                     cfg=cfg
                 )
-                # Bk is still done with old code (TODO: update)
-                done &= summarize_lightcone_pylians(
-                    source_path,
-                    # Diagnostics for lightcone stats use fiducial cosmology
-                    cosmo=Planck18,
-                    cap=cap,
-                    high_res=cfg.diag.high_res,
-                    use_ngp=cfg.diag.use_ngp,
-                    threads=threads, from_scratch=from_scratch,
-                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                    summaries=['Bk'],
-                    config=cfg
-                )
+                # # Bk is still done with old code (TODO: update)
+                # done &= summarize_lightcone_pylians(
+                #     source_path,
+                #     # Diagnostics for lightcone stats use fiducial cosmology
+                #     cosmo=Planck18,
+                #     cap=cap,
+                #     high_res=cfg.diag.high_res,
+                #     use_ngp=cfg.diag.use_ngp,
+                #     threads=threads, from_scratch=from_scratch,
+                #     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                #     summaries=['Bk'],
+                #     config=cfg
+                # )
             else:
                 raise ValueError(
                     f'Unknown survey backend: {cfg.diag.survey_backend}')
