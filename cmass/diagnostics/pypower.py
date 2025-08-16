@@ -124,24 +124,33 @@ def main():
     data_pos, data_weights, randoms_pos, randoms_weights = \
         None, None, None, None
 
+    data_rdz, randoms_rdz = None, None
+    loaded = False
     if rank == 0:
         data_filename = args.data_file
         randoms_filename = args.randoms_file
 
-        if not os.path.isfile(data_filename):
-            raise FileNotFoundError(
-                f"Data file not found: {data_filename}")
-        with h5py.File(data_filename, 'r') as f:
-            data_rdz = \
-                np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+        try:
+            with h5py.File(data_filename, 'r') as f:
+                data_rdz = \
+                    np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+            with h5py.File(randoms_filename, 'r') as f:
+                randoms_rdz = \
+                    np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+        except Exception as e:
+            error_msg = str(e)
+        loaded = (data_rdz is not None) and (randoms_rdz is not None)
 
-        if not os.path.isfile(randoms_filename):
+    # Catch and end if files are not loaded
+    loaded = comm.bcast(loaded, root=0)
+    if not loaded:
+        if rank == 0:
             raise FileNotFoundError(
-                f"Randoms file not found: {randoms_filename}")
-        with h5py.File(randoms_filename, 'r') as f:
-            randoms_rdz = \
-                np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+                f"Data or randoms file not found: {data_filename} or "
+                f"{randoms_filename}\n Exception: {error_msg}")
+        return
 
+    if rank == 0:
         # TODO: Cache randoms?
         data_pos, randoms_pos, boxsize = preprocess_lightcone_catalogs(
             data_rdz, randoms_rdz,
