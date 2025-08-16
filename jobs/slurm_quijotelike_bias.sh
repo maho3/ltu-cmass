@@ -22,19 +22,19 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /jet/home/mho1/git/ltu-cmass
 
-Nhod=5
+# Nhod=5
 
-nbody=quijotelike
-sim=fastpm_recnoise
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=reciprocal
+# nbody=quijote
+# sim=nbody_4noise
+# noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+# noise=fixed
 
-multisnapshot=False
-diag_from_scratch=True
-rm_galaxies=True
-extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-L=1000
-N=128
+# multisnapshot=False
+# diag_from_scratch=True
+# rm_galaxies=True
+# extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+# L=1000
+# N=128
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
@@ -52,14 +52,14 @@ for offset in $(seq 0 100 1999); do
     postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
 
-    # halos
-    diag_file=$outdir/$lhid/diag/halos.h5
-    if [ -f "$diag_file" ]; then
-        echo "Diag file $diag_file exists."
-    else
-        echo "Diag file $diag_file does not exist."
-        python -m cmass.diagnostics.summ $postfix diag.halo=True
-    fi
+    # # halos
+    # diag_file=$outdir/$lhid/diag/halos.h5
+    # if [ -f "$diag_file" ]; then
+    #     echo "Diag file $diag_file exists."
+    # else
+    #     echo "Diag file $diag_file does not exist."
+    #     python -m cmass.diagnostics.summ $postfix diag.halo=True
+    # fi
 
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed

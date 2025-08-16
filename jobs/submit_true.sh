@@ -6,7 +6,7 @@ cd /jet/home/mho1/git/ltu-cmass
 seriesname="4"
 
 # --- Fixed, global variables ---
-Nhod=20
+Nhod=5
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
@@ -14,33 +14,33 @@ noise=fixed
 TQDM_DISABLE=0
 
 # Define a base set of extras common to all jobs
-common_extras="bias=zhenginterp_biased diag.focus_z=0.5 hydra/job_logging=disabled"
+common_extras="bias=zheng_biased diag.focus_z=0.5 hydra/job_logging=disabled"
 common_extras="$common_extras noise.params.radial=4 noise.params.transverse=4"
 
-# # --- Quijote ---
-# nbody=quijote
-# sim=nbody_6noise
-# L=1000
-# N=128
-# noise_uniform_invoxel=False
-# job_extras="$common_extras" # This job has no special extras
-
-# sbatch --job-name="${seriesname}_quibias" \
-#        --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
-#        ./jobs/slurm_quijotelike_bias.sh
-
-
-# --- Abacus ---
-nbody=abacus
-sim=custom_4noise
-L=2000
-N=256
+# --- Quijote ---
+nbody=quijote
+sim=nbody_fof
+L=1000
+N=128
 noise_uniform_invoxel=False
-job_extras="$common_extras nbody.zf=0.5 meta.cosmofile=./params/abacus_custom_cosmologies.txt"
+job_extras="$common_extras" # This job has no special extras
 
-sbatch --job-name="${seriesname}_ababias" \
+sbatch --job-name="${seriesname}_quibias" \
        --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
-       ./jobs/slurm_abacus_bias.sh
+       ./jobs/slurm_quijotelike_bias.sh
+
+
+# # --- Abacus ---
+# nbody=abacus
+# sim=custom_4noise
+# L=2000
+# N=256
+# noise_uniform_invoxel=False
+# job_extras="$common_extras nbody.zf=0.5 meta.cosmofile=./params/abacus_custom_cosmologies.txt"
+
+# sbatch --job-name="${seriesname}_ababias" \
+#        --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
+#        ./jobs/slurm_abacus_bias.sh
 
 
 # # --- Quijote 3 Gpc/h ---
@@ -56,14 +56,14 @@ sbatch --job-name="${seriesname}_ababias" \
 #        ./jobs/slurm_mtng_bias.sh
 
 
-# --- MTNG 3 Gpc/h ---
-nbody=mtng
-sim=nbody_4noise
-L=3000
-N=384
-noise_uniform_invoxel=False
-job_extras="$common_extras nbody.zf=0.500015"
+# # --- MTNG 3 Gpc/h ---
+# nbody=mtng
+# sim=nbody_4noise
+# L=3000
+# N=384
+# noise_uniform_invoxel=False
+# job_extras="$common_extras nbody.zf=0.500015"
 
-sbatch --job-name="${seriesname}_mtngbias" \
-       --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
-       ./jobs/slurm_mtng_bias.sh
+# sbatch --job-name="${seriesname}_mtngbias" \
+#        --export=Nhod=$Nhod,multisnapshot=$multisnapshot,diag_from_scratch=$diag_from_scratch,rm_galaxies=$rm_galaxies,noise="$noise",extras="$job_extras",TQDM_DISABLE=$TQDM_DISABLE,nbody=$nbody,sim="$sim",L=$L,N=$N,noise_uniform_invoxel=$noise_uniform_invoxel \
+#        ./jobs/slurm_mtng_bias.sh
