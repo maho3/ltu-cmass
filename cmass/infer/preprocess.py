@@ -13,7 +13,7 @@ from tqdm import tqdm
 import optuna
 import multiprocessing
 
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
@@ -254,6 +254,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 

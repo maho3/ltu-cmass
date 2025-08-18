@@ -34,7 +34,7 @@ import h5py
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, save_cfg, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, load_galaxies
 try:
@@ -81,6 +81,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, hod_seed):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
