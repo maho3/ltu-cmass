@@ -15,7 +15,7 @@ from scipy.spatial.transform import Rotation as R
 import subprocess
 
 from ..utils import (
-    get_source_path, timing_decorator, cosmo_to_astropy,
+    get_source_path, timing_decorator, clean_up, cosmo_to_astropy,
     save_configuration_h5
 )
 from ..nbody.tools import parse_nbody_config
@@ -535,6 +535,7 @@ def summarize_lightcone_pypower(
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)

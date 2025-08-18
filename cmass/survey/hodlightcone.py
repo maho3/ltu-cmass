@@ -35,7 +35,7 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, clean_up, save_cfg
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, in_simbig_selection
 from .hodtools import HODEngine, randoms_engine
@@ -113,6 +113,7 @@ def check_saturation(z, nz_dir, zmin, zmax, geometry):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(

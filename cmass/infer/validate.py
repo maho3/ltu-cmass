@@ -15,7 +15,7 @@ import shutil
 import matplotlib.pyplot as plt
 
 from .tools import split_experiments, load_posterior
-from ..utils import timing_decorator
+from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
 from ili.utils.ndes_pt import LampeEnsemble
@@ -182,6 +182,7 @@ def run_experiment(exp, cfg, model_path):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')

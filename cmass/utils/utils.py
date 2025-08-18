@@ -1,7 +1,9 @@
 
+import functools
 import logging
 import datetime
 import os
+import shutil
 from os.path import join
 from astropy.cosmology import Cosmology, FlatLambdaCDM
 from colossus.cosmology import cosmology as csm
@@ -38,6 +40,26 @@ def timing_decorator(func, *args, **kwargs):
             f"({int(dt//60)}m{int(dt%60)}s)")
         return out
     return wrapper
+
+
+def clean_up(hydra):
+    """Decorator to clean up the Hydra log directory after function execution."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            finally:
+                try:
+                    logdir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+                    logging.info(f"Cleaning up log directory: {logdir}")
+                    shutil.rmtree(logdir, ignore_errors=True)
+                except Exception as e:
+                    logging.warning(
+                        f"Cleanup failed: {e}")
+
+        return wrapper
+    return decorator
 
 
 def save_cfg(source_path, cfg, field=None):

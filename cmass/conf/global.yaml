@@ -1,6 +1,7 @@
 hydra:
   run:
-    dir: ${meta.wdir}/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${meta.wdir}/logs/${now:%Y-%m-%d-%H-%M-%S}
+  output_subdir: null  # stops any log/.hydra files from being created
 
   job_logging:
     formatters:
