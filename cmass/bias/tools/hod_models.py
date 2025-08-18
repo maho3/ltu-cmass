@@ -36,6 +36,7 @@ from .phase_space_models import (
     Centrals_vBiasedNFWPhaseSpace,
     Satellites_vBiasedNFWPhaseSpace,
 )
+from .priors import SURVEY_HOD_PRIORS
 
 
 def truncated_gaussian(mean, std, lower, upper, size=1):
@@ -775,14 +776,13 @@ class Zheng07zinterp(Hod_model):
 
     @staticmethod
     def _build_custom_prior(custom_prior, npivot):
-        if custom_prior == 'mtng':
-            # MTNG prior
-            assert npivot == 3, "MTNG prior was only constrained for 3 pivot points"
+        if custom_prior in SURVEY_HOD_PRIORS:
+            assert npivot == 3, f"{custom_prior} prior was only constrained for 3 pivot points"
             pars = ["logMmin_z" + str(i) for i in range(npivot)]
             low = [None] * npivot
             up = [None] * npivot
-            loc = [12.83843, 13.05714, 13.25134]
-            sig = [0.24210, 0.19465, 0.13425]
+            loc = SURVEY_HOD_PRIORS[custom_prior]['mean']
+            sig = SURVEY_HOD_PRIORS[custom_prior]['stdev']
             dist = ["norm"] * npivot
         else:
             raise NotImplementedError(
