@@ -3,7 +3,7 @@
 #SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=5            # Number of tasks
-#SBATCH --gpus=v100-32:1     # Number of GPUs
+#SBATCH --gpus=v100-32:1,h100:1  # Request either one V100-32 or one H100 GPU
 #SBATCH --time=24:00:00         # Time limit
 #SBATCH --partition=GPU-shared      # Partition name
 #SBATCH --account=phy240015p   # Account name

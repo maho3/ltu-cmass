@@ -2,10 +2,10 @@
 
 set -e
 
-SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/fastpm"
-SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/abacuslike/fastpm_recnoise_rot"
-SUBDIR="L2000-N256"
-N=1999
+SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/mtnglike/fastpm"
+SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/mtnglike/fastpm_constrained"
+SUBDIR="L3000-N384"
+N=2999
 
 mkdir -p "$SIM2/$SUBDIR"
 cd "$SIM2/$SUBDIR"
