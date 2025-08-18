@@ -22,13 +22,13 @@ from ..nbody.tools import parse_nbody_config
 from ..bias.apply_hod import parse_hod
 from .tools import (
     get_mesh_resolution, noise_positions, store_summary, check_existing,
-    parse_noise, _get_snapshot_alist
+    parse_noise, _get_snapshot_alist, save_group
 )
 from .calculations import (
     MA, MAz, calcPk, calcBk_bfast,
     get_box_catalogue, get_box_catalogue_rsd  # not used
 )
-from .tools import save_group
+from .geometry import SURVEY_GEOMETRIES
 from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
 
 
@@ -301,21 +301,6 @@ def summarize_tracer(
     return True
 
 
-def _center_box(pos, boxpad=1.5):
-    """
-    Finds a box_size which contains all points, and centers the points
-    in a box of size box_size*boxpad. NOTE: no longer do this manually.
-    """
-    voxel_size = 1000/128
-    pos_max, pos_min = np.max(pos, axis=0), np.min(pos, axis=0)
-    box_size = np.max(pos_max - pos_min)
-    box_size *= boxpad
-    box_size = np.ceil(box_size / voxel_size) * voxel_size
-    center = (pos_max + pos_min) / 2
-    pos += (box_size/2 - center)
-    return pos, box_size
-
-
 def summarize_lightcone_pylians(
     source_path, cosmo,
     cap='ngc', high_res=False, use_ngp=False,
@@ -359,21 +344,23 @@ def summarize_lightcone_pylians(
     pos += e_phi * noise[:, 1, None] * config.noise.transverse
     pos += e_theta * noise[:, 2, None] * config.noise.transverse
 
-    # rotate pos so that line of sight is along 0th axis
-    v1 = np.mean(pos, axis=0)
-    v2 = np.array([1, 0, 0])
-    rotation, _ = R.align_vectors([v2], [v1])
-    pos = rotation.apply(pos).astype(np.float32)
+    # Pull survey geometries and box sizes
+    geom = SURVEY_GEOMETRIES.get(cap)
+
+    # rotate positions so they lie optimally along cardinal axes
+    rotmatrix = geom['rotation']
+    pos = pos @ rotmatrix.T
 
     # Center the box
-    pos, L = _center_box(pos, boxpad=1.1)
+    pos = pos - geom['boxcenter'] + 0.5 * geom['boxsize']
+    L = geom['boxsize']
 
     # Check if all tracers are inside the box
     if np.any(pos < 0) or np.any(pos > L):
         logging.error('Error! Some tracers outside of box!')
         raise ValueError(
-            f'position out of bounds for {cap}_lightcone: '
-            f'{np.min(pos, axis=0)} {np.max(pos, axis=0)}')
+            f'position out of bounds for {cap}_lightcone:\n'
+            f'\tmin={np.min(pos, axis=0)}\n\tmax={np.max(pos, axis=0)}')
 
     # Save metadata
     out_attrs = {}
@@ -492,7 +479,6 @@ def summarize_lightcone_pypower(
         --use-fkp \
         {'--high-res' if high_res else ''} \
         --resampler {'ngp' if use_ngp else 'tsc'} \
-        --boxpad 1.1 \
         --noise-radial {cfg.noise.radial} \
         --noise-transverse {cfg.noise.transverse}
     """

@@ -1,5 +1,4 @@
 
-
 import h5py
 import argparse
 import numpy as np
@@ -9,9 +8,9 @@ from astropy.cosmology import Planck18 as cosmo
 from astropy import units as u
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
-# from scipy.spatial.transform import Rotation as R
 
 from .tools import noise_positions, save_group
+from .geometry import SURVEY_GEOMETRIES
 from ..survey.tools import sky_to_xyz
 
 
@@ -44,18 +43,13 @@ def get_nofz(z, fsky, cosmo):
 
 def preprocess_lightcone_catalogs(
         data_rdz, randoms_rdz,
-        noise_radial, noise_transverse, boxpad):
+        noise_radial, noise_transverse):
     """Loads, transforms, and prepares data and randoms catalogs."""
     # Convert to comoving coordinates
     data_pos = sky_to_xyz(data_rdz, cosmo)
     randoms_pos = sky_to_xyz(randoms_rdz, cosmo)
 
-    # Measure box size
-    # Done on static randoms to ensure consistent box size
-    boxsize = np.max(np.max(randoms_pos, axis=0) - np.min(randoms_pos, axis=0))
-    boxsize *= boxpad
-
-    # Add observational noise
+    # Add observational noise (TODO: move to hodlightcone.py)
     if noise_radial > 0 or noise_transverse > 0:
         data_pos = noise_positions(
             data_pos, data_rdz[:, 0], data_rdz[:, 1],
@@ -68,7 +62,7 @@ def preprocess_lightcone_catalogs(
     data_pos = data_pos.astype(np.float32)
     randoms_pos = randoms_pos.astype(np.float32)
 
-    return data_pos, randoms_pos, boxsize
+    return data_pos, randoms_pos
 
 
 def compute_fkp_weights(z, fsky, cosmology, P0=10000, nofz=None):
@@ -80,18 +74,13 @@ def compute_fkp_weights(z, fsky, cosmology, P0=10000, nofz=None):
     return weights, nofz
 
 
-def _get_fsky(cap):
-    if cap == 'simbig':
-        fsky = 0.0487
-    elif cap == 'sgc':
-        fsky = 0.0688
-    elif cap == 'ngc':
-        fsky = 0.1822
-    elif cap == 'mtng':
-        fsky = 0.1257
-    else:
-        raise NotImplementedError(f'Cap {cap} not implemented')
-    return fsky
+def _get_box_geometry(cap):
+    geom = SURVEY_GEOMETRIES.get(cap)
+    fsky = geom['fsky']
+    boxsize = geom['boxsize']
+    boxcenter = geom['boxcenter']
+    rotation = geom['rotation']
+    return boxsize, boxcenter, rotation, fsky
 
 
 def main():
@@ -109,7 +98,6 @@ def main():
     parser.add_argument('--use-fkp', action='store_true')
     parser.add_argument('--high-res', action='store_true')
     parser.add_argument('--resampler', type=str, default='tsc')
-    parser.add_argument('--boxpad', type=float, default=1.1)
     parser.add_argument('--noise-radial', type=float, default=0.0)
     parser.add_argument('--noise-transverse', type=float, default=0.0)
     args = parser.parse_args()
@@ -144,19 +132,22 @@ def main():
     loaded = comm.bcast(loaded, root=0)
     if not loaded:
         if rank == 0:
+            comm.Abort(1)
             raise FileNotFoundError(
                 f"Data or randoms file not found: {data_filename} or "
                 f"{randoms_filename}\n Exception: {error_msg}")
         return
 
+    # Get box geometry
+    boxsize, boxcenter, rotation, fsky = _get_box_geometry(args.cap)
+
     if rank == 0:
         # TODO: Cache randoms?
-        data_pos, randoms_pos, boxsize = preprocess_lightcone_catalogs(
+        data_pos, randoms_pos = preprocess_lightcone_catalogs(
             data_rdz, randoms_rdz,
-            args.noise_radial, args.noise_transverse, args.boxpad
+            args.noise_radial, args.noise_transverse
         )
         if args.use_fkp:
-            fsky = _get_fsky(args.cap)
             data_weights, nofz = compute_fkp_weights(
                 data_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=P0)
             randoms_weights, _ = compute_fkp_weights(
@@ -167,7 +158,17 @@ def main():
 
         data_pos, randoms_pos = data_pos.T, randoms_pos.T
 
-    boxsize = comm.bcast(boxsize if rank == 0 else None, root=0)
+        # Rotate positions so they lie optimally along cardinal axes
+        data_pos = rotation @ data_pos
+        randoms_pos = rotation @ randoms_pos
+
+        # Warn if any data_pos or randoms_pos are outside the box
+        outside_box = np.sum(
+            np.any(np.abs(data_pos.T - boxcenter) > boxsize / 2, axis=1))
+        if outside_box > 0:
+            comm.Abort(1)
+            raise ValueError(
+                f"Error: {outside_box} data positions are outside the box.")
 
     cellsize = 1000 / 128  # Voxel Size
     if args.high_res:
@@ -186,6 +187,7 @@ def main():
         randoms_positions=randoms_pos,
         randoms_weights=randoms_weights,
         boxsize=boxsize,
+        boxcenter=boxcenter,
         mpicomm=comm,
         mpiroot=0,
         resampler=args.resampler,
