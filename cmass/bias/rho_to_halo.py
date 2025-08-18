@@ -40,7 +40,7 @@ from .tools.halo_sampling import (
     sample_velocities_density,
     sample_velocities_kNN,
     sample_velocities_CIC)
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, save_cfg, clean_up
 from ..nbody.tools import parse_nbody_config
 
 
@@ -326,6 +326,7 @@ def save_snapshot(outdir, a, hpos, hvel, hmass, **meta):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(

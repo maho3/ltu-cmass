@@ -12,7 +12,7 @@ from .preprocess import setup_optuna
 from .train import (load_preprocessed_data, run_training,
                     evaluate_posterior, plot_training_history)
 from ..nbody.tools import parse_nbody_config
-from ..utils import timing_decorator
+from ..utils import timing_decorator, clean_up
 from .tools import split_experiments
 
 
@@ -135,6 +135,7 @@ def run_experiment(exp, cfg, model_path):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
 
     cfg = parse_nbody_config(cfg)

@@ -25,7 +25,7 @@ import hydra
 import re
 import h5py
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, save_cfg, clean_up
 from .tools import (
     parse_nbody_config, gen_white_noise, load_white_noise, generate_pk_file)
 from .tools_pinocchio import (
@@ -426,6 +426,7 @@ def run_density(cfg, outdir):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])
