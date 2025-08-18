@@ -4,8 +4,8 @@ import numpy as np
 Hardcoded, standardized survey geometries for CMASS.
 
 The 'rotation' matrix is first applied to align the median line-of-sight (LOS) 
-with the x-axis. After rotation, the box is positioned with size 'boxsize' 
-centered at 'center'.
+with the x-axis and the largest variance along the y-axis. After rotation, the
+box is positioned with size 'boxsize' centered at 'boxcenter'.
 
 Computed in notebooks/fit_box_geometry.ipynb
 """
