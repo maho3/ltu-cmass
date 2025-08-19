@@ -11,7 +11,6 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import h5py
 from astropy.cosmology import Planck18
-from scipy.spatial.transform import Rotation as R
 import subprocess
 
 from ..utils import (
@@ -19,10 +18,10 @@ from ..utils import (
     save_configuration_h5
 )
 from ..nbody.tools import parse_nbody_config
-from ..bias.apply_hod import parse_hod
+from ..bias.tools.hod import parse_hod, parse_noise
 from .tools import (
     get_mesh_resolution, noise_positions, store_summary, check_existing,
-    parse_noise, _get_snapshot_alist, save_group
+    _get_snapshot_alist, save_group
 )
 from .calculations import (
     MA, MAz, calcPk, calcBk_bfast,
