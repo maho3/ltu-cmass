@@ -17,6 +17,7 @@
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_histogram.h>
 #include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -192,6 +193,8 @@ struct Lightcone
     const char *boss_dir;
     const Mask *mask;
     const double BoxSize, Omega_m, zmin, zmax, zmid;
+    const double sigmaradial, sigmatransverse;
+    std::vector<gsl_rng *> rngs;
     const int remap_case;
     const bool do_downsample, verbose;
     const unsigned augment;
@@ -225,6 +228,7 @@ struct Lightcone
                const char *boss_dir_=nullptr, 
                double BoxSize_=3e3, int remap_case_=0,
                bool verbose_=false, unsigned augment_=0,
+               double sigmaradial_=0.0, double sigmatransverse_=0.0,
                unsigned long seed_=137UL, bool is_north_=true) :
         mask{mask_},
         is_north{is_north_},
@@ -234,6 +238,7 @@ struct Lightcone
         boss_dir{boss_dir_}, do_downsample(boss_dir_),
         BoxSize{BoxSize_}, remap_case{remap_case_},
         verbose{verbose_}, augment{augment_},
+        sigmaradial{sigmaradial_}, sigmatransverse{sigmatransverse_},
         seed{seed_},
         C{cuboid::Cuboid(Geometry::remaps[remap_case_])}, Li{ C.L1, C.L2, C.L3}
     {
@@ -255,6 +260,11 @@ struct Lightcone
             if (verbose) std::printf("read_boss_nz\n");
             read_boss_nz();
         }
+        for (int ii=0; ii<omp_get_max_threads(); ++ii)
+        {
+            rngs.push_back(gsl_rng_alloc(gsl_rng_default));
+            gsl_rng_set(rngs.back(), seed + (unsigned long)ii);
+        }
     }
 
     void set_hod (HOD_fct_t hod_fct_) { hod_fct = hod_fct_; }
@@ -264,6 +274,7 @@ struct Lightcone
         gsl_spline_free(z_chi_interp);
         for (auto x: z_chi_interp_acc) gsl_interp_accel_free(x);
         if (boss_z_hist) gsl_histogram_free(boss_z_hist);
+        for (auto rng: rngs) gsl_rng_free(rng);
     }
 
     void _add_snap (int snap_idx, size_t Nhlo,
@@ -397,7 +408,8 @@ PYBIND11_MODULE(lc, m)
                        const std::vector<double>&,
                        const char *,
                        double, int,
-                       bool, unsigned, 
+                       bool, unsigned,
+                       double, double,
                        unsigned long,
                        bool>(),
             "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "zmid"_a, "snap_times"_a,
@@ -405,6 +417,7 @@ PYBIND11_MODULE(lc, m)
             "boss_dir"_a=nullptr,
             "BoxSize"_a=3e3, "remap_case"_a=0,
             "verbose"_a=false, "augment"_a=0,
+            "sigmaradial"_a=0.0, "sigmatransverse"_a=0.0,
             "seed"_a=137UL, "is_north"_a=true
         )
         .def("set_hod", &Lightcone::set_hod, "hod_fct"_a)
@@ -604,10 +617,13 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
     for (int kk = 0; kk < 3; ++kk) {
         scaled_offset[kk] *= scale_factor;
     }
+
+    std::printf("sigmaradial: %.6f, sigmatransverse: %.6f\n", sigmaradial, sigmatransverse);
     #pragma omp parallel
     {
         // the accelerator is non-const upon evaluation
         auto acc = z_chi_interp_acc[omp_get_thread_num()];
+        auto rng = rngs[omp_get_thread_num()];
         double los[3];
 
         #pragma omp for schedule (dynamic, 1024)
@@ -630,6 +646,29 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
 
             // only a small correction I assume (and it is borne out by experiment!)
             chi = std::hypot(los[0], los[1], los[2]);
+
+            // add radial / transverse noise
+            if (sigmaradial > 0.0 || sigmatransverse > 0.0) {
+                // 1. Generate one standard 3D random vector, where each component ~ N(0,1).
+                double g[3] = { gsl_ran_gaussian_ziggurat(rng, 1.0),
+                                gsl_ran_gaussian_ziggurat(rng, 1.0),
+                                gsl_ran_gaussian_ziggurat(rng, 1.0) };
+
+                // 2. Decompose this vector into components parallel and perpendicular to `los`.
+                double los_unit[3] = { los[0]/chi, los[1]/chi, los[2]/chi };
+                double dot = g[0]*los_unit[0] + g[1]*los_unit[1] + g[2]*los_unit[2];
+
+                double g_parallel[3] = { dot * los_unit[0], dot * los_unit[1], dot * los_unit[2] };
+                double g_perp[3] = { g[0] - g_parallel[0], g[1] - g_parallel[1], g[2] - g_parallel[2] };
+
+                // 3. Scale each component by its sigma and add the combined noise vector to the position.
+                los[0] += g_parallel[0] * sigmaradial + g_perp[0] * sigmatransverse;
+                los[1] += g_parallel[1] * sigmaradial + g_perp[1] * sigmatransverse;
+                los[2] += g_parallel[2] * sigmaradial + g_perp[2] * sigmatransverse;
+
+                // Recalculate chi with the new noisy position for the selection
+                chi = std::hypot(los[0], los[1], los[2]);
+            }
 
             if (chi>chi_bounds[snap_idx] && chi<chi_bounds[snap_idx+1])
             // we are in the comoving shell that's coming from this snapshot
