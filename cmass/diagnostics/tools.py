@@ -102,28 +102,6 @@ def get_mesh_resolution(L, high_res=False, use_ngp=False):
     return N, MAS
 
 
-def parse_noise(
-    seed, dist, params
-):
-    np.random.seed(seed)
-    if dist == 'Fixed':
-        radial, transverse = params['radial'], params['transverse']
-    elif dist == 'Uniform':
-        a = params['a']
-        b = params['b']
-        radial, transverse = np.random.uniform(a, b, size=2)
-    elif dist == 'Reciprocal':
-        a = np.log(params['a'])
-        b = np.log(params['b'])
-        radial, transverse = np.exp(np.random.uniform(a, b, size=2))
-    elif dist == 'Exponential':
-        scale = params['scale']
-        radial, transverse = np.random.exponential(scale, size=2)
-    else:
-        raise NotImplementedError(f'Noise distribution {dist} not implemented')
-    return float(radial), float(transverse)
-
-
 def noise_positions(pos, ra, dec,
                     noise_radial, noise_transverse):
     """Applies observational noise to positions."""
@@ -135,7 +113,8 @@ def noise_positions(pos, ra, dec,
     return pos
 
 
-def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
+def save_group(file, data, attrs=None, a=None, config=None,
+               save_HOD=False, save_noise=False):
     logging.info(f'Saving {len(data)} datasets to {file}')
     with h5py.File(file, 'a') as f:
         if a is not None:
@@ -152,7 +131,8 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
             group.create_dataset(key, data=value)
 
         if config is not None:
-            save_configuration_h5(f, config, save_HOD=save_HOD)
+            save_configuration_h5(
+                f, config, save_HOD=save_HOD, save_noise=save_noise)
 
 
 # Summarizer functions

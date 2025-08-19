@@ -130,7 +130,7 @@ def cosmo_to_colossus(cpars):
     return cosmo
 
 
-def save_configuration_h5(file, config, save_HOD=True):
+def save_configuration_h5(file, config, save_HOD=True, save_noise=False):
     file.attrs['config'] = OmegaConf.to_yaml(config)
     file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
     file.attrs['cosmo_params'] = config.nbody.cosmo
@@ -142,3 +142,7 @@ def save_configuration_h5(file, config, save_HOD=True):
         keys = sorted(list(config.bias.hod.theta.keys()))
         file.attrs['HOD_names'] = keys
         file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
+    if save_noise:
+        file.attrs['noise_dist'] = config.noise.dist
+        file.attrs['noise_radial'] = config.noise.radial
+        file.attrs['noise_transverse'] = config.noise.transverse
