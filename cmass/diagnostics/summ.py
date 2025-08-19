@@ -615,17 +615,17 @@ def main(cfg: DictConfig) -> None:
                     config=cfg
                 )
             elif cfg.diag.survey_backend == 'pypower':
-                done = summarize_lightcone_pypower(
-                    source_path,
-                    cap=cap,
-                    high_res=cfg.diag.high_res,
-                    use_ngp=cfg.diag.use_ngp,
-                    threads=threads, from_scratch=from_scratch,
-                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                    cfg=cfg
-                )
+                # done = summarize_lightcone_pypower(
+                #     source_path,
+                #     cap=cap,
+                #     high_res=cfg.diag.high_res,
+                #     use_ngp=cfg.diag.use_ngp,
+                #     threads=threads, from_scratch=from_scratch,
+                #     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                #     cfg=cfg
+                # )
                 # Bk is still done with old code (TODO: update)
-                done &= summarize_lightcone_pylians(
+                done = summarize_lightcone_pylians(
                     source_path,
                     # Diagnostics for lightcone stats use fiducial cosmology
                     cosmo=Planck18,
