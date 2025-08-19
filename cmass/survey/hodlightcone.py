@@ -214,7 +214,7 @@ def main(cfg: DictConfig) -> None:
         zmax=zmax,
         zmid=zmid,  # to set the offset of the simulation box
         snap_times=snap_times,
-        verbose=True,
+        verbose=False,
         augment=aug_seed,
         remap_case=remap_case,
         sigmaradial=cfg.noise.radial,

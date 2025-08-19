@@ -618,7 +618,9 @@ void Lightcone::choose_halos (int snap_idx, size_t Nhlo,
         scaled_offset[kk] *= scale_factor;
     }
 
-    std::printf("sigmaradial: %.6f, sigmatransverse: %.6f\n", sigmaradial, sigmatransverse);
+    if (verbose) {
+        std::printf("sigmaradial: %.6f, sigmatransverse: %.6f\n", sigmaradial, sigmatransverse);
+    }
     #pragma omp parallel
     {
         // the accelerator is non-const upon evaluation
