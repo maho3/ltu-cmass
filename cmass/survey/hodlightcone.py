@@ -40,7 +40,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, in_simbig_selection
 from .hodtools import HODEngine, randoms_engine
 from ..bias.apply_hod import load_snapshot
-from ..bias.tools.hod import parse_hod
+from ..bias.tools.hod import parse_hod, parse_noise
 
 try:
     from ..lightcone import lc
@@ -117,11 +117,19 @@ def check_saturation(z, nz_dir, zmin, zmax, geometry):
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'survey'])
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias',
+              'survey', 'noise'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+    # parse noise (seeded by lhid and hod seed)  (TODO: make take less lines)
+    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
+    cfg.noise.radial, cfg.noise.transverse = \
+        parse_noise(seed=noise_seed,
+                    dist=cfg.noise.dist,
+                    params=cfg.noise.params)
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -206,9 +214,11 @@ def main(cfg: DictConfig) -> None:
         zmax=zmax,
         zmid=zmid,  # to set the offset of the simulation box
         snap_times=snap_times,
-        verbose=True,
+        verbose=False,
         augment=aug_seed,
         remap_case=remap_case,
+        sigmaradial=cfg.noise.radial,
+        sigmatransverse=cfg.noise.transverse,
         seed=42,
         is_north=geometry == 'ngc'
     )
@@ -263,7 +273,9 @@ def main(cfg: DictConfig) -> None:
         hod_seed=hod_seed,
         aug_seed=aug_seed,
         saturated=saturated,
-        config=cfg
+        config=cfg,
+        noise_radial=cfg.noise.radial,
+        noise_transverse=cfg.noise.transverse
     )
     save_cfg(source_path, cfg, field='survey')
 

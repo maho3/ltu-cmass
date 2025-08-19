@@ -9,7 +9,7 @@ from astropy import units as u
 from astropy.stats import scott_bin_width
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-from .tools import noise_positions, save_group
+from .tools import save_group
 from .geometry import SURVEY_GEOMETRIES
 from ..survey.tools import sky_to_xyz
 
@@ -42,21 +42,11 @@ def get_nofz(z, fsky, cosmo):
 
 
 def preprocess_lightcone_catalogs(
-        data_rdz, randoms_rdz,
-        noise_radial, noise_transverse):
+        data_rdz, randoms_rdz):
     """Loads, transforms, and prepares data and randoms catalogs."""
     # Convert to comoving coordinates
     data_pos = sky_to_xyz(data_rdz, cosmo)
     randoms_pos = sky_to_xyz(randoms_rdz, cosmo)
-
-    # Add observational noise (TODO: move to hodlightcone.py)
-    if noise_radial > 0 or noise_transverse > 0:
-        data_pos = noise_positions(
-            data_pos, data_rdz[:, 0], data_rdz[:, 1],
-            noise_radial, noise_transverse)
-        randoms_pos = noise_positions(
-            randoms_pos, randoms_rdz[:, 0], randoms_rdz[:, 1],
-            noise_radial, noise_transverse)
 
     # Final type casting
     data_pos = data_pos.astype(np.float32)
@@ -98,8 +88,6 @@ def main():
     parser.add_argument('--use-fkp', action='store_true')
     parser.add_argument('--high-res', action='store_true')
     parser.add_argument('--resampler', type=str, default='tsc')
-    parser.add_argument('--noise-radial', type=float, default=0.0)
-    parser.add_argument('--noise-transverse', type=float, default=0.0)
     args = parser.parse_args()
 
     interlacing = 2
@@ -144,8 +132,7 @@ def main():
     if rank == 0:
         # TODO: Cache randoms?
         data_pos, randoms_pos = preprocess_lightcone_catalogs(
-            data_rdz, randoms_rdz,
-            args.noise_radial, args.noise_transverse
+            data_rdz, randoms_rdz
         )
         if args.use_fkp:
             data_weights, nofz = compute_fkp_weights(
@@ -233,8 +220,6 @@ def main():
     out_attrs['log10nbar'] = \
         np.log10(Ngalaxies) - 3 * np.log10(boxsize)
     out_attrs['high_res'] = args.high_res and args.resampler == 'tsc'
-    out_attrs['noise_radial'] = args.noise_radial
-    out_attrs['noise_transverse'] = args.noise_transverse
 
     # Save n(z)
     zbins = np.linspace(0.4, 0.7, 101)  # spacing in dz = 0.003

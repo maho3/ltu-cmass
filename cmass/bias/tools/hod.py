@@ -143,6 +143,28 @@ def parse_hod(cfg):
     return cfg
 
 
+def parse_noise(
+    seed, dist, params
+):
+    np.random.seed(seed)
+    if dist == 'Fixed':
+        radial, transverse = params['radial'], params['transverse']
+    elif dist == 'Uniform':
+        a = params['a']
+        b = params['b']
+        radial, transverse = np.random.uniform(a, b, size=2)
+    elif dist == 'Reciprocal':
+        a = np.log(params['a'])
+        b = np.log(params['b'])
+        radial, transverse = np.exp(np.random.uniform(a, b, size=2))
+    elif dist == 'Exponential':
+        scale = params['scale']
+        radial, transverse = np.random.exponential(scale, size=2)
+    else:
+        raise NotImplementedError(f'Noise distribution {dist} not implemented')
+    return float(radial), float(transverse)
+
+
 def build_HOD_model(
     cosmology,
     model,
