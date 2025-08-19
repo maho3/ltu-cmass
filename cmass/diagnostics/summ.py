@@ -347,6 +347,9 @@ def summarize_lightcone_pylians(
     pos = pos - geom['boxcenter'] + 0.5 * geom['boxsize']
     L = geom['boxsize']
 
+    # Convert to float32
+    pos = pos.astype(np.float32)
+
     # Check if all tracers are inside the box
     if np.any(pos < 0) or np.any(pos > L):
         logging.error('Error! Some tracers outside of box!')
