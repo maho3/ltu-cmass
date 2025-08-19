@@ -88,8 +88,6 @@ def main():
     parser.add_argument('--use-fkp', action='store_true')
     parser.add_argument('--high-res', action='store_true')
     parser.add_argument('--resampler', type=str, default='tsc')
-    parser.add_argument('--noise-radial', type=float, default=0.0)
-    parser.add_argument('--noise-transverse', type=float, default=0.0)
     args = parser.parse_args()
 
     interlacing = 2
