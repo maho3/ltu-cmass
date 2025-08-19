@@ -336,13 +336,6 @@ def summarize_lightcone_pylians(
     # convert to comoving
     pos = sky_to_xyz(rdz, cosmo)
 
-    # Get unit vectors and add noise along each direction
-    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
-    noise = np.random.randn(*pos.shape)
-    pos += r_hat * noise[:, 0, None] * config.noise.radial
-    pos += e_phi * noise[:, 1, None] * config.noise.transverse
-    pos += e_theta * noise[:, 2, None] * config.noise.transverse
-
     # Pull survey geometries and box sizes
     geom = SURVEY_GEOMETRIES.get(cap)
 
@@ -370,9 +363,6 @@ def summarize_lightcone_pylians(
     out_attrs['log10nbar'] = \
         np.log10(Ngalaxies) - 3 * np.log10(L)  # for numerical precision
     out_attrs['high_res'] = high_res and not use_ngp
-    out_attrs['noise_dist'] = config.noise.dist
-    out_attrs['noise_radial'] = config.noise.radial
-    out_attrs['noise_transverse'] = config.noise.transverse
 
     out_data = {}
     # Compute P(k)
@@ -416,7 +406,7 @@ def summarize_lightcone_pylians(
     out_data['nz'], out_data['nz_bins'] = np.histogram(rdz[:, -1], bins=zbins)
 
     save_group(outpath, out_data, out_attrs, None,
-               config, save_HOD=True)
+               config, save_HOD=True, save_noise=True)
     return True
 
 
@@ -477,9 +467,7 @@ def summarize_lightcone_pypower(
         --cap {cap} \
         --use-fkp \
         {'--high-res' if high_res else ''} \
-        --resampler {'ngp' if use_ngp else 'tsc'} \
-        --noise-radial {cfg.noise.radial} \
-        --noise-transverse {cfg.noise.transverse}
+        --resampler {'ngp' if use_ngp else 'tsc'}
     """
     logging.info(f"Launching MPI job with command:\n{command_string}")
 
@@ -514,7 +502,7 @@ def summarize_lightcone_pypower(
         return False
 
     with h5py.File(outpath, 'a') as f:
-        save_configuration_h5(f, cfg, save_HOD=True)
+        save_configuration_h5(f, cfg, save_HOD=True, save_noise=True)
     return True
 
 

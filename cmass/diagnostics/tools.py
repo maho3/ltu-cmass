@@ -113,7 +113,8 @@ def noise_positions(pos, ra, dec,
     return pos
 
 
-def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
+def save_group(file, data, attrs=None, a=None, config=None,
+               save_HOD=False, save_noise=False):
     logging.info(f'Saving {len(data)} datasets to {file}')
     with h5py.File(file, 'a') as f:
         if a is not None:
@@ -130,7 +131,8 @@ def save_group(file, data, attrs=None, a=None, config=None, save_HOD=False):
             group.create_dataset(key, data=value)
 
         if config is not None:
-            save_configuration_h5(f, config, save_HOD=save_HOD)
+            save_configuration_h5(
+                f, config, save_HOD=save_HOD, save_noise=save_noise)
 
 
 # Summarizer functions
