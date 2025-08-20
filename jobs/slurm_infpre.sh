@@ -1,6 +1,5 @@
 #!/bin/bash
 #SBATCH --job-name=preprocess  # Job name
-# # SBATCH --array=0-199  # Array range (dont do array)
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -21,8 +20,8 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm_recnoise_rot
+nbody=mtnglike
+sim=fastpm_constrained
 infer=lightcone  # simple  #
 
 halo=False
@@ -51,7 +50,7 @@ suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=False"
+# suffix="$suffix infer.include_noise=False"
 
 echo "Running inference pipeline with $suffix"
 python -m cmass.infer.preprocess $suffix

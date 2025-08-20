@@ -3,7 +3,7 @@
 #SBATCH --array=0-14  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
-#SBATCH --time=12:00:00         # Time limit
+#SBATCH --time=24:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
@@ -22,23 +22,12 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=abacuslike
-sim=fastpm_recnoise_rot
+nbody=mtnglike
+sim=fastpm_constrained
 infer=lightcone  # simple  #
 
 halo=False
 galaxy=False
-ngc=False
-sgc=False
-mtng=False
-simbig=True
-
-# nbody=quijote
-# sim=nbody
-# infer=simple  # simple  #
-
-# halo=False
-# galaxy=True
 # ngc=False
 # sgc=False
 # mtng=False
@@ -55,7 +44,7 @@ suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=False"
+# suffix="$suffix infer.include_noise=False"
 
 echo "Running inference pipeline with $suffix"
 
