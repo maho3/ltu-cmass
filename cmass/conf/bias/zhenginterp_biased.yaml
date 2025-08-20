@@ -1,0 +1,63 @@
+
+# halo biasing
+halo:
+  model: CHARM  # CHARM or LIMD
+
+  # CHARM-specific parameters
+  config_charm: config_v0.yaml
+
+  # LIMD-specific parameters
+  base_suite: calib_1gpch_z0.5  # base suite for LIMD
+  L: 1000
+  N: 128
+
+  # how to interpolate halo velocities
+  vel: "CIC"
+
+# galaxy biasing
+hod:
+  # Set HOD model. Can be one of:
+  # - zheng07
+  # - leauthaud11
+  # - zu_mandelbaum15
+  model: 'zheng07zinterp'
+  
+  # Whether including assembly bias
+  assem_bias: True
+  vel_assem_bias: True
+
+  # Whether to use a custom HOD prior, given an observed n(z)
+  custom_prior: null
+
+  # Configure halo mass definition as stored in halo catalogs (e.g. vir, 200c)
+  mdef: '200c'
+
+  # Use halo concentrations in HOD model (if available)
+  # Otherwise, use the mass-concentration relation
+  use_conc: True
+  
+  # Set default parameters from a given reference. 
+  # Any parameters set explicitly here will overwrite
+  # these defaults. Check cmass/bias/tools/hod.py for 
+  # available defaults for each model.
+  default_params: 'reid2014_cmass' 
+  
+  # HOD seed. If `null` or 0, use default parameters.
+  # If -1, set random seed.
+  # Else, randomly set parameters with the given seed.
+  seed: 0
+
+  # z pivot points for interpolating HODs
+  zpivot: [0.4, 0.5, 0.7]
+
+# Custom parameters for the Zheng+07 model.
+# These will overwrite any defaults set above.
+  theta:
+  #   logMmin: 13.0    # log10(Mmin) in Msun/h
+  #   sigma_logM: 0.2  # scatter in log10(Mmin)
+  #   logM0: 14.0      # log10(M0) in Msun/h
+  #   logM1: 14.0      # log10(M1) in Msun/h
+  #   alpha: 1.0       # slope of the power-law mass function
+
+  # Whether to noise the positions of the galaxies
+  noise_uniform: True
