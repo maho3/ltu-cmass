@@ -308,6 +308,7 @@ def summarize_lightcone_pylians(
     summaries=['Pk'],
     config=None
 ):
+    summaries = [] if summaries is None else summaries
     # get source file
     postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
     filename = join(source_path, postfix)
@@ -322,6 +323,8 @@ def summarize_lightcone_pylians(
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
+    if 'nz' in summaries:
+        summaries.remove('nz')  # this is run by default
 
     # compute diagnostics and save
     logging.info(f'Computing diagnostics to save to: {outpath}')
@@ -622,6 +625,7 @@ def main(cfg: DictConfig) -> None:
                     use_ngp=cfg.diag.use_ngp,
                     threads=threads, from_scratch=from_scratch,
                     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                    summaries=['Pk'],
                     cfg=cfg
                 )
                 # Bk is still done with old code (TODO: update)
