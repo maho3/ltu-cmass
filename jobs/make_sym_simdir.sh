@@ -3,9 +3,9 @@
 set -e
 
 SIM1="/anvil/scratch/x-mho1/cmass-ili/mtnglike/fastpm"
-SIM2="/anvil/scratch/x-mho1/cmass-ili/mtnglike/fastpm_constrained"
+SIM2="/anvil/scratch/x-mho1/cmass-ili/mtnglike/fastpm_unconstrained"
 SUBDIR="L3000-N384"
-N=2999
+N=999
 
 mkdir -p "$SIM2/$SUBDIR"
 cd "$SIM2/$SUBDIR"

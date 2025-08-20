@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmassrun
@@ -22,14 +22,15 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=1
 
 nbody=mtnglike
-sim=fastpm_constrained
+sim=fastpm_unconstrained
 noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
+use_custom_prior=False
 
 multisnapshot=True
 diag_from_scratch=False
 rm_galaxies=True
-extras="diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="diag=nzonly diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=3000
 N=384
 
@@ -38,7 +39,6 @@ echo "outdir=$outdir"
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
-
 
 for offset in $(seq 0 200 2999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
@@ -49,7 +49,6 @@ for offset in $(seq 0 200 2999); do
     postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
 
-
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed
 
@@ -57,22 +56,43 @@ for offset in $(seq 0 200 2999); do
         aug_seed=$hod_seed
         printf -v aug_str "%05d" $aug_seed
 
+        # Set custom_prior argument if flag is True
+        if [ "$use_custom_prior" = "True" ]; then
+            simbig_prior="bias.hod.custom_prior=simbig"
+            sgc_prior="bias.hod.custom_prior=sgc"
+            mtng_prior="bias.hod.custom_prior=mtng"
+            ngc_prior="bias.hod.custom_prior=ngc"
+        else
+            simbig_prior=""
+            sgc_prior=""
+            mtng_prior=""
+            ngc_prior=""
+        fi
+
         # simbig_lightcone
         file=$outdir/$lhid/diag/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
         if ! h5ls "$file" | grep -q '^Pk[[:space:]]'; then
             echo "Running $file"
-            python -m cmass.survey.hodlightcone survey.geometry=simbig bias.hod.custom_prior=simbig $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.simbig=True bias.hod.custom_prior=simbig bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix
+            scriptargs="diag.simbig=True survey.geometry=simbig $simbig_prior bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix"
+            datafile=$outdir/$lhid/simbig_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ ! -f "$datafile" ]; then
+                python -m cmass.survey.hodlightcone $scriptargs
+            fi
+            python -m cmass.diagnostics.summ $scriptargs
         else
             echo "skipping $file"
         fi
-       
+
         # sgc_lightcone
         file=$outdir/$lhid/diag/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
         if ! h5ls "$file" | grep -q '^Pk[[:space:]]'; then
             echo "Running $file"
-            python -m cmass.survey.hodlightcone survey.geometry=sgc bias.hod.custom_prior=sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.sgc=True bias.hod.custom_prior=sgc bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            scriptargs="diag.sgc=True survey.geometry=sgc $sgc_prior bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix"
+            datafile=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ ! -f "$datafile" ]; then
+                python -m cmass.survey.hodlightcone $scriptargs
+            fi
+            python -m cmass.diagnostics.summ $scriptargs
         else
             echo "skipping $file"
         fi
@@ -81,8 +101,12 @@ for offset in $(seq 0 200 2999); do
         file=$outdir/$lhid/diag/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
         if ! h5ls "$file" | grep -q '^Pk[[:space:]]'; then
             echo "Running $file"
-            python -m cmass.survey.hodlightcone survey.geometry=mtng bias.hod.custom_prior=mtng $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.mtng=True bias.hod.custom_prior=mtng bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix
+            scriptargs="diag.mtng=True survey.geometry=mtng $mtng_prior bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix"
+            datafile=$outdir/$lhid/mtng_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ ! -f "$datafile" ]; then
+                python -m cmass.survey.hodlightcone $scriptargs
+            fi
+            python -m cmass.diagnostics.summ $scriptargs
         else
             echo "skipping $file"
         fi
@@ -91,14 +115,17 @@ for offset in $(seq 0 200 2999); do
         file=$outdir/$lhid/diag/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
         if ! h5ls "$file" | grep -q '^Pk[[:space:]]'; then
             echo "Running $file"
-            python -m cmass.survey.hodlightcone survey.geometry=ngc bias.hod.custom_prior=ngc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.ngc=True bias.hod.custom_prior=ngc bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix
+            scriptargs="diag.ngc=True survey.geometry=ngc $ngc_prior bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix"
+            datafile=$outdir/$lhid/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+            if [ ! -f "$datafile" ]; then
+                python -m cmass.survey.hodlightcone $scriptargs
+            fi
+            python -m cmass.diagnostics.summ $scriptargs
         else
             echo "skipping $file"
         fi
     done
 
-    # Trash collection
     if [ "$rm_galaxies" = "True" ]; then
         echo "Removing galaxy and lightcone directories for lhid=$lhid"
         rm -rf "$outdir/$lhid/galaxies"
