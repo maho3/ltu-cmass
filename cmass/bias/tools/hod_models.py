@@ -700,7 +700,7 @@ class Zheng07zinterp(Hod_model):
         for p, v0, v1 in zip(init_pars, lower_bound, upper_bound):
             i = parameters.index(p)
             if p == "logMmin" and (custom_prior is not None):
-                _p = self._build_custom_prior(custom_prior, self.npivot)
+                _p = self._build_custom_prior(custom_prior, zpivot)
                 pars += _p[0]
                 low += _p[1]
                 up += _p[2]
@@ -775,18 +775,24 @@ class Zheng07zinterp(Hod_model):
                 raise NotImplementedError
 
     @staticmethod
-    def _build_custom_prior(custom_prior, npivot):
-        if custom_prior in SURVEY_HOD_PRIORS:
-            assert npivot == 3, f"{custom_prior} prior was only constrained for 3 pivot points"
-            pars = ["logMmin_z" + str(i) for i in range(npivot)]
-            low = [None] * npivot
-            up = [None] * npivot
-            loc = SURVEY_HOD_PRIORS[custom_prior]['mean']
-            sig = SURVEY_HOD_PRIORS[custom_prior]['stdev']
-            dist = ["norm"] * npivot
-        else:
+    def _build_custom_prior(name, zpivot):
+        npivot = len(zpivot)
+        key = ','.join([f'{x:.02f}' for x in zpivot])
+        if key not in SURVEY_HOD_PRIORS:
+            raise ValueError(
+                f"{zpivot} redshift bins not stored in SURVEY_HOD_PRIORS"
+            )
+        prior = SURVEY_HOD_PRIORS[key]
+        if name not in prior:
             raise NotImplementedError(
-                f"Custom prior not implemented for {custom_prior}")
+                f"Custom prior not implemented for {name}")
+
+        pars = ["logMmin_z" + str(i) for i in range(npivot)]
+        low = [None] * npivot
+        up = [None] * npivot
+        loc = prior[name]['mean']
+        sig = prior[name]['stdev']
+        dist = ["norm"] * npivot
         return pars, low, up, loc, sig, dist
 
     def set_occupation(self, **kwargs):

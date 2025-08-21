@@ -48,7 +48,7 @@ hod:
   seed: 0
 
   # z pivot points for interpolating HODs
-  zpivot: [0.45, 0.55, 0.65]
+  zpivot: [0.4, 0.5, 0.7]
 
 # Custom parameters for the Zheng+07 model.
 # These will overwrite any defaults set above.
