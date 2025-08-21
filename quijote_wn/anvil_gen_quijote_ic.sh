@@ -4,14 +4,14 @@
 #SBATCH -A phy240043
 #SBATCH -p shared # the default queue is "shared" queue
 #SBATCH --nodes=1
-#SBATCH --ntasks=1 
+#SBATCH --ntasks=32 
 #SBATCH --time=1:00:00
 #SBATCH --job-name gen_quijote_ic
-#SBATCH --output=/anvil/scratch/x-abairagi/cmass/quijote/wn/gen_ic.out
-#SBATCH --error=/anvil/scratch/x-abairagi/cmass/quijote/wn/gen_ic.out
+#SBATCH --output=/anvil/scratch/x-dbartlett/cmass/quijote/wn/gen_ic.out
+#SBATCH --error=/anvil/scratch/x-dbartlett/cmass/quijote/wn/gen_ic.out
 
 module purge
-# module restore cmass_env
+module restore cmass_env
 module list
 conda activate cmass
 
@@ -21,19 +21,19 @@ set -e
 hostname
 
 # Change to correct directory
-cd /home/x-abairagi/ltu-cmass/
+cd /home/x-dbartlett/ltu-cmass/
 pwd
 
 # Define the range for lhid
 start_lhid=0
-end_lhid=10
+end_lhid=1999
 
 # Resolution required
 N=512
 
 # Directories
-datadir=/anvil/scratch/x-abairagi/cmass/quijote/wn/N${N}
-basedir=/home/x-abairagi/ltu-cmass/quijote_wn
+datadir=/anvil/scratch/x-dbartlett/cmass/quijote/wn/N${N}
+basedir=/home/x-dbartlett/ltu-cmass/quijote_wn
 
 # Make datadir if it doesn't exist
 mkdir -p $datadir
