@@ -5,7 +5,7 @@ from_scratch: true
 # whether to compute for each tracer
 all: false
 density: false
-halo: false
+halo: true
 galaxy: false
 ngc: false
 sgc: false
@@ -19,11 +19,11 @@ high_res: true
 
 # which summaries to run
 summaries:
-    - Pk             # power spectrum
+    # - Pk             # power spectrum
     # - TwoPCF         # two-point correlation function
     # - KNN            # k-nearest neighbors
-    # - WST            # wavelet scattering transform
-    - Bk             # bispectrum
+    - WST            # wavelet scattering transform
+    # - Bk             # bispectrum
     # - Density Split  # density split statistics
 
 # whether to use abundance matching to affix number density

@@ -1,7 +1,9 @@
 
 # whether to compute for each tracer
 density: false
-halo: true
-galaxy: false
+halo: false
+galaxy: true
 
-batchsize: 128
+rsd: false
+add_noise: false
+batchsize: 256

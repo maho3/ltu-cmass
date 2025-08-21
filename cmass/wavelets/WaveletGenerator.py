@@ -41,14 +41,14 @@ def divide_into_batches(X, batch_size = 64):
     
     return mini_batches
 
-def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd):
+def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd, add_noise):
     
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # The actual maximum width of the dilated wavelet is 2*sigma*2^J=128, when the pixels in a box side is 128;
     sigma = 1.0
-    J = 6
+    J = 6 #7
     # Maximum angular frequency of harmonics: L=4;
-    l = 6
+    l = 6 #4
     # The list of integral powers, which is the power applied after the modulus operation, i.e. Sum |f*g|^{integral_powers}
     integral_powers = [0.5, 1.0, 2.0, 3.0, 4.0]
     # Up to 2nd-order coefficient;
@@ -74,6 +74,7 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd):
 
     for batch in batches:
         torch.cuda.empty_cache()
+        torch.cuda.synchronize()
         datafile = batch
         
         # get_cosmo
@@ -91,21 +92,29 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd):
             q = [file.insert(-2,'diag') for file in diagfile_list]
             diagfile_list = [os.path.join('/', *file) for file in diagfile_list]
             hod = [get_hod(diagfile) for diagfile in diagfile_list]
-            HOD=np.vstack([HOD,hod])
+            HOD = np.vstack([HOD,hod])
 
         
         # preprocess your input if required here
         pos_file = [h5py.File(file)['0.666667']['pos'][()].astype(np.float32) for file in datafile]
         vel_file = [h5py.File(file)['0.666667']['vel'][()].astype(np.float32) for file in datafile]
         
-        Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
+        if add_noise:
+            Lnoise = (1000/128)/np.sqrt(3)  # Set by CHARM resolution
 
-        if use_rsd:
-            fields = [MAz(pos + (np.random.randn(*pos.shape)*Lnoise).astype(np.float32), vel_file[i], L, N, 
-                          cosmo_to_astropy(cosmo[i]), z=0.5, MAS='CIC', axis=0).astype(np.float32) for i, pos in enumerate(pos_file)]
+            if use_rsd:
+                fields = [MAz(pos + (np.random.randn(*pos.shape)*Lnoise).astype(np.float32), vel_file[i], L, N, 
+                            cosmo_to_astropy(cosmo[i]), z=0.5, MAS='CIC', axis=0).astype(np.float32) for i, pos in enumerate(pos_file)]
+            else:
+                fields = [MA(pos + (np.random.randn(*pos.shape)*Lnoise).astype(np.float32), L, N, 
+                            MAS='CIC').astype(np.float32) for pos in pos_file]
         else:
-            fields = [MA(pos + (np.random.randn(*pos.shape)*Lnoise).astype(np.float32), L, N, 
-                         MAS='CIC').astype(np.float32) for pos in pos_file]
+            if use_rsd:
+                fields = [MAz(pos, vel_file[i], L, N, 
+                            cosmo_to_astropy(cosmo[i]), z=0.5, MAS='CIC', axis=0).astype(np.float32) for i, pos in enumerate(pos_file)]
+            else:
+                fields = [MA(pos, L, N, MAS='CIC').astype(np.float32) for pos in pos_file]
+        
         batch_x = [(delta+1)/2 for delta in fields]
         
         
@@ -125,10 +134,12 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd):
         for i in np.arange(len(datafile)):       
 
             if tracer == "nbody" or tracer == "halos":
+                ind = datafile[i].split('/')[-2]
                 filename = os.path.join(out_dir, datafile[i].split('/')[-2],'diag/',
                                         datafile[i].split('/')[-1].split('.')[0]+'_wst.h5')
                                 
             if tracer == "galaxies":
+                ind = datafile[i].split('/')[-3]
                 filename = os.path.join(out_dir, datafile[i].split('/')[-3],'diag/galaxies/',
                                         datafile[i].split('/')[-1].split('.')[0]+'_wst.h5')
                        
@@ -137,7 +148,8 @@ def Wavelets(dataset, out_dir, L, N, batchsize, tracer, use_rsd):
                 dataset[pfx+'S12'] = order12[i]
                 dataset[pfx+'S0'] = order0[i]
 
-            WPH.append(filename)
+            WPH.append([ind, filename])
+            
 
 
     if tracer == "galaxies":
@@ -166,11 +178,25 @@ def main(cfg: DictConfig) -> None:
     elif cfg.diag.galaxy:
         dataset = glob.glob(source_path+'/galaxies/*.h5')  
         tracer = "galaxies"
+    
+    # dataset=[]
+    # for i in glob.glob("/anvil/scratch/x-abairagi/cmass-ili/abacuslike/fastpm/L2000-N256/*"):
+    #     try:
+    #         a=h5py.File(i+"/halos.h5")['0.666660'].keys()
+    #         dataset.append(i+"/halos.h5")
+    #     except:
+    #         continue
+        
         
     if cfg.diag.rsd:
         use_rsd=True
     else:
         use_rsd=False
+
+    if cfg.diag.add_noise:
+        add_noise=True
+    else:
+        add_noise=False
     
     pfx = 'z' if use_rsd else ''
     
@@ -180,24 +206,24 @@ def main(cfg: DictConfig) -> None:
     out_dir = os.path.join('/', *str_list)
     
     if cfg.diag.galaxy:
-        WPH, COSMO, HOD = Wavelets(dataset, out_dir, cfg.nbody.L, cfg.nbody.N, cfg.diag.batchsize, tracer, use_rsd) 
+        WPH, COSMO, HOD = Wavelets(dataset, out_dir, cfg.nbody.L, cfg.nbody.N, cfg.diag.batchsize, tracer, use_rsd, add_noise) 
         dataframe = pd.DataFrame(columns=["Filename", "Omega_m", "Omega_b", "h", "n_s", "sigma_8", 
                                         'logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha'])
-        dataframe["Filename"]= WPH  
+        dataframe[["id", "Filename"]]= WPH  
         dataframe[cosmo_params] = COSMO 
-        dataframe[hod_params] = hod 
+        dataframe[hod_params] = HOD 
     
     else:
-        WPH, COSMO = Wavelets(dataset, out_dir, cfg.nbody.L, cfg.nbody.N, cfg.diag.batchsize, tracer, use_rsd)
+        WPH, COSMO = Wavelets(dataset, out_dir, cfg.nbody.L, cfg.nbody.N, cfg.diag.batchsize, tracer, use_rsd, add_noise)
         dataframe = pd.DataFrame(columns=["Filename", "Omega_m", "Omega_b", "h", "n_s", "sigma_8"]) 
-        dataframe["Filename"] = WPH 
+        dataframe[["id", "Filename"]] = WPH 
         dataframe[cosmo_params] = COSMO  
      
         
     # Output_dir_csv
     out_csv=os.path.join("cmass/wavelets/Dataset", cfg.nbody.suite, cfg.sim, f'L{cfg.nbody.L}-N{cfg.nbody.N}')
     os.makedirs(out_csv, exist_ok=True)
-    dataframe.to_csv(out_csv+"/"+pfx+tracer+".csv")
+    dataframe.to_csv(out_csv+"/"+pfx+tracer+".csv", index=False)
         
 if __name__ == "__main__":
     main()
