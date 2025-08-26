@@ -23,13 +23,13 @@ simbig_lightcone: False # whether to train on simbig_lightcone summaries
 experiments:
   - summary: [nbar, zPk0]   # z-space monopole
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4,0.5]
   - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4,0.5]
   - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4,0.5]
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
@@ -37,7 +37,6 @@ Nnets: 10  # number of best networks to ensemble
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
-only_cosmo: True  # only train on cosmological parameters (ignore HOD)
 include_hod: False  # whether to infer HOD parameters
 include_noise: False  # whether to infer noise parameters
 
@@ -45,12 +44,12 @@ prior: uniform  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
-batch_size: null  # batch size
-learning_rate: null  # learning rate
+# batch_size: null  # batch size
+# learning_rate: null  # learning rate
 stop_after_epochs: 50  # stop early after this many epochs
-weight_decay: null  # weight decay
-lr_decay_factor: null  # learning rate decay factor
-lr_patience: null  # learning rate decay patience
+# weight_decay: null  # weight decay
+# lr_decay_factor: null  # learning rate decay factor
+# lr_patience: null  # learning rate decay patience
 
 # ~~ OPTUNA ARGS ~~
 hyperprior:
