@@ -13,7 +13,7 @@ import yaml
 import time
 
 from .tools import split_experiments, prepare_loader
-from ..utils import timing_decorator
+from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
 import ili
@@ -272,6 +272,7 @@ def run_experiment(exp, cfg, model_path):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
 
     cfg = parse_nbody_config(cfg)

@@ -1,13 +1,12 @@
+"""Tools and routiines for diagnostics."""
+
 import os
 import numpy as np
-import Pk_library as PKL
-import MAS_library as MASL
-import redshift_space_library as RSL
-from ..utils import timing_decorator
-import BFast
 import logging
 import h5py
-# import PolyBin3D as pb
+import datetime
+from ..survey.tools import sky_to_unit_vectors
+from ..utils import save_configuration_h5
 
 
 def _delete(group, to_delete):
@@ -39,6 +38,18 @@ def _check(group, to_check):
         if key not in saved_keys:
             return False
     return True
+
+
+def _get_snapshot_alist(filename, focus_z=None):
+    # load data file and get keys
+    with h5py.File(filename, 'r') as f:
+        alist = list(f.keys())
+
+    # Filter alist to only include the closest to a specified redshift
+    if focus_z is not None:
+        i = np.argmin(np.abs(np.array(alist, dtype=float) - 1./(1 + focus_z)))
+        alist = [alist[i]]
+    return alist
 
 
 def check_existing(file, summaries, from_scratch=False, rsd=False):
@@ -82,163 +93,46 @@ def check_existing(file, summaries, from_scratch=False, rsd=False):
     return to_compute
 
 
-def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
-    pos, vel = map(np.ascontiguousarray, (pos, vel))
-    RSL.pos_redshift_space(pos, vel, L, h*100, z, axis)
-    pos %= L
-    return pos
-
-
 def get_mesh_resolution(L, high_res=False, use_ngp=False):
-
-    # set mesh resolution
-    if use_ngp:  # Forcing NGP meshing at 128 cells per 1000 Mpc/h
-        N = (L//1000)*128
-        MAS = 'NGP'
-    elif high_res:  # high resolution at 256 cells per 1000 Mpc/h
-        N = (L//1000)*256
-        MAS = 'TSC'
-    else:  # fixed resolution at 128 cells per 1000 Mpc/h
-        N = (L//1000)*128
-        MAS = 'CIC'
+    # set mesh resolution and mass assignment scheme
+    N = int((L/1000)*128)  # 128 cells per 1000 Mpc/h
+    if high_res:
+        N *= 2  # double resolution
+    MAS = 'NGP' if use_ngp else 'TSC'
     return N, MAS
 
 
-def MA(pos, L, N, MAS='CIC'):
-    pos = np.ascontiguousarray(pos)
-    delta = np.zeros((N, N, N), dtype=np.float32)
-    pos %= L
-    MASL.MA(pos, delta, BoxSize=L, MAS=MAS)
-    delta = delta.astype(np.float64)
-    delta /= np.mean(delta)
-    delta -= 1
-    return delta
+def noise_positions(pos, ra, dec,
+                    noise_radial, noise_transverse):
+    """Applies observational noise to positions."""
+    r_hat, e_phi, e_theta = sky_to_unit_vectors(ra, dec)
+    noise = np.random.randn(*pos.shape)
+    pos += r_hat * noise[:, 0, None] * noise_radial
+    pos += e_phi * noise[:, 1, None] * noise_transverse
+    pos += e_theta * noise[:, 2, None] * noise_transverse
+    return pos
 
 
-def MAz(pos, vel, L, N, cosmo, z, MAS='CIC', axis=0):
-    pos, vel = map(np.ascontiguousarray, (pos, vel))
-    RSL.pos_redshift_space(pos, vel, L, cosmo.H(z).value/cosmo.h, z, axis)
-    return MA(pos, L, N, MAS)
+def save_group(file, data, attrs=None, a=None, config=None,
+               save_HOD=False, save_noise=False):
+    logging.info(f'Saving {len(data)} datasets to {file}')
+    with h5py.File(file, 'a') as f:
+        if a is not None:
+            group = f.require_group(a)
+        else:
+            group = f
+        if attrs is not None:
+            for key, value in attrs.items():
+                group.attrs[key] = value
+            group.attrs['timestamp'] = datetime.datetime.now().isoformat()
+        for key, value in data.items():
+            if key in group:
+                del group[key]
+            group.create_dataset(key, data=value)
 
-
-def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
-    Pk = PKL.Pk(delta.astype(np.float32), L, axis, MAS, threads, verbose=False)
-    k = Pk.k3D
-    Pk = Pk.Pk
-    return k, Pk
-
-
-def calcQk_polybin(k, Pk, k123, Bk):
-    # Qk = Bk123 / (Pk1 * Pk2 + Pk2 * Pk3 + Pk3 * Pk1)
-    Pk1 = np.array([np.interp(k123[0], k, Pk[i]) for i in range(Pk.shape[0])])
-    Pk2 = np.array([np.interp(k123[1], k, Pk[i]) for i in range(Pk.shape[0])])
-    Pk3 = np.array([np.interp(k123[2], k, Pk[i]) for i in range(Pk.shape[0])])
-    Qk = Bk / (Pk1 * Pk2 + Pk2 * Pk3 + Pk3 * Pk1)
-    return Qk
-
-
-@timing_decorator
-def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
-    raise NotImplementedError('Deprecated in favor of BFast')
-    # TODO: Use ili-summarizer here
-    k_min = 1.05*2 * np.pi / L
-    n_mesh = delta.shape[0]
-    k_max = 0.95 * np.pi * n_mesh / L
-    num_bins = 12
-    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), num_bins)
-
-    # set stuff up
-    base = pb.PolyBin3D(
-        sightline='global',  # TODO: check if this properly computes RSDs
-        gridsize=n_mesh,
-        boxsize=[L]*3,
-        boxcenter=(0., 0., 0.),
-        pixel_window=MAS.lower(),
-        backend='jax',
-        nthreads=threads
-    )
-    pspec = pb.PSpec(
-        base,
-        k_bins,  # k-bin edges
-        lmax=2,  # Legendre multipoles
-        mask=None,  # real-space mask
-        applySinv=None,  # filter to apply to data
-    )
-    bspec = pb.BSpec(
-        base,
-        k_bins,  # k-bin edges
-        lmax=2,  # Legendre multipoles
-        mask=None,  # real-space mask
-        applySinv=None,  # filter to apply to data
-        k_bins_squeeze=None,
-        include_partial_triangles=False,
-    )
-    # compute
-    pk_corr = pspec.Pk_ideal(delta, discreteness_correction=True)
-    bk_corr = bspec.Bk_ideal(delta, discreteness_correction=True)
-
-    # set up outputs
-    k = pspec.get_ks()
-    k123 = bspec.get_ks()
-    weight = k123.prod(axis=0)
-    pk = np.array([pk_corr[f'p{ell}'] for ell in [0, 2]])
-    bk = np.array([bk_corr[f'b{ell}']*weight for ell in [0, 2]])
-    qk = calcQk_polybin(k, pk, k123, bk)
-    return k123, bk, qk, k, pk
-
-
-def calcQk_bfast(Pk, Bk):
-    Qk = Bk / (Pk[0] * Pk[1] + Pk[1] * Pk[2] + Pk[2] * Pk[0])
-    return Qk
-
-
-@timing_decorator
-def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
-    if cache_dir is None:
-        cache_dir = './'
-    else:
-        cache_dir += '/'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    kF = 2*np.pi/L  # Fundamental frequency
-    kmax = np.pi*delta.shape[0]/L  # Nyquist frequency
-    Nbins = 23  # Set due to GPU memory limits for 3 Gpc/h box
-    # kbinning which allows Nbins in this range (from Bfast code)
-    fc = dk = kmax/kF/(Nbins+1/2)  # span kF to kmax
-
-    result = BFast.Bk(
-        delta, L, fc, dk, Nbins, triangle_type='All', MAS=MAS,
-        fast=True, precision='float32', verbose=False,
-        file_path=cache_dir, open_triangles=False
-    )
-
-    # remove when k1 >= k2 + k3, because open_triangles=False doesn't do it
-    k123 = result[:, :3].T * kF  # k123
-    mask = k123[0] < k123[1] + k123[2]
-
-    k123 = k123[:, mask]
-    pk = result[mask, 3:6].T
-    bk = result[mask, 6:7].T
-    counts = result[mask, 7]  # number of triangles in each bin (not used)
-    qk = calcQk_bfast(pk, bk)
-
-    return k123, bk, qk, k123, pk
-
-
-def get_box_catalogue(pos, z, L, N):
-    from summarizer.data import BoxCatalogue  # only import if needed
-
-    return BoxCatalogue(
-        galaxies_pos=pos,
-        redshift=z,
-        boxsize=L,
-        n_mesh=N,
-    )
-
-
-def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
-    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
-    return get_box_catalogue(pos, z, L, N)
+        if config is not None:
+            save_configuration_h5(
+                f, config, save_HOD=save_HOD, save_noise=save_noise)
 
 
 # Summarizer functions
@@ -325,25 +219,3 @@ def store_summary(
         group.create_dataset(dataset_key, data=coord_value.values)
     summary_key = summary_name if not use_rsd else f'z{summary_name}'
     group.create_dataset(summary_key, data=summary_dataset.values)
-
-
-def parse_noise(
-    seed, dist, params
-):
-    np.random.seed(seed)
-    if dist == 'Fixed':
-        radial, transverse = params['radial'], params['transverse']
-    elif dist == 'Uniform':
-        a = params['a']
-        b = params['b']
-        radial, transverse = np.random.uniform(a, b, size=2)
-    elif dist == 'Reciprocal':
-        a = np.log(params['a'])
-        b = np.log(params['b'])
-        radial, transverse = np.exp(np.random.uniform(a, b, size=2))
-    elif dist == 'Exponential':
-        scale = params['scale']
-        radial, transverse = np.random.exponential(scale, size=2)
-    else:
-        raise NotImplementedError(f'Noise distribution {dist} not implemented')
-    return float(radial), float(transverse)

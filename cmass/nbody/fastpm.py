@@ -10,7 +10,7 @@ import subprocess
 import h5py
 import multiprocessing as mp
 
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, save_cfg, clean_up
 from .tools import (
     parse_nbody_config, get_ICs,
     save_white_noise_grafic, generate_pk_file, rho_and_vfield,
@@ -254,6 +254,7 @@ def process_outputs(cfg, outdir, delete_files=True):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'multisnapshot'])

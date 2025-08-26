@@ -13,7 +13,7 @@ from tqdm import tqdm
 import optuna
 import multiprocessing
 
-from ..utils import get_source_path, timing_decorator
+from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
@@ -131,6 +131,8 @@ def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
 def setup_optuna(exp_path, name, n_startup_trials):
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=n_startup_trials,
+        multivariate=True,
+        constant_liar=True,
     )
     study = optuna.create_study(
         sampler=sampler,
@@ -251,6 +253,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 

@@ -1,7 +1,9 @@
 
+import functools
 import logging
 import datetime
 import os
+import shutil
 from os.path import join
 from astropy.cosmology import Cosmology, FlatLambdaCDM
 from colossus.cosmology import cosmology as csm
@@ -38,6 +40,26 @@ def timing_decorator(func, *args, **kwargs):
             f"({int(dt//60)}m{int(dt%60)}s)")
         return out
     return wrapper
+
+
+def clean_up(hydra):
+    """Decorator to clean up the Hydra log directory after function execution."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            finally:
+                try:
+                    logdir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+                    logging.info(f"Cleaning up log directory: {logdir}")
+                    shutil.rmtree(logdir, ignore_errors=True)
+                except Exception as e:
+                    logging.warning(
+                        f"Cleanup failed: {e}")
+
+        return wrapper
+    return decorator
 
 
 def save_cfg(source_path, cfg, field=None):
@@ -108,7 +130,7 @@ def cosmo_to_colossus(cpars):
     return cosmo
 
 
-def save_configuration_h5(file, config, save_HOD=True):
+def save_configuration_h5(file, config, save_HOD=True, save_noise=False):
     file.attrs['config'] = OmegaConf.to_yaml(config)
     file.attrs['cosmo_names'] = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma8']
     file.attrs['cosmo_params'] = config.nbody.cosmo
@@ -120,3 +142,7 @@ def save_configuration_h5(file, config, save_HOD=True):
         keys = sorted(list(config.bias.hod.theta.keys()))
         file.attrs['HOD_names'] = keys
         file.attrs['HOD_params'] = [config.bias.hod.theta[k] for k in keys]
+    if save_noise:
+        file.attrs['noise_dist'] = config.noise.dist
+        file.attrs['noise_radial'] = config.noise.radial
+        file.attrs['noise_transverse'] = config.noise.transverse

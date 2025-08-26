@@ -39,7 +39,7 @@ from .tools import (
     xyz_to_sky, sky_to_xyz, rotate_to_z, random_rotate_translate,
     apply_mask,
     save_lightcone, load_galaxies)
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, save_cfg, clean_up
 from ..nbody.tools import parse_nbody_config
 
 
@@ -132,6 +132,7 @@ def reweight(rdz, wdir='./data', is_North=True, be=None, hobs=None):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(

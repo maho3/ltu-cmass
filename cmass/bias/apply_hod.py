@@ -29,7 +29,7 @@ from omegaconf import DictConfig, OmegaConf
 from .tools.hod import (
     build_halo_catalog, build_HOD_model, parse_hod)
 from ..utils import (
-    get_source_path, timing_decorator, cosmo_to_astropy, save_cfg)
+    get_source_path, timing_decorator, clean_up, cosmo_to_astropy, save_cfg)
 from ..nbody.tools import parse_nbody_config
 
 
@@ -143,6 +143,7 @@ def save_snapshot(outpath, a, gpos, gvel, **meta):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
@@ -157,8 +158,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.bias.hod.seed == 0:
         hod_seed = cfg.bias.hod.seed
     else:
-        # (parse_hod modifies it to lhid*1e6 + hod_seed)
-        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+        # (parse_hod modifies it to lhid*1e4 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e4)
 
     # Setup save directory
     source_path = get_source_path(

@@ -35,12 +35,12 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from ..utils import get_source_path, timing_decorator, save_cfg
+from ..utils import get_source_path, timing_decorator, clean_up, save_cfg
 from ..nbody.tools import parse_nbody_config
 from .tools import save_lightcone, in_simbig_selection
 from .hodtools import HODEngine, randoms_engine
 from ..bias.apply_hod import load_snapshot
-from ..bias.tools.hod import parse_hod
+from ..bias.tools.hod import parse_hod, parse_noise
 
 try:
     from ..lightcone import lc
@@ -62,7 +62,7 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 3e-5  # number density of CMASS
+            nbar_randoms = 10*3e-4  # 10x number density of CMASS
             Nrandoms = int(nbar_randoms * BoxSize**3)
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
@@ -113,14 +113,23 @@ def check_saturation(z, nz_dir, zmin, zmax, geometry):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
+@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
     # Filtering for necessary configs
     cfg = OmegaConf.masked_copy(
-        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias', 'survey'])
+        cfg, ['meta', 'sim', 'multisnapshot', 'nbody', 'bias',
+              'survey', 'noise'])
 
     # Build run config
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
+    # parse noise (seeded by lhid and hod seed)  (TODO: make take less lines)
+    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
+    cfg.noise.radial, cfg.noise.transverse = \
+        parse_noise(seed=noise_seed,
+                    dist=cfg.noise.dist,
+                    params=cfg.noise.params)
+
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     source_path = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
@@ -130,8 +139,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.bias.hod.seed == 0:
         hod_seed = cfg.bias.hod.seed
     else:
-        # (parse_hod modifies it to lhid*1e6 + hod_seed)
-        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e6)
+        # (parse_hod modifies it to lhid*1e4 + hod_seed)
+        hod_seed = int(cfg.bias.hod.seed - cfg.nbody.lhid * 1e4)
     aug_seed = cfg.survey.aug_seed  # for rotating and shuffling
 
     geometry = cfg.survey.geometry  # whether to use NGC, SGC, or MTNG mask
@@ -205,9 +214,11 @@ def main(cfg: DictConfig) -> None:
         zmax=zmax,
         zmid=zmid,  # to set the offset of the simulation box
         snap_times=snap_times,
-        verbose=True,
+        verbose=False,
         augment=aug_seed,
         remap_case=remap_case,
+        sigmaradial=cfg.noise.radial,
+        sigmatransverse=cfg.noise.transverse,
         seed=42,
         is_north=geometry == 'ngc'
     )
@@ -262,7 +273,9 @@ def main(cfg: DictConfig) -> None:
         hod_seed=hod_seed,
         aug_seed=aug_seed,
         saturated=saturated,
-        config=cfg
+        config=cfg,
+        noise_radial=cfg.noise.radial,
+        noise_transverse=cfg.noise.transverse
     )
     save_cfg(source_path, cfg, field='survey')
 
