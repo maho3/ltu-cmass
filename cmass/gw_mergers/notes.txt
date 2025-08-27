@@ -1,0 +1,1 @@
+Remark: it will probably be easiier to Poisson sample binary mergers from galaxies in comoving boxes, before projecting on the lightcone and applying survey masks and other surbey modelling effects.
