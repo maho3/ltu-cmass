@@ -19,8 +19,17 @@ def get_hod_params(diagfile):
 
 
 def get_noise_params(diagfile):
+    # This is a hack, because I accidentally saved noise properties in groups.
+    # This has been fixed in recent PR
+    # Kept here for compatibility (TODO: deprecate)
     with h5py.File(diagfile, 'r') as f:
-        noise_params = [f.attrs['noise_radial'], f.attrs['noise_transverse']]
+        if 'noise_radial' in f.attrs:
+            noise_params = [f.attrs['noise_radial'],
+                            f.attrs['noise_transverse']]
+        else:
+            g = f[list(f.keys())[0]]
+            noise_params = [g.attrs['noise_radial'],
+                            g.attrs['noise_transverse']]
     return np.array(noise_params)
 
 
@@ -310,6 +319,17 @@ def _construct_noise_prior(sourcepath, tracer):
     filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
     with h5py.File(join(diagpath, filelist[0]), 'r') as f:
         noisedist = f.attrs['noise_dist'] if 'noise_dist' in f.attrs else None
+    # This is a hack, because I accidentally saved noise properties in groups.
+    # This has been fixed in recent PR
+    # Kept here for compatibility (TODO: deprecate)
+    with h5py.File(join(diagpath, filelist[0]), 'r') as f:
+        noisedist = None
+        if 'noise_dist' in f.attrs:
+            noisedist = f.attrs['noise_dist']
+        else:
+            g = f[list(f.keys())[0]]
+            if 'noise_dist' in g.attrs:
+                noisedist = g.attrs['noise_dist']
     if noisedist is None:
         raise ValueError(
             f'No noise distribution found in {join(diagpath, filelist[0])}.')
