@@ -19,7 +19,7 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-Nhod=1
+Nhod=5
 
 nbody=mtnglike
 sim=fastpm_unconstrained
@@ -29,8 +29,8 @@ use_custom_prior=False
 
 multisnapshot=True
 diag_from_scratch=False
-rm_galaxies=True
-extras="diag=nzonly diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+rm_galaxies=False
+extras="diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=3000
 N=384
 

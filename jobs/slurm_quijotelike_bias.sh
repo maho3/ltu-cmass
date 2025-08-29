@@ -1,16 +1,18 @@
 #!/bin/bash
 #SBATCH --job-name=quijotefastpm_bias   # Job name
-#SBATCH --array=0-999         # Job array range for lhid
+#SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=4            # Number of tasks
-#SBATCH --time=02:00:00         # Time limit
+#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --time=04:00:00         # Time limit
 #SBATCH --partition=shared      # Partition name
 #SBATCH --account=phy240043   # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=2000
-globoffset=0
+
+set -e
+
+# SLURM_ARRAY_TASK_ID=663
 
 module restore cmass
 conda activate cmassrun
@@ -20,83 +22,77 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-Nhod=5
-Naug=1
+Nhod=1
 
-# nbody=quijotelike
-nbody=quijotelike
-sim=fastpm
+nbody=quijote
+sim=nbody_recnoise
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise=reciprocal
+
 multisnapshot=True
 diag_from_scratch=True
-rm_galaxies=False
-# extras= #"  # "meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-# extras="$extras bias.hod.model=leauthaud11 bias.hod.default_params=behroozi10"
-extras="bias=zheng_biased" #  meta.cosmofile=./params/abacus_custom_cosmologies.txt" 
+rm_galaxies=True
+extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
 N=128
+
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+for offset in $(seq 0 200 1999); do
+    lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
+    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
+    postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
+    postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
+    postfix="$postfix noise=$noise"
+    postfix="$postfix $extras"
 
-for offset in 0; do #  1000; do
-    lhid=$(($SLURM_ARRAY_TASK_ID+offset+globoffset))
+    # # halos
+    # diag_file=$outdir/$lhid/diag/halos.h5
+    # if [ -f "$diag_file" ]; then
+    #     echo "Diag file $diag_file exists."
+    # else
+    #     echo "Diag file $diag_file does not exist."
+    #     python -m cmass.diagnostics.summ $postfix diag.halo=True
+    # fi
 
-    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch $extras"
+    for hod_seed in $(seq 1 $(($Nhod))); do
+        printf -v hod_str "%05d" $hod_seed
 
-    # density
-    # python -m cmass.diagnostics.summ diag.density=True $postfix 
+        # galaxies
+        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
+        if [ -f "$diag_file" ]; then
+            echo "Diag file $diag_file exists."
+        else
+            echo "Diag file $diag_file does not exist."
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
+        fi
 
-    # halos
-    file=$outdir/$lhid/halos.h5
-    if [ -f $file ]; then
-        echo "File $file exists."
-    else
-        echo "File $file does not exist."
-        # python -m cmass.bias.rho_to_halo $postfix
+        # # set aug_seed the same as hod_seed for simplicity
+        # aug_seed=$hod_seed
+        # printf -v aug_str "%05d" $aug_seed
+
+        # # simbig_lightcone
+        # diag_file=$outdir/$lhid/diag/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # if [ -f "$diag_file" ]; then
+        #     echo "Diag file $diag_file exists."
+        # else
+        #     echo "Diag file $diag_file does not exist."
+        #     python -m cmass.survey.hodlightcone survey.geometry=ngc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # fi
+    done
+
+    # Trash collection
+    if [ "$rm_galaxies" = "True" ]; then
+        echo "Removing galaxy and lightcone directories for lhid=$lhid"
+        rm -rf "$outdir/$lhid/galaxies"
+        rm -rf "$outdir/$lhid/simbig_lightcone"
     fi
-    python -m cmass.diagnostics.summ diag.halo=True $postfix 
-
-    # # galaxies
-    # for i in $(seq 0 $(($Nhod-1))); do
-    #     hod_seed=$((lhid*10+i))
-    #     printf -v hod_str "%05d" $hod_seed
-    #     file=$outdir/$lhid/galaxies/hod$hod_str.h5
-    #     if [ -f $file ]; then
-    #         echo "File $file exists."
-    #     else
-    #         echo "File $file does not exist."
-    #         python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-    #     fi
-    #     # python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
-
-    #     # # augments
-    #     # for aug_seed in $(seq 0 $(($Naug-1))); do
-    #     #     printf -v aug_str "%05d" $aug_seed
-    #     #     # lightcone
-    #     #     file=$outdir/$lhid/sgc_lightcone/hod${hod_str}_aug${aug_str}.h5
-    #     #     if [ -f $file ]; then
-    #     #         echo "File $file exists."
-    #     #     else
-    #     #         echo "File $file does not exist."
-    #     #         python -m cmass.survey.selection survey=cmass_sgc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-    #     #     fi
-    #     #     python -m cmass.diagnostics.summ diag.sgc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
-    #     # done
-
-    #     # Trash collection
-    #     if [ $rm_galaxies = True ]; then
-    #         # galaxies
-    #         echo "Removing galaxies for lhid=$lhid hod_seed=$hod_seed"
-    #         rm $outdir/$lhid/galaxies/hod$hod_str.h5
-
-    #         # # lightcone
-    #         # echo "Removing lightcone for lhid=$lhid hod_seed=$hod_seed"
-    #         # rm $outdir/$lhid/sgc_lightcone/hod${hod_str}_aug*.h5
-    #     fi
-    # done
 done
