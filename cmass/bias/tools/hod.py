@@ -13,6 +13,7 @@ The models themselves are described in `hod_models.py`.
 import logging
 import numpy as np
 from omegaconf import open_dict
+from os.path import join
 
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import halo_mass_to_halo_radius, NFWProfile
@@ -43,6 +44,20 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
     else:
         raise NotImplementedError(
             f'Model {model} not implemented.')
+
+
+def load_hod_from_file(wdir, custom_prior, seed):
+    # Sample HOD prior by loading from a file of saved parameters
+    parameter_file = join(wdir, 'hod_priors', f'{custom_prior}.csv')
+    with open(parameter_file, 'r') as f:
+        hod_names = [n.strip() for n in f.readline().split(',')]
+        for k, line in enumerate(f):
+            if k == seed:
+                values = [float(item.strip()) for item in line.split(',')]
+                break
+        else:
+            raise ValueError(f"Seed {seed} not found in {parameter_file}")
+    return dict(zip(hod_names, values))
 
 
 def parse_hod(cfg):
@@ -120,7 +135,18 @@ def parse_hod(cfg):
                     # Sample parameters from the HOD model
                     model.sample_parameters()
 
-        # Overwrite any previously defined parameters
+        # If we're using a custom prior and from_samples=True, then pull params
+        # from file
+        if cfg.bias.hod.custom_prior and cfg.bias.hod.from_samples:
+            theta_from_samples = load_hod_from_file(
+                cfg.meta.wdir, cfg.bias.hod.custom_prior,
+                cfg.bias.hod.seed + cfg.nbody.lhid*1e4
+            )
+            print(theta_from_samples)
+            for key, param in theta_from_samples.items():
+                model.set_parameter(key, param)
+
+            # Overwrite any previously defined parameters
         if hasattr(cfg.bias.hod, "theta"):
             for key in model.parameters:
                 if hasattr(cfg.bias.hod.theta, key):
@@ -194,6 +220,8 @@ def build_HOD_model(
             Whether to include assembly bias
         vel_assem_bias (bool, optional):
             Whether to include velocity assembly bias
+        custom_prior (str, optional):
+            Name of the custom prior to use.
 
     Returns:
         hod_model (HODMockFactory): A HOD model object

@@ -1,9 +1,7 @@
-import numpy as np
-
 """
 Hardcoded, HOD priors for CMASS observational samples
 
-Each prior is Gaussian with a mean and stdev defined over three interpolated 
+Each prior is Gaussian with a mean and stdev defined over three interpolated
 redshift bins.
 
 Computed in notebooks/constrain_hod_prior.ipynb
@@ -13,8 +11,8 @@ SURVEY_HOD_PRIORS = {
     # zpivot = [0.40, 0.50, 0.70]  (edges and hump)
     '0.40,0.50,0.70': {
         'simbig': {
-            'mean': [13.147074, 12.587817, 13.521771],
-            'stdev': [0.3698568, 0.33010304, 0.27506068],
+            'mean': [13.265404, 12.479362, 13.618386],
+            'stdev': [0.327474, 0.2726059, 0.17976798],
         },
         'sgc': {
             'mean': [13.614453, 12.449558, 13.586691],
@@ -49,7 +47,3 @@ SURVEY_HOD_PRIORS = {
         }
     }
 }
-
-# for survey in SURVEY_HOD_PRIORS.values():
-#     survey['mean'] = np.array(survey['mean'])
-#     survey['stdev'] = np.array(survey['stdev'])
