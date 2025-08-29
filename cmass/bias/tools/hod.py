@@ -48,16 +48,14 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
 
 def load_hod_from_file(wdir, custom_prior, seed):
     # Sample HOD prior by loading from a file of saved parameters
-    parameter_file = join(wdir, 'hod_priors', f'{custom_prior}.csv')
-    with open(parameter_file, 'r') as f:
-        hod_names = [n.strip() for n in f.readline().split(',')]
-        for k, line in enumerate(f):
-            if k == seed:
-                values = [float(item.strip()) for item in line.split(',')]
-                break
-        else:
-            raise ValueError(f"Seed {seed} not found in {parameter_file}")
-    return dict(zip(hod_names, values))
+    parameter_file = join(wdir, 'hod_priors', f'{custom_prior}.npy')
+    paramdata = np.load(parameter_file, mmap_mode='r')
+    Nparams = len(paramdata)
+    rng = np.random.default_rng(int(seed))
+    index = rng.integers(0, Nparams)
+    values = paramdata[index]
+    valuedict = dict(zip(values.dtype.names, values))
+    return valuedict
 
 
 def parse_hod(cfg):
@@ -144,7 +142,7 @@ def parse_hod(cfg):
             )
             print(theta_from_samples)
             for key, param in theta_from_samples.items():
-                model.set_parameter(key, param)
+                model.set_parameter(key, float(param))
 
             # Overwrite any previously defined parameters
         if hasattr(cfg.bias.hod, "theta"):
