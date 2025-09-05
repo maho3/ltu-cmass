@@ -277,6 +277,13 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
     if cfg.infer.halo or cfg.infer.galaxy:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
+
+    if cfg.infer.include_hod and cfg.bias.hod.from_samples:
+        logging.warning(
+            "Inferring HOD parameters with prior from file. "
+            "ENSURE PRIOR MATCHES FILE SAMPLES TO AVOID MISMATCH."
+        )
+
     for tracer in ['halo', 'galaxy',
                    'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
                    'simbig_lightcone']:
