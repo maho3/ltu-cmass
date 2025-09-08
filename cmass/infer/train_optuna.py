@@ -13,7 +13,7 @@ import yaml
 import time
 
 from .tools import split_experiments, prepare_loader
-from ..utils import timing_decorator, clean_up
+from ..utils import timing_decorator
 from ..nbody.tools import parse_nbody_config
 
 import ili
@@ -25,7 +25,7 @@ from ili.embedding import FCN
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None):
+def prepare_prior(prior_name, device, theta=None, hodprior=None):
     # define a prior
     if prior_name.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -41,31 +41,14 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
-        if ((hodprior is not None) or (noiseprior is not None)) and (theta.shape[-1] == 5):
-            raise ValueError(
-                'HOD or noise priors provided, but theta has only 5 parameters.'
-                ' include_hod or include_noise might not be set correctly.')
-        if hodprior is not None:
+        if (theta.shape[-1] > 5):  # galaxy or lightcone
+            if hodprior is None:
+                raise ValueError('No HOD prior provided for quijote prior')
             if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
             prior_lims = np.vstack([prior_lims, hod_lims])
-        if noiseprior is not None:
-            if noiseprior.dist == 'Fixed':
-                low, high = -np.inf, np.inf
-            elif noiseprior.dist == 'Uniform':
-                low, high = noiseprior.params.a, noiseprior.params.b
-            elif noiseprior.dist == 'Reciprocal':
-                low, high = noiseprior.params.a, noiseprior.params.b
-            elif noiseprior.dist == 'Exponential':
-                low, high = 0, np.inf
-            else:
-                raise NotImplementedError(
-                    f'Noise prior distribution {noiseprior.dist} not '
-                    'implemented.')
-            noise_lims = np.array([[low, high]]*2)
-            prior_lims = np.vstack([prior_lims, noise_lims])
 
         prior = ili.utils.Uniform(
             low=prior_lims[:, 0],
@@ -81,18 +64,19 @@ def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
     prior_name, mcfg,  # model config
     batch_size, learning_rate, stop_after_epochs, val_frac,
-    weight_decay, lr_decay_factor, lr_patience,
+    lr_decay_factor, lr_patience,
     backend, engine, device,
-    hodprior=None, noiseprior=None, verbose=True
+    hodprior=None, verbose=True
 ):
+    start = time.time()
+
     # select the network configuration
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
     prior = prepare_prior(prior_name, device=device,
-                          theta=theta_train,
-                          hodprior=hodprior, noiseprior=noiseprior)
+                          theta=theta_train, hodprior=hodprior)
 
     # define an embedding network
     if mcfg.fcn_depth == 0:
@@ -117,18 +101,15 @@ def run_training(
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
-    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
-    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
-    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
-    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
-    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
+    bs, lr = batch_size, learning_rate
+    bs = mcfg.batch_size if bs is None else bs
+    lr = mcfg.learning_rate if lr is None else lr
     train_args = {
         'learning_rate': lr,
         'stop_after_epochs': stop_after_epochs,
         'validation_fraction': val_frac,
-        'weight_decay': wd,
-        'lr_decay_factor': lrdf,
-        'lr_patience': lrp
+        'lr_decay_factor': lr_decay_factor,
+        'lr_patience': lr_patience,
     }
 
     # setup data loaders
@@ -158,8 +139,7 @@ def run_training(
     )
 
     # train the model
-    #posterior, histories = runner(loader=loader, verbose=verbose)
-    posterior, histories = runner(loader=loader) # 11/06/2025: error with verbose if Lampe backend
+    posterior, histories = runner(loader=loader, verbose=verbose)
 
     return posterior, histories
 
@@ -172,8 +152,7 @@ def plot_training_history(histories, out_dir):
         ax.plot(h['validation_log_probs'], label=f'Net {i}', lw=1)
     ax.set(xlabel='Epoch', ylabel='Validation log prob')
     ax.legend()
-    f.savefig(join(out_dir, 'loss.jpg'), dpi=100, bbox_inches='tight')
-    plt.close(f)
+    f.savefig(join(out_dir, 'loss.jpg'), dpi=200, bbox_inches='tight')
 
 
 def evaluate_posterior(posterior, x, theta):
@@ -195,17 +174,13 @@ def load_preprocessed_data(exp_path):
         filepath = join(exp_path, 'hodprior.csv')
         hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
                     if os.path.exists(filepath) else None)
-        filepath = join(exp_path, 'noiseprior.yaml')
-        noiseprior = (OmegaConf.load(filepath)
-                      if os.path.exists(filepath) else None)
     except FileNotFoundError:
         raise FileNotFoundError(
             f'Could not find training/test data in {exp_path}. '
             'Make sure to run cmass.infer.preprocess first.'
         )
 
-    return (x_train, theta_train, x_val, theta_val, x_test, theta_test,
-            hodprior, noiseprior)
+    return x_train, theta_train, x_val, theta_val, x_test, theta_test, hodprior
 
 
 def run_experiment(exp, cfg, model_path):
@@ -220,21 +195,18 @@ def run_experiment(exp, cfg, model_path):
             logging.info(
                 f'Running training for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+
             # load training/test data
-            
             (x_train, theta_train,
              x_val, theta_val,
              x_test, theta_test,
-             hodprior, noiseprior) = load_preprocessed_data(exp_path)
-            
+             hodprior) = load_preprocessed_data(exp_path)
+
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
                 f'{len(x_test)} testing')
 
-            if cfg.infer.net_suffix is not None:
-                out_dir=join(exp_path, 'nets', cfg.infer.net_suffix, f'net-{cfg.infer.net_index}')
-            else:
-                out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+            out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
             logging.info(f'Saving models to {out_dir}')
 
             # run training
@@ -246,12 +218,11 @@ def run_experiment(exp, cfg, model_path):
                 learning_rate=cfg.infer.learning_rate,
                 stop_after_epochs=cfg.infer.stop_after_epochs,
                 val_frac=cfg.infer.val_frac,
-                weight_decay=cfg.infer.weight_decay,
                 lr_decay_factor=cfg.infer.lr_decay_factor,
                 lr_patience=cfg.infer.lr_patience,
                 backend=cfg.infer.backend, engine=cfg.infer.engine,
                 device=cfg.infer.device,
-                hodprior=hodprior, noiseprior=noiseprior,
+                hodprior=hodprior
             )
             end = time.time()
 
@@ -272,7 +243,6 @@ def run_experiment(exp, cfg, model_path):
 
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
-@clean_up(hydra)
 def main(cfg: DictConfig) -> None:
 
     cfg = parse_nbody_config(cfg)
@@ -281,12 +251,10 @@ def main(cfg: DictConfig) -> None:
         model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
-        cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]  
-        
+        cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
     cfg.net = cfg.net[cfg.infer.net_index]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-    print(model_dir)
 
     for tracer in ['halo', 'galaxy',
                    'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
@@ -297,7 +265,7 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer,cfg.sim, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
 
 

@@ -1,6 +1,7 @@
 """
 A script to train ML models on existing suites of simulations.
 """
+
 import time
 import yaml
 from omegaconf import DictConfig, OmegaConf
@@ -27,6 +28,7 @@ def objective(trial, cfg: DictConfig,
     hyperprior = cfg.infer.hyperprior
     model = trial.suggest_categorical("model", hyperprior.model)
     hidden_features = trial.suggest_int(
+
         "hidden_features", *hyperprior.hidden_features, log=True)
     num_transforms = trial.suggest_int(
         "num_transforms", *hyperprior.num_transforms)
@@ -48,6 +50,7 @@ def objective(trial, cfg: DictConfig,
         num_transforms=num_transforms,
         fcn_width=fcn_width,
         fcn_depth=fcn_depth,
+
         batch_size=batch_size,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
@@ -71,6 +74,7 @@ def objective(trial, cfg: DictConfig,
         device=cfg.infer.device,
         hodprior=hodprior, noiseprior=noiseprior, verbose=False
     )
+
     end = time.time()
 
     # Save the timing and metadata
@@ -116,6 +120,7 @@ def run_experiment(exp, cfg, model_path):
 
             # run hyperparameter optimization
             logging.info('Running hyperparameter optimization...')
+
             study = setup_optuna(
                 exp_path, name, cfg.infer.n_startup_trials)
             study.optimize(
@@ -157,7 +162,7 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
 
 

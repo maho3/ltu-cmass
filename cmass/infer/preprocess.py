@@ -147,7 +147,8 @@ def setup_optuna(exp_path, name, n_startup_trials):
 def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                       exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
-
+    print("SUMMARIES: ",summaries.keys())
+    
     # check that there's data
     for summ in exp.summary:
         for tag in ["Eq", "Sq", "Ss", "Is"]:
@@ -217,7 +218,6 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     f'Inconsistent lengths of summaries for {name}. Check that all '
                     'summaries have been computed for the same simulations.')
             x = np.concatenate(xs, axis=-1)
-
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
              (ids_train, ids_val, ids_test)) = split_train_val_test(
@@ -225,7 +225,6 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
-
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
@@ -258,21 +257,32 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
+    print("Scale factor a =  ",cfg.nbody.af)
+    wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
+    summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stored, only to read
+
     suite_path = get_source_path(
-        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        summ_dir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
-    model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
-    if cfg.infer.save_dir is not None:
-        model_dir = cfg.infer.save_dir
+    #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
+    model_dir = join(wdir,"preprocessed_noise")#by default, may throw error, use save_dir to be sure
+    #if cfg.infer.save_dir is not None:
+    #    print("Infer save_dir not None")
+    #    model_dir = cfg.infer.save_dir
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
-
     if cfg.infer.halo or cfg.infer.galaxy:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
+
+    if cfg.infer.include_hod and cfg.bias.hod.from_samples:
+        logging.warning(
+            "Inferring HOD parameters with prior from file. "
+            "ENSURE PRIOR MATCHES FILE SAMPLES TO AVOID MISMATCH."
+        )
 
     for tracer in ['halo', 'galaxy',
                    'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
@@ -287,7 +297,7 @@ def main(cfg: DictConfig) -> None:
             include_hod=cfg.infer.include_hod,
             include_noise=cfg.infer.include_noise)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
                               hodprior, noiseprior, exp, cfg, save_path)
 
