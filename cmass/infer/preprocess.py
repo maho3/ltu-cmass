@@ -266,7 +266,7 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
     #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
-    model_dir = join(wdir,"preprocessed")#by default, may throw error, use save_dir to be sure
+    model_dir = join(wdir,"preprocessed_noise")#by default, may throw error, use save_dir to be sure
     #if cfg.infer.save_dir is not None:
     #    print("Infer save_dir not None")
     #    model_dir = cfg.infer.save_dir

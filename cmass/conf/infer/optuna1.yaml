@@ -1,5 +1,4 @@
-
-save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -38,7 +37,7 @@ val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
 include_hod: False  # whether to infer HOD parameters
-include_noise: False  # whether to infer noise parameters
+include_noise: True  # whether to infer noise parameters
 
 prior: uniform  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
