@@ -3,6 +3,7 @@ import os
 from os.path import join
 import h5py
 import numpy as np
+import logging
 from omegaconf import OmegaConf
 from cmass.bias.tools.hod import lookup_hod_model
 
@@ -387,8 +388,12 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
             params = np.concatenate([params, hodparams], axis=0)
 
         if include_noise:  # add noise params
-            noise_params = get_noise_params(diagfile)
-            params = np.concatenate([params, noise_params], axis=0)
+            try:
+                noise_params = get_noise_params(diagfile)
+                params = np.concatenate([params, noise_params], axis=0)
+            except Exception as e:
+                logging.error(f'Issue with {diagfile}')
+                raise e
 
         # append to lists
         summlist.append(summ)
