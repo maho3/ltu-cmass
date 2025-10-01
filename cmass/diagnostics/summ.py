@@ -149,6 +149,10 @@ def summarize_tracer(
     summaries=['Pk'],
     config=None
 ):
+    # nz is not computed for tracer summaries
+    if 'nz' in summaries:
+        summaries.remove('nz')  # this is run by default
+
     # get source file
     postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
     filename = join(source_path, postfix)
