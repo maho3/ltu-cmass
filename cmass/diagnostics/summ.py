@@ -149,6 +149,10 @@ def summarize_tracer(
     summaries=['Pk'],
     config=None
 ):
+    # nz is not computed for tracer summaries
+    if 'nz' in summaries:
+        summaries.remove('nz')  # this is run by default
+
     # get source file
     postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
     filename = join(source_path, postfix)
@@ -165,6 +169,8 @@ def summarize_tracer(
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
         return True
+    if 'nz' in summaries:
+        summaries.remove('nz')  # this is run by default
 
     # compute overdensity cut
     Ncut = None if density is None else int(density * L**3)
@@ -215,9 +221,6 @@ def summarize_tracer(
         out_attrs['log10nbar'] = \
             np.log10(Ngalaxies) - 3 * np.log10(L)  # for numerical precision
         out_attrs['high_res'] = high_res and not use_ngp
-        out_attrs['noise_dist'] = config.noise.dist
-        out_attrs['noise_radial'] = config.noise.radial
-        out_attrs['noise_transverse'] = config.noise.transverse
 
         # Noise in-voxel
         if config.bias.hod.noise_uniform:
@@ -296,7 +299,7 @@ def summarize_tracer(
             out_data['mass_hist'] = hist
 
         save_group(outpath, out_data, out_attrs, a,
-                   config, save_HOD=(type == 'galaxy'))
+                   config, save_HOD=(type == 'galaxy'), save_noise=True)
     return True
 
 
