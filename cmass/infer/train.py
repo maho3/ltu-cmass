@@ -219,7 +219,11 @@ def run_experiment(exp, cfg, model_path):
         for kmax in kmax_list:
             logging.info(
                 f'Running training for {name} with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+            if not cfg.infer.do_reduction:
+                exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}', "raw")
+            else:
+                ncomp = cfg.infer.infer_comp
+                exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}', "pca_%i"%ncomp)
             # load training/test data
             
             (x_train, theta_train,

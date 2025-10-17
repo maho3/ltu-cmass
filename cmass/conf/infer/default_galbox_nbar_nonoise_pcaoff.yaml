@@ -1,5 +1,4 @@
-
-save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_nonoise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -14,25 +13,32 @@ Nmax: -1  # maximum number of simulations to load (-1 for all)
 correct_shot: true  # whether to correct for shot noise when normalizing
 
 halo: False      # whether to train on halo summaries
-galaxy: False    # whether to train on galaxy summaries
+galaxy: True    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
-sgc_lightcone: True # whether to train on sgc_lightcone summaries
+sgc_lightcone: False # whether to train on sgc_lightcone summaries
 mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  - summary: [nbar, Pk0, Pk2]   # z-space monopole
-    kmin: [0.02]
-    kmax: [0.3, 0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+    kmin: [0.]
+    kmax: [0.3]
 
-
+# REDUCTION TEST DUMMY 16/09/2025
+do_reduction: False
+reduction: # for preprocessing, messy for now
+ - method: LinearPCA
+   num_comps: [10, 20]
+infer_comp: 20 # for inference, messy for now
+ 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
-only_cosmo: True  # only train on cosmological parameters (ignore HOD)
+include_hod: False  # whether to infer HOD parameters
+include_noise: False  # whether to infer noise parameters
 
 prior: uniform  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
@@ -58,5 +64,5 @@ hyperprior:
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
 
-n_trials: 30  # number of trials for hyperparameter optimization
-n_startup_trials: 20  # number of startup trials for hyperparameter optimization
+n_trials: 50  # number of trials for hyperparameter optimization
+n_startup_trials: 50  # number of startup trials for hyperparameter optimization

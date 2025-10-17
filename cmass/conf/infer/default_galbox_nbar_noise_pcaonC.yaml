@@ -20,27 +20,15 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  - summary: [nbar, zPk0]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
   - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
+    kmax: [0.3]
 
 # REDUCTION TEST DUMMY 16/09/2025
 do_reduction: True
 reduction: # for preprocessing, messy for now
  - method: LinearPCA
-   num_comps: [20, 60, 100]
+   num_comps: [10, 20]
 infer_comp: 20 # for inference, messy for now
  
 # ~~ TRAINING ARGS ~~

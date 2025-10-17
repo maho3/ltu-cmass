@@ -1,4 +1,4 @@
-save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_nonoise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -20,29 +20,10 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  - summary: [nbar, zPk0]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-    kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
   - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
-    kmax: [0.05, 0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4,0.5]
 
-# REDUCTION TEST DUMMY 16/09/2025
-do_reduction: True
-reduction: # for preprocessing, messy for now
- - method: LinearPCA
-   num_comps: [20, 60, 100]
-infer_comp: 20 # for inference, messy for now
- 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
 
@@ -50,18 +31,13 @@ val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
 include_hod: False  # whether to infer HOD parameters
-include_noise: True  # whether to infer noise parameters
+include_noise: False  # whether to infer noise parameters
 
 prior: uniform  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
-batch_size: null  # batch size
-learning_rate: null  # learning rate
 stop_after_epochs: 50  # stop early after this many epochs
-weight_decay: null  # weight decay
-lr_decay_factor: null  # learning rate decay factor
-lr_patience: null  # learning rate decay patience
 
 # ~~ OPTUNA ARGS ~~
 hyperprior:

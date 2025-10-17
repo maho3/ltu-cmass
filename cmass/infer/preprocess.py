@@ -13,6 +13,9 @@ from tqdm import tqdm
 import optuna
 import multiprocessing
 
+from sklearn.decomposition import PCA
+import pickle as pk
+
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
@@ -218,6 +221,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     f'Inconsistent lengths of summaries for {name}. Check that all '
                     'summaries have been computed for the same simulations.')
             x = np.concatenate(xs, axis=-1)
+            
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
              (ids_train, ids_val, ids_test)) = split_train_val_test(
@@ -227,28 +231,54 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                          f'{len(x_val)} validation, {len(x_test)} testing')
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')
-            os.makedirs(exp_path, exist_ok=True)
+            os.makedirs(join(exp_path,"raw"),exist_ok=True)
             with open(join(exp_path, 'config.yaml'), 'w') as f:
                 OmegaConf.save(cfg, f)
-            np.save(join(exp_path, 'x_train.npy'), x_train)
-            np.save(join(exp_path, 'x_val.npy'), x_val)
-            np.save(join(exp_path, 'x_test.npy'), x_test)
-            np.save(join(exp_path, 'theta_train.npy'), theta_train)
-            np.save(join(exp_path, 'theta_val.npy'), theta_val)
-            np.save(join(exp_path, 'theta_test.npy'), theta_test)
-            np.save(join(exp_path, 'ids_train.npy'), ids_train)
-            np.save(join(exp_path, 'ids_val.npy'), ids_val)
-            np.save(join(exp_path, 'ids_test.npy'), ids_test)
+            np.save(join(exp_path,"raw", 'x_train.npy'), x_train)
+            np.save(join(exp_path, "raw",'x_val.npy'), x_val)
+            np.save(join(exp_path,"raw", 'x_test.npy'), x_test)
+            np.save(join(exp_path,"raw", 'theta_train.npy'), theta_train)
+            np.save(join(exp_path, "raw",'theta_val.npy'), theta_val)
+            np.save(join(exp_path, "raw",'theta_test.npy'), theta_test)
+            np.save(join(exp_path, "raw",'ids_train.npy'), ids_train)
+            np.save(join(exp_path, "raw",'ids_val.npy'), ids_val)
+            np.save(join(exp_path, "raw",'ids_test.npy'), ids_test)
+
+            # Optional dim. reduction - only linear PCA for testing purposes now
+            if cfg.infer.do_reduction:
+                for scheme in cfg.infer.reduction:
+                    if scheme.method!="LinearPCA":
+                        logging.warning(f'Method {exp.method} not implemented. Skipping...')
+                    else:
+                        logging.warning(f'Saving Linear PCA compressed summaries')
+                        pca = PCA(svd_solver = "full") # full svd, select components manually as postprocessing
+                        pca.fit(x)
+                        pk.dump(pca, open(join(exp_path,"linear_pca.pkl"),"wb"))
+
+                        for nc in scheme.num_comps:
+                            os.makedirs(join(exp_path,"pca_%i"%nc),exist_ok=True)
+                            np.save(join(exp_path,"pca_%i"%nc, 'x_train.npy'), pca.transform(x_train)[:,:nc])
+                            np.save(join(exp_path,"pca_%i"%nc, 'x_val.npy'), pca.transform(x_val)[:,:nc])
+                            np.save(join(exp_path,"pca_%i"%nc, 'x_test.npy'), pca.transform(x_test)[:,:nc])
+                            np.save(join(exp_path,"pca_%i"%nc, 'theta_train.npy'), theta_train)
+                            np.save(join(exp_path,"pca_%i"%nc, 'theta_val.npy'), theta_val)
+                            np.save(join(exp_path,"pca_%i"%nc, 'theta_test.npy'), theta_test)
+                            np.save(join(exp_path,"pca_%i"%nc,'ids_train.npy'), ids_train)
+                            np.save(join(exp_path,"pca_%i"%nc,'ids_val.npy'), ids_val)
+                            np.save(join(exp_path,"pca_%i"%nc,'ids_test.npy'), ids_test)
+                            _ = setup_optuna(join(exp_path,"pca_%i"%nc), name, cfg.infer.n_startup_trials)
+                            
             if hodprior is not None:
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')
             if noiseprior is not None:
                 with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
                     OmegaConf.save(noiseprior, f)
+                        
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
-            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+            _ = setup_optuna(join(exp_path,"raw"), name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator
@@ -266,7 +296,7 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
     #model_dir = join(summ_dir, cfg.nbody.suite, cfg.sim, 'models')
-    model_dir = join(wdir,"preprocessed_noise")#by default, may throw error, use save_dir to be sure
+    model_dir = join(wdir,"preprocessed_nonoise")#by default, may throw error, use save_dir to be sure
     #if cfg.infer.save_dir is not None:
     #    print("Infer save_dir not None")
     #    model_dir = cfg.infer.save_dir

@@ -1,0 +1,17 @@
+SchecterLuminosityFunction:
+  - m_star    : 10000    # in solar masses
+  - minimum   : 10 
+  - maximum   : 100000
+  - phi_star  : 0.12
+  - alpha     : 0.4
+  - n         : [20, 40]
+
+MergerRate:
+ - R0         : 40
+ - gamma      : 1.4
+
+PrimaryMass:
+ - model      : ["PP"] 
+ - m_min      : 5 # solar masses
+ - m_max      : 100
+
