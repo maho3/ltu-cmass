@@ -1,16 +1,19 @@
 """This module provides functions to calculate summary statistics."""
 
 import os
+import copy
 import numpy as np
 import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
 import BFast
+import PolyBin3D as pb
 from ..utils import timing_decorator
 
 
 def MA(pos, L, N, MAS='CIC'):
     pos = np.ascontiguousarray(pos)
+    pos = copy.deepcopy(pos)
     delta = np.zeros((N, N, N), dtype=np.float32)
     pos %= L
     MASL.MA(pos, delta, BoxSize=L, MAS=MAS)
@@ -22,6 +25,8 @@ def MA(pos, L, N, MAS='CIC'):
 
 def MAz(pos, vel, L, N, cosmo, z, MAS='CIC', axis=0):
     pos, vel = map(np.ascontiguousarray, (pos, vel))
+    pos = copy.deepcopy(pos)
+    vel = copy.deepcopy(vel)
     RSL.pos_redshift_space(pos, vel, L, cosmo.H(z).value/cosmo.h, z, axis)
     return MA(pos, L, N, MAS)
 
@@ -44,22 +49,22 @@ def calcQk_polybin(k, Pk, k123, Bk):
 
 @timing_decorator
 def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
-    raise NotImplementedError('Deprecated in favor of BFast')
+    assert axis == 2  # polybin measures along the z axis
+
     # TODO: Use ili-summarizer here
-    k_min = 1.05*2 * np.pi / L
+    k_min = 2 * np.pi / L
     n_mesh = delta.shape[0]
-    k_max = 0.95 * np.pi * n_mesh / L
-    num_bins = 12
-    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), num_bins)
+    k_max = np.pi * n_mesh / L
+    k_bins = np.arange(k_min, k_max, k_min * 5)
 
     # set stuff up
     base = pb.PolyBin3D(
         sightline='global',  # TODO: check if this properly computes RSDs
-        gridsize=n_mesh,
+        gridsize=[n_mesh]*3,
         boxsize=[L]*3,
         boxcenter=(0., 0., 0.),
         pixel_window=MAS.lower(),
-        backend='jax',
+        backend='fftw',
         nthreads=threads
     )
     pspec = pb.PSpec(
@@ -85,9 +90,8 @@ def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     # set up outputs
     k = pspec.get_ks()
     k123 = bspec.get_ks()
-    weight = k123.prod(axis=0)
     pk = np.array([pk_corr[f'p{ell}'] for ell in [0, 2]])
-    bk = np.array([bk_corr[f'b{ell}']*weight for ell in [0, 2]])
+    bk = np.array([bk_corr[f'b{ell}'] for ell in [0, 2]])
     qk = calcQk_polybin(k, pk, k123, bk)
     return k123, bk, qk, k, pk
 
