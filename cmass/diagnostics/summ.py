@@ -143,7 +143,8 @@ def summarize_rho(
             out = run_bispectrum(
                 rho, L, axis=2, MAS='CIC',
                 num_threads=threads, use_rsd=False,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
         if len(out) > 0:
@@ -278,7 +279,8 @@ def summarize_tracer(
             out = run_bispectrum(
                 field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=False,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
 
@@ -288,7 +290,8 @@ def summarize_tracer(
             out = run_bispectrum(
                 field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=True,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
 
@@ -406,7 +409,8 @@ def summarize_lightcone_pylians(
         out = run_bispectrum(
             field, L, axis=2, MAS=MAS,
             num_threads=threads, use_rsd=False,
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            backend=config.diag.bispectrum_backend
         )
         out_data.update(out)
 
