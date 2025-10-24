@@ -46,7 +46,9 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                 'HOD or noise priors provided, but theta has only 5 parameters.'
                 ' include_hod or include_noise might not be set correctly.')
         if hodprior is not None:
-            if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
+            # TODO: support non-uniform HOD priors
+            types = np.char.lower(hodprior[:, 1].astype(str))
+            if not np.all((types == 'uniform') | (types == 'truncnorm')):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
