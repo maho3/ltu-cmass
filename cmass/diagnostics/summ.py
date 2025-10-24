@@ -406,6 +406,10 @@ def summarize_lightcone_pylians(
             cache_dir = join(config.meta.wdir, 'scratch', 'cache')
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
+        if config.diag.bispectrum_backend == 'polybin':
+            raise NotImplementedError(
+                'PolyBin bispectrum not yet implemented for lightcones.'
+            )
         out = run_bispectrum(
             field, L, axis=2, MAS=MAS,
             num_threads=threads, use_rsd=False,
