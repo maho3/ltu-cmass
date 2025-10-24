@@ -106,7 +106,9 @@ def load_Bk(diag_file, a):
             # load the summaries
             for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
                 if stat in f[a]:
-                    for i in range(1):  # just monopole
+                    for i in range(2):
+                        if i >= f[a][stat].shape[0]:
+                            continue
                         summ[stat+str(2*i)] = {
                             'k': f[a]['Bk_k123'][:],
                             'value': f[a][stat][i, :],

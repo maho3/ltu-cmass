@@ -169,7 +169,6 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
             xs = []
-
             for summ in exp.summary:
                 # Handle all the different summaries
                 if summ in ['nbar', 'nz']:
@@ -178,23 +177,24 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 sq_bool = "Sq" in summ
                 ss_bool = "Ss" in summ
                 is_bool = "Is" in summ
+                basesumm = summ
                 for tag in ["Eq", "Sq", "Ss",  "Is"]:
-                    summ = summ.replace(tag, "")
-                x, theta, id = summaries[summ], parameters[summ], ids[summ]
+                    basesumm = basesumm.replace(tag, "")
+                x, theta, id = summaries[basesumm], parameters[basesumm], ids[basesumm]
                 # Preprocess the summaries
-                if 'Pk0' in summ:
+                if 'Pk0' in basesumm:
                     x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
                                       correct_shot=cfg.infer.correct_shot)
-                elif 'Pk' in summ:
-                    norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
+                elif 'Pk' in basesumm:
+                    norm_key = basesumm[:-1] + '0'  # monopole (Pk0 or zPk0)
                     if norm_key in summaries:
                         x = preprocess_Pk(
                             x, kmax, monopole=False, norm=summaries[norm_key],
                             kmin=kmin)
                     else:
                         raise ValueError(
-                            f'Need monopole for normalization of {summ}')
-                elif ('Bk' in summ) or ('Qk' in summ):
+                            f'Need monopole for normalization of {basesumm}')
+                elif ('Bk' in basesumm) or ('Qk' in basesumm):
                     x = preprocess_Bk(
                         x, kmin=kmin, kmax=kmax,
                         log='Bk' in summ,
@@ -206,16 +206,18 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
-                xs.append(x)
+                xs.append((summ, x))
             if 'nz' in exp.summary:  # add n(z)
-                xs.append(_get_log10nz(summaries['Pk0']))
+                xs.append(('nz', _get_log10nz(summaries['Pk0'])))
             if 'nbar' in exp.summary:  # add nbar
-                xs.append(_get_log10nbar(summaries['Pk0']))
+                xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
 
+            labels, xs = zip(*xs)
             if not np.all([len(x) == len(xs[0]) for x in xs]):
                 raise ValueError(
                     f'Inconsistent lengths of summaries for {name}. Check that all '
                     'summaries have been computed for the same simulations.')
+            startidx = np.cumsum([0] + [x.shape[1] for x in xs])
             x = np.concatenate(xs, axis=-1)
 
             # split train/test
@@ -240,6 +242,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
+            with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
+                f.write(','.join(labels) + '\n')
+                f.write(','.join(map(str, startidx.tolist())) + '\n')
             if hodprior is not None:
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')

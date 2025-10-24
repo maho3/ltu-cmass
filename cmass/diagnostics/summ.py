@@ -24,11 +24,11 @@ from .tools import (
     _get_snapshot_alist, save_group
 )
 from .calculations import (
-    MA, MAz, calcPk, calcBk_bfast,
+    MA, MAz, calcPk, calcBk_bfast, calcBk_polybin,
     get_box_catalogue, get_box_catalogue_rsd  # not used
 )
 from .geometry import SURVEY_GEOMETRIES
-from ..survey.tools import sky_to_xyz, sky_to_unit_vectors
+from ..survey.tools import sky_to_xyz
 
 
 def run_pylians(
@@ -45,16 +45,26 @@ def run_pylians(
     return out
 
 
-def run_bfast(
-    field, box_size, axis, num_threads, use_rsd, MAS='CIC', cache_dir=None
+def run_bispectrum(
+    field, box_size, axis, num_threads, use_rsd, MAS='CIC', cache_dir=None,
+    backend='polybin'
 ):
     # Only for bispectrum
     pfx = 'z' if use_rsd else ''
-    k123, Bk, Qk, k, Pk = calcBk_bfast(
-        field, box_size, axis=axis,
-        MAS=MAS, threads=num_threads,
-        cache_dir=cache_dir
-    )
+    if backend == 'bfast':
+        k123, Bk, Qk, k, Pk = calcBk_bfast(
+            field, box_size, axis=axis,
+            MAS=MAS, threads=num_threads,
+            cache_dir=cache_dir
+        )
+    elif backend == 'polybin':
+        k123, Bk, Qk, k, Pk = calcBk_polybin(
+            field, box_size, axis=axis,
+            MAS=MAS, threads=num_threads
+        )
+    else:
+        raise ValueError(f'Unknown bispectrum backend: {backend}')
+
     out = {
         pfx+'Bk_k123': k123,
         pfx+'Bk': Bk,
@@ -121,7 +131,7 @@ def summarize_rho(
         out_data = {}
         if 'Pk' in summaries:
             out = run_pylians(
-                rho, L, axis=0, MAS='CIC',
+                rho, L, axis=2, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
@@ -130,10 +140,11 @@ def summarize_rho(
             if config is not None:
                 cache_dir = join(config.meta.wdir, 'scratch', 'cache')
 
-            out = run_bfast(
-                rho, L, axis=0, MAS='CIC',
+            out = run_bispectrum(
+                rho, L, axis=2, MAS='CIC',
                 num_threads=threads, use_rsd=False,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
         if len(out) > 0:
@@ -189,7 +200,6 @@ def summarize_tracer(
                 mass = f[a][proxy][...].astype(np.float32)
             else:
                 mass = None
-        pos %= L  # Ensure all tracers inside box
 
         # Mask out low mass tracers (to match number density)
         if density is not None:
@@ -226,13 +236,14 @@ def summarize_tracer(
         if config.bias.hod.noise_uniform:
             delta = L / config.nbody.N
             pos += np.random.uniform(-delta/2, delta/2, size=pos.shape)
-            pos = np.mod(pos, L)
 
         # Get unit vectors and add noise along each direction
-        # RSDs are applied along the 0th axis
-        pos = noise_positions(pos, 0, 0,
-                              config.noise.radial,
-                              config.noise.transverse)
+        # RSDs are applied along the z-axis
+        pos = noise_positions(pos, ra=0, dec=90,
+                              noise_radial=config.noise.radial,
+                              noise_transverse=config.noise.transverse)
+
+        pos %= L
 
         # Compute P(k)
         out_data = {}
@@ -242,16 +253,16 @@ def summarize_tracer(
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
             out = run_pylians(
-                field, L, axis=0, MAS=MAS,
+                field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
 
             # redshift space
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
-                        axis=0).astype(np.float32)
+                        axis=2).astype(np.float32)
             out = run_pylians(
-                field, L, axis=0, MAS=MAS,
+                field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
@@ -265,20 +276,22 @@ def summarize_tracer(
 
             # real space
             field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_bfast(
-                field, L, axis=0, MAS=MAS,
+            out = run_bispectrum(
+                field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=False,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
 
             # redshift space
             field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
-                        axis=0).astype(np.float32)
-            out = run_bfast(
-                field, L, axis=0, MAS=MAS,
+                        axis=2).astype(np.float32)
+            out = run_bispectrum(
+                field, L, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=True,
-                cache_dir=cache_dir
+                cache_dir=cache_dir,
+                backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
 
@@ -375,11 +388,12 @@ def summarize_lightcone_pylians(
 
     out_data = {}
     # Compute P(k)
+    # TODO: check the RSD axis=2 is okay
     if 'Pk' in summaries:
         N, MAS = get_mesh_resolution(L, high_res, use_ngp)
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
         out = run_pylians(
-            field, L, axis=0, MAS=MAS,
+            field, L, axis=2, MAS=MAS,
             num_threads=threads, use_rsd=False
         )
         out_data.update(out)
@@ -392,10 +406,15 @@ def summarize_lightcone_pylians(
             cache_dir = join(config.meta.wdir, 'scratch', 'cache')
 
         field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-        out = run_bfast(
-            field, L, axis=0, MAS=MAS,
+        if config.diag.bispectrum_backend == 'polybin':
+            raise NotImplementedError(
+                'PolyBin bispectrum not yet implemented for lightcones.'
+            )
+        out = run_bispectrum(
+            field, L, axis=2, MAS=MAS,
             num_threads=threads, use_rsd=False,
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            backend=config.diag.bispectrum_backend
         )
         out_data.update(out)
 
