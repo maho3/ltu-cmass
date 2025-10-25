@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-2  # Array range
+#SBATCH --array=0-9  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=16            # Number of tasks
+#SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
@@ -21,8 +21,8 @@ net_index=0
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_recnoise
-infer=simple  # simple  #
+sim=fastpm_nonoise
+infer=simple  # simple  # lightcone
 
 halo=False
 galaxy=True
@@ -42,7 +42,7 @@ suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=False"
+suffix="$suffix infer.include_noise=True infer.include_hod=True"
 
 echo "Running inference pipeline with $suffix"
 

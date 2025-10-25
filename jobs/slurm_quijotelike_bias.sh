@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=quijotefastpm_bias   # Job name
+#SBATCH --job-name=quijote_bias   # Job name
 #SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
 #SBATCH --partition=shared      # Partition name
 #SBATCH --account=phy240043   # Account name
@@ -12,7 +12,7 @@
 
 set -e
 
-# SLURM_ARRAY_TASK_ID=663
+# SLURM_ARRAY_TASK_ID=0
 
 module restore cmass
 conda activate cmassrun
@@ -25,14 +25,14 @@ cd /home/x-mho1/git/ltu-cmass-run
 Nhod=1
 
 nbody=quijote
-sim=nbody_recnoise
+sim=nbody
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=reciprocal
+noise=fixed
 
-multisnapshot=True
+multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="bias=zheng_biased" # noise.params.radial=2.0 noise.params.transverse=2.0" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
 N=128
 
