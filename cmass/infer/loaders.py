@@ -188,18 +188,16 @@ def signed_log(x, base=10):
     return np.sign(x) * np.log1p(np.abs(x)) / np.log(base)
 
 
-def preprocess_Pk(data, kmax, monopole=True, norm=None, kmin=0., correct_shot=False):
+def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False):
     # process Pk: filtering for k's, normalizing, and flattening
-    if not monopole and norm is None:
-        raise ValueError('norm must be provided when monopole is False')
 
     X = _filter_Pk(data, kmin, kmax)
 
-    if monopole:
+    if norm is None:  # monopole case
         if correct_shot:
             X -= 1./_get_nbar(data)  # subtract shot noise
         X = signed_log(X)
-    else:
+    else:  # higher multipoles normalized by monopole
         Xnorm = _filter_Pk(norm, kmin, kmax)
         X /= Xnorm
 
@@ -262,24 +260,31 @@ def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
     return X[:, mask]
 
 
-def preprocess_Bk(data, kmax, kmin=0., norm=None, log=False,
-                  equilateral_only=False, squeezed_only=False,
-                  subsampled_only=False, isoceles_only=False,
+def preprocess_Bk(data, kmin, kmax, norm=None,
+                  mode=None,  # None, Eq, Sq, SS, or Is
                   correct_shot=False):
     # process Bk: filtering for k's, normalizing, and flattening
-    X = _filter_Bk(data, kmin, kmax, equilateral_only,
-                   squeezed_only, subsampled_only, isoceles_only)
+    X = _filter_Bk(
+        data, kmin, kmax,
+        equilateral=(mode == 'Eq'),
+        squeezed=(mode == 'Sq'),
+        subsampled=(mode == 'Ss'),
+        isoceles=(mode == 'Is')
+    )
 
     if correct_shot:  # Eq. 44 arxiv:1610.06585
         pass  # not implemented because I'm not sure its right
 
-    if log:
+    if norm is None:  # monopole case
         X = signed_log(X)
-
-    if norm is not None:
+    else:  # higher multipoles normalized by monopole
         Xnorm = _filter_Bk(
-            norm, kmin, kmax, equilateral_only,
-            squeezed_only, subsampled_only, isoceles_only)
+            norm, kmin, kmax,
+            equilateral=(mode == 'Eq'),
+            squeezed=(mode == 'Sq'),
+            subsampled=(mode == 'Ss'),
+            isoceles=(mode == 'Is')
+        )
         X /= Xnorm
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
@@ -315,7 +320,7 @@ def _construct_hod_prior(configfile):
 def _construct_noise_prior(sourcepath, tracer):
     """
     This goes into a diagnostic file, reads the noise_dist from the attributes,
-    and returns a noise prior. This is kind of a hack, because our current 
+    and returns a noise prior. This is kind of a hack, because our current
     diagnostics don't save the prior params, just the distribution.
 
     TODO: fix this hack
