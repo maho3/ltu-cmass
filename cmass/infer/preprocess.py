@@ -5,7 +5,7 @@ A script to train ML models on existing suites of simulations.
 import os
 import numpy as np
 import logging
-from os.path import join
+from os.path import join, isfile
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
@@ -173,36 +173,29 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 # Handle all the different summaries
                 if summ in ['nbar', 'nz']:
                     continue  # we handle these separately
-                eq_bool = "Eq" in summ
-                sq_bool = "Sq" in summ
-                ss_bool = "Ss" in summ
-                is_bool = "Is" in summ
-                basesumm = summ
+
+                base = summ
                 for tag in ["Eq", "Sq", "Ss",  "Is"]:
-                    basesumm = basesumm.replace(tag, "")
-                x, theta, id = summaries[basesumm], parameters[basesumm], ids[basesumm]
+                    if tag in summ:
+                        base = base.replace(tag, "")
+                        break
+
+                x, theta, id = summaries[base], parameters[base], ids[base]
                 # Preprocess the summaries
-                if 'Pk0' in basesumm:
-                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
-                                      correct_shot=cfg.infer.correct_shot)
-                elif 'Pk' in basesumm:
-                    norm_key = basesumm[:-1] + '0'  # monopole (Pk0 or zPk0)
-                    if norm_key in summaries:
-                        x = preprocess_Pk(
-                            x, kmax, monopole=False, norm=summaries[norm_key],
-                            kmin=kmin)
-                    else:
-                        raise ValueError(
-                            f'Need monopole for normalization of {basesumm}')
-                elif ('Bk' in basesumm) or ('Qk' in basesumm):
+                if 'Pk' in summ:
+                    norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
+                    x = preprocess_Pk(
+                        x, kmin=kmin, kmax=kmax,
+                        norm=None if '0' in base else summaries[norm_key],
+                        correct_shot=cfg.infer.correct_shot
+                    )
+                elif ('Bk' in summ) or ('Qk' in summ):
+                    norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
                     x = preprocess_Bk(
                         x, kmin=kmin, kmax=kmax,
-                        log='Bk' in summ,
-                        equilateral_only=eq_bool,
-                        squeezed_only=sq_bool,
-                        subsampled_only=ss_bool,
-                        isoceles_only=is_bool,
-                        correct_shot=cfg.infer.correct_shot
+                        norm=None if '0' in base else summaries[norm_key],
+                        mode=tag,
+                        correct_shot=cfg.infer.correct_shot  # doesn't work currently
                     )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
@@ -254,7 +247,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
-            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+            if not isfile(join(exp_path, 'optuna_study.db')):
+                _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator
