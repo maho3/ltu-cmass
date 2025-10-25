@@ -39,10 +39,11 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
 
 
 def calcQk_polybin(k, Pk, k123, Bk):
+    # Reducing bispectrum with the power spectrum monopole
     # Qk = Bk123 / (Pk1 * Pk2 + Pk2 * Pk3 + Pk3 * Pk1)
-    Pk1 = np.array([np.interp(k123[0], k, Pk[i]) for i in range(Pk.shape[0])])
-    Pk2 = np.array([np.interp(k123[1], k, Pk[i]) for i in range(Pk.shape[0])])
-    Pk3 = np.array([np.interp(k123[2], k, Pk[i]) for i in range(Pk.shape[0])])
+    Pk1 = np.interp(k123[0], k, Pk[0])[None, :]
+    Pk2 = np.interp(k123[1], k, Pk[0])[None, :]
+    Pk3 = np.interp(k123[2], k, Pk[0])[None, :]
     Qk = Bk / (Pk1 * Pk2 + Pk2 * Pk3 + Pk3 * Pk1)
     return Qk
 
