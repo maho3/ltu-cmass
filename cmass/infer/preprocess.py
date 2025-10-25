@@ -5,7 +5,7 @@ A script to train ML models on existing suites of simulations.
 import os
 import numpy as np
 import logging
-from os.path import join
+from os.path import join, isfile
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
@@ -195,9 +195,11 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         raise ValueError(
                             f'Need monopole for normalization of {basesumm}')
                 elif ('Bk' in basesumm) or ('Qk' in basesumm):
+                    norm_key = basesumm[:-1] + '0'  # monopole (Bk0 or zBk0)
                     x = preprocess_Bk(
                         x, kmin=kmin, kmax=kmax,
-                        log='Bk' in summ,
+                        log='Bk0' in summ,  # only log monopoles
+                        norm=summaries[norm_key] if basesumm != norm_key else None,
                         equilateral_only=eq_bool,
                         squeezed_only=sq_bool,
                         subsampled_only=ss_bool,
@@ -254,7 +256,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
-            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+            if not isfile(join(exp_path, 'optuna_study.db')):
+                _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator

@@ -240,29 +240,29 @@ def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
     if sum([equilateral, squeezed, subsampled]) > 1:
         raise ValueError(
             "Only one of equilateral, squeezed, or subsampled can be True.")
+
+    k123 = np.array([x['k'] for x in X])
+    X = np.array([x['value'] for x in X])
+
+    if not np.all(np.isclose(k123, k123[0])):
+        raise ValueError("k values are not consistent across samples.")
+
+    k123 = k123[0]
+    mask = _is_in_kminmax(k123, kmin, kmax)
     if equilateral:
-        return np.array(
-            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_equilateral(x['k'])]
-             for x in X])
+        mask &= _is_equilateral(k123)
     elif squeezed:
-        return np.array(
-            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_squeezed(x['k'])]
-             for x in X])
+        mask &= _is_squeezed(k123)
     elif subsampled:
-        return np.array(
-            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_subsampled(x['k'])]
-             for x in X])
+        mask &= _is_subsampled(k123)
     elif isoceles:
-        return np.array(
-            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_isoceles(x['k'])]
-             for x in X])
+        mask &= _is_isoceles(k123)
     else:
-        return np.array(
-            [x['value'][_is_in_kminmax(x['k'], kmin, kmax) & _is_valid_triangle(x['k'])]
-             for x in X])
+        mask &= _is_valid_triangle(k123)
+    return X[:, mask]
 
 
-def preprocess_Bk(data, kmax, kmin=0., log=False,
+def preprocess_Bk(data, kmax, kmin=0., norm=None, log=False,
                   equilateral_only=False, squeezed_only=False,
                   subsampled_only=False, isoceles_only=False,
                   correct_shot=False):
@@ -275,6 +275,12 @@ def preprocess_Bk(data, kmax, kmin=0., log=False,
 
     if log:
         X = signed_log(X)
+
+    if norm is not None:
+        Xnorm = _filter_Bk(
+            norm, kmin, kmax, equilateral_only,
+            squeezed_only, subsampled_only, isoceles_only)
+        X /= Xnorm
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
 
