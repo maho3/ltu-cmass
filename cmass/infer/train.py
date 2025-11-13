@@ -220,6 +220,7 @@ def run_training_with_precompression(
         raise NotImplementedError
 
     # ~~~~~ TRAIN PRE-COMPRESSION NETWORK ~~~~~
+    logging.info('Training pre-compression network...')
     nets = [net_loader(model='mdn', hidden_features=mcfg.fcn_width,
                        hidden_depth=mcfg.fcn_depth,
                        num_components=4)]
@@ -244,6 +245,7 @@ def run_training_with_precompression(
         param.requires_grad = False
 
     # ~~~~~ TRAIN FINAL NETWORK ~~~~~
+    logging.info('Training final network with pre-compression...')
     kwargs = {k: v for k, v in mcfg.items() if k in [
         'model', 'hidden_features', 'num_transforms', 'num_components']}
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]

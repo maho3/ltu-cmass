@@ -23,7 +23,7 @@ sleep $net_index  # to stagger the start of each job
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_nonoise
+sim=fastpm_polybin
 infer=simple  # simple  # lightcone
 
 halo=False
@@ -44,7 +44,7 @@ suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
 suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=True infer.include_hod=True"
+suffix="$suffix infer.include_noise=True infer.include_hod=False"
 
 echo "Running inference pipeline with $suffix"
 
