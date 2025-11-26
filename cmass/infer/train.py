@@ -165,6 +165,108 @@ def run_training(
     return posterior, histories
 
 
+def run_training_with_precompression(
+    x_train, theta_train, x_val, theta_val, out_dir,
+    prior_name, mcfg,  # model config
+    batch_size, learning_rate, stop_after_epochs, val_frac,
+    weight_decay, lr_decay_factor, lr_patience,
+    backend, engine, device,
+    hodprior=None, noiseprior=None, verbose=True
+):
+    # select the network configuration
+    if verbose:
+        logging.info(f'Using network architecture: {mcfg}')
+
+    # define a prior
+    prior = prepare_prior(prior_name, device=device,
+                          theta=theta_train,
+                          hodprior=hodprior, noiseprior=noiseprior)
+
+    # define training arguments
+    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
+    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
+    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
+    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
+    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
+    train_args = {
+        'learning_rate': lr,
+        'stop_after_epochs': stop_after_epochs,
+        'validation_fraction': val_frac,
+        'weight_decay': wd,
+        'lr_decay_factor': lrdf,
+        'lr_patience': lrp
+    }
+
+    # setup data loaders
+    train_loader = prepare_loader(
+        x_train, theta_train,
+        device=device,
+        batch_size=bs, shuffle=True)
+    val_loader = prepare_loader(
+        x_val, theta_val,
+        device=device,
+        batch_size=bs, shuffle=False)
+    loader = TorchLoader(train_loader, val_loader)
+
+    # make output directory
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
+
+    # instantiate your neural networks to be used as an ensemble
+    if backend == 'lampe':
+        net_loader = ili.utils.load_nde_lampe
+        extra_kwargs = {}
+    else:
+        raise NotImplementedError
+
+    # ~~~~~ TRAIN PRE-COMPRESSION NETWORK ~~~~~
+    logging.info('Training pre-compression network...')
+    nets = [net_loader(model='mdn', hidden_features=mcfg.fcn_width,
+                       hidden_depth=mcfg.fcn_depth,
+                       num_components=4)]
+
+    # initialize the trainer
+    runner = InferenceRunner.load(
+        backend=backend,
+        engine=engine,
+        prior=prior,
+        nets=nets,
+        device=device,
+        train_args=train_args,
+        out_dir=out_dir
+    )
+
+    # train the model
+    posterior, histories = runner(loader=loader, verbose=verbose)
+
+    embedding = posterior.posteriors[0].nde.flow.hyper
+    # freeze the embedding network
+    for param in embedding.parameters():
+        param.requires_grad = False
+
+    # ~~~~~ TRAIN FINAL NETWORK ~~~~~
+    logging.info('Training final network with pre-compression...')
+    kwargs = {k: v for k, v in mcfg.items() if k in [
+        'model', 'hidden_features', 'num_transforms', 'num_components']}
+    nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
+
+    # initialize the trainer
+    runner = InferenceRunner.load(
+        backend=backend,
+        engine=engine,
+        prior=prior,
+        nets=nets,
+        device=device,
+        train_args=train_args,
+        out_dir=out_dir
+    )
+
+    # train the model
+    posterior, histories = runner(loader=loader, verbose=verbose)
+
+    return posterior, histories
+
+
 def plot_training_history(histories, out_dir):
     # Plot training history
     logging.info('Plotting training history...')
