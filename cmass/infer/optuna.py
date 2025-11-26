@@ -9,7 +9,8 @@ from os.path import join
 import logging
 
 from .preprocess import setup_optuna
-from .train import (load_preprocessed_data, run_training,
+from .train import (load_preprocessed_data,
+                    run_training, run_training_with_precompression,
                     evaluate_posterior, plot_training_history)
 from ..nbody.tools import parse_nbody_config
 from ..utils import timing_decorator, clean_up
@@ -57,7 +58,8 @@ def objective(trial, cfg: DictConfig,
 
     # run training
     start = time.time()
-    posterior, histories = run_training(
+    train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
+    posterior, histories = train_fn(
         x_train, theta_train, x_val, theta_val, out_dir=out_dir,
         prior_name=cfg.infer.prior, mcfg=mcfg,
         batch_size=None,
