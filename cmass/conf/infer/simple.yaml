@@ -91,6 +91,8 @@ weight_decay: null  # weight decay
 lr_decay_factor: null  # learning rate decay factor
 lr_patience: null  # learning rate decay patience
 
+precompress: True  # whether to precompress summaries before training
+
 # ~~ OPTUNA ARGS ~~
 hyperprior:
   model: ['nsf'] # , 'maf']
