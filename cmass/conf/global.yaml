@@ -15,6 +15,11 @@ meta:
   # wdir: "/data101/bartlett/ili/cmass/"
   wdir: "/anvil/scratch/x-mho1/cmass-ili"
   logdir: "${meta.wdir}/logs/"
+  
+  # separate summary  and working dir if I do not have writing permissions in raw summaries path
+  wdir: "/anvil/scratch/x-nchartier/cmass"
+  summ_dir: "/anvil/scratch/x-mho1/cmass-ili" 
+  
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
   # cosmofile: "./params/abacus_cosmologies.txt"      # for abacus-like
