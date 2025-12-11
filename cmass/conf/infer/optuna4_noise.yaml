@@ -1,4 +1,3 @@
-
 save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
@@ -23,7 +22,7 @@ simbig_lightcone: False # whether to train on simbig_lightcone summaries
 experiments:
   - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4,0.5]
+    kmax: [0.1, 0.2, 0.3, 0.4]
 
 
 # ~~ TRAINING ARGS ~~
@@ -40,6 +39,8 @@ backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
 
 stop_after_epochs: 50  # stop early after this many epochs
+
+do_reduction: False
 
 # ~~ OPTUNA ARGS ~~
 hyperprior:

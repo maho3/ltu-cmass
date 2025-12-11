@@ -20,15 +20,17 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  - summary: [nbar, zPk0]   # z-space monopole
-    kmin: [0.]
-    kmax: [0.2, 0.3, 0.4,0.5]
+#  - summary: [nbar, zPk0]   # z-space monopole
+#    kmin: [0.]
+#    kmax: [0.1, 0.2, 0.3, 0.4]
   - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4,0.5]
+    kmax: [0.2, 0.3]
   - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
     kmin: [0.]
-    kmax: [0.2, 0.3, 0.4,0.5]
+    kmax: [0.1, 0.2, 0.3]
+
+do_reduction: False
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
