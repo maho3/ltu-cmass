@@ -70,6 +70,9 @@ weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
 
+cross_val: False
+n_splits: 4
+
 precompress: False  # whether to precompress summaries before training
 
 # ~~ VALIDATION ARGS ~~
