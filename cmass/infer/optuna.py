@@ -126,7 +126,7 @@ def run_experiment(exp, cfg, model_path):
                                         hodprior, noiseprior, exp_path),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
-                timeout=60*60*4,  # 4 hours
+                timeout=60*60*24,  # max 24 hours
                 show_progress_bar=False,
                 gc_after_trial=True
             )
