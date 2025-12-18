@@ -22,17 +22,17 @@ lhid=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-Nhod=1
+Nhod=5
 
 nbody=quijote
-sim=nbody_optnoise
+sim=nbody_nonoise
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=fixed
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zheng_biased noise.params.radial=1.7 noise.params.transverse=3.3" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="bias=zheng_biased noise.params.radial=0 noise.params.transverse=0" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=1000
 N=128
 

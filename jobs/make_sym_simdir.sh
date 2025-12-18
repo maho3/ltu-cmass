@@ -2,8 +2,8 @@
 
 set -e
 
-SIM1="/anvil/scratch/x-mho1/cmass-ili/quijotelike/fastpm"
-SIM2="/anvil/scratch/x-mho1/cmass-ili/quijotelike/fastpm_nonoise"
+SIM1="/anvil/scratch/x-mho1/cmass-ili/quijote/nbody"
+SIM2="/anvil/scratch/x-mho1/cmass-ili/quijote/nbody_nonoise"
 SUBDIR="L1000-N128"
 N=1999
 
