@@ -11,7 +11,7 @@ Nmax: -1  # maximum number of simulations to load (-1 for all)
 
 correct_shot: true  # whether to correct for shot noise when normalizing
 
-halo: True      # whether to train on halo summaries
+halo: False      # whether to train on halo summaries
 galaxy: False    # whether to train on galaxy summaries
 ngc_lightcone: False # whether to train on ngc_lightcone summaries
 sgc_lightcone: False # whether to train on sgc_lightcone summaries
@@ -19,56 +19,35 @@ mtng_lightcone: False # whether to train on mtng_lightcone summaries
 simbig_lightcone: False # whether to train on simbig_lightcone summaries
 
 experiments:
-  # - summary: [nbar, Pk0]   # monopole
+  # - summary: [Pk0]   # monopole
   #   kmin: [0.]
   #   kmax: [0.4]
-  # - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  # - summary: [Pk0, Pk2, Pk4]   # monopole, quadrupole, hexadecapole
   #   kmin: [0.]
   #   kmax: [0.4]
-  # - summary: [zPk0]   # monopole
+  # - summary: [Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
   #   kmin: [0.]
   #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  - summary: [nbar, zPk0]   # z-space monopole
-    kmin: [0.]
+  - summary: [nbar, Pk0]   # z-space monopole
+    kmin: [0.001]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4]   # z-space monopole
+    kmin: [0.001]
     kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  - summary: [zBk0]
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4, EqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+    kmin: [0.001]
     kmax: [0.4]
-  - summary: [zBk0, zBk2]
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4, SqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
+    kmin: [0.001]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4, SsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
+    kmin: [0.001]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4, IsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
+    kmin: [0.001]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zBk0, zBk2]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
+  - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+    kmin: [0.001]
     kmax: [0.4]
 
 # ~~ TRAINING ARGS ~~
@@ -87,11 +66,9 @@ engine: NPE    # engine to use for training (NPE/NLE/NRE)
 batch_size: null  # batch size
 learning_rate: null  # learning rate
 stop_after_epochs: 50  # stop early after this many epochs
-weight_decay: null  # weight decay
-lr_decay_factor: null  # learning rate decay factor
-lr_patience: null  # learning rate decay patience
-
-precompress: True  # whether to precompress summaries before training
+weight_decay: 0  # weight decay
+lr_decay_factor: 0.5  # learning rate decay factor
+lr_patience: 10  # learning rate decay patience
 
 # ~~ OPTUNA ARGS ~~
 hyperprior:
@@ -106,9 +83,10 @@ hyperprior:
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
 
-n_trials: 30  # number of trials for hyperparameter optimization
+n_trials: 50  # number of trials for hyperparameter optimization
 
 n_startup_trials: 50  # number of startup trials for hyperparameter optimization
+
 
 # ~~ VALIDATION ARGS ~~
 clean_models: True  # whether to delete poorly fit model files after validation
