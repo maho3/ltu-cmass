@@ -7,10 +7,11 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 from os.path import join
 import logging
+import numpy as np
 
 from sklearn.model_selection import KFold, train_test_split
 
-from .preprocess import setup_optuna, split_train_val
+from .preprocess import setup_optuna
 from .train import (load_preprocessed_data,
                     run_training, run_training_with_precompression,
                     evaluate_posterior, plot_training_history)
@@ -96,7 +97,7 @@ def objective(trial, cfg: DictConfig,
 
 def objective_cval(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path, n_splits_in):
+              hodprior, noiseprior, exp_path, n_splits):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -148,11 +149,11 @@ def objective_cval(trial, cfg: DictConfig,
     scores_out = np.zeros((n_splits,))
     for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all, y = theta_all)):
         
-        x_train_in = x_cvin[train_idx]
-        theta_train_in = theta_cvin[train_ids]
+        x_train_valid = x_all[train_valid_idx]
+        theta_train_valid = theta_all[train_valid_idx]
         
-        x_val_in= x_cvin[val_idx]
-        theta_val_in = theta_cvin[val_idx]
+        x_test= x_all[test_idx]
+        theta_test = theta_all[test_idx]
 
         # Our test splits redefines test_frac, so we use anotherfor valfrac (out of training set, ignoring test set)
         val_frac = cfg.infer.cv_val_frac
@@ -205,6 +206,9 @@ def run_experiment(exp, cfg, model_path):
 
     objective_fn = objective_cval if cfg.infer.cross_val else objective
     args_dict = {"n_splits":cfg.infer.n_splits} if cfg.infer.cross_val else {}
+
+    if cfg.infer.cross_val:
+        logging.info(f'Optuna objectives uses cross-validation.')
     
     for kmin in kmin_list:
         for kmax in kmax_list:
