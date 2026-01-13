@@ -8,9 +8,9 @@ import hydra
 from os.path import join
 import logging
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 
-from .preprocess import setup_optuna
+from .preprocess import setup_optuna, split_train_val
 from .train import (load_preprocessed_data,
                     run_training, run_training_with_precompression,
                     evaluate_posterior, plot_training_history)
@@ -103,11 +103,10 @@ def objective_cval(trial, cfg: DictConfig,
 
     # Instantiate cross_validators
     # In ILI, we train with validation and train sets, and perform optuna based on the test set
-    # We thus need nested cross validation
-    cval_infold = KFold(n_splits=n_splits, shuffle=True, random_state = 0)
+    # We do not use nested cross validation (inner and outer loop) for the validation set we keep fixed
     cval_outfold = KFold(n_splits=n_splits, shuffle=True, random_state = 0)
 
-    # Aggregate again the splits, to implement the nested cross-val
+    # Aggregate splits
     x_all, theta_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test))
 
     # Sample hyperparameters
@@ -147,7 +146,7 @@ def objective_cval(trial, cfg: DictConfig,
     start = time.time()
     K=0
     scores_out = np.zeros((n_splits,))
-    for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all,y = theta_all)):
+    for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all, y = theta_all)):
         
         x_train_valid = x_all[train_valid_idx]
         theta_train_valid = theta_all[train_valid_idx]
@@ -155,52 +154,44 @@ def objective_cval(trial, cfg: DictConfig,
         x_test= x_all[test_idx]
         theta_test = theta_all[test_idx]
 
-        # Inner loop - not averaged over in nested cross val
-        # The inner loop is referred as "hyperparameter tuning" in nested cross-val, which can be confusing with Optuna on top
-        score_in = np.inf
-        for fold_in, (train_idx, valid_idx) in enumerate(cval_infold.split(x_train_valid,y = theta_train_valid):
+        # Our test splits redefines test_frac, so we use anotherfor valfrac (out of training set, ignoring test set)
+        val_frac = cfg.infer.cv_val_frac
+        x_train, x_val, theta_train, theta_val = train_test_split(x_train_valid, theta_train_valid, test_size=val_frac, random_state=1)
 
-            x_train = x_train_valid[train_idx]
-            theta_train = theta_train_valid[train_idx]
+        out_dir_K = join(out_dir, "split%i"%K)
+        
+        # run training
+        train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
+        posterior, histories = train_fn(
+            x_train, theta_train, x_val, theta_val, out_dir=out_dir_K,
+            prior_name=cfg.infer.prior, mcfg=mcfg,
+            batch_size=None,
+            learning_rate=None,
+            stop_after_epochs=cfg.infer.stop_after_epochs,
+            val_frac=cfg.infer.cv_val_frac*(1.-1./n_splits), # overall val_frac including test set
+            weight_decay=None,
+            lr_decay_factor=None,
+            lr_patience=None,
+            backend=cfg.infer.backend, engine=cfg.infer.engine,
+            device=cfg.infer.device,
+            hodprior=hodprior, noiseprior=noiseprior, verbose=False
+        )
+
+        # Evaluate loop score
+        scores_out[K] = evaluate_posterior(posterior, x_test, theta_test)
+
+        # Save the timing and metadata
+        with open(join(out_dir_K, 'timing.txt'), 'w') as f:
+            f.write(f'{end - start:.3f}')
+        with open(join(out_dir_K, 'model_config.yaml'), 'w') as f:
+            yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+        
+        with open(join(out_dir_K, 'log_prob_test.txt'), 'w') as f:
+            f.write(f'{scores_out[K]}\n')
             
-            x_val = x_train_valid[valid_idx]
-            theta_val = theta_train_valid[valid_idx]
-
-            # run training
-            train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
-            posterior, histories = train_fn(
-                x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=mcfg,
-                batch_size=None,
-                learning_rate=None,
-                stop_after_epochs=cfg.infer.stop_after_epochs,
-                val_frac=cfg.infer.val_frac,
-                weight_decay=None,
-                lr_decay_factor=None,
-                lr_patience=None,
-                backend=cfg.infer.backend, engine=cfg.infer.engine,
-                device=cfg.infer.device,
-                hodprior=hodprior, noiseprior=noiseprior, verbose=False
-            )
-
-            # Evaluate inner loop score
-            log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
-            score_in = log_prob_test if log_prob_test >= score_in else score_in
-
-        scores_out[K] = scores_in
         K+=1
 
     end = time.time()
-
-    # Save the timing and metadata
-    with open(join(out_dir, 'timing.txt'), 'w') as f:
-        f.write(f'{end - start:.3f}')
-    with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-        yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
-
-    with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-        f.write(f'{scores_out.mean()}\n')
-
     return scores_out.mean()
 
 def run_experiment(exp, cfg, model_path):
