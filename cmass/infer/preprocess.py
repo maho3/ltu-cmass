@@ -292,7 +292,8 @@ def main(cfg: DictConfig) -> None:
             include_hod=cfg.infer.include_hod,
             include_noise=cfg.infer.include_noise)
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            #save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary)) # sim to compare pinocchio, fastpm...
             run_preprocessing(summaries, parameters, ids,
                               hodprior, noiseprior, exp, cfg, save_path)
 

@@ -96,7 +96,7 @@ def objective(trial, cfg: DictConfig,
 
 def objective_cval(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path, n_splits):
+              hodprior, noiseprior, exp_path, n_splits_in):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -141,18 +141,18 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
-    # Handle the cross val splits
-    # Outer loop -> the test set is taken there. Outer loop is to be averaged over - "Real risk optimization" 
+    # Handle the cross val splits: this is a cross-validation inside the hyperparameter tuning/inner loop !
+    # Careful about this confusion
     start = time.time()
     K=0
     scores_out = np.zeros((n_splits,))
     for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all, y = theta_all)):
         
-        x_train_valid = x_all[train_valid_idx]
-        theta_train_valid = theta_all[train_valid_idx]
+        x_train_in = x_cvin[train_idx]
+        theta_train_in = theta_cvin[train_ids]
         
-        x_test= x_all[test_idx]
-        theta_test = theta_all[test_idx]
+        x_val_in= x_cvin[val_idx]
+        theta_val_in = theta_cvin[val_idx]
 
         # Our test splits redefines test_frac, so we use anotherfor valfrac (out of training set, ignoring test set)
         val_frac = cfg.infer.cv_val_frac
@@ -194,6 +194,8 @@ def objective_cval(trial, cfg: DictConfig,
     end = time.time()
     return scores_out.mean()
 
+# If the inner loop cross validation is enabled, the val_frac configuration is overwritten by
+# the number of inner splits we ask for
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
@@ -201,8 +203,8 @@ def run_experiment(exp, cfg, model_path):
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-    objective_fn = objective_cval if cfg.infer.crossval else objective
-    args_dict = {"n_splits":cfg.infer.n_splits} if cfg.infer.crossval else {}
+    objective_fn = objective_cval if cfg.infer.cross_val else objective
+    args_dict = {"n_splits":cfg.infer.n_splits} if cfg.infer.cross_val else {}
     
     for kmin in kmin_list:
         for kmax in kmax_list:
@@ -244,6 +246,7 @@ def run_experiment(exp, cfg, model_path):
 @clean_up(hydra)
 def main(cfg: DictConfig) -> None:
 
+    # New for outer loop of nested cross validation
     cfg = parse_nbody_config(cfg)
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
     if cfg.infer.save_dir is not None:
@@ -263,7 +266,8 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            #save_path = join(model_dir, tracer, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary)) # sim to compare pinocchio, fastpm...
             run_experiment(exp, cfg, save_path)
 
 
