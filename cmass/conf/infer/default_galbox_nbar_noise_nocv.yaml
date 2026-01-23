@@ -1,4 +1,4 @@
-save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise_nocv  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -78,5 +78,5 @@ hyperprior:
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
 
-n_trials: 50  # number of trials for hyperparameter optimization
-n_startup_trials: 50  # number of startup trials for hyperparameter optimization
+n_trials: 60  # number of trials for hyperparameter optimization
+n_startup_trials: 40  # number of startup trials for hyperparameter optimization

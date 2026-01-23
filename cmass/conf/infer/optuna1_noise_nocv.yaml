@@ -1,4 +1,4 @@
-save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise_cv  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
+save_dir: /anvil/scratch/x-nchartier/cmass/quijotelike_benchmark/preprocessed_noise_nocv  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
@@ -53,7 +53,7 @@ stop_after_epochs: 50  # stop early after this many epochs
 # lr_patience: null  # learning rate decay patience
 
 # Cross-validation related params
-cross_val: True
+cross_val: False
 n_splits: 4
 cv_val_frac: 0.1
 

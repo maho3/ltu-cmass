@@ -142,13 +142,12 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
-    # Handle the cross val splits: this is a cross-validation inside the hyperparameter tuning/inner loop !
-    # Careful about this confusion
-    start = time.time()
+    # Handle the cross val splits.
     K=0
     scores_out = np.zeros((n_splits,))
     for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all, y = theta_all)):
         
+        start = time.time()
         x_train_valid = x_all[train_valid_idx]
         theta_train_valid = theta_all[train_valid_idx]
         
@@ -180,7 +179,7 @@ def objective_cval(trial, cfg: DictConfig,
 
         # Evaluate loop score
         scores_out[K] = evaluate_posterior(posterior, x_test, theta_test)
-
+        end = time.time()
         # Save the timing and metadata
         with open(join(out_dir_K, 'timing.txt'), 'w') as f:
             f.write(f'{end - start:.3f}')
@@ -192,7 +191,6 @@ def objective_cval(trial, cfg: DictConfig,
             
         K+=1
 
-    end = time.time()
     return scores_out.mean()
 
 # If the inner loop cross validation is enabled, the val_frac configuration is overwritten by
