@@ -1,0 +1,294 @@
+import numpy as np
+import os
+import pickle
+import argparse
+import logging
+#set logging with time 
+
+# logging.getLogger("ili").disabled = True
+# logging.getLogger("sbi").disabled = True
+# logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+
+import warnings
+warnings.filterwarnings('ignore')
+
+import ili
+from ili.dataloaders import NumpyLoader
+from ili.inference import InferenceRunner
+
+import torch
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+def train_npe_model(input_X, input_y):
+    '''
+    function to train NPE model given input data
+
+    input_X: training data (numpy array)
+    input_y: training parameters (numpy array)
+
+    returns: trained posterior ensemble
+    '''
+
+
+
+
+    # a set of hyperparameters I found useful in other projects. 
+    # Should be re-tuned
+    best = {'learning_rate': 1e-4, 
+        'batch_size': 128, 
+        'hidden_1': 49, 
+        'hidden_2': 36, 
+        'hidden_3': 64, 
+        'num_transforms': 9,
+        'hidden_features': 52}
+    
+
+    loader = NumpyLoader(x=input_X, theta=input_y)
+
+    # define a prior
+    prior = ili.utils.Uniform(low=np.min(input_y,axis=0),high=np.max(input_y,axis=0), device=device)
+    
+    # instantiate networks. I only use one model here for simplicity
+    num_models = 1
+    nets = [
+        ili.utils.load_nde_sbi(engine='NPE', model='maf', hidden_features=best['hidden_features'], num_transforms=best['num_transforms']) for _ in range(num_models)
+    ]
+
+    # define training arguments
+    train_args = {
+        'training_batch_size': best['batch_size'],
+        'learning_rate': best['learning_rate']
+    }
+
+    # initialize the trainer
+    runner = InferenceRunner.load(
+        backend='sbi',
+        engine='NPE',
+        prior=prior,
+        nets=nets,
+        device=device,
+        train_args=train_args,
+        proposal=None,
+        out_dir=None
+    )
+
+    # train the model   
+    posterior_ensemble, summaries = runner(loader=loader)
+    
+    return posterior_ensemble
+
+
+
+def train_and_save_nested_models(
+    X_all,
+    theta_all,
+    sizes,
+    B,
+    out_dir,
+    base_seed=0,
+):
+    
+    '''
+    train and save nested NPE models
+
+    X_all: all training data
+    theta_all: all training parameters
+    sizes: list of training sizes
+    B: number of nested sequences
+    out_dir: output directory to save the models
+    base_seed: base random seed for reproducibility
+
+    '''
+
+
+    N = len(X_all)
+
+    for b in range(B):
+        rng = np.random.default_rng(base_seed + b)
+
+        # one random permutation = one nested sequence
+        perm = rng.permutation(N)
+
+        X_perm = X_all[perm]
+        theta_perm = theta_all[perm]
+
+        for n in sizes:
+            assert n <= N
+
+            X_sub = X_perm[:n]
+            theta_sub = theta_perm[:n]
+
+            logging.info(f"[seq {b}] training N={n}")
+
+            model = train_npe_model(X_sub, theta_sub)
+
+            # save model
+            fname = f"npe_seq{b}_N{n}.pkl"
+            fpath = os.path.join(out_dir, fname)
+
+            torch.save(model, fpath)
+            logging.info(f"  saved -> {fpath}")
+
+
+def eval_nested_models(models_dir, X_test, theta_test, sizes, B):
+    ''''
+    evaluate the nested models by computing the average log-probability on the test set
+    models_dir: directory where the nested models are saved
+    X_test: test data
+    theta_test: test parameters
+    sizes: list of training sizes
+    B: number of nested sequences
+
+    returns:
+    all_mis: array of shape (B, len(sizes)) containing the average log-probabilities
+    '''
+
+    seq_idx_all = np.arange(B)
+
+    all_mis = []
+    for seq_idx in seq_idx_all:
+        mi_seq = []
+        for N_train in sizes:
+            model = torch.load(f'{models_dir}/npe_seq{seq_idx}_N{N_train}.pkl')
+
+            # NOTE: 
+            # Here I use `log_prob_batched` from the sbi package to speed up the computation.
+            # I also set `norm_posterior=False` to obtain *unnormalized* log probabilities.
+            #
+            # The reason is that, for flat priors, sbi estimates the normalization constant
+            # by Monte Carlo sampling a large number of points at each log-probability evaluation.
+            # This procedure is very time-consuming and can occasionally stall.
+            #
+            # When the flow is well trained, the unnormalized log probabilities should be close
+            # to the normalized ones. However, this approximation
+            # should be kept in mind when interpreting the results.
+            log_p = model.posteriors[0].log_prob_batched(np.float32(theta_test[np.newaxis]),np.float32(X_test), norm_posterior=False)
+            log_p = log_p.numpy()
+            #remove -inf values
+            log_p = log_p[~np.isinf(log_p)]
+
+            mi_seq.append(np.mean(log_p))
+
+        all_mis.append(mi_seq)
+    
+    return np.array(all_mis)  # shape (B, len(sizes))
+
+def main(summary_path, output_path=None):
+    ''''
+    main function to run data sufficiency test on a given summary
+    inputs:
+    summary_path: path to the summary directory containing x_train, theta_train, x_val, theta_val, x_test, theta_test
+    output_path: optional path to save the results (if None, saves to summary_path)
+    
+    '''
+
+    logging.info('Device: %s', device)
+    logging.info(f'Summary used: {os.path.basename(os.path.dirname(summary_path))}')
+
+
+    
+    x_train = np.load(f'{summary_path}/x_train.npy')
+    theta_train = np.load(f'{summary_path}/theta_train.npy')
+    x_val = np.load(f'{summary_path}/x_val.npy')
+    theta_val = np.load(f'{summary_path}/theta_val.npy')
+
+    #fixed test set for calculating log-probabilities
+    x_test = np.load(f'{summary_path}/x_test.npy')
+    theta_test = np.load(f'{summary_path}/theta_test.npy')
+
+    X_all = np.concatenate([x_train, x_val], axis=0)
+    theta_all = np.concatenate([theta_train, theta_val], axis=0)
+
+
+
+    N = len(X_all)
+    k = 5 # number of nested sizes
+
+    # nested sizes. in this case, double the size each time
+    sizes = np.array([N/2**(k-i-1) for i in range(k)]).astype(int)
+    sizes[-1] = N  # ensure max size = N
+
+    # number of independent nested sequences
+    # B sequences will be trained, each with different random permutations and increasing sizes
+    B = 5
+
+
+    # output directory
+    # if not provided, save to summary_path
+    # models are saved to nested_npe_models/ subdirectory
+    if output_path is None:
+        model_out_dir = os.path.join(summary_path, 'nested_npe_models/')
+        out_dir = summary_path
+    else:
+        model_out_dir = os.path.join(output_path, 'nested_npe_models/')
+        out_dir = output_path
+
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(model_out_dir, exist_ok=True)
+
+    train_and_save_nested_models(
+        X_all=X_all,
+        theta_all=theta_all,
+        sizes=sizes,
+        B=B,
+        out_dir=model_out_dir,
+    )
+
+    test_log_probs = eval_nested_models(
+        models_dir=model_out_dir,
+        X_test=x_test,
+        theta_test=theta_test,
+        sizes=sizes,
+        B=B,
+    )
+
+    #save test_log_probs
+    np.save(os.path.join(out_dir, 'test_log_probs.npy'), test_log_probs)
+
+
+def parse_args():
+    '''
+    get command line arguments
+
+    args:
+    --data_path: base path containing summary subdirectories
+    --summaries: list of summaries to run
+    --output_path: optional output path (if not provided, output_path=None)
+
+    returns: parsed arguments
+    '''
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        required=True,
+        help="Base path containing summary subdirectories",
+    )
+    parser.add_argument(
+        "--summaries",
+        type=str,
+        nargs="+",
+        required=True,
+        help="List of summaries to run",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default=None,
+        help="Optional output path (if not provided, output_path=None)",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    for summary in args.summaries:
+        # summary path, assume kmin-0.0_kmax-0.4
+        input_path = os.path.join(args.data_path, summary,'kmin-0.0_kmax-0.4')
+
+        main(
+            summary_path=input_path,
+            output_path=args.output_path,
+        )
