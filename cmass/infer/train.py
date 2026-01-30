@@ -83,7 +83,8 @@ def run_training(
     batch_size, learning_rate, stop_after_epochs, val_frac,
     weight_decay, lr_decay_factor, lr_patience,
     backend, engine, device,
-    hodprior=None, noiseprior=None, verbose=True
+    hodprior=None, noiseprior=None, verbose=True,
+    validation_smoothing_method='none', ema_decay=0.9,
 ):
     # select the network configuration
     if verbose:
@@ -128,7 +129,9 @@ def run_training(
         'validation_fraction': val_frac,
         'weight_decay': wd,
         'lr_decay_factor': lrdf,
-        'lr_patience': lrp
+        'lr_patience': lrp,
+        'ema_decay': ema_decay,
+        'validation_smoothing_method': validation_smoothing_method.lower(),
     }
 
     # setup data loaders
@@ -213,6 +216,8 @@ def run_experiment(exp, cfg, model_path):
 
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none')
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
 
     for kmin in kmin_list:
         for kmax in kmax_list:
@@ -248,6 +253,8 @@ def run_experiment(exp, cfg, model_path):
                 backend=cfg.infer.backend, engine=cfg.infer.engine,
                 device=cfg.infer.device,
                 hodprior=hodprior, noiseprior=noiseprior,
+                validation_smoothing_method=validation_smoothing_method,
+                ema_decay=ema_decay,
             )
             end = time.time()
 
