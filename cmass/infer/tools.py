@@ -4,7 +4,6 @@ import torch
 import io
 import pickle
 from torch.utils.data import TensorDataset, DataLoader
-from omegaconf import open_dict
 
 
 def split_experiments(exp_cfg):
