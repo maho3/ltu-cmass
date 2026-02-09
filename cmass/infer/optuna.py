@@ -9,7 +9,7 @@ from os.path import join
 import logging
 import numpy as np
 
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import KFold, train_test_split, GroupShuffleSplit
 
 from .preprocess import setup_optuna
 from .train import (load_preprocessed_data,
@@ -215,9 +215,9 @@ def run_experiment(exp, cfg, model_path):
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
             # load training/test data
-            (x_train, theta_train,
-             x_val, theta_val,
-             x_test, theta_test,
+            (x_train, theta_train, ids_train,
+             x_val, theta_val, ids_val,
+             x_test, theta_test, ids_test,
              hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
             logging.info(

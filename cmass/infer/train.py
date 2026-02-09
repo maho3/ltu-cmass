@@ -291,10 +291,13 @@ def load_preprocessed_data(exp_path):
     try:
         x_train = np.load(join(exp_path, 'x_train.npy'))
         theta_train = np.load(join(exp_path, 'theta_train.npy'))
+        ids_train = np.load(join(exp_path, 'ids_train.npy'))
         x_val = np.load(join(exp_path, 'x_val.npy'))
         theta_val = np.load(join(exp_path, 'theta_val.npy'))
+        ids_val = np.load(join(exp_path, 'ids_val.npy'))
         x_test = np.load(join(exp_path, 'x_test.npy'))
         theta_test = np.load(join(exp_path, 'theta_test.npy'))
+        ids_test = np.load(join(exp_path, 'ids_test.npy'))
         filepath = join(exp_path, 'hodprior.csv')
         hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
                     if os.path.exists(filepath) else None)
@@ -307,8 +310,8 @@ def load_preprocessed_data(exp_path):
             'Make sure to run cmass.infer.preprocess first.'
         )
 
-    return (x_train, theta_train, x_val, theta_val, x_test, theta_test,
-            hodprior, noiseprior)
+    return (x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, 
+            theta_test, ids_test, hodprior, noiseprior)
 
 
 def run_experiment(exp, cfg, model_path):
@@ -325,9 +328,9 @@ def run_experiment(exp, cfg, model_path):
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
             # load training/test data
-            (x_train, theta_train,
-             x_val, theta_val,
-             x_test, theta_test,
+            (x_train, theta_train, ids_train,
+             x_val, theta_val, ids_val,
+             x_test, theta_test, ids_test,
              hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
             logging.info(
