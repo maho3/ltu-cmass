@@ -19,7 +19,8 @@ from .tools import split_experiments
 
 def objective(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path):
+              hodprior, noiseprior, exp_path, validation_smoothing_method='none',
+                ema_decay=0.9):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -71,7 +72,9 @@ def objective(trial, cfg: DictConfig,
         lr_patience=None,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
-        hodprior=hodprior, noiseprior=noiseprior, verbose=False
+        hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+        validation_smoothing_method=validation_smoothing_method,
+        ema_decay=ema_decay
     )
     end = time.time()
 
@@ -100,6 +103,9 @@ def run_experiment(exp, cfg, model_path):
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
+    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none').lower()
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
+
     for kmin in kmin_list:
         for kmax in kmax_list:
             logging.info(
@@ -123,7 +129,9 @@ def run_experiment(exp, cfg, model_path):
             study.optimize(
                 lambda trial: objective(trial, cfg, x_train, theta_train,
                                         x_val, theta_val, x_test, theta_test,
-                                        hodprior, noiseprior, exp_path),
+                                        hodprior, noiseprior, exp_path,
+                                        validation_smoothing_method,
+                                        ema_decay),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
                 timeout=60*60*24,  # max 24 hours
