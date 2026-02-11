@@ -21,7 +21,7 @@ from .tools import split_experiments
 
 
 def objective(trial, cfg: DictConfig,
-              x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, theta_test, ids_test,
               hodprior, noiseprior, exp_path):
 
     trial_num = trial.number
@@ -96,7 +96,7 @@ def objective(trial, cfg: DictConfig,
     return log_prob_test
 
 def objective_cval(trial, cfg: DictConfig,
-              x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, theta_test, ids_test,
               hodprior, noiseprior, exp_path, n_splits):
 
     trial_num = trial.number
@@ -104,11 +104,10 @@ def objective_cval(trial, cfg: DictConfig,
 
     # Instantiate cross_validators
     # In ILI, we train with validation and train sets, and perform optuna based on the test set
-    # We do not use nested cross validation (inner and outer loop) for the validation set we keep fixed
-    cval_outfold = KFold(n_splits=n_splits, shuffle=True, random_state = 0)
+    # We do not use nested cross validation, i.e. we do not split based on the validation set in the "inner" loop
 
     # Aggregate splits
-    x_all, theta_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test))
+    x_all, theta_all, ids_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test),np.vstack((ids_train, ids_val, ids_test))
 
     # Sample hyperparameters
     hyperprior = cfg.infer.hyperprior
@@ -142,22 +141,36 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
-    # Handle the cross val splits.
+    
+    # Handle the cross val splits in the "outer loop" (i.e. hyperparameter study)
+    gss = GroupShuffleSplit(n_splits=n_splits, test_size=cfg.infer.test_frac, random_state = 9)
     K=0
     scores_out = np.zeros((n_splits,))
-    for fold_out, (train_valid_idx, test_idx) in enumerate(cval_outfold.split(x_all, y = theta_all)):
+
+    for fold_out, (train_valid_idx, test_idx) in enumerate(gss.split(x_all, theta_all, ids_all)):
         
         start = time.time()
         x_train_valid = x_all[train_valid_idx]
         theta_train_valid = theta_all[train_valid_idx]
+        ids_train_valid = ids_all[train_valid_idx]
         
         x_test= x_all[test_idx]
         theta_test = theta_all[test_idx]
+        ids_test = ids_all[test_idx]
 
-        # Our test splits redefines test_frac, so we use anotherfor valfrac (out of training set, ignoring test set)
-        val_frac = cfg.infer.cv_val_frac
-        x_train, x_val, theta_train, theta_val = train_test_split(x_train_valid, theta_train_valid, test_size=val_frac, random_state=1)
+        ## The validation fraction argument, for consistency, is the fraction BEFORE extracting a test set
+        val_frac = cfg.infer.val_frac/(1. - cfg.infer.test_frac)
 
+        # Inner loop (i.e "normal") split for ILI training, still using the id conditioning)
+        gss = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state = 1)
+        train_idx, val_idx = next(gss.split(x_train_valid, theta_train_valid, ids_train_valid))
+
+        x_train = x_train_valid[train_idx]
+        x_val = x_train_valid[val_idx]
+
+        theta_train = theta_train_valid[train_idx]
+        theta_val = theta_train_valid[val_idx]
+        
         out_dir_K = join(out_dir, "split%i"%K)
         
         # run training
@@ -168,7 +181,7 @@ def objective_cval(trial, cfg: DictConfig,
             batch_size=None,
             learning_rate=None,
             stop_after_epochs=cfg.infer.stop_after_epochs,
-            val_frac=cfg.infer.cv_val_frac*(1.-1./n_splits), # overall val_frac including test set
+            val_frac= val_frac # overall val_frac including test set
             weight_decay=None,
             lr_decay_factor=None,
             lr_patience=None,
@@ -229,8 +242,8 @@ def run_experiment(exp, cfg, model_path):
             study = setup_optuna(
                 exp_path, name, cfg.infer.n_startup_trials)
             study.optimize(
-                lambda trial: objective_fn(trial, cfg, x_train, theta_train,
-                                        x_val, theta_val, x_test, theta_test,
+                lambda trial: objective_fn(trial, cfg, x_train, theta_train, ids_train,
+                                        x_val, theta_val, ids_val, x_test, theta_test, ids_test,
                                         hodprior, noiseprior, exp_path, **args_dict),
                 n_trials=cfg.infer.n_trials,
                 n_jobs=1,
