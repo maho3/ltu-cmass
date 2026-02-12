@@ -20,9 +20,9 @@ from ..utils import timing_decorator, clean_up
 from .tools import split_experiments
 
 
-def objective(trial, cfg: DictConfig,
-              x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, theta_test, ids_test,
-              hodprior, noiseprior, exp_path):
+def objective(trial, cfg: DictConfig, x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              hodprior, noiseprior, exp_path, validation_smoothing_method='none',
+                ema_decay=0.9):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -74,7 +74,9 @@ def objective(trial, cfg: DictConfig,
         lr_patience=None,
         backend=cfg.infer.backend, engine=cfg.infer.engine,
         device=cfg.infer.device,
-        hodprior=hodprior, noiseprior=noiseprior, verbose=False
+        hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+        validation_smoothing_method=validation_smoothing_method,
+        ema_decay=ema_decay
     )
     end = time.time()
 
@@ -96,8 +98,9 @@ def objective(trial, cfg: DictConfig,
     return log_prob_test
 
 def objective_cval(trial, cfg: DictConfig,
-              x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, theta_test, ids_test,
-              hodprior, noiseprior, exp_path, n_splits):
+              x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              hodprior, noiseprior, exp_path, n_splits, ids_train, ids_val, ids_test,
+                   validation_smoothing_method='none',ema_decay=0.9):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -216,10 +219,12 @@ def run_experiment(exp, cfg, model_path):
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
     objective_fn = objective_cval if cfg.infer.cross_val else objective
-    args_dict = {"n_splits":cfg.infer.n_splits} if cfg.infer.cross_val else {}
 
     if cfg.infer.cross_val:
         logging.info(f'Optuna objectives uses cross-validation.')
+
+    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none').lower()
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
     
     for kmin in kmin_list:
         for kmax in kmax_list:
@@ -233,6 +238,14 @@ def run_experiment(exp, cfg, model_path):
              x_test, theta_test, ids_test,
              hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
+            if cfg.infer.cross_val:
+                list_args = [cfg.infer.n_splits]
+                list_args.append(ids_train)
+                list_args.append(ids_val)
+                list_args.append(ids_test)
+            else:
+                list_args = []
+
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
                 f'{len(x_test)} testing')
@@ -241,16 +254,15 @@ def run_experiment(exp, cfg, model_path):
             logging.info('Running hyperparameter optimization...')
             study = setup_optuna(
                 exp_path, name, cfg.infer.n_startup_trials)
-            study.optimize(
-                lambda trial: objective_fn(trial, cfg, x_train, theta_train, ids_train,
-                                        x_val, theta_val, ids_val, x_test, theta_test, ids_test,
-                                        hodprior, noiseprior, exp_path, **args_dict),
-                n_trials=cfg.infer.n_trials,
-                n_jobs=1,
-                timeout=60*60*24,  # max 24 hours
-                show_progress_bar=False,
-                gc_after_trial=True
-            )
+            study.optimize(lambda trial: objective(trial, cfg, x_train, theta_train,
+                                                   x_val, theta_val, x_test, theta_test,
+                                                   hodprior, noiseprior, exp_path, *list_args,
+                                                   validation_smoothing_method=validation_smoothing_method,ema_decay=ema_decay),
+                           n_trials=cfg.infer.n_trials, n_jobs=1,
+                           timeout=60*60*24,  # max 24 hours*
+                           show_progress_bar=False,
+                           gc_after_trial=True
+                          )
             # NOTE: n_jobs>1 doesn't seem to speed things up much,
             # It seems processes are fighting for threads.
             # Instead, we parallelize via SLURM
