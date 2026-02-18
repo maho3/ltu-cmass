@@ -110,7 +110,7 @@ def objective_cval(trial, cfg: DictConfig,
     # We do not use nested cross validation, i.e. we do not split based on the validation set in the "inner" loop
 
     # Aggregate splits
-    x_all, theta_all, ids_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test),np.vstack((ids_train, ids_val, ids_test))
+    x_all, theta_all, ids_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test)), np.concatenate((ids_train, ids_val, ids_test))
 
     # Sample hyperparameters
     hyperprior = cfg.infer.hyperprior
@@ -184,7 +184,7 @@ def objective_cval(trial, cfg: DictConfig,
             batch_size=None,
             learning_rate=None,
             stop_after_epochs=cfg.infer.stop_after_epochs,
-            val_frac= val_frac # overall val_frac including test set
+            val_frac= val_frac, # overall val_frac including test set
             weight_decay=None,
             lr_decay_factor=None,
             lr_patience=None,
@@ -209,8 +209,6 @@ def objective_cval(trial, cfg: DictConfig,
 
     return scores_out.mean()
 
-# If the inner loop cross validation is enabled, the val_frac configuration is overwritten by
-# the number of inner splits we ask for
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
@@ -221,7 +219,9 @@ def run_experiment(exp, cfg, model_path):
     objective_fn = objective_cval if cfg.infer.cross_val else objective
 
     if cfg.infer.cross_val:
-        logging.info(f'Optuna objectives uses cross-validation.')
+        logging.info(f'Optuna objective uses cross-validation.')
+    else:
+        logging.info(f'Optuna objective does not use cross-validation')
 
     validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none').lower()
     ema_decay = cfg.infer.get('ema_decay', 0.9)
@@ -254,7 +254,7 @@ def run_experiment(exp, cfg, model_path):
             logging.info('Running hyperparameter optimization...')
             study = setup_optuna(
                 exp_path, name, cfg.infer.n_startup_trials)
-            study.optimize(lambda trial: objective(trial, cfg, x_train, theta_train,
+            study.optimize(lambda trial: objective_fn(trial, cfg, x_train, theta_train,
                                                    x_val, theta_val, x_test, theta_test,
                                                    hodprior, noiseprior, exp_path, *list_args,
                                                    validation_smoothing_method=validation_smoothing_method,ema_decay=ema_decay),
