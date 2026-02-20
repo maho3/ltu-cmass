@@ -135,7 +135,7 @@ def run_retraining_after_cval(exp, cfg, model_path):
                 batch_size=None,
                 learning_rate=None,
                 stop_after_epochs=cfg.infer.stop_after_epochs,
-                val_frac= val_frac, # overall val_frac including test set
+                val_frac= cfg.infer.val_frac, # overall val_frac including test set
                 weight_decay=None,
                 lr_decay_factor=None,
                 lr_patience=None,
@@ -149,7 +149,7 @@ def run_retraining_after_cval(exp, cfg, model_path):
             with open(join(out_dir, 'timing.txt'), 'w') as f:
                 f.write(f'{end - start:.3f}')
             with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+                yaml.dump(OmegaConf.to_container(config, resolve=True), f)
 
             # plot training history
             plot_training_history(histories, out_dir)
@@ -172,7 +172,6 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
-    cfg.net = cfg.net[cfg.infer.net_index]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
