@@ -131,7 +131,7 @@ def run_retraining_after_cval(exp, cfg, model_path):
                 start = time.time()
                 posterior, histories = train_fn(
                 x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=config,
+                prior_name=cfg.infer.prior, mcfg=OmegaConf.create(config),
                 batch_size=None,
                 learning_rate=None,
                 stop_after_epochs=cfg.infer.stop_after_epochs,
