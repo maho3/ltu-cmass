@@ -128,10 +128,12 @@ def run_retraining_after_cval(exp, cfg, model_path):
                     f'Split: {len(x_train)} training, {len(x_val)} validation, '
                     f'{len(x_test)} testing')
 
+                mcfg = OmegaConf.create(config)
+
                 start = time.time()
                 posterior, histories = train_fn(
                 x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=OmegaConf.create(config),
+                prior_name=cfg.infer.prior, mcfg=mcfg,
                 batch_size=None,
                 learning_rate=None,
                 stop_after_epochs=cfg.infer.stop_after_epochs,
@@ -149,7 +151,7 @@ def run_retraining_after_cval(exp, cfg, model_path):
             with open(join(out_dir, 'timing.txt'), 'w') as f:
                 f.write(f'{end - start:.3f}')
             with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                yaml.dump(OmegaConf.to_container(config, resolve=True), f)
+                yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
 
             # plot training history
             plot_training_history(histories, out_dir)
