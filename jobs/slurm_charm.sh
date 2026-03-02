@@ -10,7 +10,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=98
+# SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 # baseoffset=0
 
@@ -25,7 +25,7 @@ cd /home/x-mho1/git/ltu-cmass-run
 nbody=quijotelike
 sim=fastpm
 multisnapshot=True
-extras="nbody.matchIC=0 nbody.suite=quijotelike_nophase" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+extras="nbody.matchIC=0 nbody.suite=quijotelike" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
 L=1000
 N=128
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)

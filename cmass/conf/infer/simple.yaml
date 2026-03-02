@@ -55,10 +55,10 @@ experiments:
   # - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
   #   kmin: [0.]
   #   kmax: [0.4]
-  - summary: [zBk0]
+  - summary: [nbar, zBk0]
     kmin: [0.]
     kmax: [0.4]
-  - summary: [zBk0, zBk2]
+  - summary: [nbar, zBk0, zBk2]
     kmin: [0.]
     kmax: [0.4]
   - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum

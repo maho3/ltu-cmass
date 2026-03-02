@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=quijotenophase  # Job name
+#SBATCH --job-name=quijotemore  # Job name
 #SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
@@ -11,7 +11,7 @@
 
 # SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
-baseoffset=0
+baseoffset=2000
 
 module restore cmass
 conda activate cmassrun
@@ -22,11 +22,11 @@ cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
 sim=fastpm
-extras="nbody.matchIC=0 nbody.suite=quijotelike_nophase" #  meta.cosmofile=./params/abacus_cosmologies.txt"
+extras="nbody.matchIC=0 nbody.suite=quijotelike" #  meta.cosmofile=./params/abacus_cosmologies.txt"
 L=1000
 N=128
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike_nophase/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 

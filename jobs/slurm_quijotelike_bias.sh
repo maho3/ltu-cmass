@@ -24,15 +24,15 @@ cd /home/x-mho1/git/ltu-cmass-run
 
 Nhod=5
 
-nbody=quijote
-sim=nbody_nonoise
-noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=fixed
+nbody=quijotelike
+sim=fastpm
+noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zheng_biased noise.params.radial=0 noise.params.transverse=0" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+extras="bias=zheng_biased nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
 L=1000
 N=128
 
