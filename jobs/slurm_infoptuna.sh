@@ -22,8 +22,8 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
-sim=fastpm_polybin
+nbody=quijote
+sim=nbody_nonoise
 infer=simple  # simple  # lightcone
 
 halo=False

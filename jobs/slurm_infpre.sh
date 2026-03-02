@@ -21,7 +21,7 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_polybin
+sim=fastpm_4k
 infer=simple  # simple  # lightcone
 
 halo=False
