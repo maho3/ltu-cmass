@@ -1,6 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=inference  # Job name
-# #SBATCH --array=0-99  # Array range
+#SBATCH --job-name=preprocess  # Job name
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -9,39 +8,38 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=3
-if [[ -z "$PS1" ]]; then
-    export TQDM_DISABLE=0
-fi
+SLURM_ARRAY_TASK_ID=0
+# export TQDM_DISABLE=0
 
 module restore cmass
-conda activate cmass
+conda activate cmassrun
 
-# exp_index=null
+exp_index=null
 net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass
+cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=mtnglike
-sim=fastpm
-infer=default
+nbody=quijotelike
+sim=fastpm_4k
+infer=simple  # simple  # lightcone
 
 halo=False
-galaxy=False
-ngc=True
+galaxy=True
+ngc=False
 sgc=False
 mtng=False
+simbig=False
 
-extras="nbody.zf=0.500015"
-device=cpu
+extras="nbody.zf=0.5" # 
+device="cpu"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
-suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng"
+suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
 suffix="$suffix infer.device=$device $extras"
+# suffix="$suffix infer.val_frac=0 infer.test_frac=1"
+suffix="$suffix infer.include_noise=True infer.include_hod=False"
 
-echo "Running inference with $suffix"
-# python -m cmass.infer.preprocess $suffix
-# python -m cmass.infer.train $suffix net=tuning
-python -m cmass.infer.validate $suffix
+echo "Running inference pipeline with $suffix"
+python -m cmass.infer.preprocess $suffix
