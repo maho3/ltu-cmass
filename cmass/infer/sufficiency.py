@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import os
-import pickle
 import argparse
 import logging
 
@@ -18,9 +17,20 @@ from ili.inference import InferenceRunner
 # logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 warnings.filterwarnings('ignore')
-
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+"""
+Notes from Matt:
+    This is a very good hack script to test convergence vs time. However, there
+    are some caveats to keep in mind when interpreting the results:
+        - This uses a fixed neural architecture.
+        - This uses the sbi backend, as opposed to our lampe implementation.
+        - This mixes simulations from the same LHID in train and val, which
+          may lead to data leakage and overfitting.
+    TODO: These things should be fixed before we do any final analysis. But,
+    this is good enough for a first pass to get a sense of the convergence
+    behavior of the flows.
+"""
 
 
 def train_npe_model(input_X, input_y):
@@ -54,7 +64,11 @@ def train_npe_model(input_X, input_y):
     # instantiate networks. I only use one model here for simplicity
     num_models = 1
     nets = [
-        ili.utils.load_nde_sbi(engine='NPE', model='maf', hidden_features=best['hidden_features'], num_transforms=best['num_transforms']) for _ in range(num_models)
+        ili.utils.load_nde_sbi(
+            engine='NPE', model='maf',
+            hidden_features=best['hidden_features'],
+            num_transforms=best['num_transforms']
+        ) for _ in range(num_models)
     ]
 
     # define training arguments
@@ -131,8 +145,9 @@ def train_and_save_nested_models(
 
 
 def eval_nested_models(models_dir, X_test, theta_test, sizes, B):
-    ''''
-    evaluate the nested models by computing the average log-probability on the test set
+    """
+    evaluate the nested models by computing the average log-probability on the
+        test set
     models_dir: directory where the nested models are saved
     X_test: test data
     theta_test: test parameters
@@ -140,28 +155,33 @@ def eval_nested_models(models_dir, X_test, theta_test, sizes, B):
     B: number of nested sequences
 
     returns:
-    all_mis: array of shape (B, len(sizes)) containing the average log-probabilities
-    '''
+    all_mis: array of shape (B, len(sizes)) containing the average
+        log-probabilities
+    """
 
     seq_idx_all = np.arange(B)
+
+    """
+    NOTE:
+    Here I use `log_prob_batched` from the sbi package to speed up the
+    computation. I also set `norm_posterior=False` to obtain *unnormalized* log
+    probabilities.
+
+    The reason is that, for flat priors, sbi estimates the normalization
+    constant by Monte Carlo sampling a large number of points at each
+    log-probability evaluation. This procedure is very time-consuming and can
+    occasionally stall.
+
+    When the flow is well trained, the unnormalized log probabilities should be
+    close to the normalized ones. However, this approximation should be kept in
+    mind when interpreting the results.
+    """
 
     all_mis = []
     for seq_idx in seq_idx_all:
         mi_seq = []
         for N_train in sizes:
             model = torch.load(f'{models_dir}/npe_seq{seq_idx}_N{N_train}.pkl')
-
-            # NOTE:
-            # Here I use `log_prob_batched` from the sbi package to speed up the computation.
-            # I also set `norm_posterior=False` to obtain *unnormalized* log probabilities.
-            #
-            # The reason is that, for flat priors, sbi estimates the normalization constant
-            # by Monte Carlo sampling a large number of points at each log-probability evaluation.
-            # This procedure is very time-consuming and can occasionally stall.
-            #
-            # When the flow is well trained, the unnormalized log probabilities should be close
-            # to the normalized ones. However, this approximation
-            # should be kept in mind when interpreting the results.
             log_p = model.posteriors[0].log_prob_batched(np.float32(
                 theta_test[np.newaxis]), np.float32(X_test), norm_posterior=False)
             log_p = log_p.numpy()
@@ -179,8 +199,10 @@ def main(summary_path, output_path=None):
     ''''
     main function to run data sufficiency test on a given summary
     inputs:
-    summary_path: path to the summary directory containing x_train, theta_train, x_val, theta_val, x_test, theta_test
-    output_path: optional path to save the results (if None, saves to summary_path)
+    summary_path: path to the summary directory containing x_train, theta_train,
+        x_val, theta_val, x_test, theta_test
+    output_path: optional path to save the results (if None, saves to
+        summary_path)
 
     '''
 
@@ -208,7 +230,8 @@ def main(summary_path, output_path=None):
     sizes[-1] = N  # ensure max size = N
 
     # number of independent nested sequences
-    # B sequences will be trained, each with different random permutations and increasing sizes
+    # B sequences will be trained, each with different random permutations and
+    # increasing sizes
     B = 5
 
     # output directory
