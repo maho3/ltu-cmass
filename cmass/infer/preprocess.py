@@ -257,9 +257,14 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
-    print("Scale factor a =  ",cfg.nbody.af)
-    wdir = cfg.meta.wdir # working dir where you have writing rights, ie to save preprocess splits
-    summ_dir = cfg.meta.summ_dir # where the raw .h5 summaries are stored, only to read
+    logging.info("Scale factor a =  ", cfg.nbody.af)
+    # working dir where you have writing rights, ie to save preprocess splits
+    wdir = cfg.meta.wdir
+    # where the raw .h5 summaries are stored, only to read
+    summ_dir = cfg.meta.summ_dir
+
+    if summ_dir != wdir:
+        logging.info(f"Loading from separate summary directory: {summ_dir}")
 
     suite_path = get_source_path(
         summ_dir, cfg.nbody.suite, cfg.sim,
@@ -296,8 +301,7 @@ def main(cfg: DictConfig) -> None:
             include_hod=cfg.infer.include_hod,
             include_noise=cfg.infer.include_noise)
         for exp in cfg.infer.experiments:
-            #save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary)) # sim to compare pinocchio, fastpm...
+            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary))
             run_preprocessing(summaries, parameters, ids,
                               hodprior, noiseprior, exp, cfg, save_path)
 
