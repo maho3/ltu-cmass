@@ -46,6 +46,12 @@ def select_nets_retrain(exp_path, Nnets):
     # Load top Nnets architectures by test log prob
     net_dirs = os.listdir(join(exp_path,"nets"))
     log_probs = []; mcfgs = []; states_mask = []
+
+    # Safety check
+    for n in net_dirs:
+        if not os.path.isdir(join(exp_path,"nets",n)):
+            net_dirs.remove(n)
+            
     for n in net_dirs:
 
         # check optuna trial state and retrieve hyperparameters dict
@@ -143,7 +149,8 @@ def run_retraining_after_cval(exp, cfg, model_path):
                 lr_patience=None,
                 backend=cfg.infer.backend, engine=cfg.infer.engine,
                 device=cfg.infer.device,
-                hodprior=hodprior, noiseprior=noiseprior, verbose=False
+                hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+                validation_smoothing_method=validation_smoothing_method, ema_decay=ema_decay
             )
                 end = time.time()
 

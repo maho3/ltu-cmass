@@ -190,7 +190,8 @@ def objective_cval(trial, cfg: DictConfig,
             lr_patience=None,
             backend=cfg.infer.backend, engine=cfg.infer.engine,
             device=cfg.infer.device,
-            hodprior=hodprior, noiseprior=noiseprior, verbose=False
+            hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+            validation_smoothing_method=validation_smoothing_method, ema_decay=ema_decay
         )
 
         # Evaluate loop score
