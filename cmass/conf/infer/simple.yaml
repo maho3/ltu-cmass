@@ -79,6 +79,11 @@ weight_decay: null  # weight decay
 lr_decay_factor: null  # learning rate decay factor
 lr_patience: null  # learning rate decay patience
 
+
+# Cross-validation related params
+cross_val: False
+n_splits: 4
+cv_val_frac: 0.1
 precompress: True  # whether to precompress summaries before training
 
 # ~~ OPTUNA ARGS ~~
