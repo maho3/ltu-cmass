@@ -313,8 +313,10 @@ def load_preprocessed_data(exp_path):
             'Make sure to run cmass.infer.preprocess first.'
         )
 
-    return (x_train, theta_train, ids_train, x_val, theta_val, ids_val, x_test, 
-            theta_test, ids_test, hodprior, noiseprior)
+    return (x_train, theta_train, ids_train,
+            x_val, theta_val, ids_val,
+            x_test, theta_test, ids_test,
+            hodprior, noiseprior)
 
 
 def run_experiment(exp, cfg, model_path):
@@ -323,7 +325,8 @@ def run_experiment(exp, cfg, model_path):
 
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
-    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none')
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none')
     ema_decay = cfg.infer.get('ema_decay', 0.9)
 
     for kmin in kmin_list:
