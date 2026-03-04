@@ -9,7 +9,7 @@ from os.path import join
 import logging
 import numpy as np
 
-from sklearn.model_selection import KFold, train_test_split, GroupShuffleSplit
+from sklearn.model_selection import GroupShuffleSplit
 
 from .preprocess import setup_optuna
 from .train import (load_preprocessed_data,
@@ -149,13 +149,16 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
-    # Handle the cross val splits in the "outer loop" (i.e. hyperparameter study)
+    # Handle the train/test splits for N-fold cross-validation, ensuring that we
+    # split based on the ids to avoid data leakage
     gss = GroupShuffleSplit(
-        n_splits=n_splits, test_size=cfg.infer.test_frac, random_state=9)
+        n_splits=n_splits, test_size=cfg.infer.test_frac,
+        random_state=9)  # random is fixed for all trials
     K = 0
     scores_out = np.zeros((n_splits,))
 
-    for fold_out, (train_valid_idx, test_idx) in enumerate(gss.split(x_all, theta_all, ids_all)):
+    for fold_i, (train_valid_idx, test_idx) in enumerate(
+            gss.split(x_all, theta_all, ids_all)):
 
         start = time.time()
         x_train_valid = x_all[train_valid_idx]
@@ -166,10 +169,11 @@ def objective_cval(trial, cfg: DictConfig,
         theta_test = theta_all[test_idx]
         ids_test = ids_all[test_idx]
 
-        # The validation fraction argument, for consistency, is the fraction BEFORE extracting a test set
+        # The validation fraction argument, for consistency, is the fraction
+        # BEFORE extracting a test set
         val_frac = cfg.infer.val_frac/(1. - cfg.infer.test_frac)
 
-        # Inner loop (i.e "normal") split for ILI training, still using the id conditioning)
+        # Train/val split for this fold
         gss = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state=1)
         train_idx, val_idx = next(
             gss.split(x_train_valid, theta_train_valid, ids_train_valid))
@@ -183,7 +187,10 @@ def objective_cval(trial, cfg: DictConfig,
         out_dir_K = join(out_dir, "split%i" % K)
 
         # run training
-        train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
+        if cfg.infer.precompress:
+            train_fn = run_training_with_precompression
+        else:
+            train_fn = run_training
         posterior, histories = train_fn(
             x_train, theta_train, x_val, theta_val, out_dir=out_dir_K,
             prior_name=cfg.infer.prior, mcfg=mcfg,
@@ -197,7 +204,8 @@ def objective_cval(trial, cfg: DictConfig,
             backend=cfg.infer.backend, engine=cfg.infer.engine,
             device=cfg.infer.device,
             hodprior=hodprior, noiseprior=noiseprior, verbose=False,
-            validation_smoothing_method=validation_smoothing_method, ema_decay=ema_decay
+            validation_smoothing_method=validation_smoothing_method,
+            ema_decay=ema_decay
         )
 
         # Evaluate loop score
