@@ -20,9 +20,10 @@ from ..utils import timing_decorator, clean_up
 from .tools import split_experiments
 
 
-def objective(trial, cfg: DictConfig, x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path, validation_smoothing_method='none',
-                ema_decay=0.9):
+def objective(trial, cfg: DictConfig,
+              x_train, theta_train, x_val, theta_val, x_test, theta_test,
+              hodprior, noiseprior, exp_path,
+              validation_smoothing_method='none', ema_decay=0.9):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -97,10 +98,12 @@ def objective(trial, cfg: DictConfig, x_train, theta_train, x_val, theta_val, x_
 
     return log_prob_test
 
+
 def objective_cval(trial, cfg: DictConfig,
-              x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path, n_splits, ids_train, ids_val, ids_test,
-                   validation_smoothing_method='none',ema_decay=0.9):
+                   x_train, theta_train, x_val, theta_val, x_test, theta_test,
+                   hodprior, noiseprior, exp_path,
+                   n_splits, ids_train, ids_val, ids_test,  # for cross-val
+                   validation_smoothing_method='none', ema_decay=0.9):
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
@@ -110,7 +113,9 @@ def objective_cval(trial, cfg: DictConfig,
     # We do not use nested cross validation, i.e. we do not split based on the validation set in the "inner" loop
 
     # Aggregate splits
-    x_all, theta_all, ids_all = np.vstack((x_train, x_val, x_test)), np.vstack((theta_train, theta_val, theta_test)), np.concatenate((ids_train, ids_val, ids_test))
+    x_all = np.vstack((x_train, x_val, x_test))
+    theta_all = np.vstack((theta_train, theta_val, theta_test))
+    ids_all = np.concatenate((ids_train, ids_val, ids_test))
 
     # Sample hyperparameters
     hyperprior = cfg.infer.hyperprior
@@ -144,38 +149,39 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
-    
     # Handle the cross val splits in the "outer loop" (i.e. hyperparameter study)
-    gss = GroupShuffleSplit(n_splits=n_splits, test_size=cfg.infer.test_frac, random_state = 9)
-    K=0
+    gss = GroupShuffleSplit(
+        n_splits=n_splits, test_size=cfg.infer.test_frac, random_state=9)
+    K = 0
     scores_out = np.zeros((n_splits,))
 
     for fold_out, (train_valid_idx, test_idx) in enumerate(gss.split(x_all, theta_all, ids_all)):
-        
+
         start = time.time()
         x_train_valid = x_all[train_valid_idx]
         theta_train_valid = theta_all[train_valid_idx]
         ids_train_valid = ids_all[train_valid_idx]
-        
-        x_test= x_all[test_idx]
+
+        x_test = x_all[test_idx]
         theta_test = theta_all[test_idx]
         ids_test = ids_all[test_idx]
 
-        ## The validation fraction argument, for consistency, is the fraction BEFORE extracting a test set
+        # The validation fraction argument, for consistency, is the fraction BEFORE extracting a test set
         val_frac = cfg.infer.val_frac/(1. - cfg.infer.test_frac)
 
         # Inner loop (i.e "normal") split for ILI training, still using the id conditioning)
-        gss = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state = 1)
-        train_idx, val_idx = next(gss.split(x_train_valid, theta_train_valid, ids_train_valid))
+        gss = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state=1)
+        train_idx, val_idx = next(
+            gss.split(x_train_valid, theta_train_valid, ids_train_valid))
 
         x_train = x_train_valid[train_idx]
         x_val = x_train_valid[val_idx]
 
         theta_train = theta_train_valid[train_idx]
         theta_val = theta_train_valid[val_idx]
-        
-        out_dir_K = join(out_dir, "split%i"%K)
-        
+
+        out_dir_K = join(out_dir, "split%i" % K)
+
         # run training
         train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
         posterior, histories = train_fn(
@@ -184,7 +190,7 @@ def objective_cval(trial, cfg: DictConfig,
             batch_size=None,
             learning_rate=None,
             stop_after_epochs=cfg.infer.stop_after_epochs,
-            val_frac= val_frac, # overall val_frac including test set
+            val_frac=val_frac,  # overall val_frac including test set
             weight_decay=None,
             lr_decay_factor=None,
             lr_patience=None,
@@ -202,13 +208,14 @@ def objective_cval(trial, cfg: DictConfig,
             f.write(f'{end - start:.3f}')
         with open(join(out_dir_K, 'model_config.yaml'), 'w') as f:
             yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
-        
+
         with open(join(out_dir_K, 'log_prob_test.txt'), 'w') as f:
             f.write(f'{scores_out[K]}\n')
-            
-        K+=1
+
+        K += 1
 
     return scores_out.mean()
+
 
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
@@ -220,13 +227,14 @@ def run_experiment(exp, cfg, model_path):
     objective_fn = objective_cval if cfg.infer.cross_val else objective
 
     if cfg.infer.cross_val:
-        logging.info(f'Optuna objective uses cross-validation.')
+        logging.info('Optuna objective uses cross-validation.')
     else:
-        logging.info(f'Optuna objective does not use cross-validation')
+        logging.info('Optuna objective does not use cross-validation')
 
-    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none').lower()
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none').lower()
     ema_decay = cfg.infer.get('ema_decay', 0.9)
-    
+
     for kmin in kmin_list:
         for kmax in kmax_list:
             logging.info(
@@ -240,12 +248,9 @@ def run_experiment(exp, cfg, model_path):
              hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
             if cfg.infer.cross_val:
-                list_args = [cfg.infer.n_splits]
-                list_args.append(ids_train)
-                list_args.append(ids_val)
-                list_args.append(ids_test)
+                cv_args = (cfg.infer.n_splits, ids_train, ids_val, ids_test)
             else:
-                list_args = []
+                cv_args = []
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -255,15 +260,19 @@ def run_experiment(exp, cfg, model_path):
             logging.info('Running hyperparameter optimization...')
             study = setup_optuna(
                 exp_path, name, cfg.infer.n_startup_trials)
-            study.optimize(lambda trial: objective_fn(trial, cfg, x_train, theta_train,
-                                                   x_val, theta_val, x_test, theta_test,
-                                                   hodprior, noiseprior, exp_path, *list_args,
-                                                   validation_smoothing_method=validation_smoothing_method,ema_decay=ema_decay),
-                           n_trials=cfg.infer.n_trials, n_jobs=1,
-                           timeout=60*60*24,  # max 24 hours*
-                           show_progress_bar=False,
-                           gc_after_trial=True
-                          )
+            study.optimize(
+                lambda trial: objective_fn(
+                    trial, cfg, x_train, theta_train,
+                    x_val, theta_val, x_test, theta_test,
+                    hodprior, noiseprior, exp_path, *cv_args,
+                    validation_smoothing_method=validation_smoothing_method,
+                    ema_decay=ema_decay),
+                n_trials=cfg.infer.n_trials,
+                n_jobs=1,
+                timeout=60*60*24,  # max 24 hours
+                show_progress_bar=False,
+                gc_after_trial=True
+            )
             # NOTE: n_jobs>1 doesn't seem to speed things up much,
             # It seems processes are fighting for threads.
             # Instead, we parallelize via SLURM
@@ -274,7 +283,6 @@ def run_experiment(exp, cfg, model_path):
 @clean_up(hydra)
 def main(cfg: DictConfig) -> None:
 
-    # New for outer loop of nested cross validation
     cfg = parse_nbody_config(cfg)
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
     if cfg.infer.save_dir is not None:
@@ -294,8 +302,7 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            #save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary)) # sim to compare pinocchio, fastpm...
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_experiment(exp, cfg, save_path)
 
 
