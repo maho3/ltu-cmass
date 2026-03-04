@@ -8,64 +8,62 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from torch import nn
 import yaml
 import time
 
-from .tools import split_experiments, prepare_loader, load_posterior
+from .tools import split_experiments
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
 from .train import (load_preprocessed_data,
                     run_training, run_training_with_precompression,
-                    evaluate_posterior, plot_training_history, prepare_prior)
-
-import ili
-from ili.dataloaders import TorchLoader
-from ili.inference import InferenceRunner
-from ili.embedding import FCN
+                    evaluate_posterior, plot_training_history)
 
 import optuna
 
-import matplotlib.pyplot as plt
 
 def select_nets_retrain(exp_path, Nnets):
     '''
-    Select nets from hyperparameter study with cross-validation splits, and retrain
-    on the presaved x_train, x_val split NOT USED during cross-validation.
+    Select nets from hyperparameter study with cross-validation splits, and
+    retrain on the presaved train/val split NOT USED during cross-validation.
     '''
 
-    # Load the optuna study. Note that model parameters are also stored separately
-    # in exp_path/nets/net-xxx/splitn/model_config.yaml
+    # Load the optuna study. Note that model parameters are also stored
+    # separately in exp_path/nets/net-xxx/splitn/model_config.yaml
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
-    
+
     # hack not to pass the summary/summaries argument again, already in exp_path
-    study_cv = optuna.load_study(storage=storage_cv, study_name=exp_path.split("/kmin")[0].split("/")[-1])
+    study_cv = optuna.load_study(
+        storage=storage_cv,
+        study_name=exp_path.split("/kmin")[0].split("/")[-1])
 
     # Load top Nnets architectures by test log prob
-    net_dirs = os.listdir(join(exp_path,"nets"))
-    log_probs = []; mcfgs = []; states_mask = []
+    net_dirs = os.listdir(join(exp_path, "nets"))
+    log_probs = []
+    mcfgs = []
+    states_mask = []
 
     # Safety check
     for n in net_dirs:
-        if not os.path.isdir(join(exp_path,"nets",n)):
+        if not os.path.isdir(join(exp_path, "nets", n)):
             net_dirs.remove(n)
-            
-    for n in net_dirs:
 
+    for n in net_dirs:
         # check optuna trial state and retrieve hyperparameters dict
-        num = int(n.replace("net-",""))
-        states_mask.append(study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
+        num = int(n.replace("net-", ""))
+        states_mask.append(
+            study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
         mcfg = study_cv.trials[num].params
         mcfg["batch_size"] = 2**mcfg["log2_batch_size"]
         mcfgs.append(mcfg)
-        
+
         # We avoid the "retrained" folders for proper validation or inference
-        splits =  [spl for spl in os.listdir(join(exp_path,"nets", n)) if "split" in spl]
+        splits = [spl for spl in os.listdir(
+            join(exp_path, "nets", n)) if "split" in spl]
         log_splits = []
         for s in splits:
-            log_prob_file = join(exp_path,"nets", n, s, 'log_prob_test.txt')
+            log_prob_file = join(exp_path, "nets", n, s, 'log_prob_test.txt')
             if os.path.exists(log_prob_file):
                 with open(log_prob_file, 'r') as f:
                     log_prob = float(f.read().strip())
@@ -88,11 +86,12 @@ def select_nets_retrain(exp_path, Nnets):
     logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')
 
     return net_dirs[top_nets], mcfgs[top_nets]
-    
+
 
 def run_retraining_after_cval(exp, cfg, model_path):
     '''
-    Retrain density estimators of interest based on Optuna study with cross-validation on the test set
+    Retrain density estimators of interest based on Optuna study with
+    cross-validation on the test set
     '''
 
     assert len(exp.summary) > 0, 'No summaries provided for inference'
@@ -102,14 +101,19 @@ def run_retraining_after_cval(exp, cfg, model_path):
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
     Nnets = cfg.infer.Nnets
-    train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
+    if cfg.infer.precompress:
+        train_fn = run_training_with_precompression
+    else:
+        train_fn = run_training
 
     if not cfg.infer.cross_val:
-        raise ValueError(f'There is no reason to retrain network without cross-validation.')
+        raise ValueError(
+            'There is no reason to retrain network without cross-validation.')
 
-    validation_smoothing_method = cfg.infer.get('validation_smoothing_method', 'none').lower()
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none').lower()
     ema_decay = cfg.infer.get('ema_decay', 0.9)
-    
+
     for kmin in kmin_list:
         for kmax in kmax_list:
             logging.info(
@@ -118,18 +122,19 @@ def run_retraining_after_cval(exp, cfg, model_path):
 
             # Only select a subset of networks within the hyperparameter study
             net_dirs, net_configs = select_nets_retrain(exp_path, Nnets)
-    
+
             for net, config in zip(net_dirs, net_configs):
-        
-                out_dir = join(exp_path,"nets", net, "retrained")
+
+                out_dir = join(exp_path, "nets", net, "retrained")
                 os.makedirs(out_dir, exist_ok=True)
-                
-                # load training/test data: we retrain on the original split from cmass.infer.preprocess
+
+                # load training/test data: we retrain on the original split
+                # from cmass.infer.preprocess
                 (x_train, theta_train, ids_train,
                  x_val, theta_val, ids_val,
                  x_test, theta_test, ids_test,
                  hodprior, noiseprior) = load_preprocessed_data(exp_path)
-    
+
                 logging.info(
                     f'Split: {len(x_train)} training, {len(x_val)} validation, '
                     f'{len(x_test)} testing')
@@ -138,20 +143,21 @@ def run_retraining_after_cval(exp, cfg, model_path):
 
                 start = time.time()
                 posterior, histories = train_fn(
-                x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=mcfg,
-                batch_size=None,
-                learning_rate=None,
-                stop_after_epochs=cfg.infer.stop_after_epochs,
-                val_frac= cfg.infer.val_frac, # overall val_frac including test set
-                weight_decay=None,
-                lr_decay_factor=None,
-                lr_patience=None,
-                backend=cfg.infer.backend, engine=cfg.infer.engine,
-                device=cfg.infer.device,
-                hodprior=hodprior, noiseprior=noiseprior, verbose=False,
-                validation_smoothing_method=validation_smoothing_method, ema_decay=ema_decay
-            )
+                    x_train, theta_train, x_val, theta_val, out_dir=out_dir,
+                    prior_name=cfg.infer.prior, mcfg=mcfg,
+                    batch_size=None,
+                    learning_rate=None,
+                    stop_after_epochs=cfg.infer.stop_after_epochs,
+                    val_frac=cfg.infer.val_frac,
+                    weight_decay=None,
+                    lr_decay_factor=None,
+                    lr_patience=None,
+                    backend=cfg.infer.backend, engine=cfg.infer.engine,
+                    device=cfg.infer.device,
+                    hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+                    validation_smoothing_method=validation_smoothing_method,
+                    ema_decay=ema_decay
+                )
                 end = time.time()
 
             # Save the timing and metadata

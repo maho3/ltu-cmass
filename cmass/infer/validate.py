@@ -24,6 +24,7 @@ import yaml
 
 import optuna
 
+
 def run_validation(posterior, x, theta, out_dir, names=None):
     logging.info('Running validation...')
 
@@ -76,35 +77,46 @@ def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
               bbox_inches='tight', dpi=200)
 
 # For cross-validation cases or not, asssuming we have been using optuna
-def load_ensemble(exp_path, Nnets, weighted = True, plot = True, cval = False, clean = False):
-    
+
+
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
+                  cval=False, clean=False):
+
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
-    
+
     # hack not to pass the summary/summaries argument again, already in exp_path
-    study_cv = optuna.load_study(storage=storage_cv, study_name=exp_path.split("/kmin")[0].split("/")[-1])
-    
-    log_probs = []; states_mask = []; mcfgs = []
-    #log_probs = load_log_probs_cval(exp_path) if cval else load_log_probs(exp_path)
-    net_dirs = os.listdir(join(exp_path,"nets"))
+    study_cv = optuna.load_study(
+        storage=storage_cv,
+        study_name=exp_path.split("/kmin")[0].split("/")[-1])
+
+    log_probs = []
+    states_mask = []
+    mcfgs = []
+    net_dirs = os.listdir(join(exp_path, "nets"))
 
     # Safety check
     for n in net_dirs:
-        if not os.path.isdir(join(exp_path,"nets",n)):
+        if not os.path.isdir(join(exp_path, "nets", n)):
             net_dirs.remove(n)
-            
+
     for n in net_dirs:
         # check optuna trial state and retrieve hyperparameters dict
-        num = int(n.replace("net-",""))
-        states_mask.append(study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
+        num = int(n.replace("net-", ""))
+        states_mask.append(
+            study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
 
-        # If we used cross-validation, "retrained" and "splitX" folders are in the same directory
-        # For cross-validation, we still use the split log probs to determine top_nets, and then we retrain/validate.
+        # If we used cross-validation, "retrained" and "splitX" folders are in
+        # the same directory
+        # For cross-validation, we still use the split log probs to determine
+        # top_nets, and then we retrain/validate.
         if cval:
-            splits =  [spl for spl in os.listdir(join(exp_path,"nets", n)) if "split" in spl]
+            splits = [spl for spl in os.listdir(
+                join(exp_path, "nets", n)) if "split" in spl]
             log_splits = []
             for s in splits:
-                log_prob_file = join(exp_path,"nets", n, s, 'log_prob_test.txt')
+                log_prob_file = join(exp_path, "nets", n,
+                                     s, 'log_prob_test.txt')
                 if os.path.exists(log_prob_file):
                     with open(log_prob_file, 'r') as f:
                         log_prob = float(f.read().strip())
@@ -113,12 +125,14 @@ def load_ensemble(exp_path, Nnets, weighted = True, plot = True, cval = False, c
                     log_splits.append(-np.inf)
             log_probs.append(np.mean(log_splits))
 
-            # Load model config from optuna study file (ie same as model_config.yaml in each split)
+            # Load model config from optuna study file
+            # (ie same as model_config.yaml in each split)
             mcfg = study_cv.trials[num].params
-            mcfg["batch_size"] = 2**mcfg["log2_batch_size"] # when loading from optuna study
+            # when loading from optuna study
+            mcfg["batch_size"] = 2**mcfg["log2_batch_size"]
             mcfgs.append(mcfg)
         else:
-            log_prob_file = join(exp_path,"nets", n, 'log_prob_test.txt')
+            log_prob_file = join(exp_path, "nets", n, 'log_prob_test.txt')
             # Load model config from model_config.yaml
             model_config_path = join(exp_path, 'nets', n, 'model_config.yaml')
             with open(model_config_path, 'r') as f:
@@ -140,7 +154,7 @@ def load_ensemble(exp_path, Nnets, weighted = True, plot = True, cval = False, c
 
     if plot:
         plot_hyperparameter_dependence(log_probs, mcfgs, exp_path)
-        
+
     logging.info(f'Found {len(log_probs)} converged nets.')
     if len(log_probs) == 0:
         raise ValueError('No converged nets found.')
@@ -149,11 +163,16 @@ def load_ensemble(exp_path, Nnets, weighted = True, plot = True, cval = False, c
     logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')
 
     ensemble_list = []
-    
+
     for i in top_nets:
-        model_path = join(exp_path,"nets", net_dirs[i], "retrained", 'posterior.pkl') if cval else join(exp_path,"nets", net_dirs[i], 'posterior.pkl')
+        if cval:
+            model_path = join(exp_path, 'nets',
+                              net_dirs[i], 'retrained', 'posterior.pkl')
+        else:
+            model_path = join(exp_path, 'nets', net_dirs[i], 'posterior.pkl')
         if not os.path.exists(model_path):
-            raise FileNotFoundError("No retrained network found after hyperparameter optimization")
+            raise FileNotFoundError(
+                "No retrained network found after hyperparameter optimization")
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
 
@@ -210,8 +229,9 @@ def run_experiment(exp, cfg, model_path):
         logging.info(f'Testing on {len(x_test)} examples')
 
         # load trained posterior
-        posterior_ensemble = load_ensemble(exp_path, cfg.infer.Nnets,
-                                           clean=cfg.infer.clean_models, cval = cfg.infer.cross_val)
+        posterior_ensemble = load_ensemble(
+            exp_path, cfg.infer.Nnets,
+            clean=cfg.infer.clean_models, cval=cfg.infer.cross_val)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)
