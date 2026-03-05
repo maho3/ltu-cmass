@@ -50,17 +50,9 @@ def objective(trial, cfg: DictConfig,
     start = time.time()
     train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
     posterior, histories = train_fn(
-        x_train, theta_train, x_val, theta_val, out_dir=None,
-        prior_name=cfg.infer.prior, mcfg=mcfg,
-        batch_size=None,
-        learning_rate=None,
-        stop_after_epochs=cfg.infer.stop_after_epochs,
-        val_frac=cfg.infer.val_frac,
-        weight_decay=None,
-        lr_decay_factor=None,
-        lr_patience=None,
-        backend=cfg.infer.backend, engine=cfg.infer.engine,
-        device=cfg.infer.device,
+        x_train=x_train, theta_train=theta_train, x_val=x_val, theta_val=theta_val,
+        out_dir=None,
+        cfg=cfg, mcfg=mcfg,
         hodprior=hodprior, noiseprior=noiseprior, verbose=False,
         validation_smoothing_method=validation_smoothing_method,
         ema_decay=ema_decay
@@ -97,6 +89,9 @@ def objective_cval(trial, cfg: DictConfig,
     # Set up output directory and record configuration
     trial.set_user_attr("mcfg", OmegaConf.to_container(mcfg, resolve=True))
 
+    # determine validation set size as a fixed fraction of the total dataset
+    n_val = int(len(x_all) * cfg.infer.val_frac)
+
     # Handle the train/test splits for N-fold cross-validation, ensuring that we
     # split based on the ids to avoid data leakage
     gss = GroupShuffleSplit(
@@ -117,36 +112,21 @@ def objective_cval(trial, cfg: DictConfig,
         x_test_fold = x_all[test_idx]
         theta_test_fold = theta_all[test_idx]
 
-        # The validation fraction argument, for consistency, is the fraction
-        # BEFORE extracting a test set
-        val_frac = cfg.infer.val_frac/(1. - cfg.infer.test_frac)
-
         # Train/val split for this fold
         gss_inner = GroupShuffleSplit(
-            n_splits=1, test_size=val_frac, random_state=1)
+            n_splits=1, test_size=n_val, random_state=1)
         train_idx, val_idx = next(
             gss_inner.split(x_train_valid, theta_train_valid, ids_train_valid))
 
-        x_train_fold = x_train_valid[train_idx]
-        x_val_fold = x_train_valid[val_idx]
-
-        theta_train_fold = theta_train_valid[train_idx]
-        theta_val_fold = theta_train_valid[val_idx]
+        x_train_fold, x_val_fold = x_train_valid[train_idx], x_train_valid[val_idx]
+        theta_train_fold, theta_val_fold = theta_train_valid[train_idx], theta_train_valid[val_idx]
 
         # run training
         train_fn = run_training_with_precompression if cfg.infer.precompress else run_training
         posterior, histories = train_fn(
-            x_train_fold, theta_train_fold, x_val_fold, theta_val_fold, out_dir=None,
-            prior_name=cfg.infer.prior, mcfg=mcfg,
-            batch_size=None,
-            learning_rate=None,
-            stop_after_epochs=cfg.infer.stop_after_epochs,
-            val_frac=val_frac,  # overall val_frac including test set
-            weight_decay=None,
-            lr_decay_factor=None,
-            lr_patience=None,
-            backend=cfg.infer.backend, engine=cfg.infer.engine,
-            device=cfg.infer.device,
+            x_train=x_train_fold, theta_train=theta_train_fold,
+            x_val=x_val_fold, theta_val=theta_val_fold,
+            out_dir=None, cfg=cfg, mcfg=mcfg,
             hodprior=hodprior, noiseprior=noiseprior, verbose=False,
             validation_smoothing_method=validation_smoothing_method,
             ema_decay=ema_decay
