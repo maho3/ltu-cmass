@@ -15,6 +15,13 @@ meta:
   # wdir: "/data101/bartlett/ili/cmass/"
   wdir: "/anvil/scratch/x-mho1/cmass-ili"
   logdir: "${meta.wdir}/logs/"
+
+  # Where to load summaries, i.e. if you want to load summaries from a
+  # different location (summ_dir) than where you save models (wdir).
+  # Useful for when you don't have write access to the summary location
+  # DEFAULT is the same as wdir
+  summ_dir: "/anvil/scratch/x-mho1/cmass-ili"
+
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
   # cosmofile: "./params/abacus_cosmologies.txt"      # for abacus-like

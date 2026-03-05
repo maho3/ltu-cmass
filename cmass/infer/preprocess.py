@@ -257,8 +257,17 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
+    logging.info("Scale factor a =  ", cfg.nbody.af)
+    # working dir where you have writing rights, ie to save preprocess splits
+    wdir = cfg.meta.wdir
+    # where the raw .h5 summaries are stored, only to read
+    summ_dir = cfg.meta.summ_dir
+
+    if summ_dir != wdir:
+        logging.info(f"Loading from separate summary directory: {summ_dir}")
+
     suite_path = get_source_path(
-        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        summ_dir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
