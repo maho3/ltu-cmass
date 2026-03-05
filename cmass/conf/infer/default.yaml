@@ -11,12 +11,7 @@ Nmax: -1  # maximum number of simulations to load (-1 for all)
 
 correct_shot: true  # whether to correct for shot noise when normalizing
 
-halo: True      # whether to train on halo summaries
-galaxy: False    # whether to train on galaxy summaries
-ngc_lightcone: False # whether to train on ngc_lightcone summaries
-sgc_lightcone: False # whether to train on sgc_lightcone summaries
-mtng_lightcone: False # whether to train on mtng_lightcone summaries
-simbig_lightcone: False # whether to train on simbig_lightcone summaries
+tracer: halo      # tracer to use for inference
 
 experiments:
   - summary: [Pk0]   # monopole

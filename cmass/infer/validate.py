@@ -250,17 +250,11 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} validation...')
-            continue
-
-        logging.info(f'Running {tracer} validation...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} validation...')
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        run_experiment(exp, cfg, save_path)
 
 
 if __name__ == "__main__":

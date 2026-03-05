@@ -288,22 +288,16 @@ def main(cfg: DictConfig) -> None:
             "ENSURE PRIOR MATCHES FILE SAMPLES TO AVOID MISMATCH."
         )
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} preprocessing...')
-            continue
-
-        logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, hodprior, noiseprior = load_summaries(
-            suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
-            include_hod=cfg.infer.include_hod,
-            include_noise=cfg.infer.include_noise)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              hodprior, noiseprior, exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} preprocessing...')
+    summaries, parameters, ids, hodprior, noiseprior = load_summaries(
+        suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
+        include_hod=cfg.infer.include_hod,
+        include_noise=cfg.infer.include_noise)
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        run_preprocessing(summaries, parameters, ids,
+                          hodprior, noiseprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":
