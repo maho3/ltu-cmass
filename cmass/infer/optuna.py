@@ -1,6 +1,7 @@
 """
 A script to train ML models on existing suites of simulations.
 """
+import os
 import time
 import yaml
 from omegaconf import DictConfig, OmegaConf
@@ -104,13 +105,15 @@ def objective_cval(trial, cfg: DictConfig,
                    hodprior, noiseprior, exp_path,
                    n_splits, ids_train, ids_val, ids_test,  # for cross-val
                    validation_smoothing_method='none', ema_decay=0.9):
+    """
+    Cross-validation strategy: Split data into train/val/test folds.
+    For each fold, train on the train+val data and evaluate on the test set.
+    Optuna optimizes hyperparameters based on test set performance averaged
+    over all folds.
+    """
 
     trial_num = trial.number
     out_dir = join(exp_path, 'nets', f'net-{trial_num}')
-
-    # Instantiate cross_validators
-    # In ILI, we train with validation and train sets, and perform optuna based on the test set
-    # We do not use nested cross validation, i.e. we do not split based on the validation set in the "inner" loop
 
     # Aggregate splits
     x_all = np.vstack((x_train, x_val, x_test))
@@ -149,6 +152,11 @@ def objective_cval(trial, cfg: DictConfig,
         lr_decay_factor=lr_decay_factor
     ))
 
+    # Set up output directory and record configuration
+    os.makedirs(out_dir, exist_ok=True)
+    with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+        yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+
     # Handle the train/test splits for N-fold cross-validation, ensuring that we
     # split based on the ids to avoid data leakage
     gss = GroupShuffleSplit(
@@ -184,15 +192,13 @@ def objective_cval(trial, cfg: DictConfig,
         theta_train = theta_train_valid[train_idx]
         theta_val = theta_train_valid[val_idx]
 
-        out_dir_K = join(out_dir, "split%i" % K)
-
         # run training
         if cfg.infer.precompress:
             train_fn = run_training_with_precompression
         else:
             train_fn = run_training
         posterior, histories = train_fn(
-            x_train, theta_train, x_val, theta_val, out_dir=out_dir_K,
+            x_train, theta_train, x_val, theta_val, out_dir=None,
             prior_name=cfg.infer.prior, mcfg=mcfg,
             batch_size=None,
             learning_rate=None,
@@ -211,14 +217,13 @@ def objective_cval(trial, cfg: DictConfig,
         # Evaluate loop score
         scores_out[K] = evaluate_posterior(posterior, x_test, theta_test)
         end = time.time()
-        # Save the timing and metadata
-        with open(join(out_dir_K, 'timing.txt'), 'w') as f:
-            f.write(f'{end - start:.3f}')
-        with open(join(out_dir_K, 'model_config.yaml'), 'w') as f:
-            yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
 
-        with open(join(out_dir_K, 'log_prob_test.txt'), 'w') as f:
-            f.write(f'{scores_out[K]}\n')
+        # Save the timing and metadata
+        with open(join(out_dir, 'timing.txt'), 'a') as f:
+            f.write(f'{end - start:.3f}\n')
+
+        with open(join(out_dir, 'log_prob_test.txt'), 'a') as f:
+            f.write(f'{scores_out[K-1]}\n')
 
         K += 1
 
