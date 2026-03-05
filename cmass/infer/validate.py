@@ -111,18 +111,14 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
         # For cross-validation, we still use the split log probs to determine
         # top_nets, and then we retrain/validate.
         if cval:
-            splits = [spl for spl in os.listdir(
-                join(exp_path, "nets", n)) if "split" in spl]
-            log_splits = []
-            for s in splits:
-                log_prob_file = join(exp_path, "nets", n,
-                                     s, 'log_prob_test.txt')
-                if os.path.exists(log_prob_file):
-                    with open(log_prob_file, 'r') as f:
-                        log_prob = float(f.read().strip())
-                    log_splits.append(log_prob)
-                else:
-                    log_splits.append(-np.inf)
+            netdir = join(exp_path, "nets", n)
+            log_prob_file = join(netdir, 'log_prob_test.txt')
+            if not os.path.exists(log_prob_file):
+                log_probs.append(-np.inf)
+                mcfgs.append(None)
+                continue
+            with open(log_prob_file, 'r') as f:
+                log_splits = [float(line.strip()) for line in f.readlines()]
             log_probs.append(np.mean(log_splits))
 
             # Load model config from optuna study file

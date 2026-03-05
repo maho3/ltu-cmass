@@ -58,18 +58,13 @@ def select_nets_retrain(exp_path, Nnets):
         mcfg["batch_size"] = 2**mcfg["log2_batch_size"]
         mcfgs.append(mcfg)
 
-        # We avoid the "retrained" folders for proper validation or inference
-        splits = [spl for spl in os.listdir(
-            join(exp_path, "nets", n)) if "split" in spl]
-        log_splits = []
-        for s in splits:
-            log_prob_file = join(exp_path, "nets", n, s, 'log_prob_test.txt')
-            if os.path.exists(log_prob_file):
-                with open(log_prob_file, 'r') as f:
-                    log_prob = float(f.read().strip())
-                log_splits.append(log_prob)
-            else:
-                log_splits.append(-np.inf)
+        netdir = join(exp_path, "nets", n)
+        log_prob_file = join(netdir, 'log_prob_test.txt')
+        if not os.path.exists(log_prob_file):
+            log_probs.append(-np.inf)
+            continue
+        with open(log_prob_file, 'r') as f:
+            log_splits = [float(line.strip()) for line in f.readlines()]
         log_probs.append(np.mean(log_splits))
 
     # The trial must also be COMPLETE
@@ -199,7 +194,7 @@ def main(cfg: DictConfig) -> None:
 
         logging.info(f'Running {tracer} inference...')
         for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, cfg.sim, '+'.join(exp.summary))
+            save_path = join(model_dir, tracer, '+'.join(exp.summary))
             run_retraining_after_cval(exp, cfg, save_path)
 
 

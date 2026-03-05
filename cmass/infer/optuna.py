@@ -165,8 +165,9 @@ def objective_cval(trial, cfg: DictConfig,
     K = 0
     scores_out = np.zeros((n_splits,))
 
-    for fold_i, (train_valid_idx, test_idx) in enumerate(
+    for K, (train_valid_idx, test_idx) in enumerate(
             gss.split(x_all, theta_all, ids_all)):
+        logging.info(f'Cross-validation fold {K+1}/{n_splits}...')
 
         start = time.time()
         x_train_valid = x_all[train_valid_idx]
@@ -223,9 +224,7 @@ def objective_cval(trial, cfg: DictConfig,
             f.write(f'{end - start:.3f}\n')
 
         with open(join(out_dir, 'log_prob_test.txt'), 'a') as f:
-            f.write(f'{scores_out[K-1]}\n')
-
-        K += 1
+            f.write(f'{scores_out[K]}\n')
 
     return scores_out.mean()
 

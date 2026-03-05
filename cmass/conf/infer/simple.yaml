@@ -78,13 +78,15 @@ stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: null  # weight decay
 lr_decay_factor: null  # learning rate decay factor
 lr_patience: null  # learning rate decay patience
+validation_smoothing_method: ema  # method for averaging weights
+ema_decay: 0.9  # decay factor for EMA smoothing
 
 
 # Cross-validation related params
-cross_val: False
+cross_val: True
 n_splits: 4
 cv_val_frac: 0.1
-precompress: True  # whether to precompress summaries before training
+precompress: False  # whether to precompress summaries before training
 
 # ~~ OPTUNA ARGS ~~
 hyperprior:
