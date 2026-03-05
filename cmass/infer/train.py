@@ -106,19 +106,19 @@ def _train_runner(loader, prior, nets, train_args, out_dir,
 
 def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
-    prior_name, mcfg,  # model config
-    batch_size, learning_rate, stop_after_epochs, val_frac,
-    weight_decay, lr_decay_factor, lr_patience,
-    backend, engine, device,
+    cfg, mcfg,
     hodprior=None, noiseprior=None, verbose=True,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
+    """
+    Train a neural network to emulate a posterior distribution.
+    """
     # select the network configuration
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    prior = prepare_prior(prior_name, device=device,
+    prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
                           hodprior=hodprior, noiseprior=noiseprior)
 
@@ -132,12 +132,12 @@ def run_training(
         )
 
     # instantiate your neural networks to be used as an ensemble
-    if backend == 'lampe':
+    if cfg.infer.backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe
         extra_kwargs = {}
-    elif backend == 'sbi':
+    elif cfg.infer.backend == 'sbi':
         net_loader = ili.utils.load_nde_sbi
-        extra_kwargs = {'engine': engine}
+        extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
     kwargs = {k: v for k, v in mcfg.items() if k in [
@@ -145,31 +145,27 @@ def run_training(
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
-    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
-    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
-    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
-    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
-    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
     train_args = {
-        'learning_rate': lr,
-        'stop_after_epochs': stop_after_epochs,
-        'validation_fraction': val_frac,
-        'weight_decay': wd,
-        'lr_decay_factor': lrdf,
-        'lr_patience': lrp,
+        'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
+        'stop_after_epochs': cfg.infer.stop_after_epochs,
+        'validation_fraction': cfg.infer.val_frac,
+        'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
+        'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
+        'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
         'ema_decay': ema_decay,
         'validation_smoothing_method': validation_smoothing_method.lower(),
     }
 
     # setup data loaders
+    batch_size = mcfg.batch_size if 'batch_size' in mcfg else cfg.infer.batch_size
     train_loader = prepare_loader(
         x_train, theta_train,
-        device=device,
-        batch_size=bs, shuffle=True)
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=True)
     val_loader = prepare_loader(
         x_val, theta_val,
-        device=device,
-        batch_size=bs, shuffle=False)
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=False)
     loader = TorchLoader(train_loader, val_loader)
 
     # train the model
@@ -179,9 +175,9 @@ def run_training(
         nets=nets,
         train_args=train_args,
         out_dir=out_dir,
-        backend=backend,
-        engine=engine,
-        device=device,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
         verbose=verbose,
     )
 
@@ -190,49 +186,46 @@ def run_training(
 
 def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
-    prior_name, mcfg,  # model config
-    batch_size, learning_rate, stop_after_epochs, val_frac,
-    weight_decay, lr_decay_factor, lr_patience,
-    backend, engine, device,
-    hodprior=None, noiseprior=None, verbose=True
+    cfg, mcfg,
+    hodprior=None, noiseprior=None, verbose=True,
+    **kwargs,
 ):
+    """
+    Train a neural network with a pre-compression layer.
+    """
     # select the network configuration
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
 
     # define a prior
-    prior = prepare_prior(prior_name, device=device,
+    prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
                           hodprior=hodprior, noiseprior=noiseprior)
 
     # define training arguments
-    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
-    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
-    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
-    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
-    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
     train_args = {
-        'learning_rate': lr,
-        'stop_after_epochs': stop_after_epochs,
-        'validation_fraction': val_frac,
-        'weight_decay': wd,
-        'lr_decay_factor': lrdf,
-        'lr_patience': lrp
+        'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
+        'stop_after_epochs': cfg.infer.stop_after_epochs,
+        'validation_fraction': cfg.infer.val_frac,
+        'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
+        'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
+        'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
     }
 
     # setup data loaders
+    batch_size = mcfg.batch_size if 'batch_size' in mcfg else cfg.infer.batch_size
     train_loader = prepare_loader(
         x_train, theta_train,
-        device=device,
-        batch_size=bs, shuffle=True)
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=True)
     val_loader = prepare_loader(
         x_val, theta_val,
-        device=device,
-        batch_size=bs, shuffle=False)
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=False)
     loader = TorchLoader(train_loader, val_loader)
 
     # instantiate your neural networks to be used as an ensemble
-    if backend == 'lampe':
+    if cfg.infer.backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe
         extra_kwargs = {}
     else:
@@ -251,9 +244,9 @@ def run_training_with_precompression(
         nets=nets,
         train_args=train_args,
         out_dir=out_dir,
-        backend=backend,
-        engine=engine,
-        device=device,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
         verbose=verbose,
     )
 
@@ -275,9 +268,9 @@ def run_training_with_precompression(
         nets=nets,
         train_args=train_args,
         out_dir=out_dir,
-        backend=backend,
-        engine=engine,
-        device=device,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
         verbose=verbose,
     )
 
@@ -366,16 +359,7 @@ def run_experiment(exp, cfg, model_path):
             start = time.time()
             posterior, histories = run_training(
                 x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=cfg.net,
-                batch_size=cfg.infer.batch_size,
-                learning_rate=cfg.infer.learning_rate,
-                stop_after_epochs=cfg.infer.stop_after_epochs,
-                val_frac=cfg.infer.val_frac,
-                weight_decay=cfg.infer.weight_decay,
-                lr_decay_factor=cfg.infer.lr_decay_factor,
-                lr_patience=cfg.infer.lr_patience,
-                backend=cfg.infer.backend, engine=cfg.infer.engine,
-                device=cfg.infer.device,
+                cfg=cfg, mcfg=cfg.net,
                 hodprior=hodprior, noiseprior=noiseprior,
                 validation_smoothing_method=validation_smoothing_method,
                 ema_decay=ema_decay,
@@ -514,16 +498,7 @@ def run_retraining(exp, cfg, model_path):
                 start = time.time()
                 posterior, histories = train_fn(
                     x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                    prior_name=cfg.infer.prior, mcfg=mcfg,
-                    batch_size=None,
-                    learning_rate=None,
-                    stop_after_epochs=cfg.infer.stop_after_epochs,
-                    val_frac=cfg.infer.val_frac,
-                    weight_decay=None,
-                    lr_decay_factor=None,
-                    lr_patience=None,
-                    backend=cfg.infer.backend, engine=cfg.infer.engine,
-                    device=cfg.infer.device,
+                    cfg=cfg, mcfg=mcfg,
                     hodprior=hodprior, noiseprior=noiseprior, verbose=False,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay
