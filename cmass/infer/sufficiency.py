@@ -8,7 +8,7 @@ import warnings
 
 import ili
 from ili.dataloaders import NumpyLoader
-from ili.inference import InferenceRunner
+from .train import _train_runner
 
 # set logging with time
 
@@ -62,35 +62,33 @@ def train_npe_model(input_X, input_y):
         device=device)
 
     # instantiate networks. I only use one model here for simplicity
-    num_models = 1
     nets = [
         ili.utils.load_nde_sbi(
             engine='NPE', model='maf',
             hidden_features=best['hidden_features'],
             num_transforms=best['num_transforms']
-        ) for _ in range(num_models)
+        )
     ]
 
     # define training arguments
     train_args = {
         'training_batch_size': best['batch_size'],
-        'learning_rate': best['learning_rate']
+        'learning_rate': best['learning_rate'],
+        'stop_after_epochs': 30,  # stop after 30 epochs
     }
 
-    # initialize the trainer
-    runner = InferenceRunner.load(
-        backend='sbi',
-        engine='NPE',
+    # train the model
+    posterior_ensemble, _ = _train_runner(
+        loader=loader,
         prior=prior,
         nets=nets,
-        device=device,
         train_args=train_args,
-        proposal=None,
-        out_dir=None
+        out_dir=None,
+        backend='sbi',
+        engine='NPE',
+        device=device,
+        verbose=False,
     )
-
-    # train the model
-    posterior_ensemble, summaries = runner(loader=loader)
 
     return posterior_ensemble
 
