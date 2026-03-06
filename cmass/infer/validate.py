@@ -17,7 +17,8 @@ import torch
 import pickle
 import scipy
 import shutil
-import matplotlib.pyplot as plt
+import optuna.visualization.matplotlib as vis
+
 
 from .tools import select_top_trials, split_experiments, load_posterior
 from ..utils import timing_decorator, clean_up
@@ -57,33 +58,33 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     )
     metric(posterior, x, theta.to('cpu'))
 
+def plot_optuna_diagnostics(study, exp_path):
+    # trials vs loss
+    axs = vis.plot_optimization_history(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_history.png'))
+    fig.close()
 
-def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
-    hyperparams = ['hidden_features', 'num_transforms',
-                   'fcn_width', 'fcn_depth', 'batch_size',
-                   'learning_rate', 'weight_decay']
-    log_scales = ['hidden_features', 'fcn_width', 'batch_size',
-                  'learning_rate', 'weight_decay']
+    # hyperparams vs loss
+    axs = vis.plot_slice(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'))
+    fig.close()
 
-    W = 4
-    H = len(hyperparams) // W + (len(hyperparams) % W > 0)
-    f, axs = plt.subplots(H, W, figsize=(5*W, 5*H))
-    axs = axs.flatten() if H > 1 else [axs]
-    for i, hp in enumerate(hyperparams):
-        values = [mcfgs[j][hp] for j in range(len(mcfgs))]
-        axs[i].plot(values, log_probs, 'x', alpha=0.8)
-        axs[i].set_xlabel(hp)
-        axs[i].set_ylabel('Log Probability')
-        if hp in log_scales:
-            axs[i].set_xscale('log')
-    for j in range(i + 1, len(axs)):
-        axs[j].axis('off')
-    f.savefig(join(exp_path, 'plot_hyperparam_dependence.jpg'),
-              bbox_inches='tight', dpi=200)
+    # parameter importance
+    axs = vis.plot_param_importances(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_param_importance.png'))
+    fig.close()
+    
+    # timeline
+    axs = vis.plot_timeline(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_timeline.png'))
+    fig.close()
+
 
 # For cross-validation cases or not, asssuming we have been using optuna
-
-
 def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
                   cval=False, clean=False):
     """
@@ -104,9 +105,7 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
     logging.info(f'Selected {len(top_trials)} nets.')
 
     if plot:
-        log_probs = [t.value for t in top_trials]
-        mcfgs = [t.user_attrs['mcfg'] for t in top_trials]
-        plot_hyperparameter_dependence(log_probs, mcfgs, exp_path)
+        plot_optuna_diagnostics(study_cv, exp_path)
 
     ensemble_list = []
     for t in top_trials:
