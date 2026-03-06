@@ -117,7 +117,7 @@ def _train_runner(loader, prior, nets, train_args, out_dir,
 
 def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
-    cfg, mcfg, val_frac=None,
+    cfg, mcfg,
     hodprior=None, noiseprior=None, verbose=True,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -166,11 +166,10 @@ def run_training(
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
-    _val_frac = val_frac if val_frac is not None else cfg.infer.val_frac
     train_args = {
         'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
         'stop_after_epochs': cfg.infer.stop_after_epochs,
-        'validation_fraction': _val_frac,
+        'validation_fraction': cfg.infer.val_frac,
         'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
         'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
@@ -208,7 +207,7 @@ def run_training(
 
 def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
-    cfg, mcfg, val_frac=None,
+    cfg, mcfg,
     hodprior=None, noiseprior=None, verbose=True,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -225,11 +224,10 @@ def run_training_with_precompression(
                           hodprior=hodprior, noiseprior=noiseprior)
 
     # define training arguments
-    _val_frac = val_frac if val_frac is not None else cfg.infer.val_frac
     train_args = {
         'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
         'stop_after_epochs': cfg.infer.stop_after_epochs,
-        'validation_fraction': _val_frac,
+        'validation_fraction': cfg.infer.val_frac,
         'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
         'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
