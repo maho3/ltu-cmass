@@ -210,7 +210,7 @@ def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg, val_frac=None,
     hodprior=None, noiseprior=None, verbose=True,
-    **kwargs,
+    validation_smoothing_method='none', ema_decay=0.9,
 ):
     """
     Train a neural network with a pre-compression layer.
@@ -233,6 +233,8 @@ def run_training_with_precompression(
         'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
         'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
+        'ema_decay': ema_decay,
+        'validation_smoothing_method': validation_smoothing_method.lower(),
     }
 
     # setup data loaders

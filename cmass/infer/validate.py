@@ -85,8 +85,7 @@ def plot_optuna_diagnostics(study, exp_path):
 
 
 # For cross-validation cases or not, asssuming we have been using optuna
-def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
-                  cval=False, clean=False):
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     """
     Load an ensemble of posteriors from an optuna study.
     """
@@ -176,7 +175,7 @@ def run_experiment(exp, cfg, model_path):
         # load trained posterior
         posterior_ensemble = load_ensemble(
             exp_path, cfg.infer.Nnets,
-            clean=cfg.infer.clean_models, cval=cfg.infer.cross_val)
+            clean=cfg.infer.clean_models)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)

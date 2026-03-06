@@ -80,6 +80,10 @@ def train_and_save_nested_models(
         }
     })
 
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none')
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
+
     N = len(X_all)
 
     for b in range(B):
@@ -110,7 +114,9 @@ def train_and_save_nested_models(
                 out_dir=None,
                 cfg=cfg,
                 mcfg=mcfg,
-                verbose=False
+                verbose=False,
+                validation_smoothing_method=validation_smoothing_method,
+                ema_decay=ema_decay,
             )
 
             # save model
