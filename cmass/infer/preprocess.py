@@ -12,6 +12,8 @@ from collections import defaultdict
 from tqdm import tqdm
 import optuna
 import multiprocessing
+from sklearn.decomposition import PCA
+import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -220,6 +222,17 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
+
+            # Precompress summaries
+            if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
+                logging.info(
+                    f"Precompressing with PCA to {cfg.infer.pca_features} features")
+                pca = PCA(n_components=cfg.infer.pca_features)
+                pca.fit(x_train)
+                x_train = pca.transform(x_train)
+                x_val = pca.transform(x_val)
+                x_test = pca.transform(x_test)
+                joblib.dump(pca, join(exp_path, 'pca.pkl'))
 
             # save training/test data
             logging.info(f'Saving training/test data to {exp_path}')

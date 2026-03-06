@@ -72,6 +72,7 @@ n_splits: 4
 cv_val_frac: 0.1
 
 precompress: False  # whether to precompress summaries before training
+pca_features: null # number of PCA features to keep. If null, no PCA.
 
 # ~~ VALIDATION ARGS ~~
 clean_models: False  # whether to delete poorly fit model files after validation
