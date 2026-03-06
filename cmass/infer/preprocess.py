@@ -234,6 +234,10 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
 
+            # Create output directory
+            logging.info(f'Saving training/test data to {exp_path}')
+            os.makedirs(exp_path, exist_ok=True)
+
             # Precompress summaries
             if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
                 logging.info(
@@ -246,8 +250,6 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 joblib.dump(pca, join(exp_path, 'pca.pkl'))
 
             # save training/test data
-            logging.info(f'Saving training/test data to {exp_path}')
-            os.makedirs(exp_path, exist_ok=True)
             with open(join(exp_path, 'config.yaml'), 'w') as f:
                 OmegaConf.save(cfg, f)
             np.save(join(exp_path, 'x_train.npy'), x_train)

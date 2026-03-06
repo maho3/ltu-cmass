@@ -23,7 +23,7 @@ import yaml
 import time
 import optuna
 
-from .tools import split_experiments, prepare_loader
+from .tools import select_top_trials, split_experiments, prepare_loader
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -419,18 +419,7 @@ def select_nets_retrain(exp_path, Nnets):
         study_name=exp_path.split("/kmin")[0].split("/")[-1])
 
     # Load top Nnets architectures by test log prob
-    trials = study_cv.get_trials(deepcopy=False, states=[
-                                 optuna.trial.TrialState.COMPLETE])
-    if len(trials) == 0:
-        raise ValueError('No completed trials found in the study.')
-
-    # sort trials by score
-    sorted_trials = sorted(trials, key=lambda t: t.value, reverse=True)
-
-    # select top Nnets
-    top_trials = sorted_trials[:Nnets]
-    if len(top_trials) == 0:
-        raise ValueError('No top trials found.')
+    top_trials = select_top_trials(study_cv, Nnets)
 
     logging.info(f'Selected {len(top_trials)} nets.')
 

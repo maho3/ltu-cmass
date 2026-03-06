@@ -49,11 +49,15 @@ def load_posterior(modelpath, device):
     return ensemble
 
 
-def select_top_nets(study: optuna.study.Study, n_nets: int) -> List[optuna.trial.FrozenTrial]:
+def select_top_trials(study: optuna.study.Study, n_nets: int) -> List[optuna.trial.FrozenTrial]:
     """
     Select the top N nets from an optuna study.
     """
-    trials = study.get_trials(deepcopy=False, states=[
-                              optuna.trial.TrialState.COMPLETE])
+    trials = study.get_trials(
+        deepcopy=False, states=[optuna.trial.TrialState.COMPLETE])
+    
+    if len(trials) == 0:
+        raise ValueError('No completed trials found in the study.')
+    
     trials = sorted(trials, key=lambda t: t.value, reverse=True)
     return trials[:n_nets]

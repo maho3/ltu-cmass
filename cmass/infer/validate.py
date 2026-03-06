@@ -19,7 +19,7 @@ import scipy
 import shutil
 import matplotlib.pyplot as plt
 
-from .tools import split_experiments, load_posterior
+from .tools import select_top_trials, split_experiments, load_posterior
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -99,18 +99,7 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
         study_name=exp_path.split("/kmin")[0].split("/")[-1])
 
     # Load top Nnets architectures by test log prob
-    trials = study_cv.get_trials(deepcopy=False, states=[
-                                 optuna.trial.TrialState.COMPLETE])
-    if len(trials) == 0:
-        raise ValueError('No completed trials found in the study.')
-
-    # sort trials by score
-    sorted_trials = sorted(trials, key=lambda t: t.value, reverse=True)
-
-    # select top Nnets
-    top_trials = sorted_trials[:Nnets]
-    if len(top_trials) == 0:
-        raise ValueError('No top trials found.')
+    top_trials = select_top_trials(study_cv, Nnets)
 
     logging.info(f'Selected {len(top_trials)} nets.')
 

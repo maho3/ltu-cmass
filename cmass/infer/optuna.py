@@ -117,9 +117,6 @@ def objective_cval(trial, cfg: DictConfig,
     # Set up output directory and record configuration
     trial.set_user_attr("mcfg", OmegaConf.to_container(mcfg, resolve=True))
 
-    # determine validation set size as a fixed fraction of the total dataset
-    n_val = int(len(x_all) * cfg.infer.val_frac)
-
     # Handle the train/test splits for N-fold cross-validation, ensuring that we
     # split based on the ids to avoid data leakage
     gss = GroupShuffleSplit(
@@ -141,8 +138,9 @@ def objective_cval(trial, cfg: DictConfig,
         theta_test_fold = theta_all[test_idx]
 
         # Train/val split for this fold
+        _cv_val_frac = cfg.infer.val_frac / (1 - cfg.infer.test_frac)
         gss_inner = GroupShuffleSplit(
-            n_splits=1, test_size=n_val, random_state=1)
+            n_splits=1, test_size=_cv_val_frac, random_state=1)
         train_idx, val_idx = next(
             gss_inner.split(x_train_valid, theta_train_valid, ids_train_valid))
 
