@@ -21,6 +21,7 @@ import ili
 from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
+from .architectures import CNN
 
 
 import matplotlib.pyplot as plt
@@ -123,13 +124,23 @@ def run_training(
                           hodprior=hodprior, noiseprior=noiseprior)
 
     # define an embedding network
-    if mcfg.fcn_depth == 0:
-        embedding = nn.Identity()
-    else:
-        embedding = FCN(
-            n_hidden=[mcfg.fcn_width]*mcfg.fcn_depth,
+    if mcfg.embedding_net == 'fcn':
+        if mcfg.fcn_depth == 0:
+            embedding = nn.Identity()
+        else:
+            embedding = FCN(
+                n_hidden=[mcfg.fcn_width]*mcfg.fcn_depth,
+                act_fn='ReLU'
+            )
+    elif mcfg.embedding_net == 'cnn':
+        out_channels = [mcfg.out_channels] * mcfg.cnn_depth
+        embedding = CNN(
+            out_channels=out_channels,
+            kernel_size=mcfg.kernel_size,
             act_fn='ReLU'
         )
+    else:
+        raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")
 
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':

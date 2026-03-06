@@ -1,0 +1,16 @@
+fcn:
+  fcn_depth: [0, 4]
+  fcn_width: [16, 128]
+cnn:
+  cnn_depth: [2, 6]
+  out_channels: [4, 16]
+  kernel_size: [3, 5]
+shared:
+  model: ['nsf']
+  hidden_features: [16, 128]
+  num_transforms: [2, 8]
+  log2_batch_size: [5, 9]
+  learning_rate: [5.e-6, 1.e-3]
+  weight_decay: [1.e-5, 1.e-1]
+  lr_patience: [5, 20]
+  lr_decay_factor: [0.1, 0.9]

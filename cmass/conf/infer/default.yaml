@@ -57,6 +57,7 @@ include_noise: False  # whether to infer noise parameters
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
+embedding_net: fcn  # embedding network to use (fcn or cnn)
 
 batch_size: null  # batch size
 learning_rate: null  # learning rate

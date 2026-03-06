@@ -9,7 +9,7 @@ defaults:
   - diag: default
   - noise: fixed
   - infer: default
-  - net: default
+  - net: hyperprior
   - _self_
 
 # What base sim to use
