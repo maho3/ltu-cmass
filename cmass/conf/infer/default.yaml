@@ -66,6 +66,10 @@ weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
 
+# Validation smoothing
+validation_smoothing_method: none  # Method for smoothing validation loss (none/swa/ema).
+ema_decay: 0.9  # EMA decay value (only if validation_smoothing_method == 'ema').
+
 # Cross-validation related params
 cross_val: False
 n_splits: 4
@@ -73,6 +77,22 @@ cv_val_frac: 0.1
 
 precompress: False  # whether to precompress summaries before training
 pca_features: null # number of PCA features to keep. If null, no PCA.
+
+# --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
+hyperprior:
+  model: ['nsf']              # Supported models: 'nsf', 'maf'.
+  hidden_features: [16, 512]  # Range for number of hidden features.
+  num_transforms: [2, 8]      # Range for number of transforms.
+  fcn_width: [16, 512]        # Range for FCN width.
+  fcn_depth: [0, 4]           # Range for FCN depth.
+  log2_batch_size: [5, 9]     # Log2 range for batch size (e.g., 2^5 to 2^9).
+  learning_rate: [5e-6, 1e-2] # Range for learning rate.
+  weight_decay: [1e-5, 1e-1]  # Range for weight decay.
+  lr_patience: [5, 20]        # Range for learning rate patience.
+  lr_decay_factor: [0.1, 0.9] # Range for learning rate decay factor.
+
+n_trials: 25        # Total number of trials for hyperparameter optimization.
+n_startup_trials: 50  # Number of initial trials to sample uniformly before using TPE.
 
 # ~~ VALIDATION ARGS ~~
 clean_models: False  # whether to delete poorly fit model files after validation
