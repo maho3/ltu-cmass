@@ -1,5 +1,10 @@
 """
 A script to validate ML models on existing suites of simulations.
+
+This script loads trained posterior inference models and performs validation 
+tasks. These tasks include plotting single posterior distributions and
+evaluating posterior coverage metrics. It can also clean up poorly performing
+models based on the validation results.
 """
 
 import os

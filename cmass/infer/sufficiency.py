@@ -1,17 +1,13 @@
-import torch
-import numpy as np
-import os
-import argparse
-import logging
-import warnings
-from omegaconf import OmegaConf
-from sklearn.model_selection import train_test_split
-from .train import run_training
 
-warnings.filterwarnings('ignore')
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 """
+Performs a data sufficiency test to evaluate how model performance scales with
+the size of the training dataset.
+
+This script trains a series of models on increasingly larger data subsets and
+evaluates them on a fixed test set. This helps diagnose whether the model has
+saturated in performance or would benefit from more data.
+
 Notes from Matt:
     This is a very good hack script to test convergence vs time. However, there
     are some caveats to keep in mind when interpreting the results:
@@ -24,6 +20,19 @@ Notes from Matt:
     behavior of the flows.
 """
 
+
+import torch
+import numpy as np
+import os
+import argparse
+import logging
+import warnings
+from omegaconf import OmegaConf
+from sklearn.model_selection import train_test_split
+from .train import run_training
+
+warnings.filterwarnings('ignore')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def train_and_save_nested_models(

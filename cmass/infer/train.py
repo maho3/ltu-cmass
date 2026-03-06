@@ -1,5 +1,15 @@
 """
-A script to train ML models on existing suites of simulations.
+Trains posterior inference models using the ltu-ili package.
+
+This script loads preprocessed data and trains a neural network to learn the
+posterior distribution of cosmological and HOD parameters, given a set of
+summary statistics. The training process is configurable via Hydra.
+
+The script supports:
+- Different inference backends (e.g., 'lampe', 'sbi').
+- Various neural network architectures (e.g., FCN, CNN).
+- Training with and without pre-compression of summary statistics.
+- Retraining models based on Optuna hyperparameter optimization studies.
 """
 
 import os

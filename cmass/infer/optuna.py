@@ -1,5 +1,11 @@
 """
 A script to train ML models on existing suites of simulations.
+
+This script leverages Optuna for hyperparameter optimization of ML
+models used for posterior inference. It supports both standard training and
+cross-validation strategies to find the best model architectures and training
+parameters. The models are trained on preprocessed simulation data and evaluated
+based on their posterior log-probability.
 """
 import os
 import time

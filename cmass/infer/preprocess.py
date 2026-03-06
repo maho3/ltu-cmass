@@ -1,5 +1,16 @@
 """
-A script to train ML models on existing suites of simulations.
+Preprocesses raw simulation summaries for training.
+
+This script loads simulation summaries, applies specified transformations,
+and saves the results for later use. The pipeline is configured via Hydra.
+
+Key steps:
+1. Loads summaries in parallel from a simulation suite.
+2. For each experiment, concatenates summaries (e.g., Pk, Bk), applies k-space
+   cuts, and optionally performs PCA dimensionality reduction.
+3. Splits data into training, validation, and test sets based on simulation ID.
+4. Saves the processed data, configuration, and priors to disk.
+5. Initializes an Optuna study for hyperparameter optimization.
 """
 
 import os
