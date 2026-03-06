@@ -1,5 +1,10 @@
 """
 A script to validate ML models on existing suites of simulations.
+
+This script loads trained posterior inference models and performs validation 
+tasks. These tasks include plotting single posterior distributions and
+evaluating posterior coverage metrics. It can also clean up poorly performing
+models based on the validation results.
 """
 
 import os
@@ -12,9 +17,10 @@ import torch
 import pickle
 import scipy
 import shutil
-import matplotlib.pyplot as plt
+import optuna.visualization.matplotlib as vis
 
-from .tools import split_experiments, load_posterior
+
+from .tools import select_top_trials, split_experiments, load_posterior
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -52,36 +58,38 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     )
     metric(posterior, x, theta.to('cpu'))
 
+def plot_optuna_diagnostics(study, exp_path):
+    # trials vs loss
+    axs = vis.plot_optimization_history(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_history.png'))
+    fig.close()
 
-def plot_hyperparameter_dependence(log_probs, mcfgs, exp_path):
-    hyperparams = ['hidden_features', 'num_transforms',
-                   'fcn_width', 'fcn_depth', 'batch_size',
-                   'learning_rate', 'weight_decay']
-    log_scales = ['hidden_features', 'fcn_width', 'batch_size',
-                  'learning_rate', 'weight_decay']
+    # hyperparams vs loss
+    axs = vis.plot_slice(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'))
+    fig.close()
 
-    W = 4
-    H = len(hyperparams) // W + (len(hyperparams) % W > 0)
-    f, axs = plt.subplots(H, W, figsize=(5*W, 5*H))
-    axs = axs.flatten() if H > 1 else [axs]
-    for i, hp in enumerate(hyperparams):
-        values = [mcfgs[j][hp] for j in range(len(mcfgs))]
-        axs[i].plot(values, log_probs, 'x', alpha=0.8)
-        axs[i].set_xlabel(hp)
-        axs[i].set_ylabel('Log Probability')
-        if hp in log_scales:
-            axs[i].set_xscale('log')
-    for j in range(i + 1, len(axs)):
-        axs[j].axis('off')
-    f.savefig(join(exp_path, 'plot_hyperparam_dependence.jpg'),
-              bbox_inches='tight', dpi=200)
+    # parameter importance
+    axs = vis.plot_param_importances(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_param_importance.png'))
+    fig.close()
+    
+    # timeline
+    axs = vis.plot_timeline(study)
+    fig = axs.get_figure()
+    fig.savefig(join(exp_path, 'optuna_timeline.png'))
+    fig.close()
+
 
 # For cross-validation cases or not, asssuming we have been using optuna
-
-
-def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
-                  cval=False, clean=False):
-
+def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
+    """
+    Load an ensemble of posteriors from an optuna study.
+    """
+    # Load the optuna study
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
 
@@ -90,82 +98,18 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
         storage=storage_cv,
         study_name=exp_path.split("/kmin")[0].split("/")[-1])
 
-    log_probs = []
-    states_mask = []
-    mcfgs = []
-    net_dirs = os.listdir(join(exp_path, "nets"))
+    # Load top Nnets architectures by test log prob
+    top_trials = select_top_trials(study_cv, Nnets)
 
-    # Safety check
-    for n in net_dirs:
-        if not os.path.isdir(join(exp_path, "nets", n)):
-            net_dirs.remove(n)
-
-    for n in net_dirs:
-        # check optuna trial state and retrieve hyperparameters dict
-        num = int(n.replace("net-", ""))
-        states_mask.append(
-            study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
-
-        # If we used cross-validation, "retrained" and "splitX" folders are in
-        # the same directory
-        # For cross-validation, we still use the split log probs to determine
-        # top_nets, and then we retrain/validate.
-        if cval:
-            netdir = join(exp_path, "nets", n)
-            log_prob_file = join(netdir, 'log_prob_test.txt')
-            if not os.path.exists(log_prob_file):
-                log_probs.append(-np.inf)
-                mcfgs.append(None)
-                continue
-            with open(log_prob_file, 'r') as f:
-                log_splits = [float(line.strip()) for line in f.readlines()]
-            log_probs.append(np.mean(log_splits))
-
-            # Load model config from optuna study file
-            # (ie same as model_config.yaml in each split)
-            mcfg = study_cv.trials[num].params
-            # when loading from optuna study
-            mcfg["batch_size"] = 2**mcfg["log2_batch_size"]
-            mcfgs.append(mcfg)
-        else:
-            log_prob_file = join(exp_path, "nets", n, 'log_prob_test.txt')
-            # Load model config from model_config.yaml
-            model_config_path = join(exp_path, 'nets', n, 'model_config.yaml')
-            with open(model_config_path, 'r') as f:
-                mcfgs.append(yaml.safe_load(f))
-            if os.path.exists(log_prob_file):
-                with open(log_prob_file, 'r') as f:
-                    log_prob = float(f.read().strip())
-                log_probs.append(log_prob)
-            else:
-                log_probs.append(-np.inf)
-                if clean:
-                    shutil.rmtree(join(exp_path, 'nets', n))
-
-    # The trial must also be COMPLETE
-    mask = np.isfinite(log_probs) & np.array(states_mask)
-    net_dirs = np.array(net_dirs)[mask]
-    log_probs = np.array(log_probs)[mask]
-    mcfgs = np.array(mcfgs)[mask]
+    logging.info(f'Selected {len(top_trials)} nets.')
 
     if plot:
-        plot_hyperparameter_dependence(log_probs, mcfgs, exp_path)
-
-    logging.info(f'Found {len(log_probs)} converged nets.')
-    if len(log_probs) == 0:
-        raise ValueError('No converged nets found.')
-
-    top_nets = np.argsort(log_probs)[::-1][:Nnets]
-    logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')
+        plot_optuna_diagnostics(study_cv, exp_path)
 
     ensemble_list = []
-
-    for i in top_nets:
-        if cval:
-            model_path = join(exp_path, 'nets',
-                              net_dirs[i], 'retrained', 'posterior.pkl')
-        else:
-            model_path = join(exp_path, 'nets', net_dirs[i], 'posterior.pkl')
+    for t in top_trials:
+        model_path = join(exp_path, 'nets',
+                          f'net-{t.number}', 'posterior.pkl')
         if not os.path.exists(model_path):
             raise FileNotFoundError(
                 "No retrained network found after hyperparameter optimization")
@@ -173,17 +117,21 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True,
         ensemble_list.append(pi.posteriors[0])
 
     if clean:   # Remove net directories that are not in top_nets
-        keep_set = set([net_dirs[i] for i in top_nets])
-        for n in net_dirs:
-            if n not in keep_set:
-                shutil.rmtree(join(exp_path, 'nets', n))
+        all_net_dirs = os.listdir(join(exp_path, "nets"))
+        top_net_numbers = {str(t.number) for t in top_trials}
+        for n in all_net_dirs:
+            # check if the folder name is net-{number}
+            if n.startswith('net-'):
+                net_number = n.split('net-')[-1]
+                if net_number not in top_net_numbers:
+                    shutil.rmtree(join(exp_path, 'nets', n))
 
     if weighted:
-        ensemble_logprobs = log_probs[top_nets]
+        ensemble_logprobs = [t.value for t in top_trials]
         weights = scipy.special.softmax(ensemble_logprobs)
         weights = torch.Tensor(weights)
     else:
-        weights = torch.ones(len(top_nets)) / len(top_nets)
+        weights = torch.ones(len(top_trials)) / len(top_trials)
 
     ensemble = LampeEnsemble(
         posteriors=ensemble_list,
@@ -227,7 +175,7 @@ def run_experiment(exp, cfg, model_path):
         # load trained posterior
         posterior_ensemble = load_ensemble(
             exp_path, cfg.infer.Nnets,
-            clean=cfg.infer.clean_models, cval=cfg.infer.cross_val)
+            clean=cfg.infer.clean_models)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)
@@ -250,17 +198,11 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} validation...')
-            continue
-
-        logging.info(f'Running {tracer} validation...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} validation...')
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        run_experiment(exp, cfg, save_path)
 
 
 if __name__ == "__main__":
