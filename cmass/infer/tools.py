@@ -4,6 +4,8 @@ import torch
 import io
 import pickle
 from torch.utils.data import TensorDataset, DataLoader
+import optuna
+from typing import List
 
 
 def split_experiments(exp_cfg):
@@ -45,3 +47,13 @@ def load_posterior(modelpath, device):
     for p in ensemble.posteriors:
         p.to(device)
     return ensemble
+
+
+def select_top_nets(study: optuna.study.Study, n_nets: int) -> List[optuna.trial.FrozenTrial]:
+    """
+    Select the top N nets from an optuna study.
+    """
+    trials = study.get_trials(deepcopy=False, states=[
+                              optuna.trial.TrialState.COMPLETE])
+    trials = sorted(trials, key=lambda t: t.value, reverse=True)
+    return trials[:n_nets]

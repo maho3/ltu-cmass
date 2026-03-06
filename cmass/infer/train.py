@@ -388,9 +388,7 @@ def select_nets_retrain(exp_path, Nnets):
     Select nets from hyperparameter study with cross-validation splits, and
     retrain on the presaved train/val split NOT USED during cross-validation.
     '''
-
-    # Load the optuna study. Note that model parameters are also stored
-    # separately in exp_path/nets/net-xxx/splitn/model_config.yaml
+    # Load the optuna study
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
 
@@ -400,48 +398,25 @@ def select_nets_retrain(exp_path, Nnets):
         study_name=exp_path.split("/kmin")[0].split("/")[-1])
 
     # Load top Nnets architectures by test log prob
-    net_dirs = os.listdir(join(exp_path, "nets"))
-    log_probs = []
-    mcfgs = []
-    states_mask = []
+    trials = study_cv.get_trials(deepcopy=False, states=[
+                                 optuna.trial.TrialState.COMPLETE])
+    if len(trials) == 0:
+        raise ValueError('No completed trials found in the study.')
 
-    # Safety check
-    for n in net_dirs:
-        if not os.path.isdir(join(exp_path, "nets", n)):
-            net_dirs.remove(n)
+    # sort trials by score
+    sorted_trials = sorted(trials, key=lambda t: t.value, reverse=True)
 
-    for n in net_dirs:
-        # check optuna trial state and retrieve hyperparameters dict
-        num = int(n.replace("net-", ""))
-        states_mask.append(
-            study_cv.trials[num].state == optuna.trial.TrialState.COMPLETE)
-        mcfg = study_cv.trials[num].params
-        mcfg["batch_size"] = 2**mcfg["log2_batch_size"]
-        mcfgs.append(mcfg)
+    # select top Nnets
+    top_trials = sorted_trials[:Nnets]
+    if len(top_trials) == 0:
+        raise ValueError('No top trials found.')
 
-        netdir = join(exp_path, "nets", n)
-        log_prob_file = join(netdir, 'log_prob_test.txt')
-        if not os.path.exists(log_prob_file):
-            log_probs.append(-np.inf)
-            continue
-        with open(log_prob_file, 'r') as f:
-            log_splits = [float(line.strip()) for line in f.readlines()]
-        log_probs.append(np.mean(log_splits))
+    logging.info(f'Selected {len(top_trials)} nets.')
 
-    # The trial must also be COMPLETE
-    mask = np.isfinite(log_probs) & np.array(states_mask)
-    net_dirs = np.array(net_dirs)[mask]
-    log_probs = np.array(log_probs)[mask]
-    mcfgs = np.array(mcfgs)[mask]
-
-    logging.info(f'Found {len(log_probs)} converged nets.')
-    if len(log_probs) == 0:
-        raise ValueError('No converged nets found.')
-
-    top_nets = np.argsort(log_probs)[::-1][:Nnets]
-    logging.info(f'Selected nets: {[net_dirs[i] for i in top_nets]}')
-
-    return net_dirs[top_nets], mcfgs[top_nets]
+    # return trial numbers and configs
+    trial_numbers = [t.number for t in top_trials]
+    mcfgs = [t.user_attrs['mcfg'] for t in top_trials]
+    return trial_numbers, mcfgs
 
 
 def run_retraining(exp, cfg, model_path):
@@ -477,11 +452,11 @@ def run_retraining(exp, cfg, model_path):
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
             # Only select a subset of networks within the hyperparameter study
-            net_dirs, net_configs = select_nets_retrain(exp_path, Nnets)
+            trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
 
-            for net, config in zip(net_dirs, net_configs):
+            for trial_number, config in zip(trial_numbers, net_configs):
 
-                out_dir = join(exp_path, "nets", net, "retrained")
+                out_dir = join(exp_path, "nets", f"net-{trial_number}")
                 os.makedirs(out_dir, exist_ok=True)
 
                 # load training/test data: we retrain on the original split
@@ -507,19 +482,20 @@ def run_retraining(exp, cfg, model_path):
                 )
                 end = time.time()
 
-            # Save the timing and metadata
-            with open(join(out_dir, 'timing.txt'), 'w') as f:
-                f.write(f'{end - start:.3f}')
-            with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+                # Save the timing and metadata
+                with open(join(out_dir, 'timing.txt'), 'w') as f:
+                    f.write(f'{end - start:.3f}')
+                with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+                    yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
 
-            # plot training history
-            plot_training_history(histories, out_dir)
+                # plot training history
+                plot_training_history(histories, out_dir)
 
-            # evaluate the posterior and save to file
-            log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
-            with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-                f.write(f'{log_prob_test}\n')
+                # evaluate the posterior and save to file
+                log_prob_test = evaluate_posterior(
+                    posterior, x_test, theta_test)
+                with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+                    f.write(f'{log_prob_test}\n')
 
 
 
