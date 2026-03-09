@@ -18,6 +18,7 @@ import numpy as np
 
 from sklearn.model_selection import GroupShuffleSplit
 
+from .hyperparameters import sample_hyperparameters_optuna
 from .preprocess import setup_optuna
 from .train import (load_preprocessed_data,
                     run_training, run_training_with_precompression,
@@ -27,52 +28,14 @@ from ..utils import timing_decorator, clean_up
 from .tools import split_experiments
 
 
-def _sample_hyperparameters(trial: "optuna.trial.Trial", cfg: DictConfig) -> DictConfig:
-    """Sample hyperparameters from the hyperprior and return a model config."""
-    hyperprior = cfg.net
-    mcfg = {"embedding_net": cfg.infer.embedding_net}
-
-    # sample shared parameters
-    mcfg['model'] = trial.suggest_categorical("model", hyperprior.shared.model)
-    mcfg['hidden_features'] = trial.suggest_int(
-        "hidden_features", *hyperprior.shared.hidden_features, log=True)
-    mcfg['num_transforms'] = trial.suggest_int(
-        "num_transforms", *hyperprior.shared.num_transforms)
-    mcfg['batch_size'] = int(2**trial.suggest_int("log2_batch_size",
-                                                 *hyperprior.shared.log2_batch_size))
-    mcfg['learning_rate'] = trial.suggest_float(
-        "learning_rate", *hyperprior.shared.learning_rate, log=True)
-    mcfg['weight_decay'] = trial.suggest_float(
-        "weight_decay", *hyperprior.shared.weight_decay, log=True)
-    mcfg['lr_patience'] = trial.suggest_int(
-        "lr_patience", *hyperprior.shared.lr_patience)
-    mcfg['lr_decay_factor'] = trial.suggest_float(
-        "lr_decay_factor", *hyperprior.shared.lr_decay_factor, log=True)
-
-    # sample embedding-specific parameters
-    if cfg.infer.embedding_net == 'fcn':
-        mcfg['fcn_depth'] = trial.suggest_int('fcn_depth',
-                                              *hyperprior.fcn.fcn_depth)
-        mcfg['fcn_width'] = trial.suggest_int('fcn_width',
-                                              *hyperprior.fcn.fcn_width, log=True)
-    elif cfg.infer.embedding_net == 'cnn':
-        mcfg['cnn_depth'] = trial.suggest_int('cnn_depth',
-                                              *hyperprior.cnn.cnn_depth)
-        mcfg['out_channels'] = trial.suggest_int(
-            'out_channels', *hyperprior.cnn.out_channels, log=True)
-        mcfg['kernel_size'] = trial.suggest_int('kernel_size',
-                                                *hyperprior.cnn.kernel_size)
-
-    return OmegaConf.create(mcfg)
-
-
 def objective(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
-              hodprior, noiseprior, exp_path,
+              hodprior, noiseprior,
               validation_smoothing_method='none', ema_decay=0.9):
 
     # Sample hyperparameters
-    mcfg = _sample_hyperparameters(trial, cfg)
+    mcfg = sample_hyperparameters_optuna(
+        trial, cfg.net, cfg.infer.embedding_net)
 
     # run training
     start = time.time()
@@ -97,7 +60,7 @@ def objective(trial, cfg: DictConfig,
 
 def objective_cval(trial, cfg: DictConfig,
                    x_train, theta_train, x_val, theta_val, x_test, theta_test,
-                   hodprior, noiseprior, exp_path,
+                   hodprior, noiseprior,
                    n_splits, ids_train, ids_val, ids_test,  # for cross-val
                    validation_smoothing_method='none', ema_decay=0.9):
     """
@@ -112,7 +75,8 @@ def objective_cval(trial, cfg: DictConfig,
     ids_all = np.concatenate((ids_train, ids_val, ids_test))
 
     # Sample hyperparameters
-    mcfg = _sample_hyperparameters(trial, cfg)
+    mcfg = sample_hyperparameters_optuna(
+        trial, cfg.net, cfg.infer.embedding_net)
 
     # Set up output directory and record configuration
     trial.set_user_attr("mcfg", OmegaConf.to_container(mcfg, resolve=True))
@@ -218,7 +182,7 @@ def run_experiment(exp, cfg, model_path):
                 lambda trial: objective_fn(
                     trial, cfg, x_train, theta_train,
                     x_val, theta_val, x_test, theta_test,
-                    hodprior, noiseprior, exp_path, *cv_args,
+                    hodprior, noiseprior, *cv_args,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay),
                 n_trials=cfg.infer.n_trials,

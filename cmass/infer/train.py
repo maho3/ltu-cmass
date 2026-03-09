@@ -24,6 +24,7 @@ import time
 import optuna
 
 from .tools import select_top_trials, split_experiments, prepare_loader
+from .hyperparameters import sample_hyperparameters_randomly
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -525,7 +526,11 @@ def main(cfg: DictConfig) -> None:
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
     if not hasattr(cfg.infer, 'retrain') or not cfg.infer.retrain:
-        cfg.net = cfg.net[cfg.infer.net_index]
+        cfg.net = sample_hyperparameters_randomly(
+            hyperprior=cfg.net,
+            embedding_net=cfg.infer.embedding_net,
+            seed=cfg.infer.net_index
+        )
         runner = run_experiment
     else:
         runner = run_retraining
