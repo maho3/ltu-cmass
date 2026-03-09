@@ -11,12 +11,7 @@ Nmax: -1  # maximum number of simulations to load (-1 for all)
 
 correct_shot: true  # whether to correct for shot noise when normalizing
 
-halo: True      # whether to train on halo summaries
-galaxy: False    # whether to train on galaxy summaries
-ngc_lightcone: False # whether to train on ngc_lightcone summaries
-sgc_lightcone: False # whether to train on sgc_lightcone summaries
-mtng_lightcone: False # whether to train on mtng_lightcone summaries
-simbig_lightcone: False # whether to train on simbig_lightcone summaries
+tracer: halo      # tracer to use for inference
 
 experiments:
   - summary: [Pk0]   # monopole
@@ -52,6 +47,7 @@ experiments:
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
+retrain: False
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
@@ -62,6 +58,7 @@ include_noise: False  # whether to infer noise parameters
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
+embedding_net: fcn  # embedding network to use (fcn or cnn)
 
 batch_size: null  # batch size
 learning_rate: null  # learning rate
@@ -70,12 +67,23 @@ weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
 
+# Validation smoothing
+validation_smoothing_method: none  # Method for smoothing validation loss (none/swa/ema).
+ema_decay: 0.9  # EMA decay value (only if validation_smoothing_method == 'ema').
+
 # Cross-validation related params
 cross_val: False
 n_splits: 4
 cv_val_frac: 0.1
 
 precompress: False  # whether to precompress summaries before training
+pca_features: null # number of PCA features to keep. If null, no PCA.
+test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+
+
+# --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
+n_trials: 25        # Total number of trials for hyperparameter optimization.
+n_startup_trials: 50  # Number of initial trials to sample uniformly before using TPE.
 
 # ~~ VALIDATION ARGS ~~
 clean_models: False  # whether to delete poorly fit model files after validation

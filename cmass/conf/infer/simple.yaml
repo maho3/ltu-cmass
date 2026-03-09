@@ -1,42 +1,24 @@
+# Top-level save directory for trained models.
+save_dir: null # (default: wdir/quijotelike/fastpm/models)
 
-save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fastpm/models)
-
-# ~~ GLOBAL ARGS ~~
+# --- GLOBAL CONFIGURATION ---
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # index of network to use in cfg.net
-device: cpu  # cpu or cuda
+net_index: 0     # Index of network to use in cfg.net (for ensembling, if applicable).
+device: cpu      # Device to use for training (cpu or cuda).
 
-# ~~ EXPERIMENT ARGS ~~
-Nmax: -1  # maximum number of simulations to load (-1 for all)
-
-correct_shot: true  # whether to correct for shot noise when normalizing
-
-halo: True      # whether to train on halo summaries
-galaxy: False    # whether to train on galaxy summaries
-ngc_lightcone: False # whether to train on ngc_lightcone summaries
-sgc_lightcone: False # whether to train on sgc_lightcone summaries
-mtng_lightcone: False # whether to train on mtng_lightcone summaries
-simbig_lightcone: False # whether to train on simbig_lightcone summaries
+# --- EXPERIMENT CONFIGURATION ---
+Nmax: -1  # Maximum number of simulations to load (-1 for all).
+correct_shot: true  # Whether to correct for shot noise when normalizing summaries.
+tracer: halo # Type of tracer to use for inference (e.g., halo, galaxy, ngc_lightcone).
 
 experiments:
-  # - summary: [nbar, Pk0]   # monopole
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0]   # monopole
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
+  # List of experiments, each defining a set of summary statistics and k-ranges.
+  - summary: [nbar, Pk0]   # monopole
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+    kmin: [0.]
+    kmax: [0.4]
   - summary: [nbar, zPk0]   # z-space monopole
     kmin: [0.]
     kmax: [0.4]
@@ -55,66 +37,65 @@ experiments:
   # - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
   #   kmin: [0.]
   #   kmax: [0.4]
-  - summary: [nbar, zBk0]
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zBk0, zBk2]
-    kmin: [0.]
-    kmax: [0.4]
+  # - summary: [nbar, zBk0]
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zBk0, zBk2]
+  #   kmin: [0.]
+  #   kmax: [0.4]
   - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zBk0, zBk2]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
-    kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zBk0, zBk2]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
 
-# ~~ TRAINING ARGS ~~
-Nnets: 10  # number of best networks to ensemble
+# --- TRAINING CONFIGURATION ---
+Nnets: 10  # Number of best networks to ensemble for posterior inference.
+retrain: False
 
-val_frac: 0.1  # fraction of data to use for validation
-test_frac: 0.1  # fraction of data to use for testing
-seed: 0  # random seed for train/val/test split
-include_hod: False    # whether to infer HOD parameters
-include_noise: True  # whether to infer noise parameters
+# Data splitting
+val_frac: 0.1  # Fraction of data to use for validation.
+test_frac: 0.1  # Fraction of data to use for testing.
+seed: 0  # Random seed for train/val/test split.
 
-prior: quijote  # prior to use for training (uniform, quijote)
-backend: lampe # backend to use for training (sbi/lampe/pydelfi)
-engine: NPE    # engine to use for training (NPE/NLE/NRE)
+# Inference parameters
+include_hod: False  # Whether to infer HOD parameters.
+include_noise: False  # Whether to infer noise parameters.
 
-batch_size: null  # batch size
-learning_rate: null  # learning rate
-stop_after_epochs: 50  # stop early after this many epochs
-weight_decay: null  # weight decay
-lr_decay_factor: null  # learning rate decay factor
-lr_patience: null  # learning rate decay patience
-validation_smoothing_method: ema  # method for averaging weights
-ema_decay: 0.9  # decay factor for EMA smoothing
+# Model backend and engine
+prior: quijote  # Prior to use for training (uniform, quijote).
+backend: lampe  # Backend to use for training (sbi/lampe/pydelfi).
+engine: NPE     # Engine to use for training (NPE/NLE/NRE).
+embedding_net: fcn # Embedding network to use (fcn or cnn).
 
+# Optimization parameters
+batch_size: null  # Batch size for training.
+learning_rate: null  # Learning rate for the optimizer.
+stop_after_epochs: 30  # Stop early after this many epochs without improvement.
+weight_decay: null  # Weight decay (L2 regularization).
+lr_decay_factor: null  # Learning rate decay factor.
+lr_patience: null  # Learning rate decay patience (epochs without improvement).
 
-# Cross-validation related params
-cross_val: True
-n_splits: 4
-cv_val_frac: 0.1
-precompress: False  # whether to precompress summaries before training
+# Validation smoothing
+validation_smoothing_method: ema  # Method for smoothing validation loss (none/swa/ema).
+ema_decay: 0.9  # EMA decay value (only if validation_smoothing_method == 'ema').
 
-# ~~ OPTUNA ARGS ~~
-hyperprior:
-  model: ['nsf'] # , 'maf']
-  hidden_features: [16, 512]
-  num_transforms: [2, 8]
-  fcn_width: [16, 512]
-  fcn_depth: [0, 4]
-  log2_batch_size: [5, 9]
-  learning_rate: [5e-6, 1e-2]
-  weight_decay: [1e-5, 1e-1]
-  lr_patience: [5, 20]
-  lr_decay_factor: [0.1, 0.9]
+# Cross-validation
+cross_val: True  # Whether to use cross-validation for hyperparameter optimization.
+n_splits: 4      # Number of splits for cross-validation.
+cv_val_frac: 0.1 # Fraction of data to use for validation within each CV fold.
 
+# Preprocessing
+precompress: False  # Whether to precompress summaries before training.
+pca_features: null  # Number of PCA features to keep. If null, no PCA.
+test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+
+# --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
 n_trials: 30  # number of trials for hyperparameter optimization
-
 n_startup_trials: 50  # number of startup trials for hyperparameter optimization
 
 # ~~ VALIDATION ARGS ~~
