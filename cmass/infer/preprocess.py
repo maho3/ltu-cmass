@@ -305,9 +305,6 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    if cfg.infer.halo or cfg.infer.galaxy:
-        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
-
     if cfg.infer.include_hod and cfg.bias.hod.from_samples:
         logging.warning(
             "Inferring HOD parameters with prior from file. "
@@ -316,6 +313,8 @@ def main(cfg: DictConfig) -> None:
 
     tracer = cfg.infer.tracer
     logging.info(f'Running {tracer} preprocessing...')
+    if tracer in ['halo', 'galaxy']:
+        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
     summaries, parameters, ids, hodprior, noiseprior = load_summaries(
         suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
         include_hod=cfg.infer.include_hod,
