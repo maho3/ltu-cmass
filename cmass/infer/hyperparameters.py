@@ -55,7 +55,7 @@ def sample_hyperparameters_randomly(
 
     if seed is not None:
         np.random.seed(seed)
-        
+
     # sample shared parameters
     mcfg['model'] = np.random.choice(hyperprior.shared.model)
     mcfg['hidden_features'] = int(np.exp(np.random.uniform(
@@ -92,5 +92,14 @@ def sample_hyperparameters_randomly(
             np.log(hyperprior.cnn.out_channels[1]))))
         mcfg['kernel_size'] = np.random.randint(
             hyperprior.cnn.kernel_size[0], hyperprior.cnn.kernel_size[1] + 1)
+        
+    # typecasting for OmegaConf
+    for k, v in mcfg.items():
+        if isinstance(v, np.int64):
+            mcfg[k] = int(v)
+        elif isinstance(v, np.float64):
+            mcfg[k] = float(v)
+        elif isinstance(v, np.str_):
+            mcfg[k] = str(v)
 
     return OmegaConf.create(mcfg)

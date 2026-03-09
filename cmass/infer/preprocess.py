@@ -226,6 +226,18 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             startidx = np.cumsum([0] + [x.shape[1] for x in xs])
             x = np.concatenate(xs, axis=-1)
 
+            # noise out summaries that are not Pk0 or zPk0
+            if cfg.infer.get('test_noised_summs', False):
+                logging.info(
+                    "TESTING: Noise out all summaries that are not Pk0 or zPk0")
+                for i, label in enumerate(labels):
+                    if label not in ['Pk0', 'zPk0']:
+                        logging.info(f"Noise out summary: {label}")
+                        start, end = startidx[i], startidx[i+1]
+                        x[:, start:end] = np.random.standard_normal(
+                            size=(x.shape[0], end-start)
+                        ).astype(x.dtype)
+
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
              (ids_train, ids_val, ids_test)) = split_train_val_test(

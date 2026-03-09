@@ -18,7 +18,7 @@ import pickle
 import scipy
 import shutil
 import optuna.visualization.matplotlib as vis
-
+from matplotlib import pyplot as plt
 
 from .tools import select_top_trials, split_experiments, load_posterior
 from ..utils import timing_decorator, clean_up
@@ -60,28 +60,28 @@ def run_validation(posterior, x, theta, out_dir, names=None):
 
 def plot_optuna_diagnostics(study, exp_path):
     # trials vs loss
-    axs = vis.plot_optimization_history(study)
-    fig = axs.get_figure()
-    fig.savefig(join(exp_path, 'optuna_history.png'))
-    fig.close()
+    ax = vis.plot_optimization_history(study)
+    fig = ax.get_figure()
+    fig.savefig(join(exp_path, 'optuna_history.png'), bbox_inches='tight')
+    plt.close(fig)
 
     # hyperparams vs loss
     axs = vis.plot_slice(study)
-    fig = axs.get_figure()
-    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'))
-    fig.close()
+    fig = axs[0].get_figure()
+    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'), bbox_inches='tight')
+    plt.close(fig)
 
     # parameter importance
-    axs = vis.plot_param_importances(study)
-    fig = axs.get_figure()
-    fig.savefig(join(exp_path, 'optuna_param_importance.png'))
-    fig.close()
+    ax = vis.plot_param_importances(study)
+    fig = ax.get_figure()
+    fig.savefig(join(exp_path, 'optuna_param_importance.png'), bbox_inches='tight')
+    plt.close(fig)
     
     # timeline
-    axs = vis.plot_timeline(study)
-    fig = axs.get_figure()
-    fig.savefig(join(exp_path, 'optuna_timeline.png'))
-    fig.close()
+    ax = vis.plot_timeline(study)
+    fig = ax.get_figure()
+    fig.savefig(join(exp_path, 'optuna_timeline.png'), bbox_inches='tight')
+    plt.close(fig)
 
 
 # For cross-validation cases or not, asssuming we have been using optuna

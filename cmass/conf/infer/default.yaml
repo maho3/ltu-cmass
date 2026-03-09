@@ -47,6 +47,7 @@ experiments:
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
+retrain: False
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
@@ -77,6 +78,8 @@ cv_val_frac: 0.1
 
 precompress: False  # whether to precompress summaries before training
 pca_features: null # number of PCA features to keep. If null, no PCA.
+test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
 hyperprior:

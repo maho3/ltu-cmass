@@ -22,7 +22,7 @@ from .hyperparameters import sample_hyperparameters_optuna
 from .preprocess import setup_optuna
 from .train import (load_preprocessed_data,
                     run_training, run_training_with_precompression,
-                    evaluate_posterior, plot_training_history)
+                    evaluate_posterior)
 from ..nbody.tools import parse_nbody_config
 from ..utils import timing_decorator, clean_up
 from .tools import split_experiments
@@ -134,7 +134,6 @@ def objective_cval(trial, cfg: DictConfig,
 
     return scores_out.mean()
 
-
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
@@ -142,12 +141,12 @@ def run_experiment(exp, cfg, model_path):
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-    objective_fn = objective_cval if cfg.infer.cross_val else objective
-
     if cfg.infer.cross_val:
         logging.info('Optuna objective uses cross-validation.')
+        objective_fn = objective_cval
     else:
         logging.info('Optuna objective does not use cross-validation')
+        objective_fn = objective
 
     validation_smoothing_method = cfg.infer.get(
         'validation_smoothing_method', 'none').lower()
@@ -165,10 +164,9 @@ def run_experiment(exp, cfg, model_path):
              x_test, theta_test, ids_test,
              hodprior, noiseprior) = load_preprocessed_data(exp_path)
 
+            cv_args = []
             if cfg.infer.cross_val:
                 cv_args = (cfg.infer.n_splits, ids_train, ids_val, ids_test)
-            else:
-                cv_args = []
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -182,7 +180,8 @@ def run_experiment(exp, cfg, model_path):
                 lambda trial: objective_fn(
                     trial, cfg, x_train, theta_train,
                     x_val, theta_val, x_test, theta_test,
-                    hodprior, noiseprior, *cv_args,
+                    hodprior, noiseprior, 
+                    *cv_args,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay),
                 n_trials=cfg.infer.n_trials,

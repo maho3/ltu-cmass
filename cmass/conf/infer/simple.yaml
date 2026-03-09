@@ -25,24 +25,37 @@ experiments:
   - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+  # - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zBk0]
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zBk0, zBk2]
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
-    kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
+  # - summary: [nbar, zPk0, zPk2, zPk4, zBk0, zBk2]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.4]
 
 # --- TRAINING CONFIGURATION ---
 Nnets: 10  # Number of best networks to ensemble for posterior inference.
+retrain: False
 
 # Data splitting
 val_frac: 0.1  # Fraction of data to use for validation.
@@ -62,7 +75,7 @@ embedding_net: fcn # Embedding network to use (fcn or cnn).
 # Optimization parameters
 batch_size: null  # Batch size for training.
 learning_rate: null  # Learning rate for the optimizer.
-stop_after_epochs: 50  # Stop early after this many epochs without improvement.
+stop_after_epochs: 30  # Stop early after this many epochs without improvement.
 weight_decay: null  # Weight decay (L2 regularization).
 lr_decay_factor: null  # Learning rate decay factor.
 lr_patience: null  # Learning rate decay patience (epochs without improvement).
@@ -79,6 +92,8 @@ cv_val_frac: 0.1 # Fraction of data to use for validation within each CV fold.
 # Preprocessing
 precompress: False  # Whether to precompress summaries before training.
 pca_features: null  # Number of PCA features to keep. If null, no PCA.
+test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
 hyperprior:
