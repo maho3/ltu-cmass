@@ -22,7 +22,9 @@ class CNN(nn.Module):
         self.flatten = nn.Flatten(start_dim=1) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if x.ndim == 2:
+        if x.ndim == 1:
+            x = x.unsqueeze(0).unsqueeze(0) # (1, 1, Length)
+        elif x.ndim == 2:
             x = x.unsqueeze(1) # (Batch, 1, Length)
         
         x = self.cnn(x)     # (Batch, Channels, New_Length)

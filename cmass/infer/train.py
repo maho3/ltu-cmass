@@ -218,6 +218,9 @@ def run_training_with_precompression(
     # select the network configuration
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
+    if cfg.infer.embedding_net != 'fcn':
+        # TODO: implement
+        raise ValueError(f'Precompression only supported for FCN embedding_net.')
 
     # define a prior
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,

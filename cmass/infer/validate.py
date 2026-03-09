@@ -83,8 +83,7 @@ def plot_optuna_diagnostics(study, exp_path):
     fig.savefig(join(exp_path, 'optuna_timeline.png'), bbox_inches='tight')
     plt.close(fig)
 
-
-# For cross-validation cases or not, asssuming we have been using optuna
+# For cross-validation cases or not, assuming we have been using optuna
 def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     """
     Load an ensemble of posteriors from an optuna study.
