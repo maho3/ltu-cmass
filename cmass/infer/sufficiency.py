@@ -1,25 +1,13 @@
-import torch
-import numpy as np
-import os
-import argparse
-import logging
 
-import warnings
-
-import ili
-from ili.dataloaders import NumpyLoader
-from ili.inference import InferenceRunner
-
-# set logging with time
-
-# logging.getLogger("ili").disabled = True
-# logging.getLogger("sbi").disabled = True
-# logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-
-warnings.filterwarnings('ignore')
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 """
+Performs a data sufficiency test to evaluate how model performance scales with
+the size of the training dataset.
+
+This script trains a series of models on increasingly larger data subsets and
+evaluates them on a fixed test set. This helps diagnose whether the model has
+saturated in performance or would benefit from more data.
+
 Notes from Matt:
     This is a very good hack script to test convergence vs time. However, there
     are some caveats to keep in mind when interpreting the results:
@@ -33,66 +21,18 @@ Notes from Matt:
 """
 
 
-def train_npe_model(input_X, input_y):
-    '''
-    function to train NPE model given input data
+import torch
+import numpy as np
+import os
+import argparse
+import logging
+import warnings
+from omegaconf import OmegaConf
+from sklearn.model_selection import train_test_split
+from .train import run_training
 
-    input_X: training data (numpy array)
-    input_y: training parameters (numpy array)
-
-    returns: trained posterior ensemble
-    '''
-
-    # a set of hyperparameters I found useful in other projects.
-    # Should be re-tuned
-    best = {'learning_rate': 1e-4,
-            'batch_size': 128,
-            'hidden_1': 49,
-            'hidden_2': 36,
-            'hidden_3': 64,
-            'num_transforms': 9,
-            'hidden_features': 52}
-
-    loader = NumpyLoader(x=input_X, theta=input_y)
-
-    # define a prior
-    prior = ili.utils.Uniform(
-        low=np.min(input_y, axis=0),
-        high=np.max(input_y, axis=0),
-        device=device)
-
-    # instantiate networks. I only use one model here for simplicity
-    num_models = 1
-    nets = [
-        ili.utils.load_nde_sbi(
-            engine='NPE', model='maf',
-            hidden_features=best['hidden_features'],
-            num_transforms=best['num_transforms']
-        ) for _ in range(num_models)
-    ]
-
-    # define training arguments
-    train_args = {
-        'training_batch_size': best['batch_size'],
-        'learning_rate': best['learning_rate']
-    }
-
-    # initialize the trainer
-    runner = InferenceRunner.load(
-        backend='sbi',
-        engine='NPE',
-        prior=prior,
-        nets=nets,
-        device=device,
-        train_args=train_args,
-        proposal=None,
-        out_dir=None
-    )
-
-    # train the model
-    posterior_ensemble, summaries = runner(loader=loader)
-
-    return posterior_ensemble
+warnings.filterwarnings('ignore')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def train_and_save_nested_models(
@@ -115,6 +55,35 @@ def train_and_save_nested_models(
 
     '''
 
+    # a set of hyperparameters I found useful in other projects.
+    # Should be re-tuned
+    mcfg = OmegaConf.create({
+        'model': 'maf',
+        'hidden_features': 52,
+        'num_transforms': 9,
+        'learning_rate': 1e-4,
+        'batch_size': 128,
+        'embedding_net': 'fcn',
+        'fcn_depth': 0,
+    })
+    cfg = OmegaConf.create({
+        'infer': {
+            'prior': 'uniform',
+            'device': device,
+            'backend': 'sbi',
+            'engine': 'NPE',
+            'stop_after_epochs': 30,
+            'val_frac': 0.2,
+            'weight_decay': 0.0,
+            'lr_decay_factor': 1.0,
+            'lr_patience': 5,
+        }
+    })
+
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none')
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
+
     N = len(X_all)
 
     for b in range(B):
@@ -134,7 +103,21 @@ def train_and_save_nested_models(
 
             logging.info(f"[seq {b}] training N={n}")
 
-            model = train_npe_model(X_sub, theta_sub)
+            x_train, x_val, theta_train, theta_val = train_test_split(
+                X_sub, theta_sub, test_size=cfg.infer.val_frac, random_state=42+b)
+
+            model, _ = run_training(
+                x_train=x_train,
+                theta_train=theta_train,
+                x_val=x_val,
+                theta_val=theta_val,
+                out_dir=None,
+                cfg=cfg,
+                mcfg=mcfg,
+                verbose=False,
+                validation_smoothing_method=validation_smoothing_method,
+                ema_decay=ema_decay,
+            )
 
             # save model
             fname = f"npe_seq{b}_N{n}.pkl"

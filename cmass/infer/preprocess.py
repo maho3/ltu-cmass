@@ -1,5 +1,16 @@
 """
-A script to train ML models on existing suites of simulations.
+Preprocesses raw simulation summaries for training.
+
+This script loads simulation summaries, applies specified transformations,
+and saves the results for later use. The pipeline is configured via Hydra.
+
+Key steps:
+1. Loads summaries in parallel from a simulation suite.
+2. For each experiment, concatenates summaries (e.g., Pk, Bk), applies k-space
+   cuts, and optionally performs PCA dimensionality reduction.
+3. Splits data into training, validation, and test sets based on simulation ID.
+4. Saves the processed data, configuration, and priors to disk.
+5. Initializes an Optuna study for hyperparameter optimization.
 """
 
 import os
@@ -12,6 +23,8 @@ from collections import defaultdict
 from tqdm import tqdm
 import optuna
 import multiprocessing
+from sklearn.decomposition import PCA
+import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -213,6 +226,18 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             startidx = np.cumsum([0] + [x.shape[1] for x in xs])
             x = np.concatenate(xs, axis=-1)
 
+            # noise out summaries that are not Pk0 or zPk0
+            if cfg.infer.get('test_noised_summs', False):
+                logging.info(
+                    "TESTING: Noise out all summaries that are not Pk0 or zPk0")
+                for i, label in enumerate(labels):
+                    if label not in ['Pk0', 'zPk0']:
+                        logging.info(f"Noise out summary: {label}")
+                        start, end = startidx[i], startidx[i+1]
+                        x[:, start:end] = np.random.standard_normal(
+                            size=(x.shape[0], end-start)
+                        ).astype(x.dtype)
+
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
              (ids_train, ids_val, ids_test)) = split_train_val_test(
@@ -221,9 +246,22 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
 
-            # save training/test data
+            # Create output directory
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
+
+            # Precompress summaries
+            if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
+                logging.info(
+                    f"Precompressing with PCA to {cfg.infer.pca_features} features")
+                pca = PCA(n_components=cfg.infer.pca_features)
+                pca.fit(x_train)
+                x_train = pca.transform(x_train)
+                x_val = pca.transform(x_val)
+                x_test = pca.transform(x_test)
+                joblib.dump(pca, join(exp_path, 'pca.pkl'))
+
+            # save training/test data
             with open(join(exp_path, 'config.yaml'), 'w') as f:
                 OmegaConf.save(cfg, f)
             np.save(join(exp_path, 'x_train.npy'), x_train)
@@ -279,31 +317,24 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    if cfg.infer.halo or cfg.infer.galaxy:
-        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
-
     if cfg.infer.include_hod and cfg.bias.hod.from_samples:
         logging.warning(
             "Inferring HOD parameters with prior from file. "
             "ENSURE PRIOR MATCHES FILE SAMPLES TO AVOID MISMATCH."
         )
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} preprocessing...')
-            continue
-
-        logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, hodprior, noiseprior = load_summaries(
-            suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
-            include_hod=cfg.infer.include_hod,
-            include_noise=cfg.infer.include_noise)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              hodprior, noiseprior, exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} preprocessing...')
+    if tracer in ['halo', 'galaxy']:
+        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
+    summaries, parameters, ids, hodprior, noiseprior = load_summaries(
+        suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
+        include_hod=cfg.infer.include_hod,
+        include_noise=cfg.infer.include_noise)
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        run_preprocessing(summaries, parameters, ids,
+                          hodprior, noiseprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":
