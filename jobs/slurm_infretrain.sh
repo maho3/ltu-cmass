@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=trainingcnn  # Job name
-#SBATCH --array=0-2  # Array range
+#SBATCH --job-name=trainingfcn  # Job name
+#SBATCH --array=2  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=3:00:00         # Time limit
@@ -9,7 +9,7 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=2
 
 module restore cmass
 conda activate cmassrun
@@ -30,24 +30,24 @@ cd /home/x-mho1/git/ltu-cmass-run
 # extras="nbody.zf=0.5" # 
 # device="cpu"
 
-# # ~~ FCN TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_nfcn
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5" # 
-# device="cpu"
-
-# ~~ CNN TEST ~~
+# ~~ FCN TEST ~~
 nbody=quijotelike
-sim=fastpm_4k_ncnn
+sim=fastpm_4k_nfcn
 infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
+extras="nbody.zf=0.5" # 
 device="cpu"
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# # ~~ CNN TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_ncnn
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
+# device="cpu"
+
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
