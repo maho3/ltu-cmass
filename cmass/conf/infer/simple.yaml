@@ -13,12 +13,6 @@ tracer: halo # Type of tracer to use for inference (e.g., halo, galaxy, ngc_ligh
 
 experiments:
   # List of experiments, each defining a set of summary statistics and k-ranges.
-  - summary: [nbar, Pk0]   # monopole
-    kmin: [0.]
-    kmax: [0.4]
-  - summary: [nbar, Pk0, Pk2, Pk4, Qk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-    kmin: [0.]
-    kmax: [0.4]
   - summary: [nbar, zPk0]   # z-space monopole
     kmin: [0.]
     kmax: [0.4]

@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=training  # Job name
-#SBATCH --array=0-5  # Array range
+#SBATCH --job-name=trainingcnn  # Job name
+#SBATCH --array=0-2  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
-#SBATCH --time=24:00:00         # Time limit
+#SBATCH --time=3:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
@@ -14,14 +14,31 @@
 module restore cmass
 conda activate cmassrun
 
-# exp_index=0
-net_index=$SLURM_ARRAY_TASK_ID
+exp_index=$SLURM_ARRAY_TASK_ID
+net_index=null
 
 sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
+# # ~~ PCA TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_npca
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5" # 
+# device="cpu"
+
+# # ~~ FCN TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nfcn
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5" # 
+# device="cpu"
+
+# ~~ CNN TEST ~~
 nbody=quijotelike
 sim=fastpm_4k_ncnn
 infer=simple  # simple  # lightcone
@@ -39,6 +56,6 @@ suffix="$suffix infer.include_noise=True infer.include_hod=False"
 
 echo "Running inference pipeline with $suffix"
 
-python -m cmass.infer.optuna $suffix
-# python -m cmass.infer.train $suffix infer.retrain=True
+# python -m cmass.infer.optuna $suffix
+python -m cmass.infer.train $suffix infer.retrain=True
 # python -m cmass.infer.retrain_optuna $suffix

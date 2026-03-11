@@ -21,22 +21,17 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_4k
+sim=fastpm_4k_npca
 infer=simple  # simple  # lightcone
 
-halo=False
-galaxy=True
-ngc=False
-sgc=False
-mtng=False
-simbig=False
+tracer=galaxy
 
-extras="nbody.zf=0.5" # 
+extras="nbody.zf=0.5 infer.Nmax=2000 infer.test_noised_summs=True" #
+extras="$extras infer.pca_features=16" 
 device="cpu"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
-suffix="$suffix infer.halo=$halo infer.galaxy=$galaxy"
-suffix="$suffix infer.ngc_lightcone=$ngc infer.sgc_lightcone=$sgc infer.mtng_lightcone=$mtng infer.simbig_lightcone=$simbig"
+suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
 suffix="$suffix infer.include_noise=True infer.include_hod=False"
