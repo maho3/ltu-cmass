@@ -152,7 +152,7 @@ def run_training(
             act_fn='ReLU'
         )
     elif mcfg.embedding_net == 'multihead':
-        in_features = np.diff(start_idx).tolist() + [x_train.shape[1] - start_idx[-1]]
+        in_features = np.diff(start_idx).tolist()
         out_features = [mcfg.out_features] * len(in_features)
         hidden_layers = [[mcfg.hidden_width]*mcfg.hidden_depth] * len(in_features)
         embedding = MultiHeadEmbedding(

@@ -63,8 +63,8 @@ def objective(trial, cfg: DictConfig,
 def objective_cval(trial, cfg: DictConfig,
                    x_train, theta_train, x_val, theta_val, x_test, theta_test,
                    hodprior, noiseprior,
-                   startidx=None,
                    n_splits, ids_train, ids_val, ids_test,  # for cross-val
+                   startidx=None,  # for multihead embedding
                    validation_smoothing_method='none', ema_decay=0.9):
     """
     Cross-validation strategy: Split data into train/val/test folds.

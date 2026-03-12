@@ -32,7 +32,7 @@ class CNN(nn.Module):
         return x
 
 
-class FCN(nn.Module):
+class MLP(nn.Module):
     """
     Fully-connected network for embedding.
     """
@@ -53,17 +53,17 @@ class FCN(nn.Module):
             n_last = n_h
         layers.append(nn.Linear(n_last, out_features))
         
-        self.fcn = nn.Sequential(*layers)
+        self.mlp = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.fcn(x)
+        return self.mlp(x)
 
 class MultiHeadEmbedding(nn.Module):
     """
     Multi-head embedding architecture.
     
     Takes a vector input, breaks it up into sub-vectors, embeds each
-    individually with FCNs, and then concatenates the embeddings into a
+    individually with MLPs, and then concatenates the embeddings into a
     new context vector.
     """
     def __init__(
@@ -80,7 +80,7 @@ class MultiHeadEmbedding(nn.Module):
         self.embedding_nets = nn.ModuleList()
         for i in range(len(start_idx)):
             self.embedding_nets.append(
-                FCN(
+                MLP(
                     in_features=in_features[i],
                     out_features=out_features[i],
                     hidden_layers=hidden_layers[i],
@@ -91,9 +91,9 @@ class MultiHeadEmbedding(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Split the input tensor into sub-vectors
         sub_vectors = []
-        for i in range(len(self.start_idx)):
+        for i in range(len(self.start_idx)-1):
             start = self.start_idx[i]
-            end = self.start_idx[i+1] if i+1 < len(self.start_idx) else x.shape[-1]
+            end = self.start_idx[i+1]
             sub_vectors.append(x[..., start:end])
         
         # Embed each sub-vector
