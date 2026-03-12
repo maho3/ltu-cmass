@@ -31,6 +31,7 @@ from .tools import split_experiments
 def objective(trial, cfg: DictConfig,
               x_train, theta_train, x_val, theta_val, x_test, theta_test,
               hodprior, noiseprior,
+              startidx=None,
               validation_smoothing_method='none', ema_decay=0.9):
 
     # Sample hyperparameters
@@ -45,6 +46,7 @@ def objective(trial, cfg: DictConfig,
         out_dir=None,
         cfg=cfg, mcfg=mcfg,
         hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+        start_idx=startidx,
         validation_smoothing_method=validation_smoothing_method,
         ema_decay=ema_decay
     )
@@ -61,6 +63,7 @@ def objective(trial, cfg: DictConfig,
 def objective_cval(trial, cfg: DictConfig,
                    x_train, theta_train, x_val, theta_val, x_test, theta_test,
                    hodprior, noiseprior,
+                   startidx=None,
                    n_splits, ids_train, ids_val, ids_test,  # for cross-val
                    validation_smoothing_method='none', ema_decay=0.9):
     """
@@ -118,6 +121,7 @@ def objective_cval(trial, cfg: DictConfig,
             x_val=x_val_fold, theta_val=theta_val_fold,
             out_dir=None, cfg=cfg, mcfg=mcfg,
             hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+            start_idx=startidx,
             validation_smoothing_method=validation_smoothing_method,
             ema_decay=ema_decay
         )
@@ -162,7 +166,8 @@ def run_experiment(exp, cfg, model_path):
             (x_train, theta_train, ids_train,
              x_val, theta_val, ids_val,
              x_test, theta_test, ids_test,
-             hodprior, noiseprior) = load_preprocessed_data(exp_path)
+             hodprior, noiseprior,
+             startidx) = load_preprocessed_data(exp_path)
 
             cv_args = []
             if cfg.infer.cross_val:
@@ -180,7 +185,8 @@ def run_experiment(exp, cfg, model_path):
                 lambda trial: objective_fn(
                     trial, cfg, x_train, theta_train,
                     x_val, theta_val, x_test, theta_test,
-                    hodprior, noiseprior, 
+                    hodprior, noiseprior,
+                    startidx,
                     *cv_args,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay),
