@@ -41,6 +41,7 @@ def train_and_save_nested_models(
     sizes,
     B,
     out_dir,
+    start_idx=None,
     base_seed=0,
 ):
     '''
@@ -115,6 +116,7 @@ def train_and_save_nested_models(
                 cfg=cfg,
                 mcfg=mcfg,
                 verbose=False,
+                start_idx=start_idx,
                 validation_smoothing_method=validation_smoothing_method,
                 ema_decay=ema_decay,
             )
@@ -197,6 +199,9 @@ def main(summary_path, output_path=None):
     theta_train = np.load(f'{summary_path}/theta_train.npy')
     x_val = np.load(f'{summary_path}/x_val.npy')
     theta_val = np.load(f'{summary_path}/theta_val.npy')
+    with open(f'{summary_path}/x_startidx.txt', 'r') as f:
+        _ = f.readline().strip().split(',')
+        startidx = np.array(f.readline().strip().split(',')).astype(int)
 
     # fixed test set for calculating log-probabilities
     x_test = np.load(f'{summary_path}/x_test.npy')
@@ -236,6 +241,7 @@ def main(summary_path, output_path=None):
         sizes=sizes,
         B=B,
         out_dir=model_out_dir,
+        start_idx=startidx,
     )
 
     test_log_probs = eval_nested_models(
