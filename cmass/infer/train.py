@@ -32,7 +32,7 @@ import ili
 from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
-from .architectures import CNN
+from .architectures import CNN, MultiHeadEmbedding
 
 
 import matplotlib.pyplot as plt
@@ -120,6 +120,7 @@ def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
     hodprior=None, noiseprior=None, verbose=True,
+    start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
     """
@@ -148,6 +149,17 @@ def run_training(
         embedding = CNN(
             out_channels=out_channels,
             kernel_size=mcfg.kernel_size,
+            act_fn='ReLU'
+        )
+    elif mcfg.embedding_net == 'mhe':
+        in_features = np.diff(start_idx).tolist()
+        out_features = [mcfg.out_features] * len(in_features)
+        hidden_layers = [[mcfg.hidden_width]*mcfg.hidden_depth] * len(in_features)
+        embedding = MultiHeadEmbedding(
+            start_idx=start_idx,
+            in_features=in_features,
+            out_features=out_features,
+            hidden_layers=hidden_layers,
             act_fn='ReLU'
         )
     else:
@@ -210,6 +222,7 @@ def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
     hodprior=None, noiseprior=None, verbose=True,
+    start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
     """
@@ -341,6 +354,9 @@ def load_preprocessed_data(exp_path):
         filepath = join(exp_path, 'noiseprior.yaml')
         noiseprior = (OmegaConf.load(filepath)
                       if os.path.exists(filepath) else None)
+        with open(join(exp_path, 'x_startidx.txt'), 'r') as f:
+            _ = f.readline().strip().split(',') # summary labels
+            startidx = np.array(f.readline().strip().split(',')).astype(int)
     except FileNotFoundError:
         raise FileNotFoundError(
             f'Could not find training/test data in {exp_path}. '
@@ -350,7 +366,8 @@ def load_preprocessed_data(exp_path):
     return (x_train, theta_train, ids_train,
             x_val, theta_val, ids_val,
             x_test, theta_test, ids_test,
-            hodprior, noiseprior)
+            hodprior, noiseprior,
+            startidx)
 
 
 def run_experiment(exp, cfg, model_path):
@@ -373,7 +390,8 @@ def run_experiment(exp, cfg, model_path):
             (x_train, theta_train, ids_train,
              x_val, theta_val, ids_val,
              x_test, theta_test, ids_test,
-             hodprior, noiseprior) = load_preprocessed_data(exp_path)
+             hodprior, noiseprior,
+             startidx) = load_preprocessed_data(exp_path)
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -388,6 +406,7 @@ def run_experiment(exp, cfg, model_path):
                 x_train, theta_train, x_val, theta_val, out_dir=out_dir,
                 cfg=cfg, mcfg=cfg.net,
                 hodprior=hodprior, noiseprior=noiseprior,
+                start_idx=startidx,
                 validation_smoothing_method=validation_smoothing_method,
                 ema_decay=ema_decay,
             )
@@ -478,7 +497,8 @@ def run_retraining(exp, cfg, model_path):
                 (x_train, theta_train, ids_train,
                  x_val, theta_val, ids_val,
                  x_test, theta_test, ids_test,
-                 hodprior, noiseprior) = load_preprocessed_data(exp_path)
+                 hodprior, noiseprior,
+                 startidx) = load_preprocessed_data(exp_path)
 
                 logging.info(
                     f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -491,6 +511,7 @@ def run_retraining(exp, cfg, model_path):
                     x_train, theta_train, x_val, theta_val, out_dir=out_dir,
                     cfg=cfg, mcfg=mcfg,
                     hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+                    start_idx=startidx,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay
                 )

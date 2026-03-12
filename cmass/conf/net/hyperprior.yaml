@@ -5,6 +5,10 @@ cnn:
   cnn_depth: [2, 6]
   out_channels: [4, 16]
   kernel_size: [3, 5]
+mhe:
+  hidden_depth: [0, 2]
+  hidden_width: [4, 32]
+  out_features: [4, 16]
 shared:
   model: ['nsf']
   hidden_features: [16, 64]
