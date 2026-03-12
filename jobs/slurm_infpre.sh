@@ -11,17 +11,18 @@
 SLURM_ARRAY_TASK_ID=0
 # export TQDM_DISABLE=0
 
-module restore cmass
-conda activate cmassrun
+# module restore cmass
+source ~/.bashrc
+conda activate cmass
 
 exp_index=null
 net_index=$SLURM_ARRAY_TASK_ID
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_4k_nmhe
+sim=fastpm_4k_nniall
 infer=simple  # simple  # lightcone
 
 tracer=galaxy

@@ -6,7 +6,7 @@ import numpy as np
 import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
-import BFast
+# import BFast  # installation issues on Delta
 import PolyBin3D as pb
 from ..utils import timing_decorator
 
