@@ -3,7 +3,7 @@
 #SBATCH --array=0-5  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
-#SBATCH --time=24:00:00         # Time limit
+#SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=shared  # Partition name
 #SBATCH --account=phy240043  # Account name
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
@@ -23,10 +23,10 @@ sleep $net_index  # to stagger the start of each job
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_4k_ncnn
+sim=fastpm_4k_nmhe
 infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
+extras="nbody.zf=0.5 infer.embedding_net=mhe" # 
 device="cpu"
 
 export TQDM_DISABLE=0

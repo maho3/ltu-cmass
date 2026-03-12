@@ -11,8 +11,8 @@ mhe:
   out_features: [4, 16]
 shared:
   model: ['nsf']
-  hidden_features: [16, 64]
-  num_transforms: [2, 8]
+  hidden_features: [8, 32]
+  num_transforms: [1, 5]
   log2_batch_size: [5, 9]
   learning_rate: [5.e-6, 1.e-3]
   weight_decay: [1.e-5, 1.e-1]
