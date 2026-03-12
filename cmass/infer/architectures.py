@@ -78,7 +78,7 @@ class MultiHeadEmbedding(nn.Module):
         
         self.start_idx = start_idx
         self.embedding_nets = nn.ModuleList()
-        for i in range(len(start_idx)):
+        for i in range(len(start_idx)-1):
             self.embedding_nets.append(
                 MLP(
                     in_features=in_features[i],

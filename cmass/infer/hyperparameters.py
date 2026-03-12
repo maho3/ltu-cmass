@@ -41,13 +41,15 @@ def sample_hyperparameters_optuna(
             'out_channels', *hyperprior.cnn.out_channels, log=True)
         mcfg['kernel_size'] = trial.suggest_int('kernel_size',
                                                 *hyperprior.cnn.kernel_size)
-    elif embedding_net == 'multihead':
+    elif embedding_net == 'mhe':
         mcfg['hidden_depth'] = trial.suggest_int('hidden_depth',
-                                                 *hyperprior.multihead.hidden_depth)
+                                                 *hyperprior.mhe.hidden_depth)
         mcfg['hidden_width'] = trial.suggest_int('hidden_width',
-                                                 *hyperprior.multihead.hidden_width, log=True)
+                                                 *hyperprior.mhe.hidden_width, log=True)
         mcfg['out_features'] = trial.suggest_int('out_features',
-                                                 *hyperprior.multihead.out_features, log=True)
+                                                 *hyperprior.mhe.out_features, log=True)
+    else:
+        raise ValueError(f"Unknown embedding net: {embedding_net}")
 
     return OmegaConf.create(mcfg)
 
@@ -99,15 +101,17 @@ def sample_hyperparameters_randomly(
             np.log(hyperprior.cnn.out_channels[1]))))
         mcfg['kernel_size'] = np.random.randint(
             hyperprior.cnn.kernel_size[0], hyperprior.cnn.kernel_size[1] + 1)
-    elif embedding_net == 'multihead':
+    elif embedding_net == 'mhe':
         mcfg['hidden_depth'] = np.random.randint(
-            hyperprior.multihead.hidden_depth[0], hyperprior.multihead.hidden_depth[1] + 1)
+            hyperprior.mhe.hidden_depth[0], hyperprior.mhe.hidden_depth[1] + 1)
         mcfg['hidden_width'] = int(np.exp(np.random.uniform(
-            np.log(hyperprior.multihead.hidden_width[0]),
-            np.log(hyperprior.multihead.hidden_width[1]))))
+            np.log(hyperprior.mhe.hidden_width[0]),
+            np.log(hyperprior.mhe.hidden_width[1]))))
         mcfg['out_features'] = int(np.exp(np.random.uniform(
-            np.log(hyperprior.multihead.out_features[0]),
-            np.log(hyperprior.multihead.out_features[1]))))
+            np.log(hyperprior.mhe.out_features[0]),
+            np.log(hyperprior.mhe.out_features[1]))))
+    else:
+        raise ValueError(f"Unknown embedding net: {embedding_net}")
         
     # typecasting for OmegaConf
     for k, v in mcfg.items():
