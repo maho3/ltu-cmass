@@ -48,6 +48,16 @@ def sample_hyperparameters_optuna(
                                                  *hyperprior.mhe.hidden_width, log=True)
         mcfg['out_features'] = trial.suggest_int('out_features',
                                                  *hyperprior.mhe.out_features, log=True)
+    elif embedding_net == 'fun':
+        mcfg['hidden_depth'] = trial.suggest_int('hidden_depth',
+                                                 *hyperprior.fun.hidden_depth)
+        mcfg['out_features'] = trial.suggest_int('out_features',
+                                                 *hyperprior.fun.out_features, log=True)
+    elif embedding_net == 'mhf':
+        mcfg['hidden_depth'] = trial.suggest_int('hidden_depth',
+                                                 *hyperprior.mhf.hidden_depth)
+        mcfg['out_features'] = trial.suggest_int('out_features',
+                                                 *hyperprior.mhf.out_features, log=True)
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 
@@ -110,6 +120,21 @@ def sample_hyperparameters_randomly(
         mcfg['out_features'] = int(np.exp(np.random.uniform(
             np.log(hyperprior.mhe.out_features[0]),
             np.log(hyperprior.mhe.out_features[1]))))
+    elif embedding_net == 'fun':
+        mcfg['hidden_depth'] = np.random.randint(
+            hyperprior.fun.hidden_depth[0], hyperprior.fun.hidden_depth[1] + 1)
+        mcfg['out_features'] = int(np.exp(np.random.uniform(
+            np.log(hyperprior.fun.out_features[0]),
+            np.log(hyperprior.fun.out_features[1]))))
+    elif embedding_net == 'mhf':
+        mcfg['hidden_depth'] = np.random.randint(
+            hyperprior.mhf.hidden_depth[0], hyperprior.mhf.hidden_depth[1] + 1)
+        mcfg['hidden_width'] = int(np.exp(np.random.uniform(
+            np.log(hyperprior.mhf.hidden_width[0]),
+            np.log(hyperprior.mhf.hidden_width[1]))))
+        mcfg['out_features'] = int(np.exp(np.random.uniform(
+            np.log(hyperprior.mhf.out_features[0]),
+            np.log(hyperprior.mhf.out_features[1]))))
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
         
