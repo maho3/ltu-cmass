@@ -18,6 +18,7 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import torch
 from torch import nn
 import yaml
 import time
@@ -182,6 +183,8 @@ def run_training(
         )
     else:
         raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")
+
+    embedding = torch.compile(embedding)
 
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':
