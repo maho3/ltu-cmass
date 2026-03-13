@@ -1,18 +1,19 @@
 #!/bin/bash
-#SBATCH --job-name=trainingfcn  # Job name
-#SBATCH --array=2  # Array range
+#SBATCH --job-name=retrain  # Job name
+#SBATCH --array=0-2  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=3:00:00         # Time limit
-#SBATCH --partition=shared  # Partition name
-#SBATCH --account=phy240043  # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --partition=cpu  # Partition name
+#SBATCH --account=bdne-delta-cpu  # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
 # SLURM_ARRAY_TASK_ID=2
 
-module restore cmass
-conda activate cmassrun
+# module restore cmass
+source ~/.bashrc
+conda activate cmass
 
 exp_index=$SLURM_ARRAY_TASK_ID
 net_index=null
@@ -20,7 +21,7 @@ net_index=null
 sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 # # ~~ PCA TEST ~~
 # nbody=quijotelike

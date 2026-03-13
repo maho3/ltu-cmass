@@ -4,18 +4,21 @@
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
-#SBATCH --partition=shared  # Partition name
-#SBATCH --account=phy240043  # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --partition=cpu  # Partition name
+#SBATCH --account=bdne-delta-cpu  # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
 # SLURM_ARRAY_TASK_ID=0
 
-module restore cmass
-conda activate cmassrun
+# module restore cmass
+source ~/.bashrc
+conda activate cmass
 
 exp_index=$SLURM_ARRAY_TASK_ID
 net_index=0
+
+sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
