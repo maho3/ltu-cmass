@@ -23,6 +23,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import optuna
 import multiprocessing
+from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import joblib
 
@@ -254,12 +255,20 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
                 logging.info(
                     f"Precompressing with PCA to {cfg.infer.pca_features} features")
+                # Standardize the features
+                scaler = StandardScaler()
+                scaler.fit(x_train)
+                x_train = scaler.transform(x_train)
+                x_val = scaler.transform(x_val)
+                x_test = scaler.transform(x_test)
+
+                # PCA compress the features
                 pca = PCA(n_components=cfg.infer.pca_features)
                 pca.fit(x_train)
                 x_train = pca.transform(x_train)
                 x_val = pca.transform(x_val)
                 x_test = pca.transform(x_test)
-                joblib.dump(pca, join(exp_path, 'pca.pkl'))
+                joblib.dump((scaler, pca), join(exp_path, 'pca.pkl'))
 
             # save training/test data
             with open(join(exp_path, 'config.yaml'), 'w') as f:

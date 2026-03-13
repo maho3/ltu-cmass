@@ -18,6 +18,7 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import torch
 from torch import nn
 import yaml
 import time
@@ -32,7 +33,7 @@ import ili
 from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
-from .architectures import CNN, MultiHeadEmbedding
+from .architectures import CNN, MultiHeadEmbedding, FunnelNetwork, MultiHeadFunnel
 
 
 import matplotlib.pyplot as plt
@@ -160,6 +161,24 @@ def run_training(
             in_features=in_features,
             out_features=out_features,
             hidden_layers=hidden_layers,
+            act_fn='ReLU'
+        )
+    elif mcfg.embedding_net == 'fun':
+        embedding = FunnelNetwork(
+            in_features=x_train.shape[-1],
+            out_features=mcfg.out_features,
+            hidden_depth=mcfg.hidden_depth,
+            act_fn='ReLU'
+        )
+    elif mcfg.embedding_net == 'mhf':
+        in_features = np.diff(start_idx).tolist()
+        out_features = [mcfg.out_features] * len(in_features)
+        hidden_depth = [mcfg.hidden_depth] * len(in_features)
+        embedding = MultiHeadFunnel(
+            start_idx=start_idx,
+            in_features=in_features,
+            out_features=out_features,
+            hidden_depth=hidden_depth,
             act_fn='ReLU'
         )
     else:
