@@ -105,7 +105,7 @@ class MultiHeadEmbedding(nn.Module):
         return torch.cat(embeddings, dim=-1)
 
 
-class FunnelNetwork(nn.Module):
+class FunnelNetwork(MLP):
     """
     Fully-connected network that linearly interpolates hidden features
     between input and output.
@@ -117,23 +117,15 @@ class FunnelNetwork(nn.Module):
         hidden_depth: int,
         act_fn: str = "ReLU",
     ):
-        super().__init__()
-        
-        layers = []
-        
-        hidden_layers = torch.linspace(in_features, out_features, hidden_depth+2).to(torch.int)[1:-1]
-        
-        n_last = in_features
-        for n_h in hidden_layers:
-            layers.append(nn.Linear(n_last, n_h))
-            layers.append(getattr(nn, act_fn)())
-            n_last = n_h
-        layers.append(nn.Linear(n_last, out_features))
-        
-        self.fun = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.fun(x)
+        hidden_layers = torch.linspace(
+            in_features, out_features, hidden_depth+2
+        ).to(torch.int)[1:-1].tolist()
+        super().__init__(
+            in_features=in_features,
+            out_features=out_features,
+            hidden_layers=hidden_layers,
+            act_fn=act_fn,
+        )
 
 
 class MultiHeadFunnel(nn.Module):
