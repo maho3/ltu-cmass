@@ -184,8 +184,6 @@ def run_training(
     else:
         raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")
 
-    embedding = torch.compile(embedding)
-
     # instantiate your neural networks to be used as an ensemble
     if cfg.infer.backend == 'lampe':
         net_loader = ili.utils.load_nde_lampe

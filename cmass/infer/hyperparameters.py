@@ -129,9 +129,6 @@ def sample_hyperparameters_randomly(
     elif embedding_net == 'mhf':
         mcfg['hidden_depth'] = np.random.randint(
             hyperprior.mhf.hidden_depth[0], hyperprior.mhf.hidden_depth[1] + 1)
-        mcfg['hidden_width'] = int(np.exp(np.random.uniform(
-            np.log(hyperprior.mhf.hidden_width[0]),
-            np.log(hyperprior.mhf.hidden_width[1]))))
         mcfg['out_features'] = int(np.exp(np.random.uniform(
             np.log(hyperprior.mhf.out_features[0]),
             np.log(hyperprior.mhf.out_features[1]))))
