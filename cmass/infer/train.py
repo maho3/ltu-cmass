@@ -173,6 +173,7 @@ def run_training(
             act_fn='ReLU',
             dropout=mcfg.dropout,
             linear_dim=mcfg.linear_dim if 'linear_dim' in mcfg else None,
+            bypass=mcfg.bypass if 'bypass' in mcfg else False,
         )
     elif mcfg.embedding_net == 'mhf':
         in_features = np.diff(start_idx).tolist()
