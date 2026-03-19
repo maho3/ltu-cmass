@@ -67,11 +67,12 @@ stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
-early_stopping: True
-noise_percent: 0.0
-lr_scheduler: 'ReduceLROnPlateau'
-max_epochs: 1000
-dropout: 0.0
+early_stopping: True  # whether to use early stopping
+noise_percent: 0.0  # percentage of noise to add to summaries
+lr_scheduler: 'ReduceLROnPlateau'  # learning rate scheduler to use
+max_epochs: 1000  # maximum number of epochs to train for
+dropout: 0.0  # dropout rate for MLP layers
+
 
 
 # Validation smoothing
