@@ -208,6 +208,10 @@ def run_training(
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
         'ema_decay': ema_decay,
         'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
     }
 
     # setup data loaders
@@ -271,6 +275,10 @@ def run_training_with_precompression(
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
         'ema_decay': ema_decay,
         'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
     }
 
     # setup data loaders

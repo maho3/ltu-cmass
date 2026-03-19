@@ -24,3 +24,7 @@ shared:
   weight_decay: [1.e-5, 1.e-1]
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
+  early_stopping: [True, False]
+  noise_percent: [0.001, 0.1]
+  lr_scheduler: ['ReduceLROnPlateau', 'CosineAnnealingLR']
+  max_epochs: [50, 1000]

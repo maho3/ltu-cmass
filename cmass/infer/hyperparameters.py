@@ -58,6 +58,14 @@ def sample_hyperparameters_optuna(
         trial, "lr_patience", hp.lr_patience, 'int')
     mcfg['lr_decay_factor'] = _get_or_sample_optuna(
         trial, "lr_decay_factor", hp.lr_decay_factor, 'float', log=True)
+    mcfg['early_stopping'] = _get_or_sample_optuna(
+        trial, "early_stopping", hp.early_stopping, 'categorical')
+    mcfg['noise_percent'] = _get_or_sample_optuna(
+        trial, "noise_percent", hp.noise_percent, 'float', log=True)
+    mcfg['lr_scheduler'] = _get_or_sample_optuna(
+        trial, "lr_scheduler", hp.lr_scheduler, 'categorical')
+    mcfg['max_epochs'] = _get_or_sample_optuna(
+        trial, "max_epochs", hp.max_epochs, 'int', log=True)
 
     # sample embedding-specific parameters
     hp_emb = hyperprior[embedding_net]
@@ -116,6 +124,14 @@ def sample_hyperparameters_randomly(
     mcfg['lr_patience'] = _get_or_sample_random(hp.lr_patience, 'randint')
     mcfg['lr_decay_factor'] = _get_or_sample_random(
         hp.lr_decay_factor, 'loguniform')
+    mcfg['early_stopping'] = _get_or_sample_random(
+        hp.early_stopping, 'choice')
+    mcfg['noise_percent'] = _get_or_sample_random(
+        hp.noise_percent, 'loguniform')
+    mcfg['lr_scheduler'] = _get_or_sample_random(
+        hp.lr_scheduler, 'choice')
+    mcfg['max_epochs'] = int(_get_or_sample_random(
+        hp.max_epochs, 'loguniform'))
 
     # sample embedding-specific parameters
     hp_emb = hyperprior[embedding_net]
