@@ -3,7 +3,7 @@ save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fa
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # index of network to use in cfg.net
+net_index: null     # index of network to use in cfg.net
 device: cpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~
@@ -48,6 +48,7 @@ experiments:
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
 retrain: False
+verbose: False
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
@@ -66,6 +67,12 @@ stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
+early_stopping: True  # whether to use early stopping
+noise_percent: 0.0  # percentage of noise to add to summaries
+lr_scheduler: 'ReduceLROnPlateau'  # learning rate scheduler to use
+max_epochs: 1000  # maximum number of epochs to train for
+dropout: 0.0  # dropout rate for MLP layers
+linear_dim: null  # linear dimension for FunnelNetwork
 
 # Validation smoothing
 validation_smoothing_method: none  # Method for smoothing validation loss (none/swa/ema).
