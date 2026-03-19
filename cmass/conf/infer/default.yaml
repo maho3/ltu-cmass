@@ -71,6 +71,7 @@ early_stopping: True
 noise_percent: 0.0
 lr_scheduler: 'ReduceLROnPlateau'
 max_epochs: 1000
+dropout: 0.0
 
 
 # Validation smoothing

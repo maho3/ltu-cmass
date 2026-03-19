@@ -28,3 +28,4 @@ shared:
   noise_percent: [0.001, 0.1]
   lr_scheduler: ['ReduceLROnPlateau', 'CosineAnnealingLR']
   max_epochs: [50, 1000]
+  dropout: [0.0, 0.5]

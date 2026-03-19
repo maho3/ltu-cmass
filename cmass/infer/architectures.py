@@ -42,6 +42,7 @@ class MLP(nn.Module):
         out_features: int,
         hidden_layers: List[int],
         act_fn: str = "ReLU",
+        dropout: float = 0.0,
     ):
         super().__init__()
         
@@ -50,6 +51,8 @@ class MLP(nn.Module):
         for n_h in hidden_layers:
             layers.append(nn.Linear(n_last, n_h))
             layers.append(getattr(nn, act_fn)())
+            if dropout > 0:
+                layers.append(nn.Dropout(p=dropout))
             n_last = n_h
         layers.append(nn.Linear(n_last, out_features))
         
@@ -73,6 +76,7 @@ class MultiHeadEmbedding(nn.Module):
         out_features: List[int],
         hidden_layers: List[List[int]],
         act_fn: str = "ReLU",
+        dropout: float = 0.0,
     ):
         super().__init__()
         
@@ -85,6 +89,7 @@ class MultiHeadEmbedding(nn.Module):
                     out_features=out_features[i],
                     hidden_layers=hidden_layers[i],
                     act_fn=act_fn,
+                    dropout=dropout,
                 )
             )
 
@@ -117,6 +122,7 @@ class FunnelNetwork(MLP):
         hidden_depth: int,
         linear_dim: int = None,
         act_fn: str = "ReLU",
+        dropout: float = 0.0,
     ):
         if hidden_depth == 0:
             hidden_layers = []
@@ -133,6 +139,7 @@ class FunnelNetwork(MLP):
             out_features=out_features,
             hidden_layers=hidden_layers,
             act_fn=act_fn,
+            dropout=dropout,
         )
 
 
@@ -151,6 +158,7 @@ class MultiHeadFunnel(nn.Module):
         out_features: List[int],
         hidden_depth: List[int],
         act_fn: str = "ReLU",
+        dropout: float = 0.0,
     ):
         super().__init__()
         
@@ -163,6 +171,7 @@ class MultiHeadFunnel(nn.Module):
                     out_features=out_features[i],
                     hidden_depth=hidden_depth[i],
                     act_fn=act_fn,
+                    dropout=dropout,
                 )
             )
 

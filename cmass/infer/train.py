@@ -162,14 +162,16 @@ def run_training(
             in_features=in_features,
             out_features=out_features,
             hidden_layers=hidden_layers,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
         )
     elif mcfg.embedding_net == 'fun':
         embedding = FunnelNetwork(
             in_features=x_train.shape[-1],
             out_features=mcfg.out_features,
             hidden_depth=mcfg.hidden_depth,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
         )
     elif mcfg.embedding_net == 'mhf':
         in_features = np.diff(start_idx).tolist()
@@ -180,7 +182,8 @@ def run_training(
             in_features=in_features,
             out_features=out_features,
             hidden_depth=hidden_depth,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
         )
     else:
         raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")

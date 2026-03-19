@@ -29,6 +29,8 @@ def _get_or_sample_random(value, sample_logic):
         return np.random.randint(value[0], value[1] + 1)
     elif sample_logic == 'loguniform':
         return np.exp(np.random.uniform(np.log(value[0]), np.log(value[1])))
+    elif sample_logic == 'uniform':
+        return np.random.uniform(value[0], value[1])
     raise ValueError(f"Unknown sample logic: {sample_logic}")
 
 
@@ -66,6 +68,8 @@ def sample_hyperparameters_optuna(
         trial, "lr_scheduler", hp.lr_scheduler, 'categorical')
     mcfg['max_epochs'] = _get_or_sample_optuna(
         trial, "max_epochs", hp.max_epochs, 'int', log=True)
+    mcfg['dropout'] = _get_or_sample_optuna(
+        trial, "dropout", hp.dropout, 'float')
 
     # sample embedding-specific parameters
     hp_emb = hyperprior[embedding_net]
@@ -132,6 +136,8 @@ def sample_hyperparameters_randomly(
         hp.lr_scheduler, 'choice')
     mcfg['max_epochs'] = int(_get_or_sample_random(
         hp.max_epochs, 'loguniform'))
+    mcfg['dropout'] = _get_or_sample_random(
+        hp.dropout, 'uniform')
 
     # sample embedding-specific parameters
     hp_emb = hyperprior[embedding_net]
