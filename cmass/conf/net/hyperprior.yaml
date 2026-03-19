@@ -16,7 +16,7 @@ mhf:
   hidden_depth: [0, 2]
   out_features: [4, 16]
 shared:
-  model: ['nsf']
+  model: 'nsf'
   hidden_features: [16, 64]
   num_transforms: [2, 8]
   log2_batch_size: [5, 9]
