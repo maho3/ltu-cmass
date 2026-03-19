@@ -3,7 +3,7 @@ save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fa
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # index of network to use in cfg.net
+net_index: null     # index of network to use in cfg.net
 device: cpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~

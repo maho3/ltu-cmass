@@ -562,7 +562,7 @@ def run_retraining(exp, cfg, model_path):
                 posterior, histories = train_fn(
                     x_train, theta_train, x_val, theta_val, out_dir=out_dir,
                     cfg=cfg, mcfg=mcfg,
-                    hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+                    hodprior=hodprior, noiseprior=noiseprior,
                     start_idx=startidx,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay
