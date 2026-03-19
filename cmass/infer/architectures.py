@@ -123,12 +123,14 @@ class FunnelNetwork(MLP):
         linear_dim: int = None,
         act_fn: str = "ReLU",
         dropout: float = 0.0,
+        bypass: bool = False,
     ):
+        self.bypass = bypass
         if hidden_depth == 0:
             hidden_layers = []
         else:
             embedding_dim = in_features if linear_dim is None else linear_dim
-            
+
             # The hidden layers interpolate from embedding_dim to out_features
             hidden_layers = torch.linspace(
                 embedding_dim, out_features, hidden_depth + 2
@@ -141,6 +143,14 @@ class FunnelNetwork(MLP):
             act_fn=act_fn,
             dropout=dropout,
         )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        mlp_output = self.mlp(x)
+        if self.bypass:
+            last_input_node = x[..., -1].unsqueeze(-1)
+            return torch.cat((mlp_output, last_input_node), dim=-1)
+        else:
+            return mlp_output
 
 
 class MultiHeadFunnel(nn.Module):

@@ -99,6 +99,8 @@ def sample_hyperparameters_optuna(
             trial, 'out_features', hp_emb.out_features, 'int', log=True)
         mcfg['linear_dim'] = _get_or_sample_optuna(
             trial, 'linear_dim', hp_emb.linear_dim, 'int', log=True)
+        mcfg['bypass'] = _get_or_sample_optuna(
+            trial, 'bypass', hp_emb.bypass, 'categorical')
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 
@@ -167,6 +169,7 @@ def sample_hyperparameters_randomly(
             _get_or_sample_random(hp_emb.out_features, 'loguniform'))
         linear_dim_value = _get_or_sample_random(hp_emb.linear_dim, 'loguniform')
         mcfg['linear_dim'] = int(linear_dim_value) if linear_dim_value is not None else None
+        mcfg['bypass'] = _get_or_sample_random(hp_emb.bypass, 'choice')
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 
