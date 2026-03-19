@@ -165,8 +165,8 @@ def sample_hyperparameters_randomly(
             hp_emb.hidden_depth, 'randint')
         mcfg['out_features'] = int(
             _get_or_sample_random(hp_emb.out_features, 'loguniform'))
-        mcfg['linear_dim'] = int(
-            _get_or_sample_random(hp_emb.linear_dim, 'loguniform'))
+        linear_dim_value = _get_or_sample_random(hp_emb.linear_dim, 'loguniform')
+        mcfg['linear_dim'] = int(linear_dim_value) if linear_dim_value is not None else None
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 
