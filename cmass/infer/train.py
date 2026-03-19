@@ -508,10 +508,27 @@ def run_retraining(exp, cfg, model_path):
             # Only select a subset of networks within the hyperparameter study
             trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
 
+            # If net_index is not None, select the net_index-th model, otherwise train all sequentially
+            if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
+                net_index = cfg.infer.net_index
+                if net_index < len(trial_numbers):
+                    logging.info(f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
+                    trial_numbers = [trial_numbers[net_index]]
+                    net_configs = [net_configs[net_index]]
+                else:
+                    logging.warning(f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
+                    return
+
             for trial_number, config in zip(trial_numbers, net_configs):
 
                 out_dir = join(exp_path, "nets", f"net-{trial_number}")
                 os.makedirs(out_dir, exist_ok=True)
+
+                # if net is run and saved already, skip
+                if os.path.exists(join(out_dir, 'posterior.pkl')):
+                    logging.info(
+                        f"Net-{trial_number} already trained. Skipping.")
+                    continue
 
                 # load training/test data: we retrain on the original split
                 # from cmass.infer.preprocess
