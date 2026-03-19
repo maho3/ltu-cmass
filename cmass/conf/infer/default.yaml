@@ -72,8 +72,7 @@ noise_percent: 0.0  # percentage of noise to add to summaries
 lr_scheduler: 'ReduceLROnPlateau'  # learning rate scheduler to use
 max_epochs: 1000  # maximum number of epochs to train for
 dropout: 0.0  # dropout rate for MLP layers
-
-
+linear_dim: null  # linear dimension for FunnelNetwork
 
 # Validation smoothing
 validation_smoothing_method: none  # Method for smoothing validation loss (none/swa/ema).

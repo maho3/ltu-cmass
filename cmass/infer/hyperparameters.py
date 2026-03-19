@@ -97,6 +97,8 @@ def sample_hyperparameters_optuna(
             trial, 'hidden_depth', hp_emb.hidden_depth, 'int')
         mcfg['out_features'] = _get_or_sample_optuna(
             trial, 'out_features', hp_emb.out_features, 'int', log=True)
+        mcfg['linear_dim'] = _get_or_sample_optuna(
+            trial, 'linear_dim', hp_emb.linear_dim, 'int', log=True)
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 
@@ -163,6 +165,8 @@ def sample_hyperparameters_randomly(
             hp_emb.hidden_depth, 'randint')
         mcfg['out_features'] = int(
             _get_or_sample_random(hp_emb.out_features, 'loguniform'))
+        mcfg['linear_dim'] = int(
+            _get_or_sample_random(hp_emb.linear_dim, 'loguniform'))
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")
 

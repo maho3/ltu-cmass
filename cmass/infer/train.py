@@ -172,11 +172,13 @@ def run_training(
             hidden_depth=mcfg.hidden_depth,
             act_fn='ReLU',
             dropout=mcfg.dropout,
+            linear_dim=mcfg.linear_dim if 'linear_dim' in mcfg else None,
         )
     elif mcfg.embedding_net == 'mhf':
         in_features = np.diff(start_idx).tolist()
         out_features = [mcfg.out_features] * len(in_features)
         hidden_depth = [mcfg.hidden_depth] * len(in_features)
+        linear_dims = [mcfg.linear_dim] * len(in_features) if 'linear_dim' in mcfg else None
         embedding = MultiHeadFunnel(
             start_idx=start_idx,
             in_features=in_features,
@@ -184,6 +186,7 @@ def run_training(
             hidden_depth=hidden_depth,
             act_fn='ReLU',
             dropout=mcfg.dropout,
+            linear_dims=linear_dims,
         )
     else:
         raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")

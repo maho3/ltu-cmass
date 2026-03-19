@@ -12,9 +12,11 @@ mhe:
 fun:
   hidden_depth: [0, 3]
   out_features: [4, 16]
+  linear_dim: null
 mhf:
   hidden_depth: [0, 2]
   out_features: [4, 16]
+  linear_dim: null
 shared:
   model: 'nsf'
   hidden_features: [16, 64]

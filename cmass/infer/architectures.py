@@ -159,6 +159,7 @@ class MultiHeadFunnel(nn.Module):
         hidden_depth: List[int],
         act_fn: str = "ReLU",
         dropout: float = 0.0,
+        linear_dims: List[int] = None,
     ):
         super().__init__()
         
@@ -172,6 +173,7 @@ class MultiHeadFunnel(nn.Module):
                     hidden_depth=hidden_depth[i],
                     act_fn=act_fn,
                     dropout=dropout,
+                    linear_dim=linear_dims[i] if linear_dims is not None else None,
                 )
             )
 
