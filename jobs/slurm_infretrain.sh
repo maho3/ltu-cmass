@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=retrain  # Job name
-#SBATCH --array=0-2  # Array range
+#SBATCH --array=0-9  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=3:00:00         # Time limit
@@ -15,8 +15,8 @@
 source ~/.bashrc
 conda activate cmass
 
-exp_index=$SLURM_ARRAY_TASK_ID
-net_index=null
+exp_index=2
+net_index=$SLURM_ARRAY_TASK_ID
 
 sleep $net_index  # to stagger the start of each job
 
@@ -31,13 +31,13 @@ cd /u/maho3/git/ltu-cmass
 # extras="nbody.zf=0.5" # 
 # device="cpu"
 
-# ~~ FCN TEST ~~
-nbody=quijotelike
-sim=fastpm_4k_nfcn
-infer=simple  # simple  # lightcone
-tracer=galaxy
-extras="nbody.zf=0.5" # 
-device="cpu"
+# # ~~ FCN TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nfcn
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5" # 
+# device="cpu"
 
 # # ~~ CNN TEST ~~
 # nbody=quijotelike
@@ -46,6 +46,14 @@ device="cpu"
 # tracer=galaxy
 # extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
 # device="cpu"
+
+# ~~ NIALL TEST ~~
+nbody=quijotelike
+sim=fastpm_4k_nniall2
+infer=simple  # simple  # lightcone
+tracer=galaxy
+extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+device="cpu"
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"

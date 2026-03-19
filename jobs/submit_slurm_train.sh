@@ -1,10 +1,10 @@
 
 #!/bin/bash
 
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 for case in galaxy ; do # simbig sgc mtng ngc
-    name="${case}mhe"
+    name="niall2"
     # Set all variables to False, then set the current case to True
     export galaxy=False simbig=False sgc=False ngc=False mtng=False
     export $case=True

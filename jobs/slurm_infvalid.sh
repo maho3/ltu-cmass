@@ -16,12 +16,12 @@ source ~/.bashrc
 conda activate cmass
 
 exp_index=$SLURM_ARRAY_TASK_ID
-net_index=0
+net_index=null
 
 sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 # # ~~ PCA TEST ~~
 # nbody=quijotelike
@@ -31,13 +31,13 @@ cd /home/x-mho1/git/ltu-cmass-run
 # extras="nbody.zf=0.5" # 
 # device="cpu"
 
-# ~~ FCN TEST ~~
-nbody=quijotelike
-sim=fastpm_4k_nfcn
-infer=simple  # simple  # lightcone
-tracer=galaxy
-extras="nbody.zf=0.5" # 
-device="cpu"
+# # ~~ FCN TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nfcn
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5" # 
+# device="cpu"
 
 # # ~~ CNN TEST ~~
 # nbody=quijotelike
@@ -46,6 +46,14 @@ device="cpu"
 # tracer=galaxy
 # extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
 # device="cpu"
+
+# ~~ NIALL TEST ~~
+nbody=quijotelike
+sim=fastpm_4k_nniall2
+infer=simple  # simple  # lightcone
+tracer=galaxy
+extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+device="cpu"
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
