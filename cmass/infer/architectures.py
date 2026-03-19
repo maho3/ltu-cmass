@@ -115,11 +115,19 @@ class FunnelNetwork(MLP):
         in_features: int,
         out_features: int,
         hidden_depth: int,
+        linear_dim: int = None,
         act_fn: str = "ReLU",
     ):
-        hidden_layers = torch.linspace(
-            in_features, out_features, hidden_depth+2
-        ).to(torch.int)[1:-1].tolist()
+        if hidden_depth == 0:
+            hidden_layers = []
+        else:
+            embedding_dim = in_features if linear_dim is None else linear_dim
+            
+            # The hidden layers interpolate from embedding_dim to out_features
+            hidden_layers = torch.linspace(
+                embedding_dim, out_features, hidden_depth + 2
+            ).to(torch.int)[1:-1].tolist()
+
         super().__init__(
             in_features=in_features,
             out_features=out_features,
