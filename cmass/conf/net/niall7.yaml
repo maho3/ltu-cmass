@@ -10,9 +10,9 @@ mhe:
   hidden_width: [4, 32]
   out_features: [4, 16]
 fun:
-  hidden_depth: [0, 3]
+  hidden_depth: [1, 3]
   out_features: [4, 16]
-  linear_dim: null
+  linear_dim: 64
 mhf:
   hidden_depth: [0, 2]
   out_features: [4, 16]

@@ -11,7 +11,7 @@ mhe:
   out_features: [4, 16]
 fun:
   hidden_depth: [0, 3]
-  out_features: [4, 16]
+  out_features: 7
   linear_dim: null
 mhf:
   hidden_depth: [0, 2]

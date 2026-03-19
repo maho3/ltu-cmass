@@ -30,4 +30,4 @@ shared:
   noise_percent: 0.01
   lr_scheduler: 'CosineAnnealingLR'
   max_epochs: [50, 1000]
-  dropout: 0.0
+  dropout: 0.1

@@ -19,8 +19,8 @@ mhf:
   linear_dim: null
 shared:
   model: 'nsf'
-  hidden_features: [8, 32]
-  num_transforms: [1, 5]
+  hidden_features: 16
+  num_transforms: 2
   log2_batch_size: [5, 9]
   learning_rate: [1.e-4, 1.e-1]
   weight_decay: 0 # [1.e-5, 1.e-1]
