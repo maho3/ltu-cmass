@@ -12,11 +12,13 @@ mhe:
 fun:
   hidden_depth: [0, 3]
   out_features: [4, 16]
+  linear_dim: null
 mhf:
   hidden_depth: [0, 2]
   out_features: [4, 16]
+  linear_dim: null
 shared:
-  model: ['nsf']
+  model: 'nsf'
   hidden_features: [8, 32]
   num_transforms: [1, 5]
   log2_batch_size: [5, 9]
@@ -24,3 +26,8 @@ shared:
   weight_decay: [1.e-5, 1.e-1]
   lr_patience: [5, 20]
   lr_decay_factor: [0.1, 0.9]
+  early_stopping: True
+  noise_percent: 0.0
+  lr_scheduler: 'ReduceLROnPlateau'
+  max_epochs: 1000
+  dropout: 0.0

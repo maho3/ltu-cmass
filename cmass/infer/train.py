@@ -94,7 +94,7 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
 
 
 def _train_runner(loader, prior, nets, train_args, out_dir,
-                    backend, engine, device, verbose=True):
+                    backend, engine, device, verbose=False):
     """Helper function to run training."""
     # make output directory
     if out_dir is not None:
@@ -120,7 +120,7 @@ def _train_runner(loader, prior, nets, train_args, out_dir,
 def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
-    hodprior=None, noiseprior=None, verbose=True,
+    hodprior=None, noiseprior=None,
     start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -128,6 +128,7 @@ def run_training(
     Train a neural network to emulate a posterior distribution.
     """
     # select the network configuration
+    verbose = cfg.infer.verbose
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
 
@@ -161,25 +162,31 @@ def run_training(
             in_features=in_features,
             out_features=out_features,
             hidden_layers=hidden_layers,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
         )
     elif mcfg.embedding_net == 'fun':
         embedding = FunnelNetwork(
             in_features=x_train.shape[-1],
             out_features=mcfg.out_features,
             hidden_depth=mcfg.hidden_depth,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
+            linear_dim=mcfg.linear_dim if 'linear_dim' in mcfg else None,
         )
     elif mcfg.embedding_net == 'mhf':
         in_features = np.diff(start_idx).tolist()
         out_features = [mcfg.out_features] * len(in_features)
         hidden_depth = [mcfg.hidden_depth] * len(in_features)
+        linear_dims = [mcfg.linear_dim] * len(in_features) if 'linear_dim' in mcfg else None
         embedding = MultiHeadFunnel(
             start_idx=start_idx,
             in_features=in_features,
             out_features=out_features,
             hidden_depth=hidden_depth,
-            act_fn='ReLU'
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
+            linear_dims=linear_dims,
         )
     else:
         raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")
@@ -207,6 +214,10 @@ def run_training(
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
         'ema_decay': ema_decay,
         'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
     }
 
     # setup data loaders
@@ -240,7 +251,7 @@ def run_training(
 def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
-    hodprior=None, noiseprior=None, verbose=True,
+    hodprior=None, noiseprior=None,
     start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -248,6 +259,7 @@ def run_training_with_precompression(
     Train a neural network with a pre-compression layer.
     """
     # select the network configuration
+    verbose = cfg.infer.verbose
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
     if cfg.infer.embedding_net != 'fcn':
@@ -269,6 +281,10 @@ def run_training_with_precompression(
         'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
         'ema_decay': ema_decay,
         'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
     }
 
     # setup data loaders
@@ -506,10 +522,27 @@ def run_retraining(exp, cfg, model_path):
             # Only select a subset of networks within the hyperparameter study
             trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
 
+            # If net_index is not None, select the net_index-th model, otherwise train all sequentially
+            if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
+                net_index = cfg.infer.net_index
+                if net_index < len(trial_numbers):
+                    logging.info(f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
+                    trial_numbers = [trial_numbers[net_index]]
+                    net_configs = [net_configs[net_index]]
+                else:
+                    logging.warning(f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
+                    return
+
             for trial_number, config in zip(trial_numbers, net_configs):
 
                 out_dir = join(exp_path, "nets", f"net-{trial_number}")
                 os.makedirs(out_dir, exist_ok=True)
+
+                # if net is run and saved already, skip
+                if os.path.exists(join(out_dir, 'posterior.pkl')):
+                    logging.info(
+                        f"Net-{trial_number} already trained. Skipping.")
+                    continue
 
                 # load training/test data: we retrain on the original split
                 # from cmass.infer.preprocess
@@ -529,7 +562,7 @@ def run_retraining(exp, cfg, model_path):
                 posterior, histories = train_fn(
                     x_train, theta_train, x_val, theta_val, out_dir=out_dir,
                     cfg=cfg, mcfg=mcfg,
-                    hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+                    hodprior=hodprior, noiseprior=noiseprior,
                     start_idx=startidx,
                     validation_smoothing_method=validation_smoothing_method,
                     ema_decay=ema_decay
