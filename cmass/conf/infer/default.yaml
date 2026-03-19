@@ -48,6 +48,7 @@ experiments:
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
 retrain: False
+verbose: False
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing

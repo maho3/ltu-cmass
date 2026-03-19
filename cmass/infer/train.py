@@ -94,7 +94,7 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
 
 
 def _train_runner(loader, prior, nets, train_args, out_dir,
-                    backend, engine, device, verbose=True):
+                    backend, engine, device, verbose=False):
     """Helper function to run training."""
     # make output directory
     if out_dir is not None:
@@ -120,7 +120,7 @@ def _train_runner(loader, prior, nets, train_args, out_dir,
 def run_training(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
-    hodprior=None, noiseprior=None, verbose=True,
+    hodprior=None, noiseprior=None,
     start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -128,6 +128,7 @@ def run_training(
     Train a neural network to emulate a posterior distribution.
     """
     # select the network configuration
+    verbose = cfg.infer.verbose
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
 
@@ -240,7 +241,7 @@ def run_training(
 def run_training_with_precompression(
     x_train, theta_train, x_val, theta_val, out_dir,
     cfg, mcfg,
-    hodprior=None, noiseprior=None, verbose=True,
+    hodprior=None, noiseprior=None,
     start_idx=None,
     validation_smoothing_method='none', ema_decay=0.9,
 ):
@@ -248,6 +249,7 @@ def run_training_with_precompression(
     Train a neural network with a pre-compression layer.
     """
     # select the network configuration
+    verbose = cfg.infer.verbose
     if verbose:
         logging.info(f'Using network architecture: {mcfg}')
     if cfg.infer.embedding_net != 'fcn':
