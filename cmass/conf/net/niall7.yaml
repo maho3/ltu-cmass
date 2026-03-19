@@ -13,10 +13,12 @@ fun:
   hidden_depth: [1, 3]
   out_features: [4, 16]
   linear_dim: 64
+  bypass: True
 mhf:
   hidden_depth: [0, 2]
   out_features: [4, 16]
   linear_dim: null
+  bypass: False
 shared:
   model: 'nsf'
   hidden_features: [8, 32]
