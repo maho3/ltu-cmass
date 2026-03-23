@@ -24,17 +24,17 @@ cd /jet/home/mho1/git/ltu-cmass
 
 Nhod=1
 
-nbody=mtnglike
-sim=fastpm_constrained
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=reciprocal
+nbody=quijote
+sim=nbody
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise=fixed
 
 multisnapshot=True
 diag_from_scratch=True
-rm_galaxies=False
-extras="diag.high_res=false bias=zhenginterp_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
-L=3000
-N=384
+rm_galaxies=True
+extras="diag.high_res=false bias=zheng_biased" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
+L=1000
+N=128
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"
@@ -64,29 +64,29 @@ for offset in 0; do # $(seq 0 100 1999); do
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed
 
-        # # galaxies
-        # diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
-        # if [ -f "$diag_file" ]; then
-        #     echo "Diag file $diag_file exists."
-        # else
-        #     echo "Diag file $diag_file does not exist."
-        #     python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
-        #     python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
-        # fi
-
-        # set aug_seed the same as hod_seed for simplicity
-        aug_seed=$hod_seed
-        printf -v aug_str "%05d" $aug_seed
-
-        # simbig_lightcone
-        diag_file=$outdir/$lhid/diag/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # galaxies
+        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
         if [ -f "$diag_file" ]; then
             echo "Diag file $diag_file exists."
         else
             echo "Diag file $diag_file does not exist."
-            python -m cmass.survey.hodlightcone survey.geometry=ngc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
-            python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed
         fi
+
+        # # set aug_seed the same as hod_seed for simplicity
+        # aug_seed=$hod_seed
+        # printf -v aug_str "%05d" $aug_seed
+
+        # # simbig_lightcone
+        # diag_file=$outdir/$lhid/diag/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # if [ -f "$diag_file" ]; then
+        #     echo "Diag file $diag_file exists."
+        # else
+        #     echo "Diag file $diag_file does not exist."
+        #     python -m cmass.survey.hodlightcone survey.geometry=ngc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # fi
     done
 
     # Trash collection

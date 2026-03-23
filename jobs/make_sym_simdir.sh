@@ -3,7 +3,7 @@
 set -e
 
 SIM1="/ocean/projects/phy240015p/mho1/cmass-ili/mtnglike/fastpm"
-SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/mtnglike/fastpm_constrained"
+SIM2="/ocean/projects/phy240015p/mho1/cmass-ili/mtnglike/fastpm_constrained_newz"
 SUBDIR="L3000-N384"
 N=2999
 
