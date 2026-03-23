@@ -1,5 +1,15 @@
 """
-A script to train ML models on existing suites of simulations.
+Trains posterior inference models using the ltu-ili package.
+
+This script loads preprocessed data and trains a neural network to learn the
+posterior distribution of cosmological and HOD parameters, given a set of
+summary statistics. The training process is configurable via Hydra.
+
+The script supports:
+- Different inference backends (e.g., 'lampe', 'sbi').
+- Various neural network architectures (e.g., FCN, CNN).
+- Training with and without pre-compression of summary statistics.
+- Retraining models based on Optuna hyperparameter optimization studies.
 """
 
 import os
@@ -8,11 +18,14 @@ import logging
 from os.path import join
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import torch
 from torch import nn
 import yaml
 import time
+import optuna
 
-from .tools import split_experiments, prepare_loader
+from .tools import select_top_trials, split_experiments, prepare_loader
+from .hyperparameters import sample_hyperparameters_randomly
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -20,6 +33,7 @@ import ili
 from ili.dataloaders import TorchLoader
 from ili.inference import InferenceRunner
 from ili.embedding import FCN
+from .architectures import CNN, MultiHeadEmbedding, FunnelNetwork, MultiHeadFunnel
 
 
 import matplotlib.pyplot as plt
@@ -46,7 +60,9 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                 'HOD or noise priors provided, but theta has only 5 parameters.'
                 ' include_hod or include_noise might not be set correctly.')
         if hodprior is not None:
-            if not np.all(hodprior[:, 1].astype(str) == 'uniform'):
+            # TODO: support non-uniform HOD priors
+            types = np.char.lower(hodprior[:, 1].astype(str))
+            if not np.all((types == 'uniform') | (types == 'truncnorm')):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
@@ -77,71 +93,9 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
     return prior
 
 
-def run_training(
-    x_train, theta_train, x_val, theta_val, out_dir,
-    prior_name, mcfg,  # model config
-    batch_size, learning_rate, stop_after_epochs, val_frac,
-    weight_decay, lr_decay_factor, lr_patience,
-    backend, engine, device,
-    hodprior=None, noiseprior=None, verbose=True
-):
-    # select the network configuration
-    if verbose:
-        logging.info(f'Using network architecture: {mcfg}')
-
-    # define a prior
-    prior = prepare_prior(prior_name, device=device,
-                          theta=theta_train,
-                          hodprior=hodprior, noiseprior=noiseprior)
-
-    # define an embedding network
-    if mcfg.fcn_depth == 0:
-        embedding = nn.Identity()
-    else:
-        embedding = FCN(
-            n_hidden=[mcfg.fcn_width]*mcfg.fcn_depth,
-            act_fn='ReLU'
-        )
-
-    # instantiate your neural networks to be used as an ensemble
-    if backend == 'lampe':
-        net_loader = ili.utils.load_nde_lampe
-        extra_kwargs = {}
-    elif backend == 'sbi':
-        net_loader = ili.utils.load_nde_sbi
-        extra_kwargs = {'engine': engine}
-    else:
-        raise NotImplementedError
-    kwargs = {k: v for k, v in mcfg.items() if k in [
-        'model', 'hidden_features', 'num_transforms', 'num_components']}
-    nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
-
-    # define training arguments
-    bs = mcfg.batch_size if 'batch_size' in mcfg else batch_size
-    lr = mcfg.learning_rate if 'learning_rate' in mcfg else learning_rate
-    wd = mcfg.weight_decay if 'weight_decay' in mcfg else weight_decay
-    lrp = mcfg.lr_patience if 'lr_patience' in mcfg else lr_patience
-    lrdf = mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else lr_decay_factor
-    train_args = {
-        'learning_rate': lr,
-        'stop_after_epochs': stop_after_epochs,
-        'validation_fraction': val_frac,
-        'weight_decay': wd,
-        'lr_decay_factor': lrdf,
-        'lr_patience': lrp
-    }
-
-    # setup data loaders
-    train_loader = prepare_loader(
-        x_train, theta_train,
-        device=device,
-        batch_size=bs, shuffle=True)
-    val_loader = prepare_loader(
-        x_val, theta_val,
-        device=device,
-        batch_size=bs, shuffle=False)
-    loader = TorchLoader(train_loader, val_loader)
-
+def _train_runner(loader, prior, nets, train_args, out_dir,
+                    backend, engine, device, verbose=False):
+    """Helper function to run training."""
     # make output directory
     if out_dir is not None:
         os.makedirs(out_dir, exist_ok=True)
@@ -159,6 +113,242 @@ def run_training(
 
     # train the model
     posterior, histories = runner(loader=loader, verbose=verbose)
+
+    return posterior, histories
+
+
+def run_training(
+    x_train, theta_train, x_val, theta_val, out_dir,
+    cfg, mcfg,
+    hodprior=None, noiseprior=None,
+    start_idx=None,
+    validation_smoothing_method='none', ema_decay=0.9,
+):
+    """
+    Train a neural network to emulate a posterior distribution.
+    """
+    # select the network configuration
+    verbose = cfg.infer.verbose
+    if verbose:
+        logging.info(f'Using network architecture: {mcfg}')
+
+    # define a prior
+    prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
+                          theta=theta_train,
+                          hodprior=hodprior, noiseprior=noiseprior)
+
+    # define an embedding network
+    if mcfg.embedding_net == 'fcn':
+        if mcfg.fcn_depth == 0:
+            embedding = nn.Identity()
+        else:
+            embedding = FCN(
+                n_hidden=[mcfg.fcn_width]*mcfg.fcn_depth,
+                act_fn='ReLU'
+            )
+    elif mcfg.embedding_net == 'cnn':
+        out_channels = [mcfg.out_channels] * mcfg.cnn_depth
+        embedding = CNN(
+            out_channels=out_channels,
+            kernel_size=mcfg.kernel_size,
+            act_fn='ReLU'
+        )
+    elif mcfg.embedding_net == 'mhe':
+        in_features = np.diff(start_idx).tolist()
+        out_features = [mcfg.out_features] * len(in_features)
+        hidden_layers = [[mcfg.hidden_width]*mcfg.hidden_depth] * len(in_features)
+        embedding = MultiHeadEmbedding(
+            start_idx=start_idx,
+            in_features=in_features,
+            out_features=out_features,
+            hidden_layers=hidden_layers,
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
+        )
+    elif mcfg.embedding_net == 'fun':
+        embedding = FunnelNetwork(
+            in_features=x_train.shape[-1],
+            out_features=mcfg.out_features,
+            hidden_depth=mcfg.hidden_depth,
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
+            linear_dim=mcfg.linear_dim if 'linear_dim' in mcfg else None,
+            bypass=mcfg.bypass if 'bypass' in mcfg else False,
+        )
+    elif mcfg.embedding_net == 'mhf':
+        in_features = np.diff(start_idx).tolist()
+        out_features = [mcfg.out_features] * len(in_features)
+        hidden_depth = [mcfg.hidden_depth] * len(in_features)
+        linear_dims = [mcfg.linear_dim] * len(in_features) if 'linear_dim' in mcfg else None
+        embedding = MultiHeadFunnel(
+            start_idx=start_idx,
+            in_features=in_features,
+            out_features=out_features,
+            hidden_depth=hidden_depth,
+            act_fn='ReLU',
+            dropout=mcfg.dropout,
+            linear_dims=linear_dims,
+        )
+    else:
+        raise ValueError(f"Unknown embedding net: {mcfg.embedding_net}")
+
+    # instantiate your neural networks to be used as an ensemble
+    if cfg.infer.backend == 'lampe':
+        net_loader = ili.utils.load_nde_lampe
+        extra_kwargs = {}
+    elif cfg.infer.backend == 'sbi':
+        net_loader = ili.utils.load_nde_sbi
+        extra_kwargs = {'engine': cfg.infer.engine}
+    else:
+        raise NotImplementedError
+    kwargs = {k: v for k, v in mcfg.items() if k in [
+        'model', 'hidden_features', 'num_transforms', 'num_components']}
+    nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
+
+    # define training arguments
+    train_args = {
+        'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
+        'stop_after_epochs': cfg.infer.stop_after_epochs,
+        'validation_fraction': cfg.infer.val_frac,
+        'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
+        'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
+        'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
+        'ema_decay': ema_decay,
+        'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
+    }
+
+    # setup data loaders
+    batch_size = mcfg.batch_size if 'batch_size' in mcfg else cfg.infer.batch_size
+    train_loader = prepare_loader(
+        x_train, theta_train,
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=True)
+    val_loader = prepare_loader(
+        x_val, theta_val,
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=False)
+    loader = TorchLoader(train_loader, val_loader)
+
+    # train the model
+    posterior, histories = _train_runner(
+        loader=loader,
+        prior=prior,
+        nets=nets,
+        train_args=train_args,
+        out_dir=out_dir,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
+        verbose=verbose,
+    )
+
+    return posterior, histories
+
+
+def run_training_with_precompression(
+    x_train, theta_train, x_val, theta_val, out_dir,
+    cfg, mcfg,
+    hodprior=None, noiseprior=None,
+    start_idx=None,
+    validation_smoothing_method='none', ema_decay=0.9,
+):
+    """
+    Train a neural network with a pre-compression layer.
+    """
+    # select the network configuration
+    verbose = cfg.infer.verbose
+    if verbose:
+        logging.info(f'Using network architecture: {mcfg}')
+    if cfg.infer.embedding_net != 'fcn':
+        # TODO: implement
+        raise ValueError(f'Precompression only supported for FCN embedding_net.')
+
+    # define a prior
+    prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
+                          theta=theta_train,
+                          hodprior=hodprior, noiseprior=noiseprior)
+
+    # define training arguments
+    train_args = {
+        'learning_rate': mcfg.learning_rate if 'learning_rate' in mcfg else cfg.infer.learning_rate,
+        'stop_after_epochs': cfg.infer.stop_after_epochs,
+        'validation_fraction': cfg.infer.val_frac,
+        'weight_decay': mcfg.weight_decay if 'weight_decay' in mcfg else cfg.infer.weight_decay,
+        'lr_decay_factor': mcfg.lr_decay_factor if 'lr_decay_factor' in mcfg else cfg.infer.lr_decay_factor,
+        'lr_patience': mcfg.lr_patience if 'lr_patience' in mcfg else cfg.infer.lr_patience,
+        'ema_decay': ema_decay,
+        'validation_smoothing_method': validation_smoothing_method.lower(),
+        'early_stopping': mcfg.early_stopping if 'early_stopping' in mcfg else cfg.infer.early_stopping,
+        'noise_percent': mcfg.noise_percent if 'noise_percent' in mcfg else cfg.infer.noise_percent,
+        'lr_scheduler': mcfg.lr_scheduler if 'lr_scheduler' in mcfg else cfg.infer.lr_scheduler,
+        'max_epochs': mcfg.max_epochs if 'max_epochs' in mcfg else cfg.infer.max_epochs,
+    }
+
+    # setup data loaders
+    batch_size = mcfg.batch_size if 'batch_size' in mcfg else cfg.infer.batch_size
+    train_loader = prepare_loader(
+        x_train, theta_train,
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=True)
+    val_loader = prepare_loader(
+        x_val, theta_val,
+        device=cfg.infer.device,
+        batch_size=batch_size, shuffle=False)
+    loader = TorchLoader(train_loader, val_loader)
+
+    # instantiate your neural networks to be used as an ensemble
+    if cfg.infer.backend == 'lampe':
+        net_loader = ili.utils.load_nde_lampe
+        extra_kwargs = {}
+    else:
+        raise NotImplementedError
+
+    # ~~~~~ TRAIN PRE-COMPRESSION NETWORK ~~~~~
+    logging.info('Training pre-compression network...')
+    nets = [net_loader(model='mdn', hidden_features=mcfg.fcn_width,
+                       hidden_depth=mcfg.fcn_depth,
+                       num_components=4)]
+
+    # train the model
+    posterior, _ = _train_runner(
+        loader=loader,
+        prior=prior,
+        nets=nets,
+        train_args=train_args,
+        out_dir=out_dir,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
+        verbose=verbose,
+    )
+
+    embedding = posterior.posteriors[0].nde.flow.hyper
+    # freeze the embedding network
+    for param in embedding.parameters():
+        param.requires_grad = False
+
+    # ~~~~~ TRAIN FINAL NETWORK ~~~~~
+    logging.info('Training final network with pre-compression...')
+    kwargs = {k: v for k, v in mcfg.items() if k in [
+        'model', 'hidden_features', 'num_transforms', 'num_components']}
+    nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
+
+    # train the model
+    posterior, histories = _train_runner(
+        loader=loader,
+        prior=prior,
+        nets=nets,
+        train_args=train_args,
+        out_dir=out_dir,
+        backend=cfg.infer.backend,
+        engine=cfg.infer.engine,
+        device=cfg.infer.device,
+        verbose=verbose,
+    )
 
     return posterior, histories
 
@@ -187,24 +377,33 @@ def load_preprocessed_data(exp_path):
     try:
         x_train = np.load(join(exp_path, 'x_train.npy'))
         theta_train = np.load(join(exp_path, 'theta_train.npy'))
+        ids_train = np.load(join(exp_path, 'ids_train.npy'))
         x_val = np.load(join(exp_path, 'x_val.npy'))
         theta_val = np.load(join(exp_path, 'theta_val.npy'))
+        ids_val = np.load(join(exp_path, 'ids_val.npy'))
         x_test = np.load(join(exp_path, 'x_test.npy'))
         theta_test = np.load(join(exp_path, 'theta_test.npy'))
+        ids_test = np.load(join(exp_path, 'ids_test.npy'))
         filepath = join(exp_path, 'hodprior.csv')
         hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
                     if os.path.exists(filepath) else None)
         filepath = join(exp_path, 'noiseprior.yaml')
         noiseprior = (OmegaConf.load(filepath)
                       if os.path.exists(filepath) else None)
+        with open(join(exp_path, 'x_startidx.txt'), 'r') as f:
+            _ = f.readline().strip().split(',') # summary labels
+            startidx = np.array(f.readline().strip().split(',')).astype(int)
     except FileNotFoundError:
         raise FileNotFoundError(
             f'Could not find training/test data in {exp_path}. '
             'Make sure to run cmass.infer.preprocess first.'
         )
 
-    return (x_train, theta_train, x_val, theta_val, x_test, theta_test,
-            hodprior, noiseprior)
+    return (x_train, theta_train, ids_train,
+            x_val, theta_val, ids_val,
+            x_test, theta_test, ids_test,
+            hodprior, noiseprior,
+            startidx)
 
 
 def run_experiment(exp, cfg, model_path):
@@ -213,6 +412,9 @@ def run_experiment(exp, cfg, model_path):
 
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none')
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
 
     for kmin in kmin_list:
         for kmax in kmax_list:
@@ -221,10 +423,11 @@ def run_experiment(exp, cfg, model_path):
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
             # load training/test data
-            (x_train, theta_train,
-             x_val, theta_val,
-             x_test, theta_test,
-             hodprior, noiseprior) = load_preprocessed_data(exp_path)
+            (x_train, theta_train, ids_train,
+             x_val, theta_val, ids_val,
+             x_test, theta_test, ids_test,
+             hodprior, noiseprior,
+             startidx) = load_preprocessed_data(exp_path)
 
             logging.info(
                 f'Split: {len(x_train)} training, {len(x_val)} validation, '
@@ -237,17 +440,11 @@ def run_experiment(exp, cfg, model_path):
             start = time.time()
             posterior, histories = run_training(
                 x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                prior_name=cfg.infer.prior, mcfg=cfg.net,
-                batch_size=cfg.infer.batch_size,
-                learning_rate=cfg.infer.learning_rate,
-                stop_after_epochs=cfg.infer.stop_after_epochs,
-                val_frac=cfg.infer.val_frac,
-                weight_decay=cfg.infer.weight_decay,
-                lr_decay_factor=cfg.infer.lr_decay_factor,
-                lr_patience=cfg.infer.lr_patience,
-                backend=cfg.infer.backend, engine=cfg.infer.engine,
-                device=cfg.infer.device,
+                cfg=cfg, mcfg=cfg.net,
                 hodprior=hodprior, noiseprior=noiseprior,
+                start_idx=startidx,
+                validation_smoothing_method=validation_smoothing_method,
+                ema_decay=ema_decay,
             )
             end = time.time()
 
@@ -266,6 +463,130 @@ def run_experiment(exp, cfg, model_path):
                 f.write(f'{log_prob_test}\n')
 
 
+def select_nets_retrain(exp_path, Nnets):
+    '''
+    Select nets from hyperparameter study with cross-validation splits, and
+    retrain on the presaved train/val split NOT USED during cross-validation.
+    '''
+    # Load the optuna study
+    optunafile_cv = join(exp_path, 'optuna_study.db')
+    storage_cv = f"sqlite:///{optunafile_cv}"
+
+    # hack not to pass the summary/summaries argument again, already in exp_path
+    study_cv = optuna.load_study(
+        storage=storage_cv,
+        study_name=exp_path.split("/kmin")[0].split("/")[-1])
+
+    # Load top Nnets architectures by test log prob
+    top_trials = select_top_trials(study_cv, Nnets)
+
+    logging.info(f'Selected {len(top_trials)} nets.')
+
+    # return trial numbers and configs
+    trial_numbers = [t.number for t in top_trials]
+    mcfgs = [t.user_attrs['mcfg'] for t in top_trials]
+    return trial_numbers, mcfgs
+
+
+def run_retraining(exp, cfg, model_path):
+    '''
+    Retrain density estimators of interest based on Optuna study with
+    cross-validation on the test set
+    '''
+
+    assert len(exp.summary) > 0, 'No summaries provided for inference'
+    name = '+'.join(exp.summary)
+
+    kmin_list = exp.kmin if 'kmin' in exp else [0.]
+    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+
+    Nnets = cfg.infer.Nnets
+    if cfg.infer.precompress:
+        train_fn = run_training_with_precompression
+    else:
+        train_fn = run_training
+
+    if not cfg.infer.cross_val:
+        raise ValueError(
+            'There is no reason to retrain network without cross-validation.')
+
+    validation_smoothing_method = cfg.infer.get(
+        'validation_smoothing_method', 'none').lower()
+    ema_decay = cfg.infer.get('ema_decay', 0.9)
+
+    for kmin in kmin_list:
+        for kmax in kmax_list:
+            logging.info(
+                f'Running training for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+
+            # Only select a subset of networks within the hyperparameter study
+            trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
+
+            # If net_index is not None, select the net_index-th model, otherwise train all sequentially
+            if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
+                net_index = cfg.infer.net_index
+                if net_index < len(trial_numbers):
+                    logging.info(f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
+                    trial_numbers = [trial_numbers[net_index]]
+                    net_configs = [net_configs[net_index]]
+                else:
+                    logging.warning(f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
+                    return
+
+            for trial_number, config in zip(trial_numbers, net_configs):
+
+                out_dir = join(exp_path, "nets", f"net-{trial_number}")
+                os.makedirs(out_dir, exist_ok=True)
+
+                # if net is run and saved already, skip
+                if os.path.exists(join(out_dir, 'posterior.pkl')):
+                    logging.info(
+                        f"Net-{trial_number} already trained. Skipping.")
+                    continue
+
+                # load training/test data: we retrain on the original split
+                # from cmass.infer.preprocess
+                (x_train, theta_train, ids_train,
+                 x_val, theta_val, ids_val,
+                 x_test, theta_test, ids_test,
+                 hodprior, noiseprior,
+                 startidx) = load_preprocessed_data(exp_path)
+
+                logging.info(
+                    f'Split: {len(x_train)} training, {len(x_val)} validation, '
+                    f'{len(x_test)} testing')
+
+                mcfg = OmegaConf.create(config)
+
+                start = time.time()
+                posterior, histories = train_fn(
+                    x_train, theta_train, x_val, theta_val, out_dir=out_dir,
+                    cfg=cfg, mcfg=mcfg,
+                    hodprior=hodprior, noiseprior=noiseprior,
+                    start_idx=startidx,
+                    validation_smoothing_method=validation_smoothing_method,
+                    ema_decay=ema_decay
+                )
+                end = time.time()
+
+                # Save the timing and metadata
+                with open(join(out_dir, 'timing.txt'), 'w') as f:
+                    f.write(f'{end - start:.3f}')
+                with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+                    yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+
+                # plot training history
+                plot_training_history(histories, out_dir)
+
+                # evaluate the posterior and save to file
+                log_prob_test = evaluate_posterior(
+                    posterior, x_test, theta_test)
+                with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+                    f.write(f'{log_prob_test}\n')
+
+
+
 @timing_decorator
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 @clean_up(hydra)
@@ -278,21 +599,24 @@ def main(cfg: DictConfig) -> None:
     if cfg.infer.exp_index is not None:
         cfg.infer.experiments = split_experiments(cfg.infer.experiments)
         cfg.infer.experiments = [cfg.infer.experiments[cfg.infer.exp_index]]
-    cfg.net = cfg.net[cfg.infer.net_index]
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} inference...')
-            continue
+    if not hasattr(cfg.infer, 'retrain') or not cfg.infer.retrain:
+        cfg.net = sample_hyperparameters_randomly(
+            hyperprior=cfg.net,
+            embedding_net=cfg.infer.embedding_net,
+            seed=cfg.infer.net_index
+        )
+        runner = run_experiment
+    else:
+        runner = run_retraining
 
-        logging.info(f'Running {tracer} inference...')
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_experiment(exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} inference...')
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        runner(exp, cfg, save_path)
 
 
 if __name__ == "__main__":

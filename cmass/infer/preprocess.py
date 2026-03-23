@@ -1,17 +1,31 @@
 """
-A script to train ML models on existing suites of simulations.
+Preprocesses raw simulation summaries for training.
+
+This script loads simulation summaries, applies specified transformations,
+and saves the results for later use. The pipeline is configured via Hydra.
+
+Key steps:
+1. Loads summaries in parallel from a simulation suite.
+2. For each experiment, concatenates summaries (e.g., Pk, Bk), applies k-space
+   cuts, and optionally performs PCA dimensionality reduction.
+3. Splits data into training, validation, and test sets based on simulation ID.
+4. Saves the processed data, configuration, and priors to disk.
+5. Initializes an Optuna study for hyperparameter optimization.
 """
 
 import os
 import numpy as np
 import logging
-from os.path import join
+from os.path import join, isfile
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from collections import defaultdict
 from tqdm import tqdm
 import optuna
 import multiprocessing
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -169,54 +183,61 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
             xs = []
-
             for summ in exp.summary:
                 # Handle all the different summaries
                 if summ in ['nbar', 'nz']:
                     continue  # we handle these separately
-                eq_bool = "Eq" in summ
-                sq_bool = "Sq" in summ
-                ss_bool = "Ss" in summ
-                is_bool = "Is" in summ
+
+                base = summ
                 for tag in ["Eq", "Sq", "Ss",  "Is"]:
-                    summ = summ.replace(tag, "")
-                x, theta, id = summaries[summ], parameters[summ], ids[summ]
+                    if tag in summ:
+                        base = base.replace(tag, "")
+                        break
+
+                x, theta, id = summaries[base], parameters[base], ids[base]
                 # Preprocess the summaries
-                if 'Pk0' in summ:
-                    x = preprocess_Pk(x, kmax, monopole=True, kmin=kmin,
-                                      correct_shot=cfg.infer.correct_shot)
-                elif 'Pk' in summ:
-                    norm_key = summ[:-1] + '0'  # monopole (Pk0 or zPk0)
-                    if norm_key in summaries:
-                        x = preprocess_Pk(
-                            x, kmax, monopole=False, norm=summaries[norm_key],
-                            kmin=kmin)
-                    else:
-                        raise ValueError(
-                            f'Need monopole for normalization of {summ}')
+                if 'Pk' in summ:
+                    norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
+                    x = preprocess_Pk(
+                        x, kmin=kmin, kmax=kmax,
+                        norm=None if '0' in base else summaries[norm_key],
+                        correct_shot=cfg.infer.correct_shot
+                    )
                 elif ('Bk' in summ) or ('Qk' in summ):
+                    norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
                     x = preprocess_Bk(
                         x, kmin=kmin, kmax=kmax,
-                        log='Bk' in summ,
-                        equilateral_only=eq_bool,
-                        squeezed_only=sq_bool,
-                        subsampled_only=ss_bool,
-                        isoceles_only=is_bool,
-                        correct_shot=cfg.infer.correct_shot
+                        norm=None if '0' in base else summaries[norm_key],
+                        mode=tag,
+                        correct_shot=cfg.infer.correct_shot  # doesn't work currently
                     )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
-                xs.append(x)
+                xs.append((summ, x))
             if 'nz' in exp.summary:  # add n(z)
-                xs.append(_get_log10nz(summaries['Pk0']))
+                xs.append(('nz', _get_log10nz(summaries['Pk0'])))
             if 'nbar' in exp.summary:  # add nbar
-                xs.append(_get_log10nbar(summaries['Pk0']))
+                xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
 
+            labels, xs = zip(*xs)
             if not np.all([len(x) == len(xs[0]) for x in xs]):
                 raise ValueError(
                     f'Inconsistent lengths of summaries for {name}. Check that all '
                     'summaries have been computed for the same simulations.')
+            startidx = np.cumsum([0] + [x.shape[1] for x in xs])
             x = np.concatenate(xs, axis=-1)
+
+            # noise out summaries that are not Pk0 or zPk0
+            if cfg.infer.get('test_noised_summs', False):
+                logging.info(
+                    "TESTING: Noise out all summaries that are not Pk0 or zPk0")
+                for i, label in enumerate(labels):
+                    if label not in ['Pk0', 'zPk0']:
+                        logging.info(f"Noise out summary: {label}")
+                        start, end = startidx[i], startidx[i+1]
+                        x[:, start:end] = np.random.standard_normal(
+                            size=(x.shape[0], end-start)
+                        ).astype(x.dtype)
 
             # split train/test
             ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
@@ -226,9 +247,30 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             logging.info(f'Split: {len(x_train)} training, '
                          f'{len(x_val)} validation, {len(x_test)} testing')
 
-            # save training/test data
+            # Create output directory
             logging.info(f'Saving training/test data to {exp_path}')
             os.makedirs(exp_path, exist_ok=True)
+
+            # Precompress summaries
+            if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
+                logging.info(
+                    f"Precompressing with PCA to {cfg.infer.pca_features} features")
+                # Standardize the features
+                scaler = StandardScaler()
+                scaler.fit(x_train)
+                x_train = scaler.transform(x_train)
+                x_val = scaler.transform(x_val)
+                x_test = scaler.transform(x_test)
+
+                # PCA compress the features
+                pca = PCA(n_components=cfg.infer.pca_features)
+                pca.fit(x_train)
+                x_train = pca.transform(x_train)
+                x_val = pca.transform(x_val)
+                x_test = pca.transform(x_test)
+                joblib.dump((scaler, pca), join(exp_path, 'pca.pkl'))
+
+            # save training/test data
             with open(join(exp_path, 'config.yaml'), 'w') as f:
                 OmegaConf.save(cfg, f)
             np.save(join(exp_path, 'x_train.npy'), x_train)
@@ -240,6 +282,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
+            with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
+                f.write(','.join(labels) + '\n')
+                f.write(','.join(map(str, startidx.tolist())) + '\n')
             if hodprior is not None:
                 np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
                            delimiter=',', fmt='%s')
@@ -249,7 +294,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
             # initialize Optuna study (to avoid overwriting during parallelization)
-            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+            if not isfile(join(exp_path, 'optuna_study.db')):
+                _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator
@@ -258,8 +304,17 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 def main(cfg: DictConfig) -> None:
     cfg = parse_nbody_config(cfg)
 
+    logging.info("Scale factor a =  ", cfg.nbody.af)
+    # working dir where you have writing rights, ie to save preprocess splits
+    wdir = cfg.meta.wdir
+    # where the raw .h5 summaries are stored, only to read
+    summ_dir = cfg.meta.summ_dir
+
+    if summ_dir != wdir:
+        logging.info(f"Loading from separate summary directory: {summ_dir}")
+
     suite_path = get_source_path(
-        cfg.meta.wdir, cfg.nbody.suite, cfg.sim,
+        summ_dir, cfg.nbody.suite, cfg.sim,
         cfg.nbody.L, cfg.nbody.N, 0, check=False
     )[:-2]  # get to the suite directory
     model_dir = join(cfg.meta.wdir, cfg.nbody.suite, cfg.sim, 'models')
@@ -271,31 +326,24 @@ def main(cfg: DictConfig) -> None:
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    if cfg.infer.halo or cfg.infer.galaxy:
-        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
-
     if cfg.infer.include_hod and cfg.bias.hod.from_samples:
         logging.warning(
             "Inferring HOD parameters with prior from file. "
             "ENSURE PRIOR MATCHES FILE SAMPLES TO AVOID MISMATCH."
         )
 
-    for tracer in ['halo', 'galaxy',
-                   'ngc_lightcone', 'sgc_lightcone', 'mtng_lightcone',
-                   'simbig_lightcone']:
-        if not getattr(cfg.infer, tracer):
-            logging.info(f'Skipping {tracer} preprocessing...')
-            continue
-
-        logging.info(f'Running {tracer} preprocessing...')
-        summaries, parameters, ids, hodprior, noiseprior = load_summaries(
-            suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
-            include_hod=cfg.infer.include_hod,
-            include_noise=cfg.infer.include_noise)
-        for exp in cfg.infer.experiments:
-            save_path = join(model_dir, tracer, '+'.join(exp.summary))
-            run_preprocessing(summaries, parameters, ids,
-                              hodprior, noiseprior, exp, cfg, save_path)
+    tracer = cfg.infer.tracer
+    logging.info(f'Running {tracer} preprocessing...')
+    if tracer in ['halo', 'galaxy']:
+        logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
+    summaries, parameters, ids, hodprior, noiseprior = load_summaries(
+        suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
+        include_hod=cfg.infer.include_hod,
+        include_noise=cfg.infer.include_noise)
+    for exp in cfg.infer.experiments:
+        save_path = join(model_dir, tracer, '+'.join(exp.summary))
+        run_preprocessing(summaries, parameters, ids,
+                          hodprior, noiseprior, exp, cfg, save_path)
 
 
 if __name__ == "__main__":

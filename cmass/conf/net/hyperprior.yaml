@@ -1,0 +1,35 @@
+fcn:
+  fcn_depth: [0, 4]
+  fcn_width: [16, 64]
+cnn:
+  cnn_depth: [2, 6]
+  out_channels: [4, 16]
+  kernel_size: [3, 5]
+mhe:
+  hidden_depth: [0, 2]
+  hidden_width: [4, 32]
+  out_features: [4, 16]
+fun:
+  hidden_depth: [0, 3]
+  out_features: [4, 16]
+  linear_dim: null
+  bypass: False
+mhf:
+  hidden_depth: [0, 2]
+  out_features: [4, 16]
+  linear_dim: null
+  bypass: False
+shared:
+  model: 'nsf'
+  hidden_features: [16, 64]
+  num_transforms: [2, 8]
+  log2_batch_size: [5, 9]
+  learning_rate: [5.e-6, 1.e-3]
+  weight_decay: [1.e-5, 1.e-1]
+  lr_patience: [5, 20]
+  lr_decay_factor: [0.1, 0.9]
+  early_stopping: True
+  noise_percent: 0.0
+  lr_scheduler: 'ReduceLROnPlateau'
+  max_epochs: 1000
+  dropout: 0.0

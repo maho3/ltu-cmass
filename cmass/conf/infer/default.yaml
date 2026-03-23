@@ -3,7 +3,7 @@ save_dir: null  # where to save trained models (default e.g. wdir/quijotelike/fa
 
 # ~~ GLOBAL ARGS ~~
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # index of network to use in cfg.net
+net_index: null     # index of network to use in cfg.net
 device: cpu  # cpu or cuda
 
 # ~~ EXPERIMENT ARGS ~~
@@ -11,12 +11,7 @@ Nmax: -1  # maximum number of simulations to load (-1 for all)
 
 correct_shot: true  # whether to correct for shot noise when normalizing
 
-halo: True      # whether to train on halo summaries
-galaxy: False    # whether to train on galaxy summaries
-ngc_lightcone: False # whether to train on ngc_lightcone summaries
-sgc_lightcone: False # whether to train on sgc_lightcone summaries
-mtng_lightcone: False # whether to train on mtng_lightcone summaries
-simbig_lightcone: False # whether to train on simbig_lightcone summaries
+tracer: halo      # tracer to use for inference
 
 experiments:
   - summary: [Pk0]   # monopole
@@ -52,6 +47,8 @@ experiments:
 
 # ~~ TRAINING ARGS ~~
 Nnets: 10  # number of best networks to ensemble
+retrain: False
+verbose: False
 
 val_frac: 0.1  # fraction of data to use for validation
 test_frac: 0.1  # fraction of data to use for testing
@@ -62,6 +59,7 @@ include_noise: False  # whether to infer noise parameters
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)
+embedding_net: fcn  # embedding network to use (fcn or cnn)
 
 batch_size: null  # batch size
 learning_rate: null  # learning rate
@@ -69,6 +67,30 @@ stop_after_epochs: 50  # stop early after this many epochs
 weight_decay: 0  # weight decay
 lr_decay_factor: 0.5  # learning rate decay factor
 lr_patience: 10  # learning rate decay patience
+early_stopping: True  # whether to use early stopping
+noise_percent: 0.0  # percentage of noise to add to summaries
+lr_scheduler: 'ReduceLROnPlateau'  # learning rate scheduler to use
+max_epochs: 1000  # maximum number of epochs to train for
+dropout: 0.0  # dropout rate for MLP layers
+linear_dim: null  # linear dimension for FunnelNetwork
+
+# Validation smoothing
+validation_smoothing_method: none  # Method for smoothing validation loss (none/swa/ema).
+ema_decay: 0.9  # EMA decay value (only if validation_smoothing_method == 'ema').
+
+# Cross-validation related params
+cross_val: False
+n_splits: 4
+cv_val_frac: 0.1
+
+precompress: False  # whether to precompress summaries before training
+pca_features: null # number of PCA features to keep. If null, no PCA.
+test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+
+
+# --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
+n_trials: 25        # Total number of trials for hyperparameter optimization.
+n_startup_trials: 50  # Number of initial trials to sample uniformly before using TPE.
 
 # ~~ VALIDATION ARGS ~~
 clean_models: False  # whether to delete poorly fit model files after validation
