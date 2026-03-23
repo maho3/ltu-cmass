@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=2  # Array range
+#SBATCH --array=0-2  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -44,12 +44,28 @@ cd /home/x-mho1/git/ltu-cmass-run
 # extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
 # device="cpu"
 
-# ~~ MHE TEST ~~
+# # ~~ MHE TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nmhe
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=mhe" # 
+# device="cpu"
+
+# # ~~ PCA2 TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_npca2
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+# device="cpu"
+
+# ~~ MHF TEST ~~
 nbody=quijotelike
-sim=fastpm_4k_nmhe
+sim=fastpm_4k_nmhf
 infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=mhe" # 
+extras="nbody.zf=0.5 infer.embedding_net=mhf" # 
 device="cpu"
 
 export TQDM_DISABLE=0

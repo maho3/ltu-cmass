@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=trainingfcn  # Job name
+#SBATCH --job-name=trainingpca  # Job name
 #SBATCH --array=0-2  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
@@ -46,16 +46,32 @@ cd /home/x-mho1/git/ltu-cmass-run
 # extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
 # device="cpu"
 
-# ~~ MHE TEST ~~
+# # ~~ MHE TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nmhe
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=mhe" # 
+# device="cpu"
+
+# ~~ PCA2 TEST ~~
 nbody=quijotelike
-sim=fastpm_4k_nmhe
+sim=fastpm_4k_npca2
 infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=mhe" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun" # 
 device="cpu"
 
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+# # ~~ MHF TEST ~~
+# nbody=quijotelike
+# sim=fastpm_4k_nmhf
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=mhf" # 
+# device="cpu"
+
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"

@@ -4,7 +4,7 @@
 cd /home/x-mho1/git/ltu-cmass-run
 
 for case in galaxy ; do # simbig sgc mtng ngc
-    name="${case}mhe"
+    name="${case}pca2"
     # Set all variables to False, then set the current case to True
     export galaxy=False simbig=False sgc=False ngc=False mtng=False
     export $case=True

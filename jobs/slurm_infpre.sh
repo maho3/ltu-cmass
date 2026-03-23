@@ -21,13 +21,13 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /home/x-mho1/git/ltu-cmass-run
 
 nbody=quijotelike
-sim=fastpm_4k_nmhe
+sim=fastpm_4k_npca2
 infer=simple  # simple  # lightcone
 
 tracer=galaxy
 
 extras="nbody.zf=0.5 infer.Nmax=2000 infer.test_noised_summs=True" #
-# extras="$extras infer.pca_features=16" 
+# extras="$extras infer.pca_features=32" 
 device="cpu"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
