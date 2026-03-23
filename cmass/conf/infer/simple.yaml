@@ -3,7 +3,7 @@ save_dir: null # (default: wdir/quijotelike/fastpm/models)
 
 # --- GLOBAL CONFIGURATION ---
 exp_index: null  # index of experiment to run (null for all)
-net_index: 0     # Index of network to use in cfg.net (for ensembling, if applicable).
+net_index: null     # Index of network to use in cfg.net (for ensembling, if applicable).
 device: cpu      # Device to use for training (cpu or cuda).
 
 # --- EXPERIMENT CONFIGURATION ---
@@ -50,6 +50,7 @@ experiments:
 # --- TRAINING CONFIGURATION ---
 Nnets: 10  # Number of best networks to ensemble for posterior inference.
 retrain: False
+verbose: False
 
 # Data splitting
 val_frac: 0.1  # Fraction of data to use for validation.
