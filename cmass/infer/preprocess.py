@@ -53,10 +53,14 @@ def _load_summaries_worker(lhid, suitepath, tracer, a,
     Helper function to load data for a single simulation.
     """
     sourcepath = join(suitepath, lhid)
-    summs, params = _load_single_simulation_summaries(
-        sourcepath, tracer, a=a,
-        include_hod=include_hod, include_noise=include_noise
-    )
+    try:
+        summs, params = _load_single_simulation_summaries(
+            sourcepath, tracer, a=a,
+            include_hod=include_hod, include_noise=include_noise
+        )
+    except Exception as e:
+        print(f'Error loading simulation summary lhid: {lhid}.')
+        raise e
     ids = [lhid] * len(summs)
     return summs, params, ids
 

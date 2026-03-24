@@ -21,7 +21,7 @@ meta:
   # different location (summ_dir) than where you save models (wdir).
   # Useful for when you don't have write access to the summary location
   # DEFAULT is the same as wdir
-  summ_dir: "/anvil/scratch/x-mho1/cmass-ili"
+  summ_dir: "${meta.wdir}"
 
   cosmofile: "./params/latin_hypercube_params.txt"    # for quijote-like
   # cosmofile: "./params/big_sobol_params.txt"        # for big_sobol-like
