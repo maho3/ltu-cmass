@@ -120,7 +120,7 @@ def objective_cval(trial, cfg: DictConfig,
             x_train=x_train_fold, theta_train=theta_train_fold,
             x_val=x_val_fold, theta_val=theta_val_fold,
             out_dir=None, cfg=cfg, mcfg=mcfg,
-            hodprior=hodprior, noiseprior=noiseprior, verbose=False,
+            hodprior=hodprior, noiseprior=noiseprior,
             start_idx=startidx,
             validation_smoothing_method=validation_smoothing_method,
             ema_decay=ema_decay

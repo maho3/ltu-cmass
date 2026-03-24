@@ -106,14 +106,20 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
         plot_optuna_diagnostics(study_cv, exp_path)
 
     ensemble_list = []
+    valid_trials = []
     for t in top_trials:
         model_path = join(exp_path, 'nets',
                           f'net-{t.number}', 'posterior.pkl')
         if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                "No retrained network found after hyperparameter optimization")
+            logging.warning(f"Model path not found, skipping: {model_path}")
+            continue
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
+        valid_trials.append(t)
+    top_trials = valid_trials
+
+    if not top_trials:
+        raise RuntimeError("No valid models found to form an ensemble.")
 
     if clean:   # Remove net directories that are not in top_nets
         all_net_dirs = os.listdir(join(exp_path, "nets"))
