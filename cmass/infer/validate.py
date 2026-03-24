@@ -159,9 +159,21 @@ def run_experiment(exp, cfg, model_path):
 
         # load test data
         try:
-            logging.info(f'Loading test data from {exp_path}')
-            x_test = np.load(join(exp_path, 'x_test.npy'))
-            theta_test = np.load(join(exp_path, 'theta_test.npy'))
+            if cfg.infer.testing.path is None:
+                logging.info(f'Loading test data from {exp_path}')
+                x_test = np.load(join(exp_path, 'x_test.npy'))
+                theta_test = np.load(join(exp_path, 'theta_test.npy'))
+                out_path = exp_path
+            else:
+                logging.info(
+                    f'Loading external test data from {cfg.infer.testing.path}')
+                x_test = np.load(join(cfg.infer.testing.path, 'x_test.npy'))
+                theta_test = np.load(
+                    join(cfg.infer.testing.path, 'theta_test.npy'))
+
+                out_path = join(exp_path, 'testing', cfg.infer.testing.name)
+                if not os.path.exists(out_path):
+                    os.makedirs(out_path)
 
             names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
             filepath = join(exp_path, 'hodprior.csv')
@@ -186,7 +198,7 @@ def run_experiment(exp, cfg, model_path):
         x_test = torch.Tensor(x_test).to(cfg.infer.device)
         theta_test = torch.Tensor(theta_test).to(cfg.infer.device)
         run_validation(posterior_ensemble, x_test, theta_test,
-                       exp_path, names=names)
+                       out_path, names=names)
 
 
 @timing_decorator

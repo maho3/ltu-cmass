@@ -95,3 +95,7 @@ n_startup_trials: 50  # Number of initial trials to sample uniformly before usin
 # ~~ VALIDATION ARGS ~~
 clean_models: False  # whether to delete poorly fit model files after validation
 
+testing:
+  path: null
+  name: null
+
