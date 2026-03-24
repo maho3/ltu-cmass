@@ -106,14 +106,20 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
         plot_optuna_diagnostics(study_cv, exp_path)
 
     ensemble_list = []
+    valid_trials = []
     for t in top_trials:
         model_path = join(exp_path, 'nets',
                           f'net-{t.number}', 'posterior.pkl')
         if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                "No retrained network found after hyperparameter optimization")
+            logging.warning(f"Model path not found, skipping: {model_path}")
+            continue
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
+        valid_trials.append(t)
+    top_trials = valid_trials
+
+    if not top_trials:
+        raise RuntimeError("No valid models found to form an ensemble.")
 
     if clean:   # Remove net directories that are not in top_nets
         all_net_dirs = os.listdir(join(exp_path, "nets"))
@@ -152,23 +158,35 @@ def run_experiment(exp, cfg, model_path):
             exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
 
         # load test data
-        try:
-            logging.info(f'Loading test data from {exp_path}')
-            x_test = np.load(join(exp_path, 'x_test.npy'))
-            theta_test = np.load(join(exp_path, 'theta_test.npy'))
+            try:
+                if cfg.infer.testing.path is None:
+                    logging.info(f'Loading test data from {exp_path}')
+                    x_test = np.load(join(exp_path, 'x_test.npy'))
+                    theta_test = np.load(join(exp_path, 'theta_test.npy'))
+                    out_path = exp_path
+                else:
+                    logging.info(
+                        f'Loading external test data from {cfg.infer.testing.path}')
+                    x_test = np.load(join(cfg.infer.testing.path, 'x_test.npy'))
+                    theta_test = np.load(
+                        join(cfg.infer.testing.path, 'theta_test.npy'))
 
-            names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
-            filepath = join(exp_path, 'hodprior.csv')
-            if cfg.infer.include_hod and os.path.exists(filepath):
-                hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
-                names += hodprior[:, 0].astype('str').tolist()
-            if cfg.infer.include_noise:
-                names += ['noise_radial', 'noise_transverse']
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f'Could not find test data for {name} with kmax={kmax}.'
-                'Make sure to run cmass.infer.preprocess first.'
-            )
+                    out_path = join(exp_path, 'testing', cfg.infer.testing.name)
+                    if not os.path.exists(out_path):
+                        os.makedirs(out_path)
+
+                names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+                filepath = join(exp_path, 'hodprior.csv')
+                if cfg.infer.include_hod and os.path.exists(filepath):
+                    hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
+                    names += hodprior[:, 0].astype('str').tolist()
+                if cfg.infer.include_noise:
+                    names += ['noise_radial', 'noise_transverse']
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    f'Could not find test data for {name} with kmax={kmax}.'
+                    'Make sure to run cmass.infer.preprocess first.'
+                )
         logging.info(f'Testing on {len(x_test)} examples')
 
         # load trained posterior
@@ -180,7 +198,7 @@ def run_experiment(exp, cfg, model_path):
         x_test = torch.Tensor(x_test).to(cfg.infer.device)
         theta_test = torch.Tensor(theta_test).to(cfg.infer.device)
         run_validation(posterior_ensemble, x_test, theta_test,
-                       exp_path, names=names)
+                       out_path, names=names)
 
 
 @timing_decorator

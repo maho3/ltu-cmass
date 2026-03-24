@@ -13,39 +13,15 @@ tracer: halo # Type of tracer to use for inference (e.g., halo, galaxy, ngc_ligh
 
 experiments:
   # List of experiments, each defining a set of summary statistics and k-ranges.
-  - summary: [nbar, zPk0]   # z-space monopole
+  - summary: [nbar, zPk0]  # z-space monopole
     kmin: [0.]
     kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4]   # z-space monopole
+  - summary: [nbar, zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole,
     kmin: [0.]
     kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zEqQk0]   # monopole, quadrupole, hexadecapole, reduced equilateral bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zSqQk0]   # monopole, quadrupole, hexadecapole, reduced squeezed bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zSsQk0]   # monopole, quadrupole, hexadecapole, reduced subsampled bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zIsQk0]   # monopole, quadrupole, hexadecapole, reduced isoceles bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zBk0]
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zBk0, zBk2]
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
+  - summary: [nbar, zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zQk0]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
-  # - summary: [nbar, zPk0, zPk2, zPk4, zBk0, zBk2]   # monopole, quadrupole, hexadecapole, reduced bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.4]
 
 # --- TRAINING CONFIGURATION ---
 Nnets: 10  # Number of best networks to ensemble for posterior inference.
@@ -60,6 +36,7 @@ seed: 0  # Random seed for train/val/test split.
 # Inference parameters
 include_hod: False  # Whether to infer HOD parameters.
 include_noise: False  # Whether to infer noise parameters.
+subselect_cosmo: null # whether to subselect cosmologies by index
 
 # Model backend and engine
 prior: quijote  # Prior to use for training (uniform, quijote).
@@ -88,6 +65,7 @@ cv_val_frac: 0.1 # Fraction of data to use for validation within each CV fold.
 precompress: False  # Whether to precompress summaries before training.
 pca_features: null  # Number of PCA features to keep. If null, no PCA.
 test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+loglinear_start_idx: null # starting index for log-linear binning of Pk
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
 n_trials: 30  # number of trials for hyperparameter optimization
@@ -95,3 +73,7 @@ n_startup_trials: 50  # number of startup trials for hyperparameter optimization
 
 # ~~ VALIDATION ARGS ~~
 clean_models: True  # whether to delete poorly fit model files after validation
+
+testing:
+  path: null
+  name: null

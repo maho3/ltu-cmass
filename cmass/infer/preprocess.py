@@ -48,7 +48,8 @@ def aggregate(summlist, paramlist, idlist):
 
 
 def _load_summaries_worker(lhid, suitepath, tracer, a,
-                           include_hod, include_noise):
+                           include_hod, include_noise,
+                           subselect_cosmo=None):
     """
     Helper function to load data for a single simulation.
     """
@@ -56,7 +57,8 @@ def _load_summaries_worker(lhid, suitepath, tracer, a,
     try:
         summs, params = _load_single_simulation_summaries(
             sourcepath, tracer, a=a,
-            include_hod=include_hod, include_noise=include_noise
+            include_hod=include_hod, include_noise=include_noise,
+            subselect_cosmo=subselect_cosmo
         )
     except Exception as e:
         print(f'Error loading simulation summary lhid: {lhid}.')
@@ -66,7 +68,8 @@ def _load_summaries_worker(lhid, suitepath, tracer, a,
 
 
 def load_summaries(suitepath, tracer, Nmax, a=None,
-                   include_hod=False, include_noise=False):
+                   include_hod=False, include_noise=False,
+                   subselect_cosmo=None):
     """
     Loads summaries from a suite of simulations in parallel.
     """
@@ -82,7 +85,8 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
         simpaths = simpaths[:Nmax]
 
     # Create a list of arguments for each worker task
-    tasks = [(lhid, suitepath, tracer, a, include_hod, include_noise)
+    tasks = [(lhid, suitepath, tracer, a, include_hod, include_noise,
+              subselect_cosmo)
              for lhid in simpaths]
 
     # Use available CPUs, but no more than 16
@@ -205,7 +209,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     x = preprocess_Pk(
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
-                        correct_shot=cfg.infer.correct_shot
+                        correct_shot=cfg.infer.correct_shot,
+                        loglinear_start_idx=cfg.infer.loglinear_start_idx
                     )
                 elif ('Bk' in summ) or ('Qk' in summ):
                     norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
@@ -343,7 +348,8 @@ def main(cfg: DictConfig) -> None:
     summaries, parameters, ids, hodprior, noiseprior = load_summaries(
         suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
         include_hod=cfg.infer.include_hod,
-        include_noise=cfg.infer.include_noise)
+        include_noise=cfg.infer.include_noise,
+        subselect_cosmo=cfg.infer.subselect_cosmo)
     for exp in cfg.infer.experiments:
         save_path = join(model_dir, tracer, '+'.join(exp.summary))
         run_preprocessing(summaries, parameters, ids,
