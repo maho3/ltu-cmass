@@ -6,6 +6,7 @@ import numpy as np
 import logging
 from omegaconf import OmegaConf
 from cmass.bias.tools.hod import lookup_hod_model
+from .tools import log2_avg
 
 
 def get_cosmo(source_path):
@@ -194,7 +195,8 @@ def signed_log(x, base=10):
     return np.sign(x) * np.log1p(np.abs(x)) / np.log(base)
 
 
-def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False):
+def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False,
+                  loglinear_start_idx=None):
     # process Pk: filtering for k's, normalizing, and flattening
 
     X = _filter_Pk(data, kmin, kmax)
@@ -206,6 +208,9 @@ def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False):
     else:  # higher multipoles normalized by monopole
         Xnorm = _filter_Pk(norm, kmin, kmax)
         X /= Xnorm
+
+    if loglinear_start_idx is not None:
+        X = np.apply_along_axis(log2_avg, 1, X, s=loglinear_start_idx)
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
 
@@ -367,7 +372,8 @@ def _construct_noise_prior(sourcepath, tracer):
 
 
 def _load_single_simulation_summaries(sourcepath, tracer, a=None,
-                                      include_hod=True, include_noise=False):
+                                      include_hod=True, include_noise=False,
+                                      subselect_cosmo=None):
     # specify paths to diagnostics
     diagpath = join(sourcepath, 'diag')
     if tracer == 'galaxy':
@@ -396,6 +402,8 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
 
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
+        if subselect_cosmo is not None:
+            params = params[subselect_cosmo]
         if (tracer != 'halo') & (include_hod):  # add HOD params
             hodparams = get_hod_params(diagfile)
             params = np.concatenate([params, hodparams], axis=0)
