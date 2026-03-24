@@ -36,6 +36,7 @@ seed: 0  # Random seed for train/val/test split.
 # Inference parameters
 include_hod: False  # Whether to infer HOD parameters.
 include_noise: False  # Whether to infer noise parameters.
+subselect_cosmo: null # whether to subselect cosmologies by index
 
 # Model backend and engine
 prior: quijote  # Prior to use for training (uniform, quijote).

@@ -55,6 +55,7 @@ test_frac: 0.1  # fraction of data to use for testing
 seed: 0  # random seed for train/val/test split
 include_hod: True  # whether to infer HOD parameters
 include_noise: False  # whether to infer noise parameters
+subselect_cosmo: null # whether to subselect cosmologies by index
 
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)

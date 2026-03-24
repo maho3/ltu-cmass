@@ -361,7 +361,8 @@ def _construct_noise_prior(sourcepath, tracer):
 
 
 def _load_single_simulation_summaries(sourcepath, tracer, a=None,
-                                      include_hod=True, include_noise=False):
+                                      include_hod=True, include_noise=False,
+                                      subselect_cosmo=None):
     # specify paths to diagnostics
     diagpath = join(sourcepath, 'diag')
     if tracer == 'galaxy':
@@ -390,6 +391,8 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
 
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
+        if subselect_cosmo is not None:
+            params = params[subselect_cosmo]
         if (tracer != 'halo') & (include_hod):  # add HOD params
             hodparams = get_hod_params(diagfile)
             params = np.concatenate([params, hodparams], axis=0)
