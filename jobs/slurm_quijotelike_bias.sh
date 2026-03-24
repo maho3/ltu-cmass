@@ -1,32 +1,32 @@
 #!/bin/bash
 #SBATCH --job-name=quijote_bias   # Job name
-#SBATCH --array=0-199         # Job array range for lhid
+#SBATCH --array=0-399         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
-#SBATCH --partition=shared      # Partition name
-#SBATCH --account=phy240043   # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --partition=cpu  # Partition name
+#SBATCH --account=bdne-delta-cpu  # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
 
-set -e
+# set -e
 
 # SLURM_ARRAY_TASK_ID=0
 
-module restore cmass
-conda activate cmassrun
+source ~/.bashrc
+conda activate cmass
 lhid=$SLURM_ARRAY_TASK_ID
 
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 Nhod=5
 
-nbody=quijotelike
-sim=fastpm
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+nbody=quijote
+sim=nbody
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
@@ -43,7 +43,7 @@ outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 200 1999); do
+for offset in $(seq 0 400 1999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"

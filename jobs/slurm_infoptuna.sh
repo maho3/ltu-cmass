@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-7  # Array range
+#SBATCH --array=0-11  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
-#SBATCH --time=18:00:00         # Time limit
+#SBATCH --ntasks=4            # Number of tasks
+#SBATCH --time=24:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
@@ -22,15 +22,17 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-nbody=quijotelike
-sim=fastpm_4k_nniall2
-infer=simple  # simple  # lightcone
-tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+nbody=abacuslike
+sim=fastpm_recnoise
+infer=simple_lc  # simple  # lightcone
+tracer=mtng_lightcone
+extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
+
+# extras="$extras infer.verbose=True"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"

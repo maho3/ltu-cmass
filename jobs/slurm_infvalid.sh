@@ -9,7 +9,7 @@
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=2
 
 # module restore cmass
 source ~/.bashrc
@@ -18,45 +18,21 @@ conda activate cmass
 exp_index=$SLURM_ARRAY_TASK_ID
 net_index=null
 
-sleep $net_index  # to stagger the start of each job
+sleep $exp_index  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-# # ~~ PCA TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_npca
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5" # 
-# device="cpu"
-
-# # ~~ FCN TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_nfcn
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5" # 
-# device="cpu"
-
-# # ~~ CNN TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_ncnn
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
-# device="cpu"
-
 # ~~ NIALL TEST ~~
-nbody=quijotelike
-sim=fastpm_4k_nniall2
-infer=simple  # simple  # lightcone
-tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+nbody=abacuslike
+sim=fastpm_recnoise
+infer=simple_lc  # simple  # lightcone
+tracer=mtng_lightcone
+extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"

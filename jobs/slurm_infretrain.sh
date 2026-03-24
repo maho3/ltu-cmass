@@ -15,7 +15,7 @@
 source ~/.bashrc
 conda activate cmass
 
-exp_index=2
+# exp_index=2
 net_index=$SLURM_ARRAY_TASK_ID
 
 sleep $net_index  # to stagger the start of each job
@@ -23,36 +23,20 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-# # ~~ PCA TEST ~~
+# # ~~ NIALL TEST ~~
 # nbody=quijotelike
-# sim=fastpm_4k_npca
+# sim=fastpm_4k_niall2
 # infer=simple  # simple  # lightcone
 # tracer=galaxy
-# extras="nbody.zf=0.5" # 
+# extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 # device="cpu"
 
-# # ~~ FCN TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_nfcn
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5" # 
-# device="cpu"
-
-# # ~~ CNN TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_ncnn
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5 infer.embedding_net=cnn" # 
-# device="cpu"
-
-# ~~ NIALL TEST ~~
-nbody=quijotelike
-sim=fastpm_4k_nniall2
+# ~~ ABACUS ~~
+nbody=abacuslike
+sim=fastpm_recnoise
 infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
 # export TQDM_DISABLE=0
