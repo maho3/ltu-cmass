@@ -205,7 +205,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     x = preprocess_Pk(
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
-                        correct_shot=cfg.infer.correct_shot
+                        correct_shot=cfg.infer.correct_shot,
+                        loglinear_start_idx=cfg.infer.loglinear_start_idx
                     )
                 elif ('Bk' in summ) or ('Qk' in summ):
                     norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)

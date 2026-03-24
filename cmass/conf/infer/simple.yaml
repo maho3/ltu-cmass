@@ -65,6 +65,7 @@ cv_val_frac: 0.1 # Fraction of data to use for validation within each CV fold.
 precompress: False  # Whether to precompress summaries before training.
 pca_features: null  # Number of PCA features to keep. If null, no PCA.
 test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+loglinear_start_idx: null # starting index for log-linear binning of Pk
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
 n_trials: 30  # number of trials for hyperparameter optimization

@@ -87,6 +87,7 @@ cv_val_frac: 0.1
 precompress: False  # whether to precompress summaries before training
 pca_features: null # number of PCA features to keep. If null, no PCA.
 test_noised_summs: false # whether to replace non-Pk0 summaries with noise
+loglinear_start_idx: null # starting index for log-linear binning of Pk
 
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
