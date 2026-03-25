@@ -177,6 +177,8 @@ def run_experiment(exp, cfg, model_path):
 
                 names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
                 filepath = join(exp_path, 'hodprior.csv')
+                if cfg.infer.subselect_cosmo is not None:
+                    names = [names[i] for i in cfg.infer.subselect_cosmo]
                 if cfg.infer.include_hod and os.path.exists(filepath):
                     hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
                     names += hodprior[:, 0].astype('str').tolist()
