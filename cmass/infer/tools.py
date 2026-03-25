@@ -6,6 +6,7 @@ import pickle
 from torch.utils.data import TensorDataset, DataLoader
 import optuna
 from typing import List
+import numpy as np
 
 
 def split_experiments(exp_cfg):
@@ -61,3 +62,11 @@ def select_top_trials(study: optuna.study.Study, n_nets: int) -> List[optuna.tri
     
     trials = sorted(trials, key=lambda t: t.value, reverse=True)
     return trials[:n_nets]
+
+def log2_avg(A, s=0):
+    A = np.asarray(A)
+    if len(A) <= s:
+        return A
+    idx = s + (1 << np.arange((len(A) - s).bit_length())) - 1
+    idx = np.r_[np.arange(s), idx] if s > 0 else idx
+    return np.add.reduceat(A, idx) / np.diff(np.append(idx, len(A)))
