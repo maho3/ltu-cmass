@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-2  # Array range
+#SBATCH --array=0-3  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -25,9 +25,9 @@ cd /u/maho3/git/ltu-cmass
 
 # ~~ NIALL TEST ~~
 nbody=abacuslike
-sim=fastpm_recnoise
-infer=simple_lc  # simple  # lightcone
-tracer=mtng_lightcone
+sim=fastpm_recnoise_tempOms8
+infer=simple  # simple  # lightcone
+tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
@@ -37,7 +37,9 @@ device="cpu"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=False infer.include_hod=False"
+suffix="$suffix infer.subselect_cosmo=[0,4]"
+# suffix="$suffix infer.loglinear_start_idx=30"
 
 echo "Running inference pipeline with $suffix"
 

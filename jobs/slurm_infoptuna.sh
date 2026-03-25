@@ -23,9 +23,9 @@ sleep $net_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 nbody=abacuslike
-sim=fastpm_recnoise
-infer=simple_lc  # simple  # lightcone
-tracer=mtng_lightcone
+sim=fastpm_recnoise_temploglinear
+infer=simple  # simple  # lightcone
+tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
@@ -37,7 +37,9 @@ extras="$extras hydra/job_logging=disabled"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=False infer.include_hod=False"
+# suffix="$suffix infer.subselect_cosmo=[0,4]"
+suffix="$suffix infer.loglinear_start_idx=30"
 
 echo "Running inference pipeline with $suffix"
 
