@@ -23,21 +23,21 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-# # ~~ NIALL TEST ~~
-# nbody=quijotelike
-# sim=fastpm_4k_niall2
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
-# device="cpu"
-
-# ~~ ABACUS ~~
-nbody=abacuslike
-sim=fastpm_recnoise_tempOms8
+# ~~ NIALL TEST ~~
+nbody=quijotelike
+sim=fastpm_4k_hodz
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
+
+# # ~~ ABACUS ~~
+# nbody=abacuslike
+# sim=fastpm_recnoise_tempOms8
+# infer=simple  # simple  # lightcone
+# tracer=galaxy
+# extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
+# device="cpu"
 
 # export TQDM_DISABLE=0
 # extras="$extras hydra/job_logging=disabled"
@@ -45,8 +45,8 @@ device="cpu"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=False infer.include_hod=False"
-suffix="$suffix infer.subselect_cosmo=[0,4]"
+suffix="$suffix infer.include_noise=True infer.include_hod=False"
+# suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 
 echo "Running inference pipeline with $suffix"

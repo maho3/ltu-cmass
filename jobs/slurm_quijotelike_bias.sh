@@ -24,15 +24,15 @@ cd /u/maho3/git/ltu-cmass
 
 Nhod=5
 
-nbody=quijote
-sim=nbody
-noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+nbody=quijotelike
+sim=fastpm_4k_hodz
+noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zheng_biased nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
 L=1000
 N=128
 
@@ -43,7 +43,7 @@ outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 400 1999); do
+for offset in $(seq 0 400 3999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
