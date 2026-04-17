@@ -98,6 +98,6 @@ n_startup_trials: 50  # Number of initial trials to sample uniformly before usin
 clean_models: False  # whether to delete poorly fit model files after validation
 
 testing:
-  path: null
-  name: null
+  suite: null
+  sim: null
 

@@ -287,6 +287,17 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
+
+            # Always save nbar for train/val/test (TODO: clean up)
+            nbar_all = np.array(_get_log10nbar(summaries['Pk0']))[:,-1]
+            id_arr = np.array(id)
+            nbar_train = nbar_all[np.isin(id_arr, np.unique(ids_train))]
+            nbar_val = nbar_all[np.isin(id_arr, np.unique(ids_val))]
+            nbar_test = nbar_all[np.isin(id_arr, np.unique(ids_test))]
+            np.save(join(exp_path, 'nbar_train.npy'), nbar_train)
+            np.save(join(exp_path, 'nbar_val.npy'), nbar_val)
+            np.save(join(exp_path, 'nbar_test.npy'), nbar_test)
+
             with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
                 f.write(','.join(labels) + '\n')
                 f.write(','.join(map(str, startidx.tolist())) + '\n')
