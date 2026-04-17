@@ -285,6 +285,10 @@ def build_halo_catalog(
     if conc is None:
         conc = mass_to_concentration(mass, redshift, cosmo, mdef)
 
+    hz = halo_redshift if halo_redshift is not None else redshift
+    if isinstance(redshift, float):
+        hz = np.array([hz]*len(pos))
+
     # Specify arguments
     kws = {
         # halo properties
@@ -297,7 +301,7 @@ def build_halo_catalog(
         mkey: mass,
         rkey: radius,
         'halo_nfw_conc': conc,
-        'halo_redshift': halo_redshift if halo_redshift is not None else redshift,
+        'halo_redshift': hz,
         'halo_id': np.arange(len(mass)),
         'halo_hostid': np.zeros(len(mass), dtype=int),
         'halo_upid': np.zeros(len(mass)) - 1,

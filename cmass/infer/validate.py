@@ -159,19 +159,25 @@ def run_experiment(exp, cfg, model_path):
 
         # load test data
             try:
-                if cfg.infer.testing.path is None:
+                if cfg.infer.testing.suite is None:
                     logging.info(f'Loading test data from {exp_path}')
                     x_test = np.load(join(exp_path, 'x_test.npy'))
                     theta_test = np.load(join(exp_path, 'theta_test.npy'))
                     out_path = exp_path
                 else:
+                    test_path = join(
+                        cfg.meta.wdir, 
+                        cfg.infer.testing.suite, cfg.infer.testing.sim, 
+                        'models', cfg.infer.tracer, name,
+                        f'kmin-{kmin}_kmax-{kmax}')
                     logging.info(
-                        f'Loading external test data from {cfg.infer.testing.path}')
-                    x_test = np.load(join(cfg.infer.testing.path, 'x_test.npy'))
+                        f'Loading external test data from {test_path}')
+                    x_test = np.load(join(test_path, 'x_test.npy'))
                     theta_test = np.load(
-                        join(cfg.infer.testing.path, 'theta_test.npy'))
+                        join(test_path, 'theta_test.npy'))
 
-                    out_path = join(exp_path, 'testing', cfg.infer.testing.name)
+                    out_path = join(exp_path, 'testing', 
+                                    f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
                     if not os.path.exists(out_path):
                         os.makedirs(out_path)
 
