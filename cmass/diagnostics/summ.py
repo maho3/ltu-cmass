@@ -337,6 +337,9 @@ def summarize_lightcone_pylians(
 
     # check if diagnostics already computed
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    if getattr(config.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}_noise{config.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
@@ -458,6 +461,9 @@ def summarize_lightcone_pypower(
 
     # check if diagnostics already computed
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    if getattr(cfg.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}_noise{cfg.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
@@ -478,7 +484,7 @@ def summarize_lightcone_pypower(
                         f'hod{0:05}_aug{0:05}.h5')
 
     # Limit the number of processes to avoid overloading the system
-    n_processes = min(threads, 16)  # Limit to 16 processes
+    n_processes = min(threads, 8)  # Limit to 8 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
@@ -545,11 +551,20 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
 
     # parse noise (seeded by lhid and hod seed)
-    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
-    cfg.noise.radial, cfg.noise.transverse = \
-        parse_noise(seed=noise_seed,
-                    dist=cfg.noise.dist,
-                    params=cfg.noise.params)
+    if getattr(cfg.diag, 'noise_seed', None) is not None and getattr(cfg.diag, 'noise_file', None) is not None:
+        noise_seed = cfg.diag.noise_seed
+        # Load the csv separated noise_file, index it by row
+        noise_data = np.loadtxt(cfg.diag.noise_file, delimiter=',')
+
+        # Pull the radial and transverse noise amounts
+        row = noise_data[noise_seed]
+        cfg.noise.radial, cfg.noise.transverse = float(row[0]), float(row[1])
+    else:
+        noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
+        cfg.noise.radial, cfg.noise.transverse = \
+            parse_noise(seed=noise_seed,
+                        dist=cfg.noise.dist,
+                        params=cfg.noise.params)
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
@@ -653,19 +668,19 @@ def main(cfg: DictConfig) -> None:
                     summaries=['Pk'],
                     cfg=cfg
                 )
-                # Bk is still done with old code (TODO: update)
-                done &= summarize_lightcone_pylians(
-                    source_path,
-                    # Diagnostics for lightcone stats use fiducial cosmology
-                    cosmo=Planck18,
-                    cap=cap,
-                    high_res=cfg.diag.high_res,
-                    use_ngp=cfg.diag.use_ngp,
-                    threads=threads, from_scratch=from_scratch,
-                    hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                    summaries=['Bk'],
-                    config=cfg
-                )
+                # # Bk is still done with old code (TODO: update)
+                # done &= summarize_lightcone_pylians(
+                #     source_path,
+                #     # Diagnostics for lightcone stats use fiducial cosmology
+                #     cosmo=Planck18,
+                #     cap=cap,
+                #     high_res=cfg.diag.high_res,
+                #     use_ngp=cfg.diag.use_ngp,
+                #     threads=threads, from_scratch=from_scratch,
+                #     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                #     summaries=['Bk'],
+                #     config=cfg
+                # )
             else:
                 raise ValueError(
                     f'Unknown survey backend: {cfg.diag.survey_backend}')
