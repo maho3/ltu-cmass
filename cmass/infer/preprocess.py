@@ -303,9 +303,9 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             if "noiseid" in summaries:
                 # noise indices
                 noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
-                np.save(join(exp_path, "noise_train.npy"), noise[train_mask])
-                np.save(join(exp_path, "noise_val.npy"), noise[val_mask])
-                np.save(join(exp_path, "noise_test.npy"), noise[test_mask])
+                np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
+                np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
+                np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
 
             with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
                 f.write(','.join(labels) + '\n')
