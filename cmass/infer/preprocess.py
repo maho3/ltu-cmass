@@ -223,6 +223,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 xs.append(('nz', _get_log10nz(summaries['Pk0'])))
             if 'nbar' in exp.summary:  # add nbar
                 xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
+            if 'noiseid' in summaries:  # add noiseid (TODO: save separately)
+                xs.append(('noiseid', np.array(summaries['noiseid'])[:, None]))
 
             labels, xs = zip(*xs)
             if not np.all([len(x) == len(xs[0]) for x in xs]):
@@ -289,7 +291,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
 
             # Always save nbar for train/val/test (TODO: clean up)
-            nbar_all = np.array(_get_log10nbar(summaries['Pk0']))[:,-1]
+            nbar_all = np.array(_get_log10nbar(summaries['Pk0']))[:, -1]
             id_arr = np.array(id)
             nbar_train = nbar_all[np.isin(id_arr, np.unique(ids_train))]
             nbar_val = nbar_all[np.isin(id_arr, np.unique(ids_val))]

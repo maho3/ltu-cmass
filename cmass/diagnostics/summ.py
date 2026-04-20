@@ -165,8 +165,8 @@ def summarize_tracer(
         summaries.remove('nz')  # this is run by default
 
     # get source file
-    postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
-    filename = join(source_path, postfix)
+    in_postfix = 'halos.h5' if type == 'halo' else f'galaxies/hod{hod_seed:05}.h5'
+    filename = join(source_path, in_postfix)
     if not os.path.isfile(filename):
         logging.error(f'File not found: {filename}')
         return False
@@ -175,7 +175,11 @@ def summarize_tracer(
     # check if diagnostics already computed
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
-    outpath = join(source_path, 'diag', postfix)
+    out_postfix = in_postfix
+    if type == 'galaxy' and getattr(config.diag, 'noise_seed', None) is not None:
+        out_postfix = f'galaxies/hod{hod_seed:05}_noise{config.diag.noise_seed:06}.h5'
+
+    outpath = join(source_path, 'diag', out_postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
     if len(summaries) == 0:
         logging.info('All diagnostics already saved. Skipping...')
