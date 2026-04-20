@@ -25,7 +25,8 @@ from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
 from ili.utils.ndes_pt import LampeEnsemble
-from ili.validation import PlotSinglePosterior, PosteriorCoverage
+from ili.validation import (
+    PlotSinglePosterior, PlotSinglePosteriorEnsemble, PosteriorCoverage)
 import yaml
 
 import optuna
@@ -47,6 +48,13 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     )
     metric(posterior, x_obs=xobs, theta_fid=thetaobs.to('cpu'))
 
+    # Plotting single posterior, overplotting posteriors from each ensemble member
+    metric = PlotSinglePosteriorEnsemble(
+        num_samples=10_000, sample_method='direct',
+        labels=names, out_dir=out_dir
+    )
+    metric(posterior, x_obs=xobs, theta_fid=thetaobs.to('cpu'))
+
     # Posterior coverage
     logging.info('Running posterior coverage...')
     metric = PosteriorCoverage(
@@ -58,6 +66,7 @@ def run_validation(posterior, x, theta, out_dir, names=None):
     )
     metric(posterior, x, theta.to('cpu'))
 
+
 def plot_optuna_diagnostics(study, exp_path):
     # trials vs loss
     ax = vis.plot_optimization_history(study)
@@ -68,15 +77,17 @@ def plot_optuna_diagnostics(study, exp_path):
     # hyperparams vs loss
     axs = vis.plot_slice(study)
     fig = axs[0].get_figure()
-    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'), bbox_inches='tight')
+    fig.savefig(join(exp_path, 'optuna_hyperparam_dependence.png'),
+                bbox_inches='tight')
     plt.close(fig)
 
     # parameter importance
     ax = vis.plot_param_importances(study)
     fig = ax.get_figure()
-    fig.savefig(join(exp_path, 'optuna_param_importance.png'), bbox_inches='tight')
+    fig.savefig(join(exp_path, 'optuna_param_importance.png'),
+                bbox_inches='tight')
     plt.close(fig)
-    
+
     # timeline
     ax = vis.plot_timeline(study)
     fig = ax.get_figure()
@@ -84,6 +95,8 @@ def plot_optuna_diagnostics(study, exp_path):
     plt.close(fig)
 
 # For cross-validation cases or not, assuming we have been using optuna
+
+
 def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     """
     Load an ensemble of posteriors from an optuna study.
@@ -166,8 +179,8 @@ def run_experiment(exp, cfg, model_path):
                     out_path = exp_path
                 else:
                     test_path = join(
-                        cfg.meta.wdir, 
-                        cfg.infer.testing.suite, cfg.infer.testing.sim, 
+                        cfg.meta.wdir,
+                        cfg.infer.testing.suite, cfg.infer.testing.sim,
                         'models', cfg.infer.tracer, name,
                         f'kmin-{kmin}_kmax-{kmax}')
                     logging.info(
@@ -176,7 +189,7 @@ def run_experiment(exp, cfg, model_path):
                     theta_test = np.load(
                         join(test_path, 'theta_test.npy'))
 
-                    out_path = join(exp_path, 'testing', 
+                    out_path = join(exp_path, 'testing',
                                     f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
                     if not os.path.exists(out_path):
                         os.makedirs(out_path)
@@ -186,7 +199,8 @@ def run_experiment(exp, cfg, model_path):
                 if cfg.infer.subselect_cosmo is not None:
                     names = [names[i] for i in cfg.infer.subselect_cosmo]
                 if cfg.infer.include_hod and os.path.exists(filepath):
-                    hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
+                    hodprior = np.genfromtxt(
+                        filepath, delimiter=',', dtype=object)
                     names += hodprior[:, 0].astype('str').tolist()
                 if cfg.infer.include_noise:
                     names += ['noise_radial', 'noise_transverse']
