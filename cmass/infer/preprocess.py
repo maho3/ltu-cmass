@@ -223,8 +223,6 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                 xs.append(('nz', _get_log10nz(summaries['Pk0'])))
             if 'nbar' in exp.summary:  # add nbar
                 xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
-            if 'noiseid' in summaries:  # add noiseid (TODO: save separately)
-                xs.append(('noiseid', np.array(summaries['noiseid'])[:, None]))
 
             labels, xs = zip(*xs)
             if not np.all([len(x) == len(xs[0]) for x in xs]):
@@ -299,6 +297,16 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'nbar_train.npy'), nbar_train)
             np.save(join(exp_path, 'nbar_val.npy'), nbar_val)
             np.save(join(exp_path, 'nbar_test.npy'), nbar_test)
+
+            if 'noiseid' in summaries:
+                # to save the indices of noise sensitivity tests, for ref
+                noise_all = np.array(summaries['noiseid'])[:, None]
+                noise_train = noise_all[np.isin(id_arr, np.unique(ids_train))]
+                noise_val = noise_all[np.isin(id_arr, np.unique(ids_val))]
+                noise_test = noise_all[np.isin(id_arr, np.unique(ids_test))]
+                np.save(join(exp_path, 'noise_train.npy'), noise_train)
+                np.save(join(exp_path, 'noise_val.npy'), noise_val)
+                np.save(join(exp_path, 'noise_test.npy'), noise_test)
 
             with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
                 f.write(','.join(labels) + '\n')
