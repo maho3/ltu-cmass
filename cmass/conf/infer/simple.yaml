@@ -19,7 +19,10 @@ experiments:
   - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole,
     kmin: [0.]
     kmax: [0.4]
-  - summary: [zPk0, zPk2, zPk4, zBk0]   # monopole, quadrupole, hexadecapole, bispectrum
+  - summary: [zPk0, zPk2, zPk4, zBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+    kmin: [0.]
+    kmax: [0.4]
+  - summary: [zPk0, zPk2, zPk4, zEqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax: [0.4]
   # - summary: [zPk0, zPk2, zPk4, zEqBk0]   # monopole, quadrupole, hexadecapole, bispectrum
