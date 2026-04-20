@@ -1,0 +1,96 @@
+#!/bin/bash
+#SBATCH --job-name=quijote_bias   # Job name
+#SBATCH --array=0-199         # Job array range for lhid
+#SBATCH --nodes=1               # Number of nodes
+#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --time=04:00:00         # Time limit
+#SBATCH --partition=cpu  # Partition name
+#SBATCH --account=bdne-delta-cpu  # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
+
+
+# set -e
+
+# SLURM_ARRAY_TASK_ID=1000
+
+source ~/.bashrc
+conda activate cmass
+lhid=$SLURM_ARRAY_TASK_ID
+
+
+# Command to run for each lhid
+cd /u/maho3/git/ltu-cmass
+
+Nhod=1
+Nnoise=49
+
+nbody=quijote
+sim=nbody_hodz_gridnoise
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+noise=reciprocal
+
+multisnapshot=False
+diag_from_scratch=True
+rm_galaxies=True
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
+L=1000
+N=128
+
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
+
+outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
+echo "outdir=$outdir"
+
+
+for offset in $(seq 0 200 1999); do
+    lhid=$(($SLURM_ARRAY_TASK_ID+offset))
+
+    postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
+    postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
+    postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
+    postfix="$postfix noise=$noise"
+    postfix="$postfix $extras"
+
+    # # halos
+    # diag_file=$outdir/$lhid/diag/halos.h5
+    # if [ -f "$diag_file" ]; then
+    #     echo "Diag file $diag_file exists."
+    # else
+    #     echo "Diag file $diag_file does not exist."
+    #     python -m cmass.diagnostics.summ $postfix diag.halo=True
+    # fi
+
+    hod_seed=1
+    python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed
+
+    for noise_seed in $(seq 0 $(($Nnoise))); do
+        printf -v hod_str "%05d" $hod_seed
+        printf -v noise_str "%05d" $noise_seed
+
+        # galaxies
+        python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed diag.noise_seed=$noise_seed
+
+        # # set aug_seed the same as hod_seed for simplicity
+        # aug_seed=$hod_seed
+        # printf -v aug_str "%05d" $aug_seed
+
+        # # simbig_lightcone
+        # diag_file=$outdir/$lhid/diag/ngc_lightcone/hod${hod_str}_aug${aug_str}.h5
+        # if [ -f "$diag_file" ]; then
+        #     echo "Diag file $diag_file exists."
+        # else
+        #     echo "Diag file $diag_file does not exist."
+        #     python -m cmass.survey.hodlightcone survey.geometry=ngc $postfix bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed
+        #     python -m cmass.diagnostics.summ diag.ngc=True bias.hod.seed=$hod_seed survey.aug_seed=$aug_seed $postfix 
+        # fi
+    done
+
+    # Trash collection
+    if [ "$rm_galaxies" = "True" ]; then
+        echo "Removing galaxy and lightcone directories for lhid=$lhid"
+        rm -rf "$outdir/$lhid/galaxies"
+        rm -rf "$outdir/$lhid/simbig_lightcone"
+    fi
+done
