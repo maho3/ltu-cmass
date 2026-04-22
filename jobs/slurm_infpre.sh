@@ -21,8 +21,8 @@ net_index=$SLURM_ARRAY_TASK_ID
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-nbody=quijotelike
-sim=fastpm_4k_hodz
+nbody=quijote
+sim=meshed_hodz_gridnoise
 infer=simple  # simple  # lightcone
 
 tracer=galaxy
@@ -34,7 +34,7 @@ device="cpu"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-# suffix="$suffix infer.val_frac=0 infer.test_frac=1"
+suffix="$suffix infer.val_frac=0 infer.test_frac=1"
 suffix="$suffix infer.include_noise=True infer.include_hod=False"
 
 echo "Running inference pipeline with $suffix"

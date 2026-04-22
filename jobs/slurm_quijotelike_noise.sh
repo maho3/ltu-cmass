@@ -12,7 +12,7 @@
 
 # set -e
 
-# SLURM_ARRAY_TASK_ID=1000
+# SLURM_ARRAY_TASK_ID=81
 
 source ~/.bashrc
 conda activate cmass
@@ -26,8 +26,8 @@ Nhod=1
 Nnoise=49
 
 nbody=quijote
-sim=nbody_hodz_gridnoise
-noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+sim=meshed_hodz_gridnoise
+noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
