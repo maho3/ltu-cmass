@@ -35,6 +35,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from .tools import split_experiments
 from ..utils import timing_decorator, clean_up
@@ -45,10 +46,10 @@ log = logging.getLogger(__name__)
 
 # ── Hardcoded hyperparameters ────────────────────────────────────────────────
 HIDDEN_FEATURES = 128
-HIDDEN_DEPTH = 3
+HIDDEN_DEPTH = 4
 N_EPOCHS = 500
-BATCH_SIZE = 256
-LR = 1e-3
+BATCH_SIZE = 128
+LR = 1e-4
 
 
 class DiagonalGaussianNLE(nn.Module):
@@ -129,9 +130,12 @@ def _train(model, x_train, theta_train, x_val, theta_val, device='cpu'):
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=N_EPOCHS)
     train_losses, val_losses = [], []
 
-    for epoch in range(N_EPOCHS):
+    pbar = tqdm(range(N_EPOCHS), unit='ep')
+    for epoch in pbar:
         model.train()
         epoch_loss, n = 0.0, 0
         for xb, tb in train_loader:
@@ -154,11 +158,10 @@ def _train(model, x_train, theta_train, x_val, theta_val, device='cpu'):
                 n += len(xb)
         val_losses.append(epoch_loss / n)
 
-        if (epoch + 1) % 50 == 0 or epoch == 0:
-            log.info(
-                f'Epoch {epoch+1:4d}/{N_EPOCHS}  '
-                f'train_loss={train_losses[-1]:.4f}  '
-                f'val_loss={val_losses[-1]:.4f}')
+        scheduler.step()
+        pbar.set_postfix(
+            trloss=f'{train_losses[-1]:.2f}',
+            valoss=f'{val_losses[-1]:.2f}')
 
     return train_losses, val_losses
 
@@ -183,7 +186,8 @@ def _plot_loss(train_losses, val_losses, out_path):
     ax.plot(val_losses, label='validation', lw=1)
     ax.set(xlabel='Epoch', ylabel='Negative log-likelihood')
     ax.legend()
-    fig.savefig(out_path, dpi=100, bbox_inches='tight')
+    ax.grid(True)
+    fig.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     log.info(f'Saved loss plot to {out_path}')
 
@@ -238,10 +242,6 @@ def main(cfg: DictConfig) -> None:
                 D_x = x_train.shape[1]
                 D_theta = theta_train.shape[1]
 
-                out_dir = join(
-                    exp_path, 'nets', f'net-{cfg.infer.net_index}')
-                os.makedirs(out_dir, exist_ok=True)
-
                 model = DiagonalGaussianNLE(
                     D_x, D_theta,
                     hidden_features=HIDDEN_FEATURES,
@@ -251,9 +251,9 @@ def main(cfg: DictConfig) -> None:
                     model, x_train, theta_train, x_val, theta_val,
                     device=device)
 
-                _save(model, D_x, D_theta, join(out_dir, 'nle.pt'))
+                _save(model, D_x, D_theta, join(exp_path, 'nle.pt'))
                 _plot_loss(
-                    train_losses, val_losses, join(out_dir, 'nle_loss.png'))
+                    train_losses, val_losses, join(exp_path, 'nle_loss.png'))
 
 
 if __name__ == "__main__":
