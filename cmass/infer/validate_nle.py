@@ -30,22 +30,45 @@ from ..nbody.tools import parse_nbody_config
 log = logging.getLogger(__name__)
 
 
+def _load_segments(exp_path):
+    """Parse x_startidx.txt into a list of (name, start, end) tuples, or None."""
+    p = join(exp_path, 'x_startidx.txt')
+    if not os.path.exists(p):
+        return None
+    with open(p) as f:
+        names = f.readline().strip().split(',')
+        indices = list(map(int, f.readline().strip().split(',')))
+    return list(zip(names, indices[:-1], indices[1:]))
+
+
 def plot_emulations(model, x_test, theta_test, out_path, device='cpu',
-                    n_panels=9):
-    """Draw predicted mean/std from p(x|theta) for random test points."""
+                    n_panels=9, segments=None):
+    """Draw predicted mean/std from p(x|theta) and pull residuals for random test points.
+
+    If segments is a list of (name, start, end) tuples, each summary is
+    coloured independently; otherwise a single colour is used.
+    """
     rng = np.random.default_rng(0)
     n_panels = min(n_panels, len(x_test))
     idxs = rng.choice(len(x_test), size=n_panels, replace=False)
 
     ncols = 3
     nrows = int(np.ceil(n_panels / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4 * nrows))
+    fig, axes = plt.subplots(
+        nrows * 2, ncols, figsize=(5 * ncols, 3 * nrows * 2),
+        gridspec_kw={'height_ratios': [2, 1] * nrows})
     axes = np.atleast_2d(axes)
+
+    prop_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     model.eval()
     with torch.no_grad():
         for i, idx in enumerate(idxs):
-            ax = axes.flat[i]
+            row_i = i // ncols
+            col_i = i % ncols
+            ax_data = axes[2 * row_i, col_i]
+            ax_res = axes[2 * row_i + 1, col_i]
+
             theta_i = torch.tensor(
                 theta_test[idx], dtype=torch.float32
             ).unsqueeze(0).to(device)
@@ -54,21 +77,49 @@ def plot_emulations(model, x_test, theta_test, out_path, device='cpu',
             mean = mean.squeeze(0).cpu().numpy()
             std = std.squeeze(0).cpu().numpy()
             bins = np.arange(len(mean))
+            residual = (x_test[idx] - mean) / std
 
-            ax.plot(bins, mean, lw=1, label='predicted mean')
-            ax.fill_between(bins, mean - std, mean + std, alpha=0.3,
-                            label=r'$\pm 1\sigma$')
-            ax.plot(bins, x_test[idx], 'k--', lw=1, label='truth')
-            ax.set_title(
+            if segments is not None:
+                for k, (seg_name, seg_s, seg_e) in enumerate(segments):
+                    color = prop_cycle[k % len(prop_cycle)]
+                    sl = slice(seg_s, seg_e)
+                    label = seg_name if i == 0 else None
+                    ax_data.plot(bins[sl], mean[sl], lw=1, color=color,
+                                 label=label)
+                    ax_data.fill_between(
+                        bins[sl], mean[sl] - std[sl], mean[sl] + std[sl],
+                        alpha=0.3, color=color)
+                    ax_data.plot(bins[sl], x_test[idx][sl], '--', lw=1,
+                                 color=color)
+                    ax_res.plot(bins[sl], residual[sl], lw=1, color=color)
+            else:
+                ax_data.plot(bins, mean, lw=1, color='C0',
+                             label='predicted mean' if i == 0 else None)
+                ax_data.fill_between(
+                    bins, mean - std, mean + std, alpha=0.3, color='C0',
+                    label=r'$\pm 1\sigma$' if i == 0 else None)
+                ax_data.plot(bins, x_test[idx], 'k--', lw=1,
+                             label='truth' if i == 0 else None)
+                ax_res.plot(bins, residual, lw=1, color='C0')
+
+            ax_data.set_title(
                 r'$\theta$=[' +
                 ', '.join(f'{v:.2f}' for v in theta_test[idx]) + ']',
                 fontsize=8)
-            ax.set_xlabel('data-vector index')
             if i == 0:
-                ax.legend(fontsize=7)
+                ax_data.legend(fontsize=7)
 
-    for j in range(n_panels, len(axes.flat)):
-        axes.flat[j].set_visible(False)
+            ax_res.axhline(0, color='k', lw=0.8, ls='--')
+            ax_res.axhline(1, color='gray', lw=0.5, ls=':')
+            ax_res.axhline(-1, color='gray', lw=0.5, ls=':')
+            ax_res.set_xlabel('data-vector index')
+            ax_res.set_ylabel(r'$(x_{\rm true} - \mu)/\sigma$', fontsize=7)
+
+    for j in range(n_panels, nrows * ncols):
+        row_j = j // ncols
+        col_j = j % ncols
+        axes[2 * row_j, col_j].set_visible(False)
+        axes[2 * row_j + 1, col_j].set_visible(False)
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=100, bbox_inches='tight')
@@ -118,9 +169,7 @@ def run_experiment(exp, cfg, model_path):
             log.info(f'Testing on {len(x_test)} examples')
 
             # ── load trained NLE ─────────────────────────────────────
-            net_dir = join(
-                exp_path, 'nets', f'net-{cfg.infer.net_index}')
-            nle_path = join(net_dir, 'nle.pt')
+            nle_path = join(exp_path, 'nle.pt')
             if not os.path.exists(nle_path):
                 log.error(f'No NLE checkpoint at {nle_path}. '
                           'Run cmass.infer.train_nle first.')
@@ -129,11 +178,16 @@ def run_experiment(exp, cfg, model_path):
             model = load_nle(nle_path, device=cfg.infer.device)
             log.info(f'Loaded NLE from {nle_path}')
 
+            segments = _load_segments(exp_path)
+            if segments is not None:
+                log.info(f'Colouring by segments: {[s[0] for s in segments]}')
+
             # ── plot emulations ──────────────────────────────────────
             plot_emulations(
                 model, x_test, theta_test,
                 join(out_path, 'nle_emulations.png'),
-                device=cfg.infer.device)
+                device=cfg.infer.device,
+                segments=segments)
 
 
 @timing_decorator
