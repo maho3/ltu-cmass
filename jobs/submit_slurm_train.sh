@@ -10,8 +10,8 @@ for case in galaxy ; do # simbig sgc mtng ngc
     export $case=True
     for exp_index in 0 1 2 3; do
         echo "Submitting inference job for case=$case, exp_index=$exp_index"
-        # sbatch --export=exp_index=$exp_index,galaxy=$galaxy,simbig=$simbig,sgc=$sgc,ngc=$ngc,mtng=$mtng --job-name="${name}$exp_index" jobs/slurm_infoptuna.sh
-        sbatch --export=exp_index=$exp_index,galaxy=$galaxy,simbig=$simbig,sgc=$sgc,ngc=$ngc,mtng=$mtng --job-name="${name}$exp_index" jobs/slurm_infretrain.sh
+        sbatch --export=exp_index=$exp_index,galaxy=$galaxy,simbig=$simbig,sgc=$sgc,ngc=$ngc,mtng=$mtng --job-name="${name}$exp_index" jobs/slurm_infoptuna.sh
+        # sbatch --export=exp_index=$exp_index,galaxy=$galaxy,simbig=$simbig,sgc=$sgc,ngc=$ngc,mtng=$mtng --job-name="${name}$exp_index" jobs/slurm_infretrain.sh
         sleep 0.1
     done
 done
