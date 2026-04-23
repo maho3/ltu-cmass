@@ -493,8 +493,8 @@ def summarize_lightcone_pypower(
     command_string = f"""
     cd {codedir}
     module purge
-    module restore pmesh
-    source /opt/packages/anaconda3-2024.10-1/bin/activate
+    module restore cmass
+    source /apps/anvil/external/apps/conda/2024.02/bin/activate
     conda activate pmesh
     which python
     mpirun -n {n_processes} python -m cmass.diagnostics.pypower \

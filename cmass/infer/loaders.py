@@ -10,8 +10,12 @@ from .tools import log2_avg
 
 
 def get_cosmo(source_path):
-    cfg = OmegaConf.load(join(source_path, 'config.yaml'))
-    return np.array(cfg.nbody.cosmo)
+    try:
+        cfg = OmegaConf.load(join(source_path, 'config.yaml'))
+        return np.array(cfg.nbody.cosmo)
+    except Exception as e:
+        print(f"Error loading cosmology parameters: {e} {source_path}")
+        return None
 
 
 def get_hod_params(diagfile):
@@ -41,6 +45,8 @@ get_hod = get_hod_params  # for backwards compatibility
 def closest_a(lst, a):
     lst = [float(el) for el in lst]
     lst = np.asarray(lst)
+    if len(lst) == 0:
+        return 0
     idx = (np.abs(lst - a)).argmin()
     return lst[idx]
 
@@ -165,7 +171,7 @@ def _get_log10nz(data):
     Extracts n(z) values from each data entry and bins them into 3 coarse bins
     with edges at [0.4, 0.5, 0.6, 0.7]. Returns a 2D array of shape (len(data), 3).
     """
-    num_bins = 3
+    num_bins = 10
     bin_edges = np.linspace(0.4, 0.7, num_bins + 1)
     binned_nz = np.empty((len(data), num_bins))
     for i, entry in enumerate(data):
