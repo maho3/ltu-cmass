@@ -23,24 +23,17 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-# ~~ NIALL TEST ~~
+
 nbody=quijotelike
 sim=fastpm_4k_hodz
 infer=simple  # simple  # lightcone
+
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
-# # ~~ ABACUS ~~
-# nbody=abacuslike
-# sim=fastpm_recnoise_tempOms8
-# infer=simple  # simple  # lightcone
-# tracer=galaxy
-# extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
-# device="cpu"
-
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
