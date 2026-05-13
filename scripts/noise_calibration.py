@@ -23,14 +23,14 @@ mpl.style.use('../matts_tests/style.mcstyle')
 # Configuration
 # ---------------------------------------------------------------------------
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
-BASEDIR = f'{WDIR}/quijote/meshed_hodz/models/galaxy'
-TESTDIR_BASE = f'{WDIR}/quijote/nbody_hodz_gridnoise/models/galaxy'
-SIM_TEST = 'quijote_nbody_hodz_gridnoise'
+BASEDIR = f'{WDIR}/quijotelike/fastpm_4k_hodz/models/galaxy'
+TESTDIR_BASE = f'{WDIR}/quijote/meshed_hodz_gridnoise/models/galaxy'
+SIM_TEST = 'quijote_meshed_hodz_gridnoise'
 NOISE_GRID_PATH = f'{WDIR}/noise_priors/noisegrid.csv'
 FIG_DIR = './figures'
 os.makedirs(FIG_DIR, exist_ok=True)
 
-z = 'z'
+z = ''
 SUMMARY_NAMES = [
     f'{z}Pk0',
     f'{z}Pk0+{z}Pk2+{z}Pk4',
@@ -90,7 +90,8 @@ def load_heatmaps(s, kmax, p_list):
         samples = np.load(paths['ood_samples'], mmap_mode='r')
         theta = np.load(paths['theta_ood'])
         noiseidx = np.load(paths['noiseid_ood'])[:, 0]
-    except (OSError, ValueError, IndexError):
+    except (OSError, ValueError, IndexError) as e:
+        print(f'Error loading data for {s}, kmax={kmax}: {e}')
         return None
 
     out = {p: np.full((7, 7), np.nan) for p in p_list}
@@ -134,6 +135,7 @@ for p_idx in PARAM_IDXS:
             hm = res[p_idx] if (res is not None and p_idx in res) else None
 
             if hm is None or np.all(np.isnan(hm)):
+                print(f'No valid data for {s}, kmax={kval}')
                 ax.text(0.5, 0.5, 'N/A', ha='center', va='center',
                         transform=ax.transAxes)
                 ax.set_xticks([])
