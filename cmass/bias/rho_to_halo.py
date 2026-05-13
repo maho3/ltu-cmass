@@ -161,70 +161,138 @@ def batch_cube(x, Nsub, width, stride):
     return np.stack(batches, axis=0)
 
 
-def apply_charm(rho, fvel, charm_cfg, L, cosmo):
-    """Apply CHARM, accounting for the pre-trained resolution."""
+def apply_charm(rho, fvel, charm_cfg, L, cosmo, z):
+    """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
 
-    # Load CHARM
-    from charm.infer_halos_from_PM import get_model_interface
-    charm_interface = get_model_interface()
+    import torch
+    from charm.config_loader import load_config
+    from charm.run_charm_joint_ddp import build_model
+    from charm.run_inference_v2 import (
+        load_checkpoint, build_cond_tensors,
+        build_dm_velocity_interpolators, reconstruct_catalog,
+    )
 
-    # Hard-code the pre-trained CHARM configuration
-    Npix = 128  # pre-trained resolution
-    pad = 4  # CHARM padding
-    Lcharm = 1000  # CHARM box size
-    Npad = 128+2*pad  # padded resolution
+    # TODO: expose these via cfg.bias.halo (currently charm_cfg='config_v0.yaml'
+    # is the legacy main-branch token and is ignored here). The gobig YAML and
+    # checkpoint live in the CHARM repo on the `gobig` branch.
+    charm_repo = '/u/maho3/git/CHARM'
+    charm_yaml = os.path.join(
+        charm_repo, 'run_configs',
+        'TRAIN_CHARM_JOINT_v2vel_finetune2.yaml')
+    cfg_charm = load_config(charm_yaml)
+
+    sc = cfg_charm['sim_settings']
+    Nmax = int(sc['Nmax'])
+    lgMmin = float(sc['lgMmin'])
+    lgMmax = float(sc['lgMmax'])
+    vmin = float(sc.get('vmin', -1000.))
+    vmax = float(sc.get('vmax',  1000.))
+    cmin = float(sc.get('cmin', -8.))
+    cmax = float(sc.get('cmax',  8.))
+    nb = int(sc['nb'])                          # 8
+    nax = int(sc['ns_h']) // nb                  # 16
+    n_cnn = sum(1 if t == 'cnn' else 2 for t in sc['layers_types'])
+    n_pad = (int(sc['nf']) - 1) // 2 * n_cnn
+
+    Npix = nb * nax        # pre-trained per-chunk resolution (128)
+    Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
+
+    ckpt_dir = cfg_charm['train_settings']['checkpoint_dir']
+    if not os.path.isabs(ckpt_dir):
+        ckpt_dir = os.path.normpath(os.path.join(charm_repo, ckpt_dir))
+    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_best_val.pth'
+
+    # Register a colossus cosmology so concentration.concentration() works
+    # when we add the baseline below. cosmo = [Om, Ob, h, ns, s8].
+    from colossus.cosmology import cosmology as colossus_cosmology
+    colossus_cosmology.setCosmology('charm_runtime', {
+        'flat': True,
+        'Om0': float(cosmo[0]),
+        'Ob0': float(cosmo[1]),
+        'H0':  float(cosmo[2]) * 100.0,
+        'ns':  float(cosmo[3]),
+        'sigma8': float(cosmo[4]),
+    })
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logging.info(f'Loading CHARM gobig model on {device}...')
+    model = build_model(cfg_charm).to(device)
+    load_checkpoint(model, ckpt_path, device)
+    model.eval()
 
     N = rho.shape[0]  # input resolution
     assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize
+    Nsub = N // Npix
 
-    Nsub = N//Npix  # number of sub-boxes
-
-    # Pad the input density field
-    rho_pad = np.pad(rho, pad, mode='wrap')
-    fvel_pad = np.pad(fvel, [(pad, pad)]*3+[(0, 0)], mode='wrap')
-
-    # Split the inputs into batches
-    batch_rho = batch_cube(rho, Nsub, Npix, Npix)
-    batch_rho_pad = batch_cube(rho_pad, Nsub, Npad, Npix)
+    # Split inputs into per-chunk (Npix^3) cubes; gobig handles its own padding.
+    batch_rho = batch_cube(rho,  Nsub, Npix, Npix)
     batch_fvel = batch_cube(fvel, Nsub, Npix, Npix)
-    batch_fvel_pad = batch_cube(fvel_pad, Nsub, Npad, Npix)
 
-    # Run CHARM on each batch and append outputs
+    cosmo_arr = np.array(cosmo, dtype=np.float32)
+
     hposs, hmasss, hvels, hconcs = [], [], [], []
     for i in range(len(batch_rho)):
         logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
-        hpos, hmass, hvel, hconc = charm_interface.process_input_density(
-            rho_m_zg=batch_rho[i],
-            rho_m_vel_zg=np.stack([batch_fvel[i, ..., j]
-                                  for j in range(3)], axis=0),
-            rho_m_pad_zg=batch_rho_pad[i],
-            rho_m_vel_pad_zg=np.stack(
-                [batch_fvel_pad[i, ..., j] for j in range(3)], axis=0),
-            cosmology_array=np.array(cosmo),
-            BoxSize=Lcharm
-        )
-        mask = hmass > np.log10(5e12)  # charm minimum mass threshold
-        hposs.append(hpos[mask])
-        hmasss.append(hmass[mask])
-        hvels.append(hvel[mask])
-        hconcs.append(hconc[mask])
 
-    # Shift the positions to the original box
+        rho_chunk = batch_rho[i].astype(np.float32)
+        # fvel has components on the last axis (Npix,Npix,Npix,3) → (3,...).
+        # Caller passes fvel already scaled to km/s (no /1000 normalisation).
+        vel_chunk = batch_fvel[i].transpose(3, 0, 1, 2).astype(np.float32)
+
+        cond_x, cond_x_nsh, cond_cosmo = build_cond_tensors(
+            rho_chunk, vel_chunk, cosmo_arr,
+            nb=nb, nax=nax, n_pad=n_pad,
+        )
+
+        with torch.no_grad():
+            sample_out = model.sample(
+                cond_x.to(device),
+                cond_x_nsh.to(device),
+                cond_cosmo.to(device),
+            )
+
+        vel_interps = build_dm_velocity_interpolators(vel_chunk, BoxSize=Lcharm)
+        hpos, hmass, hvel, hconc = reconstruct_catalog(
+            sample_out,
+            nb=nb, nax=nax, Nmax=Nmax,
+            lgMmin=lgMmin, lgMmax=lgMmax,
+            vmin=vmin, vmax=vmax,
+            cmin=cmin, cmax=cmax,
+            BoxSize=Lcharm,
+            vel_interps=vel_interps,
+        )
+
+        # Convert concentration residual back to absolute concentration
+        # (the old main-branch interface returned absolute values).
+        if len(hmass) > 0:
+            from colossus.halo import concentration as colossus_conc
+            c_base = colossus_conc.concentration(
+                np.clip(10**hmass, 0.9 * 10**lgMmin, 1.1 * 10**lgMmax),
+                '200c', z, model='diemer19',
+            )
+            hconc = np.clip(c_base + hconc, 1.0, 30.0)
+
+        hposs.append(hpos)
+        hmasss.append(hmass)
+        hvels.append(hvel)
+        hconcs.append(hconc)
+
+    # Shift positions to the original box
     l = 0
     for i in range(Nsub):
         for j in range(Nsub):
             for k in range(Nsub):
-                hposs[l] += np.array([i, j, k])*Lcharm
+                if len(hposs[l]) > 0:
+                    hposs[l] = hposs[l] + np.array(
+                        [i, j, k], dtype=np.float32) * Lcharm
                 l += 1
 
-    # Combine the outputs
     hposs, hmasss, hvels, hconcs = map(
         np.concatenate, [hposs, hmasss, hvels, hconcs])
 
     # ensure periodicity
     hposs = hposs % L
 
-    # save misc halo metadata
     meta = {'concentration': hconcs}
 
     return hposs, hmasss, hvels, meta
@@ -274,12 +342,13 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
 
-        # apply CHARM model
+        # apply CHARM model (gobig branch: expects velocity in km/s)
         hpos, hmass, hvel, meta = apply_charm(
             rho,
-            fvel*a/1e3,  # CHARM vel normalization (physical velocities Mm/s)
+            fvel*a,  # physical velocities in km/s
             cfg.bias.halo.config_charm,
-            cfg.nbody.L, cfg.nbody.cosmo
+            cfg.nbody.L, cfg.nbody.cosmo,
+            z=1.0/a - 1.0,
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')

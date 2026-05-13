@@ -10,28 +10,30 @@
 #SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 # baseoffset=0
 
-module restore cmass
-conda activate cmassrun
+# module restore cmass
+source ~/.bashrc
+conda activate cmass
+
 lhid=$((SLURM_ARRAY_TASK_ID + baseoffset))
 echo "lhid=$lhid"
 
 # Command to run for each lhid
-cd /home/x-mho1/git/ltu-cmass-run
+cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm
-multisnapshot=True
+sim=fastpm_charm2
+multisnapshot=False
 extras="nbody.matchIC=0 nbody.suite=quijotelike" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
 L=1000
 N=128
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
 keys_to_check=(0.666667)
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike_nophase/$sim/L$L-N$N
+outdir=/work/hdd/bdne/maho3/cmass-ili/quijotelike/fastpm_charm2/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
@@ -40,7 +42,7 @@ extras="$extras hydra/job_logging=disabled"
 
 
 # Loop through offsets and process files
-for offset in $(seq 0 200 1800); do
+for offset in 0; do # $(seq 0 200 1800); do
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5
