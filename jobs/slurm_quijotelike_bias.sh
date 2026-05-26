@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=quijote_bias   # Job name
-#SBATCH --array=0-399         # Job array range for lhid
+#SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
@@ -25,25 +25,25 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=quijotelike
-sim=fastpm_4k_hodz
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+sim=fastpm_charm3
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "noise.params.radial=0 noise.params.transverse=0
 L=1000
 N=128
 
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
+outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 400 3999); do
+for offset in $(seq 0 100 4799); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
@@ -60,6 +60,12 @@ for offset in $(seq 0 400 3999); do
     #     echo "Diag file $diag_file does not exist."
     #     python -m cmass.diagnostics.summ $postfix diag.halo=True
     # fi
+    if [ ! -d "$outdir/$lhid" ]; then
+        echo "Directory $outdir/$lhid does not exist. Skipping lhid=$lhid"
+        continue
+    fi
+    cat $outdir/$lhid/config.yaml
+    
 
     for hod_seed in $(seq 1 $(($Nhod))); do
         printf -v hod_str "%05d" $hod_seed

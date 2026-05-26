@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_4k_hodz
+sim=fastpm_charm3
 infer=simple  # simple  # lightcone
 
 tracer=galaxy

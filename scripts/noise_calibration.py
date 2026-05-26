@@ -23,14 +23,14 @@ mpl.style.use('../matts_tests/style.mcstyle')
 # Configuration
 # ---------------------------------------------------------------------------
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
-BASEDIR = f'{WDIR}/quijotelike/fastpm_4k_hodz/models/galaxy'
-TESTDIR_BASE = f'{WDIR}/quijote/meshed_hodz_gridnoise/models/galaxy'
-SIM_TEST = 'quijote_meshed_hodz_gridnoise'
+BASEDIR = f'{WDIR}/quijotelike/fastpm_charm3/models/galaxy'
+TESTDIR_BASE = f'{WDIR}/quijote/nbody_hodz_gridnoise/models/galaxy'
+SIM_TEST = 'quijote_nbody_hodz_gridnoise'
 NOISE_GRID_PATH = f'{WDIR}/noise_priors/noisegrid.csv'
 FIG_DIR = './figures'
 os.makedirs(FIG_DIR, exist_ok=True)
 
-z = ''
+z = 'z'
 SUMMARY_NAMES = [
     f'{z}Pk0',
     f'{z}Pk0+{z}Pk2+{z}Pk4',
