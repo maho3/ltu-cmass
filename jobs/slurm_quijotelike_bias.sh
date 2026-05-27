@@ -25,14 +25,14 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=quijotelike
-sim=fastpm_charm3
+sim=fastpm_charm4
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=reciprocal
+noise=fixed
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "noise.params.radial=0 noise.params.transverse=0
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/stupid_fastpm_4k_params.txt noise.params.radial=2.0 noise.params.transverse=2.5"
 L=1000
 N=128
 
