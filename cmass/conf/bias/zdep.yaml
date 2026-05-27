@@ -5,7 +5,6 @@ halo:
 
   # CHARM-specific parameters
   # config_charm: config_v0.yaml
-  config_charm: /u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml
 
   # LIMD-specific parameters
   base_suite: calib_1gpch_z0.5  # base suite for LIMD
