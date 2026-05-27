@@ -230,7 +230,7 @@ def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
     return hposs, hmasss, hvels, meta
 
 
-def apply_charm_new(rho, fvel, charm_cfg, L, cosmo):
+def apply_charm_new(rho, fvel, charm_yaml_path, L, cosmo):
     """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
 
     import torch
@@ -241,14 +241,7 @@ def apply_charm_new(rho, fvel, charm_cfg, L, cosmo):
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
 
-    # TODO: expose these via cfg.bias.halo (currently charm_cfg='config_v0.yaml'
-    # is the legacy main-branch token and is ignored here). The gobig YAML and
-    # checkpoint live in the CHARM repo on the `gobig` branch.
-    charm_repo = '/u/maho3/git/CHARM'
-    charm_yaml = os.path.join(
-        charm_repo, 'run_configs',
-        'TRAIN_CHARM_JOINT_v2vel_finetune2.yaml')
-    cfg_charm = load_config(charm_yaml)
+    cfg_charm = load_config(charm_yaml_path)
 
     sc = cfg_charm['sim_settings']
     Nmax = int(sc['Nmax'])
