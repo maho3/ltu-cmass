@@ -262,7 +262,7 @@ def apply_charm_new(rho, fvel, charm_yaml_path, L, cosmo):
     ckpt_dir = cfg_charm['train_settings']['checkpoint_dir']
     if not os.path.isabs(ckpt_dir):
         ckpt_dir = os.path.normpath(os.path.join(charm_repo, ckpt_dir))
-    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_best_val.pth'
+    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_step001030_ph0_finetune5.pth'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Loading CHARM gobig model on {device}...')

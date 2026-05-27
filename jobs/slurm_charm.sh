@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=charm  # Job name
-#SBATCH --array=0-199         # Job array range for lhid
+#SBATCH --array=0-49         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
-#SBATCH --time=24:00:00         # Time limit
-#SBATCH --partition=gpu        # Partition name
+#SBATCH --ntasks=16            # Number of tasks
+#SBATCH --time=12:00:00         # Time limit
+#SBATCH --partition=ghx4        # Partition name
 #SBATCH --gpus-per-node=1       # Number of GPUs per node
-#SBATCH --account=phy240043-gpu   # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --account=bdne-dtai-gh   # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 # baseoffset=0
 
@@ -25,15 +25,15 @@ echo "lhid=$lhid"
 cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_charm2
+sim=fastpm_charm4
 multisnapshot=False
-extras="nbody.matchIC=0 nbody.suite=quijotelike" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+extras="nbody.matchIC=0 nbody.suite=quijotelike meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
 L=1000
 N=128
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
 keys_to_check=(0.666667)
 
-outdir=/work/hdd/bdne/maho3/cmass-ili/quijotelike/fastpm_charm2/$sim/L$L-N$N
+outdir=/work/hdd/bdne/maho3/cmass-ili/quijotelike/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
@@ -42,10 +42,16 @@ extras="$extras hydra/job_logging=disabled"
 
 
 # Loop through offsets and process files
-for offset in 0; do # $(seq 0 200 1800); do
+for offset in $(seq 0 50 4799); do  # 4799
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5
+
+    # Check if directory exists
+    if [ ! -d "$outdir/$loff" ]; then
+        echo "Directory $outdir/$loff does not exist. Continuing..."
+        continue
+    fi
 
     # Check if file exists
     if [ -f $file ]; then
@@ -53,13 +59,13 @@ for offset in 0; do # $(seq 0 200 1800); do
         all_keys_exist=true
 
         # Check if all keys exist in the file
-        for key in $keys_to_check; do
-            if ! h5ls $file | grep -q $key; then
-                all_keys_exist=false
-                echo "Key $key does not exist in $file."
-                break
-            fi
-        done
+        # for key in $keys_to_check; do
+        #     if ! h5ls $file | grep -q $key; then
+        #         all_keys_exist=false
+        #         echo "Key $key does not exist in $file."
+        #         break
+        #     fi
+        # done
 
         # Process file based on key existence
         if $all_keys_exist; then
