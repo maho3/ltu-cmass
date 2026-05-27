@@ -230,7 +230,7 @@ def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
     return hposs, hmasss, hvels, meta
 
 
-def apply_charm_new(rho, fvel, charm_yaml_path, L, cosmo):
+def apply_charm_new(rho, fvel, L, cosmo):
     """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
 
     import torch
@@ -241,6 +241,7 @@ def apply_charm_new(rho, fvel, charm_yaml_path, L, cosmo):
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
 
+    charm_yaml_path = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
     cfg_charm = load_config(charm_yaml_path)
 
     sc = cfg_charm['sim_settings']
@@ -259,9 +260,6 @@ def apply_charm_new(rho, fvel, charm_yaml_path, L, cosmo):
     Npix = nb * nax        # pre-trained per-chunk resolution (128)
     Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
 
-    ckpt_dir = cfg_charm['train_settings']['checkpoint_dir']
-    if not os.path.isabs(ckpt_dir):
-        ckpt_dir = os.path.normpath(os.path.join(charm_repo, ckpt_dir))
     ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_step001030_ph0_finetune5.pth'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -399,7 +397,6 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         hpos, hmass, hvel, meta = apply_charm_new(
             rho,
             fvel*a,  # physical velocities in km/s
-            cfg.bias.halo.config_charm,
             cfg.nbody.L, cfg.nbody.cosmo
         )
     elif cfg.bias.halo.model == "LIMD":
