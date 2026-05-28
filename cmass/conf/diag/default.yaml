@@ -45,3 +45,7 @@ halo_proxy: mass  # property for abundance matching (null for no abundance match
 # Note, we don't have a mass proxy for galaxies, so we can't use abundance matching
 galaxy_density: null  # number density in h^3/Mpc^3. null for no abundance matching
 galaxy_proxy: null  # property for abundance matching (null for no abundance matching)
+
+# For studying subgrid noising sensitivity
+noise_seed: null  # the index in noise_file to run
+noise_file: /work/hdd/bdne/maho3/cmass-ili/noise_priors/noisegrid.csv  # a csv of noise values

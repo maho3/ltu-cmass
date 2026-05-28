@@ -161,7 +161,7 @@ def batch_cube(x, Nsub, width, stride):
     return np.stack(batches, axis=0)
 
 
-def apply_charm(rho, fvel, charm_cfg, L, cosmo):
+def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
     """Apply CHARM, accounting for the pre-trained resolution."""
 
     # Load CHARM
@@ -230,6 +230,117 @@ def apply_charm(rho, fvel, charm_cfg, L, cosmo):
     return hposs, hmasss, hvels, meta
 
 
+def apply_charm_new(rho, fvel, L, cosmo):
+    """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
+
+    import torch
+    from charm.config_loader import load_config
+    from charm.run_charm_joint_ddp import build_model
+    from charm.run_inference_v2 import (
+        load_checkpoint, build_cond_tensors,
+        build_dm_velocity_interpolators, reconstruct_catalog,
+    )
+
+    charm_yaml_path = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
+    cfg_charm = load_config(charm_yaml_path)
+
+    sc = cfg_charm['sim_settings']
+    Nmax = int(sc['Nmax'])
+    lgMmin = float(sc['lgMmin'])
+    lgMmax = float(sc['lgMmax'])
+    vmin = float(sc['vmin'])
+    vmax = float(sc['vmax'])
+    cmin = float(sc['cmin'])
+    cmax = float(sc['cmax'])
+    nb = int(sc['nb'])                          # 8
+    nax = int(sc['ns_h']) // nb                  # 16
+    n_cnn = sum(1 if t == 'cnn' else 2 for t in sc['layers_types'])
+    n_pad = (int(sc['nf']) - 1) // 2 * n_cnn
+
+    Npix = nb * nax        # pre-trained per-chunk resolution (128)
+    Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
+
+    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_step001030_ph0_finetune5.pth'
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logging.info(f'Loading CHARM gobig model on {device}...')
+    model = build_model(cfg_charm).to(device)
+    load_checkpoint(model, ckpt_path, device)
+    model.eval()
+
+    N = rho.shape[0]  # input resolution
+    assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize
+    Nsub = N // Npix
+
+    # Split inputs into per-chunk (Npix^3) cubes; gobig handles its own padding.
+    batch_rho = batch_cube(rho,  Nsub, Npix, Npix)
+    batch_fvel = batch_cube(fvel, Nsub, Npix, Npix)
+
+    cosmo_arr = np.array(cosmo, dtype=np.float32)
+
+    hposs, hmasss, hvels, hconcs = [], [], [], []
+    for i in range(len(batch_rho)):
+        logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
+
+        rho_chunk = batch_rho[i].astype(np.float32)
+        # fvel has components on the last axis (Npix,Npix,Npix,3) → (3,...).
+        # Caller passes fvel already scaled to km/s (no /1000 normalisation).
+        vel_chunk = batch_fvel[i].transpose(3, 0, 1, 2).astype(np.float32)
+
+        cond_x, cond_x_nsh, cond_cosmo = build_cond_tensors(
+            rho_chunk, vel_chunk, cosmo_arr,
+            nb=nb, nax=nax, n_pad=n_pad,
+        )
+
+        with torch.no_grad():
+            sample_out = model.sample(
+                cond_x.to(device),
+                cond_x_nsh.to(device),
+                cond_cosmo.to(device),
+            )
+
+        vel_interps = build_dm_velocity_interpolators(vel_chunk, BoxSize=Lcharm)
+        hpos, hmass, hvel, hconc = reconstruct_catalog(
+            sample_out,
+            nb=nb, nax=nax, Nmax=Nmax,
+            lgMmin=lgMmin, lgMmax=lgMmax,
+            vmin=vmin, vmax=vmax,
+            cmin=cmin, cmax=cmax,
+            BoxSize=Lcharm,
+            vel_interps=vel_interps,
+        )
+
+        hposs.append(hpos)
+        hmasss.append(hmass)
+        hvels.append(hvel)
+        hconcs.append(hconc)
+
+    # Shift positions to the original box
+    l = 0
+    for i in range(Nsub):
+        for j in range(Nsub):
+            for k in range(Nsub):
+                if len(hposs[l]) > 0:
+                    hposs[l] = hposs[l] + np.array(
+                        [i, j, k], dtype=np.float32) * Lcharm
+                l += 1
+
+    # Concentrations are raw Rockstar 200c (c_sim = R_200c / Rs), already
+    # denormalized inside reconstruct_catalog via c = conc_norm*(cmax-cmin)+cmin
+    # with cmin=1, cmax=15 from sim_settings. Values at 1.0 or 15.0 are
+    # saturated (training clipped to this range); no baseline correction needed.
+
+    hposs, hmasss, hvels, hconcs = map(
+        np.concatenate, [hposs, hmasss, hvels, hconcs])
+
+    # ensure periodicity
+    hposs = hposs % L
+
+    meta = {'concentration': hconcs}
+
+    return hposs, hmasss, hvels, meta
+
+
 def apply_limd(rho, fvel, cfg, ppos=None, pvel=None):
     # Load bias parameters
     bcfg = deepcopy(cfg)
@@ -274,11 +385,18 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
     if cfg.bias.halo.model == "CHARM":
         logging.info('Using CHARM model...')
 
-        # apply CHARM model
-        hpos, hmass, hvel, meta = apply_charm(
+        # # apply old CHARM model (before May 2026)
+        # hpos, hmass, hvel, meta = apply_charm_old(
+        #     rho,
+        #     fvel*a/1e3,  # CHARM vel normalization (physical velocities Mm/s)
+        #     cfg.bias.halo.config_charm,
+        #     cfg.nbody.L, cfg.nbody.cosmo
+        # )
+
+        # apply CHARM model (since May 2026)
+        hpos, hmass, hvel, meta = apply_charm_new(
             rho,
-            fvel*a/1e3,  # CHARM vel normalization (physical velocities Mm/s)
-            cfg.bias.halo.config_charm,
+            fvel*a,  # physical velocities in km/s
             cfg.nbody.L, cfg.nbody.cosmo
         )
     elif cfg.bias.halo.model == "LIMD":

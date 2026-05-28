@@ -175,6 +175,9 @@ def summarize_tracer(
     # check if diagnostics already computed
     if type == 'galaxy':
         os.makedirs(join(source_path, 'diag', 'galaxies'), exist_ok=True)
+    if type == 'galaxy' and getattr(config.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'galaxies/hod{hod_seed:05}_noise{config.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
     if len(summaries) == 0:
@@ -334,6 +337,9 @@ def summarize_lightcone_pylians(
 
     # check if diagnostics already computed
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    if getattr(config.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}_noise{config.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
@@ -455,6 +461,9 @@ def summarize_lightcone_pypower(
 
     # check if diagnostics already computed
     os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    if getattr(cfg.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}_noise{cfg.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
     if len(summaries) == 0:
@@ -542,11 +551,20 @@ def main(cfg: DictConfig) -> None:
     cfg = parse_hod(cfg)
 
     # parse noise (seeded by lhid and hod seed)
-    noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
-    cfg.noise.radial, cfg.noise.transverse = \
-        parse_noise(seed=noise_seed,
-                    dist=cfg.noise.dist,
-                    params=cfg.noise.params)
+    if getattr(cfg.diag, 'noise_seed', None) is not None and getattr(cfg.diag, 'noise_file', None) is not None:
+        noise_seed = cfg.diag.noise_seed
+        # Load the csv separated noise_file, index it by row
+        noise_data = np.loadtxt(cfg.diag.noise_file, delimiter=',')
+
+        # Pull the radial and transverse noise amounts
+        row = noise_data[noise_seed]
+        cfg.noise.radial, cfg.noise.transverse = float(row[0]), float(row[1])
+    else:
+        noise_seed = int(cfg.nbody.lhid*1e4 + cfg.bias.hod.seed)
+        cfg.noise.radial, cfg.noise.transverse = \
+            parse_noise(seed=noise_seed,
+                        dist=cfg.noise.dist,
+                        params=cfg.noise.params)
 
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 

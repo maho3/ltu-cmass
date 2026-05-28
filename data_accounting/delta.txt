@@ -1,0 +1,115 @@
+./quijotelike/fastpm_charm2:      26916 files,     8417 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1          0         
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         9982       9957      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k_hodz:     21760 files,    12061 subdir,      638 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         2          15388     
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_CAMELS:      13896 files,     5962 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         11         9885      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm:             10017 files,     2817 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 2800       0         
+  halos.h5                 2800       0         
+  galaxies/hod*.h5         17         0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k_niall2:      668 files,      102 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_charm3:      25574 files,    10135 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2798       0         
+  galaxies/hod*.h5         9992       9986      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k:            282 files,       92 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody:                  14027 files,     6818 subdir,      803 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         11         9977      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody_gridnoise:         9200 files,      814 subdir,       15 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         193        8758      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed_hodz_gridnoise:    10089 files,      860 subdir,       12 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         200        9085      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody_hodz_gridnoise:    10053 files,      635 subdir,       11 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         0          9540      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed_hodz:            13910 files,     6259 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         0          9980      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed:                  4000 files,     2003 subdir,        1 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+==========================================================================
+TOTAL:                           160392 files,    56975 subdir,     1480 empty
+(base) [maho3@dt-login01 cmass-ili]$ check_files . | tee output.txt 
+./quijotelike/fastpm_charm2:      26916 files,     8417 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1          0         
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         9982       9957      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k_hodz:     21760 files,    12061 subdir,      638 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         2          15388     
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_CAMELS:      13896 files,     5962 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         11         9885      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm:             10017 files,     2817 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 2800       0         
+  halos.h5                 2800       0         
+  galaxies/hod*.h5         17         0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k_niall2:      668 files,      102 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_charm3:      25574 files,    10135 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2798       0         
+  galaxies/hod*.h5         9992       9986      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_4k:            282 files,       92 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody:                  14027 files,     6818 subdir,      803 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+  galaxies/hod*.h5         11         9977      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody_gridnoise:         9200 files,      814 subdir,       15 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         193        8758      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed_hodz_gridnoise:    10089 files,      860 subdir,       12 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         200        9085      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody_hodz_gridnoise:    10053 files,      635 subdir,       11 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         0          9540      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed_hodz:            13910 files,     6259 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         0          9980      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed:                  4000 files,     2003 subdir,        1 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+==========================================================================
+TOTAL:                           160392 files,    56975 subdir,     1480 empty

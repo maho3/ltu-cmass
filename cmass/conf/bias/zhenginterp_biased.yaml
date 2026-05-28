@@ -4,7 +4,7 @@ halo:
   model: CHARM  # CHARM or LIMD
 
   # CHARM-specific parameters
-  config_charm: config_v0.yaml
+  # config_charm: config_v0.yaml
 
   # LIMD-specific parameters
   base_suite: calib_1gpch_z0.5  # base suite for LIMD
