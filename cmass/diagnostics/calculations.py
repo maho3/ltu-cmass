@@ -55,8 +55,8 @@ def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     # TODO: Use ili-summarizer here
     k_min = 2 * np.pi / L
     n_mesh = delta.shape[0]
-    k_max = np.pi * n_mesh / L
-    k_bins = np.arange(k_min, k_max, k_min * 5)
+    k_max = np.pi * n_mesh / L * 0.99
+    k_bins = np.linspace(k_min, k_max, 11)
 
     # set stuff up
     base = pb.PolyBin3D(
