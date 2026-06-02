@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=quijote_bias   # Job name
-#SBATCH --array=0-199         # Job array range for lhid
+#SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
@@ -12,7 +12,7 @@
 
 # set -e
 
-# SLURM_ARRAY_TASK_ID=81
+# SLURM_ARRAY_TASK_ID=0
 
 source ~/.bashrc
 conda activate cmass
@@ -26,8 +26,8 @@ Nhod=1
 Nnoise=49
 
 nbody=quijote
-sim=meshed_hodz_gridnoise
-noise_uniform_invoxel=True  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
+sim=nbody_hodz_gridnoise
+noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
@@ -40,11 +40,11 @@ N=128
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/$nbody/$sim/L$L-N$N
+outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 200 1999); do
+for offset in $(seq 0 100 1999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
@@ -52,6 +52,11 @@ for offset in $(seq 0 200 1999); do
     postfix="$postfix bias.hod.noise_uniform=$noise_uniform_invoxel"
     postfix="$postfix noise=$noise"
     postfix="$postfix $extras"
+
+    if [ ! -d "$outdir/$lhid" ]; then
+        echo "Directory $outdir/$lhid does not exist. Skipping lhid=$lhid"
+        continue
+    fi
 
     # # halos
     # diag_file=$outdir/$lhid/diag/halos.h5
@@ -68,6 +73,9 @@ for offset in $(seq 0 200 1999); do
     for noise_seed in $(seq 0 $(($Nnoise))); do
         printf -v hod_str "%05d" $hod_seed
         printf -v noise_str "%05d" $noise_seed
+
+        # # halos
+        # python -m cmass.diagnostics.summ $postfix diag.halo=True diag.noise_seed=$noise_seed
 
         # galaxies
         python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed diag.noise_seed=$noise_seed

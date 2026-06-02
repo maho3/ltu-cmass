@@ -27,12 +27,12 @@ Nhod=5
 nbody=quijotelike
 sim=fastpm_charm4
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
-noise=fixed
+noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/stupid_fastpm_4k_params.txt noise.params.radial=2.0 noise.params.transverse=2.5"
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # noise.params.radial=2.0 noise.params.transverse=2.5"
 L=1000
 N=128
 
@@ -64,7 +64,6 @@ for offset in $(seq 0 100 4799); do
         echo "Directory $outdir/$lhid does not exist. Skipping lhid=$lhid"
         continue
     fi
-    cat $outdir/$lhid/config.yaml
     
 
     for hod_seed in $(seq 1 $(($Nhod))); do

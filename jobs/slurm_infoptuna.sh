@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-7  # Array range
+#SBATCH --array=0-15  # Array range
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=24:00:00         # Time limit
@@ -23,7 +23,7 @@ sleep $net_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_4k_hodz
+sim=fastpm_charm4
 infer=simple  # simple  # lightcone
 
 tracer=galaxy

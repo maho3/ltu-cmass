@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=ch2o  # Job name
-#SBATCH --array=0,1,3,4,5,6  # Array range 0-15, 0-31
+#SBATCH --job-name=validate  # Job name
+#SBATCH --array=0-15  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_charm3
+sim=fastpm_charm4
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 

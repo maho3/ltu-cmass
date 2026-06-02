@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_charm3
+sim=fastpm_charm4
 infer=simple  # simple  # lightcone
 
 tracer=galaxy
@@ -46,4 +46,5 @@ echo "Running inference pipeline with $suffix"
 
 # python -m cmass.infer.optuna $suffix
 python -m cmass.infer.train $suffix infer.retrain=True
+
 # python -m cmass.infer.retrain_optuna $suffix

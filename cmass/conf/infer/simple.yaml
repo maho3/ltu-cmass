@@ -25,18 +25,18 @@ experiments:
   - summary: [zPk0, zPk2, zPk4, zEqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax: [0.1, 0.2, 0.3, 0.4]
-  - summary: [Pk0]  # z-space monopole
-    kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
-  - summary: [Pk0, Pk2, Pk4]  # z-space monopole, quadrupole, hexadecapole,
-    kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
-  - summary: [Pk0, Pk2, Pk4, Bk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
-    kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
-  - summary: [Pk0, Pk2, Pk4, EqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
-    kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
+  # - summary: [Pk0]  # z-space monopole
+  #   kmin: [0.]
+  #   kmax: [0.1, 0.2, 0.3, 0.4]
+  # - summary: [Pk0, Pk2, Pk4]  # z-space monopole, quadrupole, hexadecapole,
+  #   kmin: [0.]
+  #   kmax: [0.1, 0.2, 0.3, 0.4]
+  # - summary: [Pk0, Pk2, Pk4, Bk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.1, 0.2, 0.3, 0.4]
+  # - summary: [Pk0, Pk2, Pk4, EqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+  #   kmin: [0.]
+  #   kmax: [0.1, 0.2, 0.3, 0.4]
 
 # --- TRAINING CONFIGURATION ---
 Nnets: 10  # Number of best networks to ensemble for posterior inference.
