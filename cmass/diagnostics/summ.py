@@ -178,6 +178,9 @@ def summarize_tracer(
     if type == 'galaxy' and getattr(config.diag, 'noise_seed', None) is not None:
         # for saving things with a specific noise, for sensitivity tests
         postfix = f'galaxies/hod{hod_seed:05}_noise{config.diag.noise_seed:06}.h5'
+    if type == 'halo' and getattr(config.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'halos_noise{config.diag.noise_seed:06}.h5'
     outpath = join(source_path, 'diag', postfix)
     summaries = check_existing(outpath, summaries, from_scratch, rsd=True)
     if len(summaries) == 0:

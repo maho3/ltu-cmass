@@ -341,7 +341,10 @@ def _construct_noise_prior(sourcepath, tracer):
         diagpath = join(diagpath, 'galaxies')
     elif 'lightcone' in tracer:
         diagpath = join(diagpath, f'{tracer}')
-    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
+    filelist = [f for f in os.listdir(diagpath)
+                if os.path.isfile(join(diagpath, f))]
+    if tracer == 'halos':
+        filelist = [f for f in filelist if 'halos' in f]
     with h5py.File(join(diagpath, filelist[0]), 'r') as f:
         noisedist = f.attrs['noise_dist'] if 'noise_dist' in f.attrs else None
     # This is a hack, because I accidentally saved noise properties in groups.
@@ -384,7 +387,11 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
         return [], []
 
     # for each diagnostics file
-    filelist = ['halos.h5'] if tracer == 'halo' else os.listdir(diagpath)
+    filelist = [f for f in os.listdir(diagpath)
+                if os.path.isfile(join(diagpath, f))]
+    if tracer == 'halos':
+        filelist = [f for f in filelist if 'halos' in f]
+
     summlist, paramlist = [], []
     for f in filelist:
         diagfile = join(diagpath, f)

@@ -47,7 +47,7 @@ def populate_hod(
 ):
     cosmo = cosmo_to_astropy(cosmo)
 
-    if (hmeta is not None) and ('concentration' in hmeta):
+    if hmeta is not None:
         logging.info('Using saved halo concentration...')
         hconc = hmeta['concentration']
     else:

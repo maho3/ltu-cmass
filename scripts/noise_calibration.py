@@ -23,7 +23,7 @@ mpl.style.use('../matts_tests/style.mcstyle')
 # Configuration
 # ---------------------------------------------------------------------------
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
-BASEDIR = f'{WDIR}/quijotelike/fastpm_charm3/models/galaxy'
+BASEDIR = f'{WDIR}/quijotelike/fastpm_charm4/models/galaxy'
 TESTDIR_BASE = f'{WDIR}/quijote/nbody_hodz_gridnoise/models/galaxy'
 SIM_TEST = 'quijote_nbody_hodz_gridnoise'
 NOISE_GRID_PATH = f'{WDIR}/noise_priors/noisegrid.csv'
@@ -87,7 +87,7 @@ def load_heatmaps(s, kmax, p_list):
     if not all(exists(paths[k]) for k in paths):
         return None
     try:
-        samples = np.load(paths['ood_samples'], mmap_mode='r')
+        samples = np.load(paths['ood_samples'])
         theta = np.load(paths['theta_ood'])
         noiseidx = np.load(paths['noiseid_ood'])[:, 0]
     except (OSError, ValueError, IndexError) as e:
