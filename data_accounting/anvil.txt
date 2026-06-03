@@ -1,0 +1,14 @@
+./quijote/nbody:                   2000 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm:              2000 files,     8365 subdir,     2789 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacuslike/fastpm:               1884 files,     2017 subdir,      130 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 1884       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+==========================================================================
+TOTAL:                             5884 files,    12384 subdir,     2919 empty

@@ -1,0 +1,156 @@
+./quijotelike-fid/fastpm:          9968 files,     1999 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1990       0         
+  halos.h5                 1990       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./images/anim_sgc_lightcone:         47 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike_nophase/fastpm:      9998 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1999       0         
+  halos.h5                 1999       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./mtng/fastpm:                        5 files,        3 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1          0         
+  halos.h5                 1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./mtng/nbody:                        12 files,        6 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  mtng_lightcone/hod*.h5   1          1         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus/fastpm:                    312 files,      106 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 52         0         
+  halos.h5                 52         52        
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus/randoms:                     4 files,        6 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  mtng_lightcone/hod*.h5   1          0         
+  sgc_lightcone/hod*.h5    1          0         
+  simbig_lightcone/hod*.h5 1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus/nbody:                     104 files,       54 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 52         0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus/custom:                    239 files,      121 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1          0         
+  halos.h5                 119        0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./literature/simbig:                  4 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./literature/processed:               5 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./literature/ivanov:                180 files,        3 subdir,        1 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote3gpch/fastpm:                4 files,        3 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1          0         
+  halos.h5                 1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote3gpch/randoms:               2 files,        4 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  ngc_lightcone/hod*.h5    1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote3gpch/nbody:                18 files,        8 subdir,        1 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 1          1         
+  galaxies/hod*.h5         0          5         
+  ngc_lightcone/hod*.h5    5          5         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./for_sammy/pinocchio:            20021 files,     4002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1985       0         
+  halos.h5                 1985       0         
+  galaxies/hod*.h5         10000      0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./mtnglike/fastpm:                14146 files,     6002 subdir,        1 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 3000       0         
+  halos.h5                 2999       2999      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm:             12000 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 2000       0         
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/pinocchio:          14017 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijotelike/fastpm_CAMELS:      10004 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 2000       0         
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./real_data/cmass_ngc:                2 files,        6 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  ngc_lightcone/hod*.h5    1          1         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./real_data/cmass_sgc:                2 files,        6 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  sgc_lightcone/hod*.h5    1          1         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./real_data/cmass_simbig:             1 files,        4 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  simbig_lightcone/hod*.h5 1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/meshed:                  4000 files,     2003 subdir,        1 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/wn:                         7 files,        5 subdir,        1 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/randoms:                    2 files,        4 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  galaxies/hod*.h5         1          0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody_fof:               4000 files,     2004 subdir,        2 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./quijote/nbody:                   4000 files,     2002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 2000       0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./scratch/fastpm:                     3 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./scratch/cache:                    125 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./scratch/bfast:                      4 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./scratch/from_shivam:                1 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus1gpch/cmass_ngc:              1 files,        5 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus1gpch/nbody:                676 files,      210 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 52         52        
+  galaxies/hod*.h5         260        260       
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacus1gpch/custom:               238 files,      121 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  halos.h5                 119        0         
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacuslike/fastpm:              29848 files,     7971 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 1997       0         
+  halos.h5                 1997       1995      
+  galaxies/hod*.h5         0          9985      
+  sgc_lightcone/hod*.h5    0          9879      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./abacuslike/pinocchio:           29991 files,     8002 subdir,        0 empty
+  PATTERN                  MAIN       DIAG      
+  nbody.h5                 2000       0         
+  halos.h5                 2000       1991      
+  galaxies/hod*.h5         0          10000     
+  sgc_lightcone/hod*.h5    0          10000     
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./obs/n-z-fake:                       1 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./obs/n-z:                            1 files,        1 subdir,        0 empty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+==========================================================================
+TOTAL:                           163993 files,    42677 subdir,        7 empty

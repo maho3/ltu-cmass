@@ -291,6 +291,26 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             np.save(join(exp_path, 'ids_train.npy'), ids_train)
             np.save(join(exp_path, 'ids_val.npy'), ids_val)
             np.save(join(exp_path, 'ids_test.npy'), ids_test)
+
+            # Save split-wise aux arrays
+            id_arr = np.asarray(id)
+            train_mask = np.isin(id_arr, ids_train)
+            val_mask = np.isin(id_arr, ids_val)
+            test_mask = np.isin(id_arr, ids_test)
+
+            # number densities
+            nbar = np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1]
+            np.save(join(exp_path, "nbar_train.npy"), nbar[train_mask])
+            np.save(join(exp_path, "nbar_val.npy"), nbar[val_mask])
+            np.save(join(exp_path, "nbar_test.npy"), nbar[test_mask])
+
+            if "noiseid" in summaries:
+                # noise indices
+                noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
+                np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
+                np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
+                np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
+
             with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
                 f.write(','.join(labels) + '\n')
                 f.write(','.join(map(str, startidx.tolist())) + '\n')

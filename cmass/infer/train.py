@@ -39,7 +39,7 @@ from .architectures import CNN, MultiHeadEmbedding, FunnelNetwork, MultiHeadFunn
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None):
+def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None, subselect_cosmo=None):
     # define a prior
     if prior_name.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -55,6 +55,9 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
             (0.8, 1.2),  # n_s
             (0.6, 1.0),  # sigma8
         ])
+        if subselect_cosmo is not None:
+            prior_lims = prior_lims[subselect_cosmo]
+
         if ((hodprior is not None) or (noiseprior is not None)) and (theta.shape[-1] == 5):
             raise ValueError(
                 'HOD or noise priors provided, but theta has only 5 parameters.'
@@ -135,7 +138,8 @@ def run_training(
     # define a prior
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
-                          hodprior=hodprior, noiseprior=noiseprior)
+                          hodprior=hodprior, noiseprior=noiseprior,
+                          subselect_cosmo=cfg.infer.get('subselect_cosmo'))
 
     # define an embedding network
     if mcfg.embedding_net == 'fcn':
@@ -270,7 +274,8 @@ def run_training_with_precompression(
     # define a prior
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
-                          hodprior=hodprior, noiseprior=noiseprior)
+                          hodprior=hodprior, noiseprior=noiseprior,
+                          subselect_cosmo=cfg.infer.get('subselect_cosmo'))
 
     # define training arguments
     train_args = {

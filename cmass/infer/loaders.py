@@ -394,6 +394,9 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
         if len(summ) == 0:
             continue  # skip empty files
 
+        if 'noise' in f:  # for keeping track of noise sensitivity tests
+            summ['noiseid'] = int(f[-9:].split('.')[0])
+
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
         if subselect_cosmo is not None:

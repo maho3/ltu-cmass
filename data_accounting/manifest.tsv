@@ -1,0 +1,50 @@
+PATH                            DELTA  BRIDGES   ANVIL  DESCRIPTION
+#==================================================================
+abacus/custom                  ABSENT      239  ABSENT  The full Abacus COMPASO halos, reordered for convenience. Velocities corrected to match Rockstar
+abacus/fastpm                  ABSENT      312  ABSENT  2 Gpc/h FastPM+CHARM run at matched abacus cosmologies
+abacus/nbody                   ABSENT      104  ABSENT  The original raw COMPASO abacus halos of the emulator set
+abacus/randoms                 ABSENT        4  ABSENT  
+abacus1gpch/cmass_ngc          ABSENT        1  ABSENT  
+abacus1gpch/custom             ABSENT      238  ABSENT  1 Gpc/h chunks of the associated abacus/ suites
+abacus1gpch/nbody              ABSENT      676  ABSENT  1 Gpc/h chunks of the associated abacus/ suites
+abacuslike/fastpm              ABSENT    29848    1884  2 Gpc/h FastPM+CHARM
+abacuslike/pinocchio           ABSENT    29991  ABSENT  2 Gpc/h Pinocchio
+for_sammy/pinocchio            ABSENT    20021  ABSENT  More 2 Gpc/h pinocchio for PQMass comparisons
+images/anim_sgc_lightcone      ABSENT       47  ABSENT  
+literature/ivanov              ABSENT      180  ABSENT  
+literature/processed           ABSENT        5  ABSENT  
+literature/simbig              ABSENT        4  ABSENT  
+mtng/fastpm                    ABSENT        5  ABSENT  2 Gpc/h FastPM+CHARM run at MTNG cosmology
+mtng/nbody                     ABSENT       12  ABSENT  MTNG 2 Gpc/h lightcone
+mtnglike/fastpm                ABSENT    14146  ABSENT  3 Gpc/h FastPM+CHARM
+obs/n-z                        ABSENT        1  ABSENT  
+obs/n-z-fake                   ABSENT        1  ABSENT  
+quijote/meshed                   4000     4000  ABSENT  Quijote halos snapped to voxel centers
+quijote/meshed_hodz             13910   ABSENT  ABSENT  ^ + galaxies sampled from CMASS-constrained HOD + recnoise
+quijote/meshed_hodz_gridnoise   10089   ABSENT  ABSENT  ^ - recnoise + a grid of noise scales
+quijote/nbody                   14027     4000    2000  Quijote Rockstar halos
+quijote/nbody_fof              ABSENT     4000  ABSENT  Quijote FoF halos
+quijote/nbody_gridnoise          9200   ABSENT  ABSENT  Quijote halos with a grid of noise scales
+quijote/nbody_hodz_gridnoise    10053   ABSENT  ABSENT  ^ + galaxies sampled from CMASS-constrained HOD
+quijote/randoms                ABSENT        2  ABSENT  
+quijote/wn                     ABSENT        7  ABSENT  
+quijote3gpch/fastpm            ABSENT        4  ABSENT  3 Gpc/h FastPM+CHARM run at Quijote fiducial cosmo
+quijote3gpch/nbody             ABSENT       18  ABSENT  3 Gpc/h Quijote Rockstar
+quijote3gpch/randoms           ABSENT        2  ABSENT  
+quijotelike-fid/fastpm         ABSENT     9968  ABSENT  1 Gpc/h FastPM+CHARM run at fixed fiducial cosmology
+quijotelike/fastpm              10017    12000    2000  1 Gpc/h FastPM+CHARM
+quijotelike/fastpm_4k             282   ABSENT  ABSENT  1 Gpc/h FastPM+CHARM stitched together from /fastpm and /fastpm_CAMELS
+quijotelike/fastpm_4k_hodz      21760   ABSENT  ABSENT  ^ + galaxies sampled from CMASS-constrained HOD + recnoise
+quijotelike/fastpm_4k_niall2      668   ABSENT  ABSENT  Temporary, same as fastpm_4k, with new models
+quijotelike/fastpm_CAMELS       13896    10004  ABSENT  1 Gpc/h FastPM+CHARM run at CAMELS Big Sobol cosmologies
+quijotelike/fastpm_charm2       26916   ABSENT  ABSENT  1 Gpc/h FastPM+CHARM run with new CHARM
+quijotelike/fastpm_charm3       25574   ABSENT  ABSENT  1 Gpc/h FastPM+CHARM run with new new CHARM
+quijotelike/pinocchio          ABSENT    14017  ABSENT  1 Gpc/h Pinocchio
+quijotelike_nophase/fastpm     ABSENT     9998  ABSENT  1 Gpc/h FastPM+CHARM run at fixed ICs
+real_data/cmass_ngc            ABSENT        2  ABSENT  
+real_data/cmass_sgc            ABSENT        2  ABSENT  
+real_data/cmass_simbig         ABSENT        1  ABSENT  
+scratch/bfast                  ABSENT        4  ABSENT  
+scratch/cache                  ABSENT      125  ABSENT  
+scratch/fastpm                 ABSENT        3  ABSENT  
+scratch/from_shivam            ABSENT        1  ABSENT  
