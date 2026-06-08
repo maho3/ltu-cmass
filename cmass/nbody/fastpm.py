@@ -144,21 +144,32 @@ def run_density(cfg, outdir):
             break
     logging.info(f"Using {max_divisible_cores} cores for FastPM")
 
-    #  Run FastPM
+    # Use srun on Cray systems, mpirun elsewhere
     param_file = join(outdir, "parameter_file.lua")
-    command = f'mpirun -n {max_divisible_cores} {mpi_args} '
+    launcher = _get_mpi_launcher()
+    command = f'{launcher} -n {max_divisible_cores} {mpi_args} '
     command += f'{cfg.meta.fastpm_exec} {param_file}'
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     _ = subprocess.run(command, shell=True, check=True, env=env)
 
 
+def _get_mpi_launcher():
+    """Return srun on Cray/SLURM systems, mpirun otherwise."""
+    import shutil
+    if shutil.which("srun") is not None:
+        return "srun"
+    if shutil.which("mpirun") is not None:
+        return "mpirun"
+    raise RuntimeError("No MPI launcher (srun or mpirun) found in PATH")
+
+
 @timing_decorator
-def process_transfer(cfg, outdir, delete_files=True):
+def process_transfer(cfg, workdir, outdir, delete_files=True):
     with h5py.File(join(outdir, 'transfer.h5'), 'w') as outfile:
         a = 1/(1+99.)  # hardcoded for now, from CHARM training
         logging.info(f"Processing transfer function at a={a:.4f}...")
-        snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+        snapdir = join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
         infile = bigfile.File(snapdir)
         ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
         pos = np.array(ds[:]['Position'])
@@ -180,9 +191,9 @@ def process_transfer(cfg, outdir, delete_files=True):
         shutil.rmtree(snapdir)
 
 
-def process_single_snapshot(cfg, outdir, a, delete_files=True):
+def process_single_snapshot(cfg, workdir, a, delete_files=True):
     logging.info(f"Reading snapshot at a={a:.4f}...")
-    snapdir = join(outdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+    snapdir = join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
 
     if not os.path.isdir(snapdir):
         logging.warning(f"Snapshot at a={a:.4f} not found, skipping...")
@@ -210,7 +221,7 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
     fvel *= 1/a
 
     # Save to file
-    with h5py.File(join(outdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
+    with h5py.File(join(workdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
         outfile.create_dataset('rho', data=rho)
         outfile.create_dataset('fvel', data=fvel)
 
@@ -220,21 +231,21 @@ def process_single_snapshot(cfg, outdir, a, delete_files=True):
 
 
 @timing_decorator
-def process_outputs(cfg, outdir, delete_files=True):
+def process_outputs(cfg, workdir, outdir, delete_files=True):
     asave = sorted(cfg.nbody.asave)
     rho, fvel = None, None
 
     with mp.Pool(3) as pool:
         _ = pool.starmap(
             process_single_snapshot,
-            [(cfg, outdir, a, delete_files) for a in asave]
+            [(cfg, workdir, a, delete_files) for a in asave]
         )
 
     logging.info("Concatenating snapshots...")
     with h5py.File(join(outdir, 'nbody.h5'), 'w') as outfile:
         for a in asave:
             # Read snapshot
-            filename = join(outdir, f'nbody_{a:.4f}.h5')
+            filename = join(workdir, f'nbody_{a:.4f}.h5')
             with h5py.File(filename, 'r') as infile:
                 rho = infile['rho'][:]
                 fvel = infile['fvel'][:]
@@ -267,47 +278,67 @@ def main(cfg: DictConfig) -> None:
         hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     logging.info('Running with config:\n' + OmegaConf.to_yaml(cfg))
 
-    # Create output directory
+    # Create persistent output directory (holds only final field maps)
     outdir = get_source_path(
         cfg.meta.wdir, cfg.nbody.suite, "fastpm",
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
     os.makedirs(outdir, exist_ok=True)
 
-    # Setup power spectrum file if needed
-    generate_pk_file(cfg, outdir)
-
-    # Convert ICs to correct format
-    save_ICs(cfg, outdir)
-
-    # Generate parameter file
-    generate_param_file(
-        L=cfg.nbody.L, N=cfg.nbody.N, supersampling=cfg.nbody.supersampling,
-        B=cfg.nbody.B, N_steps=cfg.nbody.N_steps,
-        zf=cfg.nbody.zf, asave=cfg.nbody.asave,
-        save_transfer=cfg.nbody.save_transfer,
-        cosmo=cfg.nbody.cosmo, outdir=outdir
+    # Create transient work directory for heavy FastPM intermediates (particle
+    # snapshots, ICs, param file). Defaults to wdir if meta.scratchdir is unset.
+    # On Slurm, point meta.scratchdir at node-local /tmp to keep the ~76GB of
+    # particle snapshots off the shared/quota'd filesystem.
+    scratch_base = cfg.meta.get('scratchdir', None) or cfg.meta.wdir
+    workdir = get_source_path(
+        scratch_base, cfg.nbody.suite, "fastpm",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
+    if workdir != outdir and os.path.isdir(workdir):
+        shutil.rmtree(workdir)  # clear stale data from a crashed prior run
+    os.makedirs(workdir, exist_ok=True)
 
-    # Run
-    logging.info("Running FastPM...")
-    run_density(cfg, outdir)
-    os.remove(join(outdir, 'WhiteNoise_grafic'))  # remove ICs
+    try:
+        # Setup power spectrum file if needed
+        generate_pk_file(cfg, workdir)
 
-    # Process outputs
-    logging.info("Processing outputs...")
-    if cfg.nbody.save_transfer:
-        process_transfer(cfg, outdir, delete_files=True)
-    if 'postprocess' in cfg.nbody and cfg.nbody.postprocess:
-        rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+        # Convert ICs to correct format
+        save_ICs(cfg, workdir)
 
-    if not cfg.nbody.save_particles:
-        pos, vel = None, None
+        # Generate parameter file
+        generate_param_file(
+            L=cfg.nbody.L, N=cfg.nbody.N, supersampling=cfg.nbody.supersampling,
+            B=cfg.nbody.B, N_steps=cfg.nbody.N_steps,
+            zf=cfg.nbody.zf, asave=cfg.nbody.asave,
+            save_transfer=cfg.nbody.save_transfer,
+            cosmo=cfg.nbody.cosmo, outdir=workdir
+        )
 
-    # Save nbody-type outputs (unnecessary because of process_outputs)
-    # save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel, 'a')
-    # TODO: add a way to append particles to the existing nbody.h5 file
-    save_cfg(outdir, cfg)
+        # Run
+        logging.info("Running FastPM...")
+        run_density(cfg, workdir)
+        os.remove(join(workdir, 'WhiteNoise_grafic'))  # remove ICs
+
+        # Process outputs (snapshots read from workdir, field maps -> outdir)
+        logging.info("Processing outputs...")
+        if cfg.nbody.save_transfer:
+            process_transfer(cfg, workdir, outdir, delete_files=True)
+        if 'postprocess' in cfg.nbody and cfg.nbody.postprocess:
+            rho, fvel, pos, vel = process_outputs(
+                cfg, workdir, outdir, delete_files=True)
+
+        if not cfg.nbody.save_particles:
+            pos, vel = None, None
+
+        # Save nbody-type outputs (unnecessary because of process_outputs)
+        # save_nbody(outdir, cfg.nbody.af, rho, fvel, pos, vel, 'a')
+        # TODO: add a way to append particles to the existing nbody.h5 file
+        save_cfg(outdir, cfg)
+    finally:
+        # Always clear the transient work directory (node-local /tmp is purged
+        # at job end, but clean up explicitly for the wdir-fallback case too)
+        if workdir != outdir and os.path.isdir(workdir):
+            shutil.rmtree(workdir, ignore_errors=True)
 
     # clean up slurm hostfile if it exists
     if os.path.isfile('slurm_hostfile'):
