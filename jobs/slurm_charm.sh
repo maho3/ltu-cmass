@@ -25,9 +25,9 @@ echo "lhid=$lhid"
 cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_charm4
+sim=fastpm_charm5
 multisnapshot=False
-extras="nbody.matchIC=0 nbody.suite=quijotelike meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+extras="nbody.matchIC=0 meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
 L=1000
 N=128
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
