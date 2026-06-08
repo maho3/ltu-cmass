@@ -22,7 +22,7 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_charm4
+sim=fastpm_charm5
 infer=simple  # simple  # lightcone
 
 tracer=galaxy

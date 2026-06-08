@@ -23,7 +23,7 @@ mpl.style.use('../matts_tests/style.mcstyle')
 # Configuration
 # ---------------------------------------------------------------------------
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
-BASEDIR = f'{WDIR}/quijotelike/fastpm_charm4/models/galaxy'
+BASEDIR = f'{WDIR}/quijotelike/fastpm_charm5/models/galaxy'
 TESTDIR_BASE = f'{WDIR}/quijote/nbody_hodz_gridnoise/models/galaxy'
 SIM_TEST = 'quijote_nbody_hodz_gridnoise'
 NOISE_GRID_PATH = f'{WDIR}/noise_priors/noisegrid.csv'

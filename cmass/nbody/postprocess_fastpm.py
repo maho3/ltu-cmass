@@ -30,7 +30,18 @@ def main(cfg: DictConfig) -> None:
         cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
     )
 
-    rho, fvel, pos, vel = process_outputs(cfg, outdir, delete_files=True)
+    # Locate the (transient) work directory holding the FastPM snapshots.
+    # NOTE: with node-local /tmp staging the snapshots do not survive the job,
+    # so standalone postprocessing only works when meta.scratchdir is unset
+    # (or equals wdir), i.e. snapshots persist alongside outdir.
+    scratch_base = cfg.meta.get('scratchdir', None) or cfg.meta.wdir
+    workdir = get_source_path(
+        scratch_base, cfg.nbody.suite, "fastpm",
+        cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+    )
+
+    rho, fvel, pos, vel = process_outputs(
+        cfg, workdir, outdir, delete_files=True)
 
     logging.info("Done!")
 
