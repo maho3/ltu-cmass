@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=charm  # Job name
+#SBATCH --job-name=abacuscharm  # Job name
 #SBATCH --array=0-49         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
@@ -24,16 +24,16 @@ echo "lhid=$lhid"
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-nbody=quijotelike
-sim=fastpm_charm5
-multisnapshot=False
-extras="nbody.matchIC=0 meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
-L=1000
-N=128
+nbody=abacuslike
+sim=fastpm_charm6
+multisnapshot=True
+extras="nbody.matchIC=0" #  meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+L=2000
+N=256
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
 keys_to_check=(0.666667)
 
-outdir=/work/hdd/bdne/maho3/cmass-ili/quijotelike/$sim/L$L-N$N
+outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
@@ -42,7 +42,7 @@ extras="$extras hydra/job_logging=disabled"
 
 
 # Loop through offsets and process files
-for offset in $(seq 0 50 4799); do  # 4799
+for offset in $(seq 0 50 3999); do  # 4799
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5

@@ -260,7 +260,7 @@ def apply_charm_new(rho, fvel, L, cosmo):
     Npix = nb * nax        # pre-trained per-chunk resolution (128)
     Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
 
-    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_best_val_ft10.pth'
+    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_best_val_ft15.pth'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Loading CHARM gobig model on {device}...')
