@@ -235,8 +235,8 @@ def apply_charm_new(rho, fvel, L, cosmo):
 
     import torch
     from charm.config_loader import load_config
-    from charm.run_charm_joint_ddp import build_model
-    from charm.run_inference_v2 import (
+    from charm.run_charm_joint_v2vel_ddp import build_model
+    from charm.inferers.run_inference_v2 import (
         load_checkpoint, build_cond_tensors,
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
@@ -272,48 +272,75 @@ def apply_charm_new(rho, fvel, L, cosmo):
     assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize
     Nsub = N // Npix
 
-    # Split inputs into per-chunk (Npix^3) cubes; gobig handles its own padding.
+    # Pre-pad the full volume once with correct periodic boundaries so that
+    # sub-cubes at chunk edges see real neighbor data rather than wrapping
+    # against the same chunk's opposite face (which causes grid artifacts).
+    fvel_t = fvel.transpose(3, 0, 1, 2).astype(np.float32)  # (3,N,N,N)
+    rho_full_pad  = np.pad(rho,   n_pad,                          mode='wrap')
+    fvel_full_pad = np.pad(fvel_t, [(0, 0)] + [(n_pad, n_pad)]*3, mode='wrap')
+
+    # Split inputs into per-chunk (Npix^3) cubes for unshifted conditioning.
     batch_rho = batch_cube(rho,  Nsub, Npix, Npix)
     batch_fvel = batch_cube(fvel, Nsub, Npix, Npix)
 
     cosmo_arr = np.array(cosmo, dtype=np.float32)
 
     hposs, hmasss, hvels, hconcs = [], [], [], []
-    for i in range(len(batch_rho)):
-        logging.info(f'Processing CHARM batch {i+1}/{len(batch_rho)}...')
+    b = 0
+    for ci in range(Nsub):
+        for cj in range(Nsub):
+            for ck in range(Nsub):
+                logging.info(
+                    f'Processing CHARM batch {b+1}/{Nsub**3}...')
 
-        rho_chunk = batch_rho[i].astype(np.float32)
-        # fvel has components on the last axis (Npix,Npix,Npix,3) → (3,...).
-        # Caller passes fvel already scaled to km/s (no /1000 normalisation).
-        vel_chunk = batch_fvel[i].transpose(3, 0, 1, 2).astype(np.float32)
+                rho_chunk = batch_rho[b].astype(np.float32)
+                # fvel has components on the last axis (Npix,Npix,Npix,3) → (3,...).
+                # Caller passes fvel already scaled to km/s (no /1000 normalisation).
+                vel_chunk = batch_fvel[b].transpose(3, 0, 1, 2).astype(np.float32)
 
-        cond_x, cond_x_nsh, cond_cosmo = build_cond_tensors(
-            rho_chunk, vel_chunk, cosmo_arr,
-            nb=nb, nax=nax, n_pad=n_pad,
-        )
+                # Slice the correctly-padded context for this chunk from the
+                # pre-padded full volume (stride=Npix, window=Npix+2*n_pad).
+                si, sj, sk = ci*Npix, cj*Npix, ck*Npix
+                rho_chunk_pad = rho_full_pad[
+                    si:si+Npix+2*n_pad,
+                    sj:sj+Npix+2*n_pad,
+                    sk:sk+Npix+2*n_pad].astype(np.float32)
+                vel_chunk_pad = fvel_full_pad[
+                    :,
+                    si:si+Npix+2*n_pad,
+                    sj:sj+Npix+2*n_pad,
+                    sk:sk+Npix+2*n_pad].astype(np.float32)
 
-        with torch.no_grad():
-            sample_out = model.sample(
-                cond_x.to(device),
-                cond_x_nsh.to(device),
-                cond_cosmo.to(device),
-            )
+                cond_x, cond_x_nsh, cond_cosmo = build_cond_tensors(
+                    rho_chunk, vel_chunk, cosmo_arr,
+                    nb=nb, nax=nax, n_pad=n_pad,
+                    rho_pad=rho_chunk_pad, vel_pad=vel_chunk_pad,
+                )
 
-        vel_interps = build_dm_velocity_interpolators(vel_chunk, BoxSize=Lcharm)
-        hpos, hmass, hvel, hconc = reconstruct_catalog(
-            sample_out,
-            nb=nb, nax=nax, Nmax=Nmax,
-            lgMmin=lgMmin, lgMmax=lgMmax,
-            vmin=vmin, vmax=vmax,
-            cmin=cmin, cmax=cmax,
-            BoxSize=Lcharm,
-            vel_interps=vel_interps,
-        )
+                with torch.no_grad():
+                    sample_out = model.sample(
+                        cond_x.to(device),
+                        cond_x_nsh.to(device),
+                        cond_cosmo.to(device),
+                    )
 
-        hposs.append(hpos)
-        hmasss.append(hmass)
-        hvels.append(hvel)
-        hconcs.append(hconc)
+                vel_interps = build_dm_velocity_interpolators(
+                    vel_chunk, BoxSize=Lcharm)
+                hpos, hmass, hvel, hconc = reconstruct_catalog(
+                    sample_out,
+                    nb=nb, nax=nax, Nmax=Nmax,
+                    lgMmin=lgMmin, lgMmax=lgMmax,
+                    vmin=vmin, vmax=vmax,
+                    cmin=cmin, cmax=cmax,
+                    BoxSize=Lcharm,
+                    vel_interps=vel_interps,
+                )
+
+                hposs.append(hpos)
+                hmasss.append(hmass)
+                hvels.append(hvel)
+                hconcs.append(hconc)
+                b += 1
 
     # Shift positions to the original box
     l = 0

@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=abacuscharm  # Job name
-#SBATCH --array=0-49         # Job array range for lhid
+#SBATCH --array=0-4,10-14         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=16            # Number of tasks
-#SBATCH --time=12:00:00         # Time limit
+#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --time=2:00:00         # Time limit
 #SBATCH --partition=ghx4        # Partition name
 #SBATCH --gpus-per-node=1       # Number of GPUs per node
 #SBATCH --account=bdne-dtai-gh   # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=4
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 # baseoffset=0
 
@@ -26,8 +26,8 @@ cd /u/maho3/git/ltu-cmass
 
 nbody=abacuslike
 sim=fastpm_charm6
-multisnapshot=True
-extras="nbody.matchIC=0" #  meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+multisnapshot=False
+extras="nbody.matchIC=0 nbody.zf=0.500015" #  meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
 L=2000
 N=256
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
@@ -42,7 +42,7 @@ extras="$extras hydra/job_logging=disabled"
 
 
 # Loop through offsets and process files
-for offset in $(seq 0 50 3999); do  # 4799
+for offset in $(seq 0 20 3999); do  # 4799
     loff=$((lhid + offset))
     postfix="nbody=$nbody sim=$sim nbody.lhid=$loff multisnapshot=$multisnapshot $extras"
     file=$outdir/$loff/halos.h5
