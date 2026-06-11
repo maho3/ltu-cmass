@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=quijote_bias   # Job name
+#SBATCH --job-name=quijote_noise   # Job name
 #SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
@@ -25,15 +25,15 @@ cd /u/maho3/git/ltu-cmass
 Nhod=1
 Nnoise=49
 
-nbody=quijote
-sim=nbody_hodz_gridnoise
+nbody=abacus1gpch
+sim=custom_hodz_gridnoise
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5" # "noise.params.radial=0 noise.params.transverse=0
+extras="bias=zhenginterp_biased bias.hod.custom_prior=ngc nbody.zf=0.5 meta.cosmofile=./params/abacus_custom_cosmologies.txt bias.hod.use_conc=False" # "noise.params.radial=0 noise.params.transverse=0
 L=1000
 N=128
 
@@ -44,7 +44,7 @@ outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 100 1999); do
+for offset in $(seq 0 100 120); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"

@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_charm5
+sim=fastpm_charm6
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
@@ -40,7 +40,8 @@ suffix="$suffix infer.device=$device $extras"
 suffix="$suffix infer.include_noise=True infer.include_hod=False"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
-suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_hodz_gridnoise"
+# suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_hodz_gridnoise"
+# suffix="$suffix infer.testing.suite=abacus1gpch infer.testing.sim=custom_hodz_gridnoise"
 
 echo "Running inference pipeline with $suffix"
 
