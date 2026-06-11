@@ -2,7 +2,7 @@
 #SBATCH --job-name=quijote_bias   # Job name
 #SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=4            # Number of tasks
+#SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=quijotelike
-sim=fastpm_charm5
+sim=fastpm_charm6
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
