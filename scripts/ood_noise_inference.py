@@ -19,7 +19,7 @@ from os.path import join
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 BASEDIR = '/work/hdd/bdne/maho3/cmass-ili/quijotelike/fastpm_charm6/models/galaxy'
-TESTDIR = '/work/hdd/bdne/maho3/cmass-ili/quijote/abacus1gpch_custom_hodz_gridnoise/models/galaxy'
+TESTDIR = '/work/hdd/bdne/maho3/cmass-ili/quijote/nbody_hodz_gridnoise/models/galaxy'
 NOISES_PATH = '/work/hdd/bdne/maho3/cmass-ili/noise_priors/noisegrid.csv'
 
 SUMMARIES = [
