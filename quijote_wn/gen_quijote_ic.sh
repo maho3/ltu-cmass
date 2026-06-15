@@ -4,7 +4,7 @@
 N=$1
 lhid=$2
 # prefix=/home/mattho/git/ltu-cmass
-prefix=/home/x-mho1/git/ltu-cmass
+prefix=/u/maho3/git/ltu-cmass
 datadir=$prefix/data/quijote/wn/N${N}
 basedir=$prefix/quijote_wn
 
