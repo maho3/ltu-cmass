@@ -31,7 +31,8 @@ from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
+    preprocess_Pk, preprocess_Bk,
+    _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
@@ -168,9 +169,10 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
     # check that there's data
     for summ in exp.summary:
-        for tag in ["Eq", "Sq", "Ss", "Is"]:
+        for tag in ["Eq", "Sq", "Ss", "Is", ""]:
             if tag in summ:
                 summ = summ.replace(tag, "")
+                break
         if summ in ['nbar', 'nz']:  # these come for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
@@ -193,7 +195,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     continue  # we handle these separately
 
                 base = summ
-                for tag in ["Eq", "Sq", "Ss",  "Is"]:
+                for tag in ["Eq", "Sq", "Ss",  "Is", ""]:
                     if tag in summ:
                         base = base.replace(tag, "")
                         break
@@ -206,7 +208,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         correct_shot=cfg.infer.correct_shot,
-                        loglinear_start_idx=cfg.infer.loglinear_start_idx
+                        loglinear_start_idx=cfg.infer.loglinear_start_idx,
                     )
                 elif ('Bk' in summ) or ('Qk' in summ):
                     norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
@@ -214,7 +216,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         mode=tag,
-                        correct_shot=cfg.infer.correct_shot  # doesn't work currently
+                        correct_shot=cfg.infer.correct_shot,  # doesn't work currently
                     )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
