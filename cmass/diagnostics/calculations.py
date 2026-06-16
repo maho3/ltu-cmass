@@ -46,22 +46,44 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
 
 
 def rebin_pk(k, Pk, Nmodes):
-    """Rebin pylians P(k) onto a fixed grid using mode-weighted averaging.
+    """Rebin pylians P(k) onto a fixed physical grid using mode-weighted averaging.
 
-    Pk has shape (N_bins_fine, n_ell). Returns (k_centers, Pk_rebinned).
+    Pylians bins at width k_F = 2pi/L, which varies with box size. This maps
+    those fine, volume-dependent bins onto a fixed grid (K_MIN, k_Nyq, DK_PK)
+    so that the output data vector has consistent meaning and length across
+    simulations of different volumes.
+
+    Within each output bin, modes are averaged weighted by Nmodes — the number
+    of Fourier modes in each fine bin. This is the statistically correct weight:
+    bins with more modes have smaller variance and should contribute more to the
+    average. It is equivalent to computing the straight average of all individual
+    k-modes that fall in the coarse bin.
+
+    Pk has shape (N_bins_fine, n_ell) where n_ell=3 (monopole, quadrupole,
+    hexadecapole) as returned by pylians. Returns (k_centers, Pk_rebinned,
+    Nmodes_rebinned) where Pk_rebinned has shape (N_bins_coarse, n_ell) and
+    Nmodes_rebinned has shape (N_bins_coarse,) — the total mode count per
+    coarse bin, saved so downstream rebinning can remain mode-weighted.
+    Output bins that contain no pylians modes are left as nan / 0.
     """
     k_nyq = k.max()
+    # Build fixed output bin edges and centers
     k_edges = np.arange(K_MIN, k_nyq + DK_PK, DK_PK)
     k_centers = 0.5 * (k_edges[:-1] + k_edges[1:])
     n_ell = Pk.shape[1] if Pk.ndim > 1 else 1
     Pk_out = np.full((len(k_centers), n_ell), np.nan)
+    Nmodes_out = np.zeros(len(k_centers), dtype=np.float64)
     for i, (lo, hi) in enumerate(zip(k_edges[:-1], k_edges[1:])):
+        # Select all pylians bins whose centers fall in this output bin
         mask = (k >= lo) & (k < hi)
         if not mask.any():
             continue
+        # Weight by number of Fourier modes: more modes = lower variance = higher weight
         w = Nmodes[mask]
         Pk_out[i] = np.average(Pk[mask], weights=w, axis=0)
-    return k_centers, Pk_out
+        # Total mode count for this coarse bin, used for further downstream rebinning
+        Nmodes_out[i] = w.sum()
+    return k_centers, Pk_out, Nmodes_out
 
 
 def calcQk_polybin(k, Pk, k123, Bk):
@@ -117,6 +139,7 @@ def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     pk = np.array([pk_corr[f'p{ell}'] for ell in [0, 2]])
     bk = np.array([bk_corr[f'b{ell}'] for ell in [0, 2]])
     qk = calcQk_polybin(k, pk, k123, bk)
+
     return k123, bk, qk, k, pk
 
 

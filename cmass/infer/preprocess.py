@@ -31,7 +31,8 @@ from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
+    preprocess_Pk, preprocess_Bk,
+    _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
@@ -180,6 +181,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
     name = '+'.join(exp.summary)
     kmin_list = exp.kmin if 'kmin' in exp else [0.]
     kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+    max_length = exp.max_length if 'max_length' in exp else {}
 
     for kmin in kmin_list:
         for kmax in kmax_list:
@@ -206,16 +208,26 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         correct_shot=cfg.infer.correct_shot,
-                        loglinear_start_idx=cfg.infer.loglinear_start_idx
+                        loglinear_start_idx=cfg.infer.loglinear_start_idx,
+                        max_length=max_length.get(summ, None)
                     )
+                    if summ in max_length:
+                        logging.info(
+                            f'Rebinned {summ} to {x.shape[1]} bins '
+                            f'(max_length={max_length[summ]})')
                 elif ('Bk' in summ) or ('Qk' in summ):
                     norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
                     x = preprocess_Bk(
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         mode=tag,
-                        correct_shot=cfg.infer.correct_shot  # doesn't work currently
+                        correct_shot=cfg.infer.correct_shot,  # doesn't work currently
+                        max_length=max_length.get(summ, None)
                     )
+                    if summ in max_length:
+                        logging.info(
+                            f'Rebinned {summ} to {x.shape[1]} triangles '
+                            f'(max_length={max_length[summ]})')
                 else:
                     raise NotImplementedError  # TODO: implement other summaries
                 xs.append((summ, x))

@@ -56,13 +56,17 @@ def load_Pk(diag_file, a):
             # load the summaries
             for stat in ['Pk', 'zPk']:
                 if stat in f[a]:
+                    nmodes_key = stat + '_Nmodes'
+                    nmodes = f[a][nmodes_key][:] if nmodes_key in f[a] else None
                     for i in range(3):  # monopole, quadrupole, hexadecapole
                         summ[stat+str(2*i)] = {
                             'k': f[a][stat+'_k3D'][:],
                             'value': f[a][stat][:, i],
                             'nbar': f[a].attrs['nbar'],
                             'log10nbar': f[a].attrs['log10nbar'],
-                            'a_loaded': a}
+                            'a_loaded': a,
+                            'Nmodes': nmodes,
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -76,6 +80,7 @@ def load_lc_Pk(diag_file):
         with h5py.File(diag_file, 'r') as f:
             # load the summaries
             stat = 'Pk'
+            nmodes = f['Pk_Nmodes'][:] if 'Pk_Nmodes' in f else None
             for i in range(3):  # monopole, quadrupole, hexadecapole
                 summ[stat+str(2*i)] = {
                     'k': f[stat+'_k3D'][:],
@@ -84,6 +89,7 @@ def load_lc_Pk(diag_file):
                     'log10nbar': f.attrs['log10nbar'],
                     'nz': f['nz'][:],
                     'nz_bins': f['nz_bins'][:],
+                    'Nmodes': nmodes,
                 }
     except (OSError, KeyError):
         return {}
@@ -98,18 +104,19 @@ def load_Bk(diag_file, a):
         with h5py.File(diag_file, 'r') as f:
             a = closest_a(f.keys(), a)
             a = f'{a:.6f}'
-            # load the summaries
+            g = f[a]
             for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
-                if stat in f[a]:
+                if stat in g:
                     for i in range(2):
-                        if i >= f[a][stat].shape[0]:
+                        if i >= g[stat].shape[0]:
                             continue
                         summ[stat+str(2*i)] = {
-                            'k': f[a]['Bk_k123'][:],
-                            'value': f[a][stat][i, :],
-                            'nbar': f[a].attrs['nbar'],
-                            'log10nbar': f[a].attrs['log10nbar'],
-                            'a_loaded': a}
+                            'k': g['Bk_k123'][:],
+                            'value': g[stat][i, :],
+                            'nbar': g.attrs['nbar'],
+                            'log10nbar': g.attrs['log10nbar'],
+                            'a_loaded': a,
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -121,7 +128,6 @@ def load_lc_Bk(diag_file):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            # load the summaries
             for stat in ['Bk', 'Qk']:
                 if stat in f:
                     for i in range(1):  # just monopole
@@ -131,7 +137,7 @@ def load_lc_Bk(diag_file):
                             'nbar': f.attrs['nbar'],
                             'log10nbar': f.attrs['log10nbar'],
                             'nz': f['nz'][:],
-                            'nz_bins': f['nz_bins'][:]
+                            'nz_bins': f['nz_bins'][:],
                         }
     except (OSError, KeyError):
         return {}
@@ -147,6 +153,16 @@ def _filter_Pk(X, kmin, kmax):
     # filter kmin and kmax
     return np.array(
         [x['value'][_is_in_kminmax(x['k'], kmin, kmax)] for x in X])
+
+
+def _get_Nmodes_Pk(data, kmin, kmax):
+    # Extract Nmodes for the k-bins that survive the kmin/kmax cut.
+    # Nmodes is the same for all sims (fixed grid), so we only need one entry.
+    nmodes = data[0].get('Nmodes', None)
+    if nmodes is None:
+        return None
+    k = data[0]['k']
+    return nmodes[_is_in_kminmax(k, kmin, kmax)]
 
 
 def _get_nbar(data):
@@ -184,13 +200,50 @@ def _get_log10nz(data):
     return binned_nz_logged  # shape: (num_entries, num_bins*num_repeat)
 
 
+def rebin_Pk_to_length(X, max_length, Nmodes=None):
+    """Coarsen Pk from shape (N_sims, N) to at most (N_sims, max_length).
+
+    Groups consecutive k-bins and averages within each group, weighted by
+    Nmodes (total Fourier mode count per bin). Falls back to uniform averaging
+    if Nmodes is None (e.g. old files without Pk_Nmodes saved).
+    """
+    N = X.shape[1]
+    if N <= max_length:
+        return X
+    group_size = int(np.ceil(N / max_length))
+    N_trimmed = (N // group_size) * group_size
+    X_t = X[:, :N_trimmed].reshape(X.shape[0], -1, group_size)  # (N_sims, n_out, group)
+    if Nmodes is not None:
+        w = Nmodes[:N_trimmed].reshape(-1, group_size)           # (n_out, group)
+        return np.einsum('sog,og->so', X_t, w) / w.sum(axis=1)
+    return X_t.mean(axis=2)
+
+
+def rebin_Bk_to_length(X, max_length):
+    """Coarsen Bk from shape (N_sims, N_triangles) to at most (N_sims, max_length).
+
+    Groups consecutive triangles and averages uniformly within each group.
+    NOTE: this is approximate — the exact weight per triangle is the number of
+    fundamental-mode triplets in the bin, which is not currently saved. Uniform
+    averaging is a reasonable substitute since B(k) is smooth, but it is not
+    the minimum-variance estimate. Order also matters: this must be called on
+    raw B(k) before signed_log so that mean(B) is averaged rather than mean(log B).
+    """
+    N = X.shape[1]
+    if N <= max_length:
+        return X
+    group_size = int(np.ceil(N / max_length))
+    N_trimmed = (N // group_size) * group_size
+    return X[:, :N_trimmed].reshape(X.shape[0], -1, group_size).mean(axis=2)
+
+
 def signed_log(x, base=10):
     # Compute the signed logarithm of x (for negative values)
     return np.sign(x) * np.log1p(np.abs(x)) / np.log(base)
 
 
 def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False,
-                  loglinear_start_idx=None):
+                  loglinear_start_idx=None, max_length=None):
     # process Pk: filtering for k's, normalizing, and flattening
 
     X = _filter_Pk(data, kmin, kmax)
@@ -198,9 +251,18 @@ def preprocess_Pk(data, kmin, kmax, norm=None, correct_shot=False,
     if norm is None:  # monopole case
         if correct_shot:
             X -= 1./_get_nbar(data)  # subtract shot noise
+        # Rebin on raw P(k) before log so mode-weighted averaging is exact:
+        # mean(log P) != log(mean(P)), so order matters here.
+        if max_length is not None:
+            Nmodes = _get_Nmodes_Pk(data, kmin, kmax)
+            X = rebin_Pk_to_length(X, max_length, Nmodes)
         X = signed_log(X)
     else:  # higher multipoles normalized by monopole
         Xnorm = _filter_Pk(norm, kmin, kmax)
+        if max_length is not None:
+            Nmodes = _get_Nmodes_Pk(data, kmin, kmax)
+            X = rebin_Pk_to_length(X, max_length, Nmodes)
+            Xnorm = rebin_Pk_to_length(Xnorm, max_length, Nmodes)
         X /= Xnorm
 
     if loglinear_start_idx is not None:
@@ -267,29 +329,30 @@ def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
 
 def preprocess_Bk(data, kmin, kmax, norm=None,
                   mode=None,  # None, Eq, Sq, SS, or Is
-                  correct_shot=False):
+                  correct_shot=False, max_length=None):
     # process Bk: filtering for k's, normalizing, and flattening
-    X = _filter_Bk(
-        data, kmin, kmax,
+    filter_kwargs = dict(
         equilateral=(mode == 'Eq'),
         squeezed=(mode == 'Sq'),
         subsampled=(mode == 'Ss'),
-        isoceles=(mode == 'Is')
+        isoceles=(mode == 'Is'),
     )
+    X = _filter_Bk(data, kmin, kmax, **filter_kwargs)
 
     if correct_shot:  # Eq. 44 arxiv:1610.06585
         pass  # not implemented because I'm not sure its right
 
     if norm is None:  # monopole case
+        # Rebin before log: mean(log B) != log(mean(B)), so order matters.
+        # Weighting is uniform (approximate) — see rebin_Bk_to_length docstring.
+        if max_length is not None:
+            X = rebin_Bk_to_length(X, max_length)
         X = signed_log(X)
     else:  # higher multipoles normalized by monopole
-        Xnorm = _filter_Bk(
-            norm, kmin, kmax,
-            equilateral=(mode == 'Eq'),
-            squeezed=(mode == 'Sq'),
-            subsampled=(mode == 'Ss'),
-            isoceles=(mode == 'Is')
-        )
+        Xnorm = _filter_Bk(norm, kmin, kmax, **filter_kwargs)
+        if max_length is not None:
+            X = rebin_Bk_to_length(X, max_length)
+            Xnorm = rebin_Bk_to_length(Xnorm, max_length)
         X /= Xnorm
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
