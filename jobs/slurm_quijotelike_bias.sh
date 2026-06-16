@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=quijote_bias   # Job name
-#SBATCH --array=0-99         # Job array range for lhid
+#SBATCH --array=0-4799         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
-#SBATCH --time=04:00:00         # Time limit
+#SBATCH --time=00:20:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=quijotelike
-sim=fastpm_charm6
+sim=fastpm_charm6_rebin
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
@@ -43,7 +43,7 @@ outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 100 4799); do
+for offset in $(seq 0 4799 4799); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
