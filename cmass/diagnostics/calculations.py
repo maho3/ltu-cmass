@@ -132,12 +132,14 @@ def calcBk_bfast(delta, L, axis=0, MAS='CIC', threads=16, cache_dir=None):
     counts = result[mask, 7]  # number of triangles in each bin (not used)
     qk = calcQk_bfast(pk, bk)
 
-    return k123, bk, qk, k123, pk
+    # 1D k-bin centers for the power spectrum, extracted from the triangle legs
+    k1d = np.unique(k123)
+    return k123, bk, qk, k1d, pk
 
 
-def get_redshift_space_pos(pos, vel, L, h, z, axis=0):
+def get_redshift_space_pos(pos, vel, L, cosmo, z, axis=0):
     pos, vel = map(np.ascontiguousarray, (pos, vel))
-    RSL.pos_redshift_space(pos, vel, L, h*100, z, axis)
+    RSL.pos_redshift_space(pos, vel, L, cosmo.H(z).value/cosmo.h, z, axis)
     pos %= L
     return pos
 
@@ -153,6 +155,6 @@ def get_box_catalogue(pos, z, L, N):
     )
 
 
-def get_box_catalogue_rsd(pos, vel, z, L, h, axis, N):
-    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, h=h, axis=axis, L=L,)
+def get_box_catalogue_rsd(pos, vel, z, L, cosmo, axis, N):
+    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, cosmo=cosmo, axis=axis, L=L)
     return get_box_catalogue(pos, z, L, N)

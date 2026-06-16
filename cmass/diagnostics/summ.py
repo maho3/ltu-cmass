@@ -147,7 +147,7 @@ def summarize_rho(
                 backend=config.diag.bispectrum_backend
             )
             out_data.update(out)
-        if len(out) > 0:
+        if len(out_data) > 0:
             save_group(outpath, out_data, None, a, config)
     return True
 
