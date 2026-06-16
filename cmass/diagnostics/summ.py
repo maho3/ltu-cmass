@@ -24,7 +24,7 @@ from .tools import (
     _get_snapshot_alist, save_group
 )
 from .calculations import (
-    MA, MAz, calcPk, calcBk_bfast, calcBk_polybin,
+    MA, MAz, calcPk, rebin_pk, calcBk_bfast, calcBk_polybin,
     get_box_catalogue, get_box_catalogue_rsd  # not used
 )
 from .geometry import SURVEY_GEOMETRIES
@@ -36,8 +36,9 @@ def run_pylians(
 ):
     # Only for power spectrum
     pfx = 'z' if use_rsd else ''
-    k, Pk = calcPk(field, box_size, axis=axis,
-                   MAS=MAS, threads=num_threads)
+    k, Pk, Nmodes = calcPk(field, box_size, axis=axis,
+                           MAS=MAS, threads=num_threads)
+    k, Pk = rebin_pk(k, Pk, Nmodes)
     out = {
         pfx+'Pk_k3D': k,
         pfx+'Pk': Pk

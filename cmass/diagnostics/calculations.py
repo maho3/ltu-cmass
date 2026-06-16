@@ -10,6 +10,12 @@ import BFast
 import PolyBin3D as pb
 from ..utils import timing_decorator
 
+# Fixed k-binning for all summary statistics
+K_MIN = 0.01    # h/Mpc, first bin edge
+DK_PK = 0.01   # h/Mpc, bin width for P(k)
+DK_BK = 0.02   # h/Mpc, bin width for B(k)
+K_MAX_BK = 0.40  # h/Mpc, hard kmax for B(k)
+
 
 def MA(pos, L, N, MAS='CIC'):
     pos = np.ascontiguousarray(pos)
@@ -34,8 +40,28 @@ def MAz(pos, vel, L, N, cosmo, z, MAS='CIC', axis=0):
 def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
     Pk = PKL.Pk(delta.astype(np.float32), L, axis, MAS, threads, verbose=False)
     k = Pk.k3D
+    Nmodes = Pk.Nmodes3D
     Pk = Pk.Pk
-    return k, Pk
+    return k, Pk, Nmodes
+
+
+def rebin_pk(k, Pk, Nmodes):
+    """Rebin pylians P(k) onto a fixed grid using mode-weighted averaging.
+
+    Pk has shape (N_bins_fine, n_ell). Returns (k_centers, Pk_rebinned).
+    """
+    k_nyq = k.max()
+    k_edges = np.arange(K_MIN, k_nyq + DK_PK, DK_PK)
+    k_centers = 0.5 * (k_edges[:-1] + k_edges[1:])
+    n_ell = Pk.shape[1] if Pk.ndim > 1 else 1
+    Pk_out = np.full((len(k_centers), n_ell), np.nan)
+    for i, (lo, hi) in enumerate(zip(k_edges[:-1], k_edges[1:])):
+        mask = (k >= lo) & (k < hi)
+        if not mask.any():
+            continue
+        w = Nmodes[mask]
+        Pk_out[i] = np.average(Pk[mask], weights=w, axis=0)
+    return k_centers, Pk_out
 
 
 def calcQk_polybin(k, Pk, k123, Bk):
@@ -52,11 +78,8 @@ def calcQk_polybin(k, Pk, k123, Bk):
 def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     assert axis == 2  # polybin measures along the z axis
 
-    # TODO: Use ili-summarizer here
-    k_min = 2 * np.pi / L
     n_mesh = delta.shape[0]
-    k_max = np.pi * n_mesh / L
-    k_bins = np.arange(k_min, k_max, k_min * 5)
+    k_bins = np.arange(K_MIN, K_MAX_BK + DK_BK, DK_BK)
 
     # set stuff up
     base = pb.PolyBin3D(
