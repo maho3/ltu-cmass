@@ -169,9 +169,10 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
     # check that there's data
     for summ in exp.summary:
-        for tag in ["Eq", "Sq", "Ss", "Is"]:
+        for tag in ["Eq", "Sq", "Ss", "Is", ""]:
             if tag in summ:
                 summ = summ.replace(tag, "")
+                break
         if summ in ['nbar', 'nz']:  # these come for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
@@ -194,7 +195,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     continue  # we handle these separately
 
                 base = summ
-                for tag in ["Eq", "Sq", "Ss",  "Is"]:
+                for tag in ["Eq", "Sq", "Ss",  "Is", ""]:
                     if tag in summ:
                         base = base.replace(tag, "")
                         break
