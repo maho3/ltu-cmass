@@ -28,7 +28,6 @@ DK_BK = 0.04   # h/Mpc, bin width for B(k)  → ~220 triangles
 K_MAX_BK = 0.40  # h/Mpc, hard kmax for B(k)
 
 
-
 def MA(pos, L, N, MAS='CIC'):
     pos = np.ascontiguousarray(pos)
     pos = copy.deepcopy(pos)
@@ -78,7 +77,9 @@ def rebin_pk(k, Pk, Nmodes):
     """
     k_nyq = k.max()
     # Build fixed output bin edges and centers
-    k_edges = np.arange(K_MIN, k_nyq + DK_PK, DK_PK)
+    n_bins = (k_nyq - K_MIN) // DK_PK
+    k_edges = np.append(K_MIN + DK_PK*np.arange(n_bins+1),
+                        k_nyq)   # last bin shorter
     k_centers = 0.5 * (k_edges[:-1] + k_edges[1:])
     n_ell = Pk.shape[1] if Pk.ndim > 1 else 1
     Pk_out = np.full((len(k_centers), n_ell), np.nan)
@@ -108,7 +109,9 @@ def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     assert axis == 2  # polybin measures along the z axis
 
     n_mesh = delta.shape[0]
-    k_bins = np.arange(K_MIN, K_MAX_BK + DK_BK, DK_BK)
+    n_bins = (K_MAX_BK - K_MIN) // DK_BK
+    k_bins = np.append(K_MIN + DK_BK*np.arange(n_bins+1),
+                       K_MAX_BK)  # last bin shorter
 
     # set stuff up
     base = pb.PolyBin3D(
@@ -209,5 +212,6 @@ def get_box_catalogue(pos, z, L, N):
 
 
 def get_box_catalogue_rsd(pos, vel, z, L, cosmo, axis, N):
-    pos = get_redshift_space_pos(pos=pos, vel=vel, z=z, cosmo=cosmo, axis=axis, L=L)
+    pos = get_redshift_space_pos(
+        pos=pos, vel=vel, z=z, cosmo=cosmo, axis=axis, L=L)
     return get_box_catalogue(pos, z, L, N)
