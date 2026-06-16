@@ -17,6 +17,7 @@ DK_BK = 0.02   # h/Mpc, bin width for B(k)
 K_MAX_BK = 0.40  # h/Mpc, hard kmax for B(k)
 
 
+
 def MA(pos, L, N, MAS='CIC'):
     pos = np.ascontiguousarray(pos)
     pos = copy.deepcopy(pos)
@@ -60,11 +61,9 @@ def rebin_pk(k, Pk, Nmodes):
     k-modes that fall in the coarse bin.
 
     Pk has shape (N_bins_fine, n_ell) where n_ell=3 (monopole, quadrupole,
-    hexadecapole) as returned by pylians. Returns (k_centers, Pk_rebinned,
-    Nmodes_rebinned) where Pk_rebinned has shape (N_bins_coarse, n_ell) and
-    Nmodes_rebinned has shape (N_bins_coarse,) — the total mode count per
-    coarse bin, saved so downstream rebinning can remain mode-weighted.
-    Output bins that contain no pylians modes are left as nan / 0.
+    hexadecapole) as returned by pylians. Returns (k_centers, Pk_rebinned)
+    where Pk_rebinned has shape (N_bins_coarse, n_ell). Output bins that
+    contain no pylians modes are left as nan.
     """
     k_nyq = k.max()
     # Build fixed output bin edges and centers
@@ -72,7 +71,6 @@ def rebin_pk(k, Pk, Nmodes):
     k_centers = 0.5 * (k_edges[:-1] + k_edges[1:])
     n_ell = Pk.shape[1] if Pk.ndim > 1 else 1
     Pk_out = np.full((len(k_centers), n_ell), np.nan)
-    Nmodes_out = np.zeros(len(k_centers), dtype=np.float64)
     for i, (lo, hi) in enumerate(zip(k_edges[:-1], k_edges[1:])):
         # Select all pylians bins whose centers fall in this output bin
         mask = (k >= lo) & (k < hi)
@@ -81,9 +79,7 @@ def rebin_pk(k, Pk, Nmodes):
         # Weight by number of Fourier modes: more modes = lower variance = higher weight
         w = Nmodes[mask]
         Pk_out[i] = np.average(Pk[mask], weights=w, axis=0)
-        # Total mode count for this coarse bin, used for further downstream rebinning
-        Nmodes_out[i] = w.sum()
-    return k_centers, Pk_out, Nmodes_out
+    return k_centers, Pk_out
 
 
 def calcQk_polybin(k, Pk, k123, Bk):

@@ -38,11 +38,10 @@ def run_pylians(
     pfx = 'z' if use_rsd else ''
     k, Pk, Nmodes = calcPk(field, box_size, axis=axis,
                            MAS=MAS, threads=num_threads)
-    k, Pk, Nmodes = rebin_pk(k, Pk, Nmodes)
+    k, Pk = rebin_pk(k, Pk, Nmodes)
     out = {
         pfx+'Pk_k3D': k,
         pfx+'Pk': Pk,
-        pfx+'Pk_Nmodes': Nmodes,
     }
     return out
 
