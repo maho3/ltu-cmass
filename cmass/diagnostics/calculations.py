@@ -10,10 +10,21 @@ import BFast
 import PolyBin3D as pb
 from ..utils import timing_decorator
 
-# Fixed k-binning for all summary statistics
+# Fixed k-binning for all summary statistics.
+# These are shared across all volumes so the data vector has consistent length
+# and meaning for SBI, regardless of box size.
+#
+# K_MIN: set to ~k_F of the largest volume we use (3 Gpc/h → k_F ≈ 0.002),
+#   rounded up to 0.01 to exclude the noisiest large-scale modes.
+# DK_PK: dk=0.01 gives ~40 Pk bins (k_Nyq ≈ 0.40 is volume-independent),
+#   comfortably O(100).
+# DK_BK: dk=0.04 gives ~220 Bk triangles — chosen to keep the Bk data vector
+#   O(100-200). Finer bins (dk=0.02) give 1540 triangles, which is too large.
+# K_MAX_BK: 0.40 h/Mpc matches k_Nyquist for our standard mesh (N=128 per Gpc/h),
+#   so we use all available signal without extrapolating.
 K_MIN = 0.01    # h/Mpc, first bin edge
-DK_PK = 0.01   # h/Mpc, bin width for P(k)
-DK_BK = 0.02   # h/Mpc, bin width for B(k)
+DK_PK = 0.01   # h/Mpc, bin width for P(k)  → ~40 bins
+DK_BK = 0.04   # h/Mpc, bin width for B(k)  → ~220 triangles
 K_MAX_BK = 0.40  # h/Mpc, hard kmax for B(k)
 
 
