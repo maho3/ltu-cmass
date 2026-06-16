@@ -274,7 +274,7 @@ def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
 
 
 def preprocess_Bk(data, kmin, kmax, norm=None,
-                  mode=None,  # None, Eq, Sq, SS, or Is
+                  mode=None,  # None, Eq, Sq, Ss, or Is
                   correct_shot=False):
     # process Bk: filtering for k's, normalizing, and flattening
     filter_kwargs = dict(
