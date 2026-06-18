@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=training  # Job name
-#SBATCH --array=0-15  # Array range
+#SBATCH --array=0-19  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=4            # Number of tasks
-#SBATCH --time=24:00:00         # Time limit
+#SBATCH --ntasks=2            # Number of tasks
+#SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
@@ -23,10 +23,10 @@ sleep $net_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 nbody=quijotelike
-sim=fastpm_charm4
+sim=fastpm_charm6_rebin
 infer=simple  # simple  # lightcone
 
-tracer=galaxy
+tracer=${tracer:-galaxy}
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 

@@ -15,28 +15,19 @@ experiments:
   # List of experiments, each defining a set of summary statistics and k-ranges.
   - summary: [zPk0]  # z-space monopole
     kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4, 0.5, 0.6]
   - summary: [zPk0, zPk2, zPk4]  # z-space monopole, quadrupole, hexadecapole,
     kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4, 0.5, 0.6]
   - summary: [zPk0, zPk2, zPk4, zBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
+    kmax: [0.2, 0.3, 0.4]
   - summary: [zPk0, zPk2, zPk4, zEqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
-    kmax: [0.1, 0.2, 0.3, 0.4]
-  # - summary: [Pk0]  # z-space monopole
+    kmax: [0.2, 0.3, 0.4]
+  # - summary: [zPk0, zPk2, zPk4, zSqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
   #   kmin: [0.]
-  #   kmax: [0.1, 0.2, 0.3, 0.4]
-  # - summary: [Pk0, Pk2, Pk4]  # z-space monopole, quadrupole, hexadecapole,
-  #   kmin: [0.]
-  #   kmax: [0.1, 0.2, 0.3, 0.4]
-  # - summary: [Pk0, Pk2, Pk4, Bk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.1, 0.2, 0.3, 0.4]
-  # - summary: [Pk0, Pk2, Pk4, EqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
-  #   kmin: [0.]
-  #   kmax: [0.1, 0.2, 0.3, 0.4]
+  #   kmax: [0.2, 0.3, 0.4]
 
 # --- TRAINING CONFIGURATION ---
 Nnets: 10  # Number of best networks to ensemble for posterior inference.
@@ -73,7 +64,7 @@ ema_decay: 0.9  # EMA decay value (only if validation_smoothing_method == 'ema')
 
 # Cross-validation
 cross_val: True  # Whether to use cross-validation for hyperparameter optimization.
-n_splits: 4      # Number of splits for cross-validation.
+n_splits: 2      # Number of splits for cross-validation.
 cv_val_frac: 0.1 # Fraction of data to use for validation within each CV fold.
 
 # Preprocessing
@@ -83,7 +74,7 @@ test_noised_summs: false # whether to replace non-Pk0 summaries with noise
 loglinear_start_idx: null # starting index for log-linear binning of Pk
 
 # --- OPTUNA CONFIGURATION (Hyperparameter Optimization) ---
-n_trials: 30  # number of trials for hyperparameter optimization
+n_trials: 20  # number of trials for hyperparameter optimization
 n_startup_trials: 50  # number of startup trials for hyperparameter optimization
 
 # ~~ VALIDATION ARGS ~~

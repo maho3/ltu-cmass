@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-15  # Array range 0-15, 0-31
+#SBATCH --array=0-18  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_charm6
+sim=fastpm_charm6_rebin
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 

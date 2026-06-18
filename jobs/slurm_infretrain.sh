@@ -2,20 +2,20 @@
 #SBATCH --job-name=retrain  # Job name
 #SBATCH --array=0-9  # Array range
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=8            # Number of tasks
+#SBATCH --ntasks=2            # Number of tasks
 #SBATCH --time=3:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=0
 
 # module restore cmass
 source ~/.bashrc
 conda activate cmass
 
-# exp_index=2
+# exp_index=0
 net_index=$SLURM_ARRAY_TASK_ID
 
 sleep $net_index  # to stagger the start of each job
@@ -25,10 +25,10 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=quijotelike
-sim=fastpm_charm6
+sim=fastpm_charm6_rebin
 infer=simple  # simple  # lightcone
 
-tracer=galaxy
+tracer=${tracer:-galaxy}
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
 device="cpu"
 
@@ -41,6 +41,7 @@ suffix="$suffix infer.device=$device $extras"
 suffix="$suffix infer.include_noise=True infer.include_hod=False"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
+# suffix="$suffix infer.verbose=true"
 
 echo "Running inference pipeline with $suffix"
 
