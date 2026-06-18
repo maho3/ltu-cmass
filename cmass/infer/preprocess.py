@@ -123,17 +123,19 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
-    if seed is not None:
-        np.random.seed(seed)
     x, theta, ids = map(np.array, [x, theta, ids])
 
-    # split by lhid
+    # Assign each lhid to a split via a stable per-id hash so that adding or
+    # removing lhids never changes the assignment of the remaining ones.
     unique_ids = np.unique(ids)
-    np.random.shuffle(unique_ids)
-    s1, s2 = int(val_frac * len(unique_ids)), int(test_frac * len(unique_ids))
-    ui_val = unique_ids[:s1]
-    ui_test = unique_ids[s1:s1+s2]
-    ui_train = unique_ids[s1+s2:]
+    # Draw a uniform value per lhid, keyed on (seed, lhid), then threshold.
+    vals = np.array([
+        np.random.default_rng([seed if seed is not None else 0, int(lhid)]).random()
+        for lhid in unique_ids
+    ])
+    ui_val = unique_ids[vals < val_frac]
+    ui_test = unique_ids[(vals >= val_frac) & (vals < val_frac + test_frac)]
+    ui_train = unique_ids[vals >= val_frac + test_frac]
 
     # mask
     train_mask = np.isin(ids, ui_train)
