@@ -217,9 +217,9 @@ def _is_valid_triangle(k):
 
 
 def _is_squeezed(k):
-    # Return mask of squeezed triangles: k1 < k2 + k3 and k1 < 0.5 * (k2 + k3)
+    # k ordering is k1 <= k2 <= k3; squeezed means k1 << k2 ~= k3
     k1, k2, k3 = k
-    return np.isclose(k1, k2) & (k3 < k2)
+    return np.isclose(k2, k3) & (k1 < k2)
 
 
 def _is_isoceles(k):

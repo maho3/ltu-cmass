@@ -97,7 +97,7 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
 
 
 def _train_runner(loader, prior, nets, train_args, out_dir,
-                    backend, engine, device, verbose=False):
+                  backend, engine, device, verbose=False):
     """Helper function to run training."""
     # make output directory
     if out_dir is not None:
@@ -160,7 +160,8 @@ def run_training(
     elif mcfg.embedding_net == 'mhe':
         in_features = np.diff(start_idx).tolist()
         out_features = [mcfg.out_features] * len(in_features)
-        hidden_layers = [[mcfg.hidden_width]*mcfg.hidden_depth] * len(in_features)
+        hidden_layers = [[mcfg.hidden_width] *
+                         mcfg.hidden_depth] * len(in_features)
         embedding = MultiHeadEmbedding(
             start_idx=start_idx,
             in_features=in_features,
@@ -183,7 +184,8 @@ def run_training(
         in_features = np.diff(start_idx).tolist()
         out_features = [mcfg.out_features] * len(in_features)
         hidden_depth = [mcfg.hidden_depth] * len(in_features)
-        linear_dims = [mcfg.linear_dim] * len(in_features) if 'linear_dim' in mcfg else None
+        linear_dims = [mcfg.linear_dim] * \
+            len(in_features) if 'linear_dim' in mcfg else None
         embedding = MultiHeadFunnel(
             start_idx=start_idx,
             in_features=in_features,
@@ -269,7 +271,8 @@ def run_training_with_precompression(
         logging.info(f'Using network architecture: {mcfg}')
     if cfg.infer.embedding_net != 'fcn':
         # TODO: implement
-        raise ValueError(f'Precompression only supported for FCN embedding_net.')
+        raise ValueError(
+            f'Precompression only supported for FCN embedding_net.')
 
     # define a prior
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
@@ -396,7 +399,7 @@ def load_preprocessed_data(exp_path):
         noiseprior = (OmegaConf.load(filepath)
                       if os.path.exists(filepath) else None)
         with open(join(exp_path, 'x_startidx.txt'), 'r') as f:
-            _ = f.readline().strip().split(',') # summary labels
+            _ = f.readline().strip().split(',')  # summary labels
             startidx = np.array(f.readline().strip().split(',')).astype(int)
     except FileNotFoundError:
         raise FileNotFoundError(
@@ -532,11 +535,13 @@ def run_retraining(exp, cfg, model_path):
             if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
                 net_index = cfg.infer.net_index
                 if net_index < len(trial_numbers):
-                    logging.info(f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
+                    logging.info(
+                        f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
                     trial_numbers = [trial_numbers[net_index]]
                     net_configs = [net_configs[net_index]]
                 else:
-                    logging.warning(f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
+                    logging.warning(
+                        f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
                     return
 
             for trial_number, config in zip(trial_numbers, net_configs):
@@ -589,7 +594,6 @@ def run_retraining(exp, cfg, model_path):
                     posterior, x_test, theta_test)
                 with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
                     f.write(f'{log_prob_test}\n')
-
 
 
 @timing_decorator
