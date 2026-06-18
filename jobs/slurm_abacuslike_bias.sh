@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=abacus_bias   # Job name
-#SBATCH --array=0-99         # Job array range for lhid
+#SBATCH --array=0-999         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
@@ -43,7 +43,7 @@ outdir=/work/hdd/bdne/maho3/cmass-ili/$nbody/$sim/L$L-N$N
 echo "outdir=$outdir"
 
 
-for offset in $(seq 0 100 3999); do
+for offset in $(seq 0 1000 3999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
