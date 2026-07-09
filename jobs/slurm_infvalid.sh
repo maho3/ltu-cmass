@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-18  # Array range 0-15, 0-31
+#SBATCH --array=0-15  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -24,8 +24,8 @@ sleep $exp_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 
-nbody=quijotelike
-sim=fastpm_charm6_rebin
+nbody=abacuslike
+sim=fastpm_charm6_comp
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 

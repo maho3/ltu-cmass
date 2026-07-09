@@ -24,8 +24,8 @@ sleep $net_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 
-nbody=quijotelike
-sim=fastpm_charm6_rebin
+nbody=abacuslike
+sim=fastpm_charm6_comp
 infer=simple  # simple  # lightcone
 
 tracer=${tracer:-galaxy}
