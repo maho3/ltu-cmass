@@ -31,7 +31,8 @@ from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments
 from .loaders import (
-    preprocess_Pk, preprocess_Bk, _construct_hod_prior, _construct_noise_prior,
+    preprocess_Pk, preprocess_Bk,
+    _construct_hod_prior, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
@@ -126,17 +127,19 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
-    if seed is not None:
-        np.random.seed(seed)
     x, theta, ids = map(np.array, [x, theta, ids])
 
-    # split by lhid
+    # Assign each lhid to a split via a stable per-id hash so that adding or
+    # removing lhids never changes the assignment of the remaining ones.
     unique_ids = np.unique(ids)
-    np.random.shuffle(unique_ids)
-    s1, s2 = int(val_frac * len(unique_ids)), int(test_frac * len(unique_ids))
-    ui_val = unique_ids[:s1]
-    ui_test = unique_ids[s1:s1+s2]
-    ui_train = unique_ids[s1+s2:]
+    # Draw a uniform value per lhid, keyed on (seed, lhid), then threshold.
+    vals = np.array([
+        np.random.default_rng([seed if seed is not None else 0, int(lhid)]).random()
+        for lhid in unique_ids
+    ])
+    ui_val = unique_ids[vals < val_frac]
+    ui_test = unique_ids[(vals >= val_frac) & (vals < val_frac + test_frac)]
+    ui_train = unique_ids[vals >= val_frac + test_frac]
 
     # mask
     train_mask = np.isin(ids, ui_train)
@@ -172,9 +175,10 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
 
     # check that there's data
     for summ in exp.summary:
-        for tag in ["Eq", "Sq", "Ss", "Is"]:
+        for tag in ["Eq", "Sq", "Ss", "Is", ""]:
             if tag in summ:
                 summ = summ.replace(tag, "")
+                break
         if summ in ['nbar', 'nz']:  # these come for free with any summaries
             continue
         if (summ not in summaries) or (len(summaries[summ]) == 0):
@@ -197,7 +201,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     continue  # we handle these separately
 
                 base = summ
-                for tag in ["Eq", "Sq", "Ss",  "Is"]:
+                for tag in ["Eq", "Sq", "Ss",  "Is", ""]:
                     if tag in summ:
                         base = base.replace(tag, "")
                         break
@@ -210,7 +214,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         correct_shot=cfg.infer.correct_shot,
-                        loglinear_start_idx=cfg.infer.loglinear_start_idx
+                        loglinear_start_idx=cfg.infer.loglinear_start_idx,
                     )
                 elif ('Bk' in summ) or ('Qk' in summ):
                     norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
@@ -218,7 +222,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                         x, kmin=kmin, kmax=kmax,
                         norm=None if '0' in base else summaries[norm_key],
                         mode=tag,
-                        correct_shot=cfg.infer.correct_shot  # doesn't work currently
+                        correct_shot=cfg.infer.correct_shot,  # doesn't work currently
                     )
                 else:
                     raise NotImplementedError  # TODO: implement other summaries

@@ -5,6 +5,10 @@ Each prior is Gaussian with a mean and stdev defined over three interpolated
 redshift bins.
 
 Computed in notebooks/constrain_hod_prior.ipynb
+
+COMPOSITE_HOD_PRIORS: z-independent priors obtained by marginalizing the
+z-dependent logMmin prior over the observed n(z) of each survey.
+Computed in notebooks/composite_hod_prior.ipynb
 """
 
 SURVEY_HOD_PRIORS = {
@@ -46,4 +50,10 @@ SURVEY_HOD_PRIORS = {
             'stdev': [0.2084813, 0.19274066, 0.1532904],
         }
     }
+}
+
+# Composite (n(z)-marginalized) logMmin priors for z-independent HOD models.
+# logMmin ~ N(mean, stdev); all other params remain uniform as in Zheng07.
+COMPOSITE_HOD_PRIORS = {
+    'ngc': {'mean': 12.8163, 'stdev': 0.3246},
 }

@@ -62,7 +62,8 @@ def load_Pk(diag_file, a):
                             'value': f[a][stat][:, i],
                             'nbar': f[a].attrs['nbar'],
                             'log10nbar': f[a].attrs['log10nbar'],
-                            'a_loaded': a}
+                            'a_loaded': a,
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -98,18 +99,19 @@ def load_Bk(diag_file, a):
         with h5py.File(diag_file, 'r') as f:
             a = closest_a(f.keys(), a)
             a = f'{a:.6f}'
-            # load the summaries
+            g = f[a]
             for stat in ['Bk', 'Qk', 'zBk', 'zQk']:
-                if stat in f[a]:
+                if stat in g:
                     for i in range(2):
-                        if i >= f[a][stat].shape[0]:
+                        if i >= g[stat].shape[0]:
                             continue
                         summ[stat+str(2*i)] = {
-                            'k': f[a]['Bk_k123'][:],
-                            'value': f[a][stat][i, :],
-                            'nbar': f[a].attrs['nbar'],
-                            'log10nbar': f[a].attrs['log10nbar'],
-                            'a_loaded': a}
+                            'k': g['Bk_k123'][:],
+                            'value': g[stat][i, :],
+                            'nbar': g.attrs['nbar'],
+                            'log10nbar': g.attrs['log10nbar'],
+                            'a_loaded': a,
+                        }
     except (OSError, KeyError):
         return {}
     return summ
@@ -121,7 +123,6 @@ def load_lc_Bk(diag_file):
     summ = {}
     try:
         with h5py.File(diag_file, 'r') as f:
-            # load the summaries
             for stat in ['Bk', 'Qk']:
                 if stat in f:
                     for i in range(1):  # just monopole
@@ -131,7 +132,7 @@ def load_lc_Bk(diag_file):
                             'nbar': f.attrs['nbar'],
                             'log10nbar': f.attrs['log10nbar'],
                             'nz': f['nz'][:],
-                            'nz_bins': f['nz_bins'][:]
+                            'nz_bins': f['nz_bins'][:],
                         }
     except (OSError, KeyError):
         return {}
@@ -216,9 +217,9 @@ def _is_valid_triangle(k):
 
 
 def _is_squeezed(k):
-    # Return mask of squeezed triangles: k1 < k2 + k3 and k1 < 0.5 * (k2 + k3)
+    # k ordering is k1 <= k2 <= k3; squeezed means k1 << k2 ~= k3
     k1, k2, k3 = k
-    return np.isclose(k1, k2) & (k3 < k2)
+    return np.isclose(k2, k3) & (k1 < k2)
 
 
 def _is_isoceles(k):
@@ -238,6 +239,22 @@ def _is_subsampled(k):
     return np.arange(len(k[0])) % 5 == 0
 
 
+def _get_Bk_mask(k123, kmin, kmax, equilateral=False, squeezed=False,
+                 subsampled=False, isoceles=False):
+    mask = _is_in_kminmax(k123, kmin, kmax)
+    if equilateral:
+        mask &= _is_equilateral(k123)
+    elif squeezed:
+        mask &= _is_squeezed(k123)
+    elif subsampled:
+        mask &= _is_subsampled(k123)
+    elif isoceles:
+        mask &= _is_isoceles(k123)
+    else:
+        mask &= _is_valid_triangle(k123)
+    return mask
+
+
 def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
                subsampled=False, isoceles=False):
     if sum([equilateral, squeezed, subsampled]) > 1:
@@ -251,31 +268,22 @@ def _filter_Bk(X, kmin, kmax, equilateral=False, squeezed=False,
         raise ValueError("k values are not consistent across samples.")
 
     k123 = k123[0]
-    mask = _is_in_kminmax(k123, kmin, kmax)
-    if equilateral:
-        mask &= _is_equilateral(k123)
-    elif squeezed:
-        mask &= _is_squeezed(k123)
-    elif subsampled:
-        mask &= _is_subsampled(k123)
-    elif isoceles:
-        mask &= _is_isoceles(k123)
-    else:
-        mask &= _is_valid_triangle(k123)
+    mask = _get_Bk_mask(k123, kmin, kmax, equilateral, squeezed,
+                        subsampled, isoceles)
     return X[:, mask]
 
 
 def preprocess_Bk(data, kmin, kmax, norm=None,
-                  mode=None,  # None, Eq, Sq, SS, or Is
+                  mode=None,  # None, Eq, Sq, Ss, or Is
                   correct_shot=False):
     # process Bk: filtering for k's, normalizing, and flattening
-    X = _filter_Bk(
-        data, kmin, kmax,
+    filter_kwargs = dict(
         equilateral=(mode == 'Eq'),
         squeezed=(mode == 'Sq'),
         subsampled=(mode == 'Ss'),
-        isoceles=(mode == 'Is')
+        isoceles=(mode == 'Is'),
     )
+    X = _filter_Bk(data, kmin, kmax, **filter_kwargs)
 
     if correct_shot:  # Eq. 44 arxiv:1610.06585
         pass  # not implemented because I'm not sure its right
@@ -283,13 +291,7 @@ def preprocess_Bk(data, kmin, kmax, norm=None,
     if norm is None:  # monopole case
         X = signed_log(X)
     else:  # higher multipoles normalized by monopole
-        Xnorm = _filter_Bk(
-            norm, kmin, kmax,
-            equilateral=(mode == 'Eq'),
-            squeezed=(mode == 'Sq'),
-            subsampled=(mode == 'Ss'),
-            isoceles=(mode == 'Is')
-        )
+        Xnorm = _filter_Bk(norm, kmin, kmax, **filter_kwargs)
         X /= Xnorm
 
     return np.nan_to_num(X, nan=0.0).reshape(len(X), -1)
