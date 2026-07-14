@@ -53,12 +53,13 @@ def run_pypower_box(
     """Periodic-box P(k) via pypower+interlacing=2. Replaces `run_pylians`
     for volumes we paint ourselves (halos/galaxies) -- see
     power_tests/REPORT.md for the accuracy/speed comparison motivating this.
+    `calcPk_pypower` already bins directly onto the fixed output grid, so
+    unlike `run_pylians` there's no separate `rebin_pk` step here.
     """
     os.environ.setdefault('OMP_NUM_THREADS', str(num_threads))
     pfx = 'z' if use_rsd else ''
-    k, Pk, Nmodes = calcPk_pypower(
+    k, Pk, _ = calcPk_pypower(
         pos, box_size, N, axis=axis, resampler=MAS, interlacing=2)
-    k, Pk = rebin_pk(k, Pk, Nmodes)
     out = {
         pfx+'Pk_k3D': k,
         pfx+'Pk': Pk,
@@ -71,11 +72,11 @@ def run_pypower_field(
 ):
     """Periodic-box P(k) via pypower for a pre-painted field (e.g. the nbody
     density field). No interlacing possible -- see `calcPk_pypower_field`.
+    Bins directly onto the fixed output grid (no separate `rebin_pk` step).
     """
     os.environ.setdefault('OMP_NUM_THREADS', str(num_threads))
     pfx = 'z' if use_rsd else ''
-    k, Pk, Nmodes = calcPk_pypower_field(field, box_size, axis=axis, MAS=MAS)
-    k, Pk = rebin_pk(k, Pk, Nmodes)
+    k, Pk, _ = calcPk_pypower_field(field, box_size, axis=axis, MAS=MAS)
     out = {
         pfx+'Pk_k3D': k,
         pfx+'Pk': Pk,

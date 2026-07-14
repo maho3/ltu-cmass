@@ -165,4 +165,3 @@ We include various additional functionality beyond the minimal working example a
 - [Building and running the PINOCCHIO simulator](./options/PINOCCHIO.md)
 - [Filtering and weighting galaxy positions](./options/FILTERING.md)
 - [Installing pypower](./options/PYPOWER.md)
-- [Replacing pylians with pypower for periodic-volume P(k)](./pypower_periodic_box_migration.md)
