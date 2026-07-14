@@ -3,6 +3,7 @@ from os.path import join
 import hydra
 import logging
 import os
+import time
 import bigfile
 from omegaconf import DictConfig, OmegaConf
 import shutil
@@ -171,9 +172,8 @@ def process_transfer(cfg, workdir, outdir, delete_files=True):
         logging.info(f"Processing transfer function at a={a:.4f}...")
         snapdir = join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
         infile = bigfile.File(snapdir)
-        ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
-        pos = np.array(ds[:]['Position'])
-        vel = np.array(ds[:]['Velocity'])
+        pos = infile['1/Position'][:]
+        vel = infile['1/Velocity'][:]
 
         # Measure density field
         rho, _ = rho_and_vfield(
@@ -192,6 +192,11 @@ def process_transfer(cfg, workdir, outdir, delete_files=True):
 
 
 def process_single_snapshot(cfg, workdir, a, delete_files=True):
+    # Idempotent: skip if already converted (e.g. by the streaming watcher)
+    outpath = join(workdir, f'nbody_{a:.4f}.h5')
+    if os.path.exists(outpath):
+        return
+
     logging.info(f"Reading snapshot at a={a:.4f}...")
     snapdir = join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
 
@@ -200,9 +205,11 @@ def process_single_snapshot(cfg, workdir, a, delete_files=True):
         return
 
     infile = bigfile.File(snapdir)
-    ds = bigfile.Dataset(infile['1/'], ['Position', 'Velocity', 'ID'])
-    pos = np.array(ds[:]['Position'])  # comoving positions [Mpc/h]
-    vel = np.array(ds[:]['Velocity'])  # physical velocities [km/s]
+    # Read columns directly: bigfile is columnar, so this touches only the
+    # Position/Velocity blocks (a compound Dataset[:] would read all columns
+    # including the unused 8B/particle ID, twice)
+    pos = infile['1/Position'][:]  # comoving positions [Mpc/h]
+    vel = infile['1/Velocity'][:]  # physical velocities [km/s]
 
     # Measure density and velocity field
     logging.info(f"Processing snapshot at a={a:.4f}...")
@@ -220,10 +227,71 @@ def process_single_snapshot(cfg, workdir, a, delete_files=True):
     # Convert from physical -> comoving velocities
     fvel *= 1/a
 
-    # Save to file
-    with h5py.File(join(workdir, f'nbody_{a:.4f}.h5'), 'w') as outfile:
+    # Save to file (write to .tmp then rename, so existence == complete)
+    with h5py.File(outpath + '.tmp', 'w') as outfile:
         outfile.create_dataset('rho', data=rho)
         outfile.create_dataset('fvel', data=fvel)
+    os.replace(outpath + '.tmp', outpath)
+
+
+def _snapdir(workdir, cfg, a):
+    return join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
+
+
+def _move_snapshots(cfg, workdir, localwork, sentinel, poll=10):
+    """Streaming mover: as FastPM finishes each snapshot, move it from the
+    shared scratch (workdir) to node-local disk (localwork) to free quota.
+
+    Snapshot i is known complete once FastPM has created snapshot i+1's
+    directory (writes are strictly sequential), or once the sentinel file
+    exists (FastPM exited).
+    """
+    asave = sorted(cfg.nbody.asave)
+    mover_done = join(localwork, '.mover_done')
+    try:
+        for i, a in enumerate(asave):
+            src = _snapdir(workdir, cfg, a)
+            dst = _snapdir(localwork, cfg, a)
+            marker = join(localwork, f'.moved_{a:.4f}')
+            while True:
+                nxt = (i + 1 < len(asave)
+                       and os.path.isdir(_snapdir(workdir, cfg, asave[i+1])))
+                if os.path.isdir(src) and (nxt or os.path.exists(sentinel)):
+                    break
+                if os.path.exists(sentinel) and not os.path.isdir(src):
+                    logging.warning(
+                        f"Mover: snapshot a={a:.4f} never appeared, skipping")
+                    src = None
+                    break
+                time.sleep(poll)
+            if src is None:
+                continue
+            if not os.path.isdir(dst):
+                # copy to .tmp then rename, so dst existence == complete copy
+                shutil.copytree(src, dst + '.tmp', dirs_exist_ok=True)
+                os.rename(dst + '.tmp', dst)
+            open(marker, 'w').close()
+            shutil.rmtree(src)
+            logging.info(f"Mover: snapshot a={a:.4f} moved to local disk")
+    finally:
+        open(mover_done, 'w').close()
+
+
+def _convert_snapshots(cfg, localwork, poll=10):
+    """Streaming converter: convert moved snapshots to nbody_{a}.h5 fields
+    (deleting the raw snapshot) while FastPM is still running."""
+    asave = sorted(cfg.nbody.asave)
+    mover_done = join(localwork, '.mover_done')
+    for a in asave:
+        marker = join(localwork, f'.moved_{a:.4f}')
+        while not os.path.exists(marker):
+            if os.path.exists(mover_done):
+                break
+            time.sleep(poll)
+        if not os.path.exists(marker):
+            continue  # mover skipped this one; post-run fallback handles it
+        process_single_snapshot(cfg, localwork, a, delete_files=True)
+        logging.info(f"Converter: snapshot a={a:.4f} converted")
 
     if delete_files:
         infile.close()
@@ -231,7 +299,8 @@ def process_single_snapshot(cfg, workdir, a, delete_files=True):
 
 
 @timing_decorator
-def process_outputs(cfg, workdir, outdir, delete_files=True):
+def process_outputs(cfg, workdir, outdir, delete_files=True,
+                    fallback_workdir=None):
     asave = sorted(cfg.nbody.asave)
     rho, fvel = None, None
 
@@ -246,6 +315,8 @@ def process_outputs(cfg, workdir, outdir, delete_files=True):
         for a in asave:
             # Read snapshot
             filename = join(workdir, f'nbody_{a:.4f}.h5')
+            if not os.path.exists(filename) and fallback_workdir is not None:
+                filename = join(fallback_workdir, f'nbody_{a:.4f}.h5')
             with h5py.File(filename, 'r') as infile:
                 rho = infile['rho'][:]
                 fvel = infile['fvel'][:]
@@ -314,18 +385,60 @@ def main(cfg: DictConfig) -> None:
             cosmo=cfg.nbody.cosmo, outdir=workdir
         )
 
+        # Streaming postprocess: move finished snapshots off the shared
+        # scratch to node-local disk (meta.localdir) and convert them to
+        # field maps while FastPM is still running. Requires localdir on the
+        # node running this driver (post-FastPM steps are single-node).
+        stream = (cfg.nbody.get('stream_postprocess', False)
+                  and cfg.meta.get('localdir', None) is not None
+                  and cfg.nbody.get('postprocess', False)
+                  and cfg.multisnapshot)
+        if stream:
+            localwork = get_source_path(
+                cfg.meta.localdir, cfg.nbody.suite, "fastpm",
+                cfg.nbody.L, cfg.nbody.N, cfg.nbody.lhid, check=False
+            )
+            os.makedirs(localwork, exist_ok=True)
+            sentinel = join(workdir, '.fastpm_done')
+            mover = mp.Process(
+                target=_move_snapshots, args=(cfg, workdir, localwork, sentinel))
+            converter = mp.Process(
+                target=_convert_snapshots, args=(cfg, localwork))
+            mover.start()
+            converter.start()
+
         # Run
         logging.info("Running FastPM...")
-        run_density(cfg, workdir)
+        try:
+            run_density(cfg, workdir)
+        finally:
+            if stream:
+                open(sentinel, 'w').close()  # unblock workers even on failure
         os.remove(join(workdir, 'WhiteNoise_grafic'))  # remove ICs
+
+        if stream:
+            mover.join()
+            converter.join()
+            # Fallback: convert in place anything the streaming path missed
+            for a in sorted(cfg.nbody.asave):
+                if (not os.path.exists(join(localwork, f'nbody_{a:.4f}.h5'))
+                        and os.path.isdir(_snapdir(workdir, cfg, a))):
+                    logging.warning(
+                        f"Streaming missed a={a:.4f}; converting in place")
+                    process_single_snapshot(cfg, workdir, a, delete_files=True)
 
         # Process outputs (snapshots read from workdir, field maps -> outdir)
         logging.info("Processing outputs...")
         if cfg.nbody.save_transfer:
             process_transfer(cfg, workdir, outdir, delete_files=True)
         if 'postprocess' in cfg.nbody and cfg.nbody.postprocess:
-            rho, fvel, pos, vel = process_outputs(
-                cfg, workdir, outdir, delete_files=True)
+            if stream:
+                rho, fvel, pos, vel = process_outputs(
+                    cfg, localwork, outdir, delete_files=True,
+                    fallback_workdir=workdir)
+            else:
+                rho, fvel, pos, vel = process_outputs(
+                    cfg, workdir, outdir, delete_files=True)
 
         if not cfg.nbody.save_particles:
             pos, vel = None, None
@@ -337,8 +450,14 @@ def main(cfg: DictConfig) -> None:
     finally:
         # Always clear the transient work directory (node-local /tmp is purged
         # at job end, but clean up explicitly for the wdir-fallback case too)
-        if workdir != outdir and os.path.isdir(workdir):
+        # nbody.harvest=True leaves snapshots in the shared scratch for an
+        # external harvester job to convert and clean up
+        if (workdir != outdir and os.path.isdir(workdir)
+                and not cfg.nbody.get('harvest', False)):
             shutil.rmtree(workdir, ignore_errors=True)
+        if (cfg.meta.get('localdir', None) is not None
+                and os.path.isdir(cfg.meta.localdir)):
+            shutil.rmtree(cfg.meta.localdir, ignore_errors=True)
 
     # clean up slurm hostfile if it exists
     if os.path.isfile('slurm_hostfile'):
