@@ -37,7 +37,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from .tools import split_experiments
+from .tools import split_experiments, iter_kcuts, kcut_dirname
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -214,46 +214,42 @@ def main(cfg: DictConfig) -> None:
         name = '+'.join(exp.summary)
         save_path = join(model_dir, tracer, name)
 
-        kmin_list = exp.kmin if 'kmin' in exp else [0.]
-        kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+        for kmin, kmax in iter_kcuts(exp):
+            log.info(
+                f'NLE training for {name} with {kmin} <= k <= {kmax}')
+            exp_path = join(save_path, kcut_dirname(kmin, kmax))
 
-        for kmin in kmin_list:
-            for kmax in kmax_list:
-                log.info(
-                    f'NLE training for {name} with {kmin} <= k <= {kmax}')
-                exp_path = join(save_path, f'kmin-{kmin}_kmax-{kmax}')
+            try:
+                x_train = np.load(join(exp_path, 'x_train.npy'))
+                theta_train = np.load(join(exp_path, 'theta_train.npy'))
+                x_val = np.load(join(exp_path, 'x_val.npy'))
+                theta_val = np.load(join(exp_path, 'theta_val.npy'))
+            except FileNotFoundError:
+                log.error(
+                    f'Missing preprocessed data in {exp_path}. '
+                    'Run cmass.infer.preprocess first.')
+                continue
 
-                try:
-                    x_train = np.load(join(exp_path, 'x_train.npy'))
-                    theta_train = np.load(join(exp_path, 'theta_train.npy'))
-                    x_val = np.load(join(exp_path, 'x_val.npy'))
-                    theta_val = np.load(join(exp_path, 'theta_val.npy'))
-                except FileNotFoundError:
-                    log.error(
-                        f'Missing preprocessed data in {exp_path}. '
-                        'Run cmass.infer.preprocess first.')
-                    continue
+            log.info(
+                f'x_train {x_train.shape}, theta_train {theta_train.shape}')
+            log.info(
+                f'x_val {x_val.shape}, theta_val {theta_val.shape}')
 
-                log.info(
-                    f'x_train {x_train.shape}, theta_train {theta_train.shape}')
-                log.info(
-                    f'x_val {x_val.shape}, theta_val {theta_val.shape}')
+            D_x = x_train.shape[1]
+            D_theta = theta_train.shape[1]
 
-                D_x = x_train.shape[1]
-                D_theta = theta_train.shape[1]
+            model = DiagonalGaussianNLE(
+                D_x, D_theta,
+                hidden_features=HIDDEN_FEATURES,
+                hidden_depth=HIDDEN_DEPTH,
+            ).to(device)
+            train_losses, val_losses = _train(
+                model, x_train, theta_train, x_val, theta_val,
+                device=device)
 
-                model = DiagonalGaussianNLE(
-                    D_x, D_theta,
-                    hidden_features=HIDDEN_FEATURES,
-                    hidden_depth=HIDDEN_DEPTH,
-                ).to(device)
-                train_losses, val_losses = _train(
-                    model, x_train, theta_train, x_val, theta_val,
-                    device=device)
-
-                _save(model, D_x, D_theta, join(exp_path, 'nle.pt'))
-                _plot_loss(
-                    train_losses, val_losses, join(exp_path, 'nle_loss.png'))
+            _save(model, D_x, D_theta, join(exp_path, 'nle.pt'))
+            _plot_loss(
+                train_losses, val_losses, join(exp_path, 'nle_loss.png'))
 
 
 if __name__ == "__main__":

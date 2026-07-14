@@ -29,7 +29,7 @@ import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
-from .tools import split_experiments
+from .tools import split_experiments, iter_kcuts, kcut_dirname, resolve_kmax
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
     _construct_hod_prior, _construct_noise_prior,
@@ -182,149 +182,149 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             return
 
     name = '+'.join(exp.summary)
-    kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-    for kmin in kmin_list:
-        for kmax in kmax_list:
+    for kmin, kmax in iter_kcuts(exp):
+        logging.info(
+            f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
+        exp_path = join(model_path, kcut_dirname(kmin, kmax))
+        xs = []
+        for summ in exp.summary:
+            # Handle all the different summaries
+            if summ in ['nbar', 'nz']:
+                continue  # we handle these separately
+
+            base = summ
+            for tag in ["Eq", "Sq", "Ss",  "Is", ""]:
+                if tag in summ:
+                    base = base.replace(tag, "")
+                    break
+
+            # kmax may differ between summaries (e.g. Pk to 0.6, Bk to 0.2)
+            skmax = resolve_kmax(kmax, summ)
+
+            x, theta, id = summaries[base], parameters[base], ids[base]
+            # Preprocess the summaries
+            if 'Pk' in summ:
+                norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
+                x = preprocess_Pk(
+                    x, kmin=kmin, kmax=skmax,
+                    norm=None if '0' in base else summaries[norm_key],
+                    correct_shot=cfg.infer.correct_shot,
+                    loglinear_start_idx=cfg.infer.loglinear_start_idx,
+                )
+            elif ('Bk' in summ) or ('Qk' in summ):
+                norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
+                x = preprocess_Bk(
+                    x, kmin=kmin, kmax=skmax,
+                    norm=None if '0' in base else summaries[norm_key],
+                    mode=tag,
+                    correct_shot=cfg.infer.correct_shot,  # doesn't work currently
+                )
+            else:
+                raise NotImplementedError  # TODO: implement other summaries
+            xs.append((summ, x))
+        if 'nz' in exp.summary:  # add n(z)
+            xs.append(('nz', _get_log10nz(summaries['Pk0'])))
+        if 'nbar' in exp.summary:  # add nbar
+            xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
+
+        labels, xs = zip(*xs)
+        if not np.all([len(x) == len(xs[0]) for x in xs]):
+            raise ValueError(
+                f'Inconsistent lengths of summaries for {name}. Check that all '
+                'summaries have been computed for the same simulations.')
+        startidx = np.cumsum([0] + [x.shape[1] for x in xs])
+        x = np.concatenate(xs, axis=-1)
+
+        # noise out summaries that are not Pk0 or zPk0
+        if cfg.infer.get('test_noised_summs', False):
             logging.info(
-                f'Running preprocessing for {name} with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
-            xs = []
-            for summ in exp.summary:
-                # Handle all the different summaries
-                if summ in ['nbar', 'nz']:
-                    continue  # we handle these separately
+                "TESTING: Noise out all summaries that are not Pk0 or zPk0")
+            for i, label in enumerate(labels):
+                if label not in ['Pk0', 'zPk0']:
+                    logging.info(f"Noise out summary: {label}")
+                    start, end = startidx[i], startidx[i+1]
+                    x[:, start:end] = np.random.standard_normal(
+                        size=(x.shape[0], end-start)
+                    ).astype(x.dtype)
 
-                base = summ
-                for tag in ["Eq", "Sq", "Ss",  "Is", ""]:
-                    if tag in summ:
-                        base = base.replace(tag, "")
-                        break
+        # split train/test
+        ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
+         (ids_train, ids_val, ids_test)) = split_train_val_test(
+            x, theta, id,
+            cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
+        logging.info(f'Split: {len(x_train)} training, '
+                     f'{len(x_val)} validation, {len(x_test)} testing')
 
-                x, theta, id = summaries[base], parameters[base], ids[base]
-                # Preprocess the summaries
-                if 'Pk' in summ:
-                    norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
-                    x = preprocess_Pk(
-                        x, kmin=kmin, kmax=kmax,
-                        norm=None if '0' in base else summaries[norm_key],
-                        correct_shot=cfg.infer.correct_shot,
-                        loglinear_start_idx=cfg.infer.loglinear_start_idx,
-                    )
-                elif ('Bk' in summ) or ('Qk' in summ):
-                    norm_key = base[:-1] + '0'  # monopole (Bk0 or zBk0)
-                    x = preprocess_Bk(
-                        x, kmin=kmin, kmax=kmax,
-                        norm=None if '0' in base else summaries[norm_key],
-                        mode=tag,
-                        correct_shot=cfg.infer.correct_shot,  # doesn't work currently
-                    )
-                else:
-                    raise NotImplementedError  # TODO: implement other summaries
-                xs.append((summ, x))
-            if 'nz' in exp.summary:  # add n(z)
-                xs.append(('nz', _get_log10nz(summaries['Pk0'])))
-            if 'nbar' in exp.summary:  # add nbar
-                xs.append(('nbar', _get_log10nbar(summaries['Pk0'])))
+        # Create output directory
+        logging.info(f'Saving training/test data to {exp_path}')
+        os.makedirs(exp_path, exist_ok=True)
 
-            labels, xs = zip(*xs)
-            if not np.all([len(x) == len(xs[0]) for x in xs]):
-                raise ValueError(
-                    f'Inconsistent lengths of summaries for {name}. Check that all '
-                    'summaries have been computed for the same simulations.')
-            startidx = np.cumsum([0] + [x.shape[1] for x in xs])
-            x = np.concatenate(xs, axis=-1)
+        # Precompress summaries
+        if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
+            logging.info(
+                f"Precompressing with PCA to {cfg.infer.pca_features} features")
+            # Standardize the features
+            scaler = StandardScaler()
+            scaler.fit(x_train)
+            x_train = scaler.transform(x_train)
+            x_val = scaler.transform(x_val)
+            x_test = scaler.transform(x_test)
 
-            # noise out summaries that are not Pk0 or zPk0
-            if cfg.infer.get('test_noised_summs', False):
-                logging.info(
-                    "TESTING: Noise out all summaries that are not Pk0 or zPk0")
-                for i, label in enumerate(labels):
-                    if label not in ['Pk0', 'zPk0']:
-                        logging.info(f"Noise out summary: {label}")
-                        start, end = startidx[i], startidx[i+1]
-                        x[:, start:end] = np.random.standard_normal(
-                            size=(x.shape[0], end-start)
-                        ).astype(x.dtype)
+            # PCA compress the features
+            pca = PCA(n_components=cfg.infer.pca_features)
+            pca.fit(x_train)
+            x_train = pca.transform(x_train)
+            x_val = pca.transform(x_val)
+            x_test = pca.transform(x_test)
+            joblib.dump((scaler, pca), join(exp_path, 'pca.pkl'))
 
-            # split train/test
-            ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
-             (ids_train, ids_val, ids_test)) = split_train_val_test(
-                x, theta, id,
-                cfg.infer.val_frac, cfg.infer.test_frac, cfg.infer.seed)
-            logging.info(f'Split: {len(x_train)} training, '
-                         f'{len(x_val)} validation, {len(x_test)} testing')
+        # save training/test data
+        with open(join(exp_path, 'config.yaml'), 'w') as f:
+            OmegaConf.save(cfg, f)
+        np.save(join(exp_path, 'x_train.npy'), x_train)
+        np.save(join(exp_path, 'x_val.npy'), x_val)
+        np.save(join(exp_path, 'x_test.npy'), x_test)
+        np.save(join(exp_path, 'theta_train.npy'), theta_train)
+        np.save(join(exp_path, 'theta_val.npy'), theta_val)
+        np.save(join(exp_path, 'theta_test.npy'), theta_test)
+        np.save(join(exp_path, 'ids_train.npy'), ids_train)
+        np.save(join(exp_path, 'ids_val.npy'), ids_val)
+        np.save(join(exp_path, 'ids_test.npy'), ids_test)
 
-            # Create output directory
-            logging.info(f'Saving training/test data to {exp_path}')
-            os.makedirs(exp_path, exist_ok=True)
+        # Save split-wise aux arrays
+        id_arr = np.asarray(id)
+        train_mask = np.isin(id_arr, ids_train)
+        val_mask = np.isin(id_arr, ids_val)
+        test_mask = np.isin(id_arr, ids_test)
 
-            # Precompress summaries
-            if cfg.infer.pca_features is not None and cfg.infer.pca_features > 0:
-                logging.info(
-                    f"Precompressing with PCA to {cfg.infer.pca_features} features")
-                # Standardize the features
-                scaler = StandardScaler()
-                scaler.fit(x_train)
-                x_train = scaler.transform(x_train)
-                x_val = scaler.transform(x_val)
-                x_test = scaler.transform(x_test)
+        # number densities
+        nbar = np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1]
+        np.save(join(exp_path, "nbar_train.npy"), nbar[train_mask])
+        np.save(join(exp_path, "nbar_val.npy"), nbar[val_mask])
+        np.save(join(exp_path, "nbar_test.npy"), nbar[test_mask])
 
-                # PCA compress the features
-                pca = PCA(n_components=cfg.infer.pca_features)
-                pca.fit(x_train)
-                x_train = pca.transform(x_train)
-                x_val = pca.transform(x_val)
-                x_test = pca.transform(x_test)
-                joblib.dump((scaler, pca), join(exp_path, 'pca.pkl'))
+        if "noiseid" in summaries:
+            # noise indices
+            noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
+            np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
+            np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
+            np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
 
-            # save training/test data
-            with open(join(exp_path, 'config.yaml'), 'w') as f:
-                OmegaConf.save(cfg, f)
-            np.save(join(exp_path, 'x_train.npy'), x_train)
-            np.save(join(exp_path, 'x_val.npy'), x_val)
-            np.save(join(exp_path, 'x_test.npy'), x_test)
-            np.save(join(exp_path, 'theta_train.npy'), theta_train)
-            np.save(join(exp_path, 'theta_val.npy'), theta_val)
-            np.save(join(exp_path, 'theta_test.npy'), theta_test)
-            np.save(join(exp_path, 'ids_train.npy'), ids_train)
-            np.save(join(exp_path, 'ids_val.npy'), ids_val)
-            np.save(join(exp_path, 'ids_test.npy'), ids_test)
+        with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
+            f.write(','.join(labels) + '\n')
+            f.write(','.join(map(str, startidx.tolist())) + '\n')
+        if hodprior is not None:
+            np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
+                       delimiter=',', fmt='%s')
+        if noiseprior is not None:
+            with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
+                OmegaConf.save(noiseprior, f)
+        # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
-            # Save split-wise aux arrays
-            id_arr = np.asarray(id)
-            train_mask = np.isin(id_arr, ids_train)
-            val_mask = np.isin(id_arr, ids_val)
-            test_mask = np.isin(id_arr, ids_test)
-
-            # number densities
-            nbar = np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1]
-            np.save(join(exp_path, "nbar_train.npy"), nbar[train_mask])
-            np.save(join(exp_path, "nbar_val.npy"), nbar[val_mask])
-            np.save(join(exp_path, "nbar_test.npy"), nbar[test_mask])
-
-            if "noiseid" in summaries:
-                # noise indices
-                noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
-                np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
-                np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
-                np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
-
-            with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
-                f.write(','.join(labels) + '\n')
-                f.write(','.join(map(str, startidx.tolist())) + '\n')
-            if hodprior is not None:
-                np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
-                           delimiter=',', fmt='%s')
-            if noiseprior is not None:
-                with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
-                    OmegaConf.save(noiseprior, f)
-            # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
-
-            # initialize Optuna study (to avoid overwriting during parallelization)
-            if not isfile(join(exp_path, 'optuna_study.db')):
-                _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
+        # initialize Optuna study (to avoid overwriting during parallelization)
+        if not isfile(join(exp_path, 'optuna_study.db')):
+            _ = setup_optuna(exp_path, name, cfg.infer.n_startup_trials)
 
 
 @timing_decorator

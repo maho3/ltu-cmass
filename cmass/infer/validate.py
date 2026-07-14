@@ -20,7 +20,8 @@ import shutil
 import optuna.visualization.matplotlib as vis
 from matplotlib import pyplot as plt
 
-from .tools import select_top_trials, split_experiments, load_posterior
+from .tools import (select_top_trials, split_experiments, load_posterior,
+                    iter_kcuts, kcut_dirname, study_name_from_path)
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -105,10 +106,10 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
 
-    # hack not to pass the summary/summaries argument again, already in exp_path
+    # the summary combination is already encoded in exp_path
     study_cv = optuna.load_study(
         storage=storage_cv,
-        study_name=exp_path.split("/kmin")[0].split("/")[-1])
+        study_name=study_name_from_path(exp_path))
 
     # Load top Nnets architectures by test log prob
     top_trials = select_top_trials(study_cv, Nnets)
@@ -161,54 +162,51 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
 
-    for kmin in kmin_list:
-        for kmax in kmax_list:
-            logging.info(
-                f'Running validation for {name} with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+    for kmin, kmax in iter_kcuts(exp):
+        logging.info(
+            f'Running validation for {name} with {kmin} <= k <= {kmax}')
+        exp_path = join(model_path, kcut_dirname(kmin, kmax))
 
         # load test data
-            try:
-                if cfg.infer.testing.suite is None:
-                    logging.info(f'Loading test data from {exp_path}')
-                    x_test = np.load(join(exp_path, 'x_test.npy'))
-                    theta_test = np.load(join(exp_path, 'theta_test.npy'))
-                    out_path = exp_path
-                else:
-                    test_path = join(
-                        cfg.meta.wdir,
-                        cfg.infer.testing.suite, cfg.infer.testing.sim,
-                        'models', cfg.infer.tracer, name,
-                        f'kmin-{kmin}_kmax-{kmax}')
-                    logging.info(
-                        f'Loading external test data from {test_path}')
-                    x_test = np.load(join(test_path, 'x_test.npy'))
-                    theta_test = np.load(
-                        join(test_path, 'theta_test.npy'))
+        try:
+            if cfg.infer.testing.suite is None:
+                logging.info(f'Loading test data from {exp_path}')
+                x_test = np.load(join(exp_path, 'x_test.npy'))
+                theta_test = np.load(join(exp_path, 'theta_test.npy'))
+                out_path = exp_path
+            else:
+                test_path = join(
+                    cfg.meta.wdir,
+                    cfg.infer.testing.suite, cfg.infer.testing.sim,
+                    'models', cfg.infer.tracer, name,
+                    kcut_dirname(kmin, kmax))
+                logging.info(
+                    f'Loading external test data from {test_path}')
+                x_test = np.load(join(test_path, 'x_test.npy'))
+                theta_test = np.load(
+                    join(test_path, 'theta_test.npy'))
 
-                    out_path = join(exp_path, 'testing',
-                                    f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
-                    if not os.path.exists(out_path):
-                        os.makedirs(out_path)
+                out_path = join(exp_path, 'testing',
+                                f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
+                if not os.path.exists(out_path):
+                    os.makedirs(out_path)
 
-                names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
-                filepath = join(exp_path, 'hodprior.csv')
-                if cfg.infer.subselect_cosmo is not None:
-                    names = [names[i] for i in cfg.infer.subselect_cosmo]
-                if cfg.infer.include_hod and os.path.exists(filepath):
-                    hodprior = np.genfromtxt(
-                        filepath, delimiter=',', dtype=object)
-                    names += hodprior[:, 0].astype('str').tolist()
-                if cfg.infer.include_noise:
-                    names += ['noise_radial', 'noise_transverse']
-            except FileNotFoundError:
-                raise FileNotFoundError(
-                    f'Could not find test data for {name} with kmax={kmax}.'
-                    'Make sure to run cmass.infer.preprocess first.'
-                )
+            names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+            filepath = join(exp_path, 'hodprior.csv')
+            if cfg.infer.subselect_cosmo is not None:
+                names = [names[i] for i in cfg.infer.subselect_cosmo]
+            if cfg.infer.include_hod and os.path.exists(filepath):
+                hodprior = np.genfromtxt(
+                    filepath, delimiter=',', dtype=object)
+                names += hodprior[:, 0].astype('str').tolist()
+            if cfg.infer.include_noise:
+                names += ['noise_radial', 'noise_transverse']
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f'Could not find test data for {name} with kmax={kmax}.'
+                'Make sure to run cmass.infer.preprocess first.'
+            )
         logging.info(f'Testing on {len(x_test)} examples')
 
         # load trained posterior
