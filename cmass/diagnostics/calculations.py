@@ -56,6 +56,73 @@ def calcPk(delta, L, axis=0, MAS='CIC', threads=16):
     return k, Pk, Nmodes
 
 
+def _fixed_pk_kedges(k_nyq):
+    """The fixed (K_MIN, DK_PK) output grid, capped at a mesh's k_nyq.
+
+    Same grid `rebin_pk` rebins pylians onto -- built here directly so
+    pypower can bin straight onto it in one pass, instead of measuring on
+    pypower's own (much finer, k_F-spaced) bins and rebinning after.
+    """
+    n_bins = (k_nyq - K_MIN) // DK_PK
+    return np.append(K_MIN + DK_PK * np.arange(n_bins + 1),
+                     k_nyq)  # last bin shorter
+
+
+def calcPk_pypower(pos, L, N, axis=0, resampler='TSC', interlacing=2):
+    """Periodic-box P(k) multipoles via pypower (CatalogMesh + MeshFFTPower).
+
+    Paints the catalog with `interlacing` shifted copies to suppress the
+    grid aliasing that pylians' single-pass compensated assignment leaves
+    behind at k gtrsim 0.25 (see power_tests/REPORT.md). Bins directly onto
+    the fixed (K_MIN, DK_PK) output grid (see `_fixed_pk_kedges`), so the
+    result needs no further rebinning. Returns (k, Pk[:, :3], Nmodes) in the
+    same layout as `calcPk`.
+    """
+    from pypower import CatalogMesh, MeshFFTPower
+    los = ['x', 'y', 'z'][axis]
+    mesh = CatalogMesh(
+        data_positions=np.ascontiguousarray(pos, dtype=np.float32),
+        boxsize=L, boxcenter=L / 2, nmesh=N,
+        resampler=resampler.lower(), interlacing=interlacing,
+        position_type='pos')
+    kedges = _fixed_pk_kedges(np.pi * N / L)
+    poles = MeshFFTPower(mesh, edges=kedges, ells=(0, 2, 4), los=los).poles
+    Pk = np.stack([
+        poles(ell=0, complex=False, remove_shotnoise=False),
+        poles(ell=2, complex=False),
+        poles(ell=4, complex=False)], axis=-1)
+    return poles.k, Pk, poles.nmodes
+
+
+def calcPk_pypower_field(field, L, axis=0, MAS='CIC'):
+    """Periodic-box P(k) multipoles via pypower for an already-painted field
+    (e.g. the nbody density field written by fastpm/borglpt/etc).
+
+    No interlacing is applied here: the field was painted once upstream by
+    the N-body code, so this only swaps the assignment-window
+    deconvolution/FFT backend, not the anti-aliasing treatment. `field` is
+    the mean-zero density contrast (as stored in nbody.h5); pypower's
+    normalization for a bare RealField is derived from the field's own mean
+    density (`mesh.csum() / volume`), so it must be passed as 1+delta, not
+    delta -- passing delta directly makes the mean ~0 and blows up wnorm.
+    Bins directly onto the fixed (K_MIN, DK_PK) output grid, as above.
+    """
+    from pypower import ArrayMesh, MeshFFTPower
+    los = ['x', 'y', 'z'][axis]
+    N = field.shape[0]
+    mesh = ArrayMesh(
+        np.ascontiguousarray(1 + field, dtype=np.float32),
+        boxsize=L, type='real', nmesh=N)
+    kedges = _fixed_pk_kedges(np.pi * N / L)
+    poles = MeshFFTPower(mesh, edges=kedges, ells=(0, 2, 4), los=los,
+                         compensations=MAS.lower()).poles
+    Pk = np.stack([
+        poles(ell=0, complex=False, remove_shotnoise=False),
+        poles(ell=2, complex=False),
+        poles(ell=4, complex=False)], axis=-1)
+    return poles.k, Pk, poles.nmodes
+
+
 def rebin_pk(k, Pk, Nmodes):
     """Rebin pylians P(k) onto a fixed physical grid using mode-weighted averaging.
 
