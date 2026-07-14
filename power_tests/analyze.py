@@ -139,6 +139,31 @@ def main():
     fig.savefig(f'{args.figdir}/pk_backend_prod_diff.png', dpi=150)
     print(f'saved {args.figdir}/pk_backend_prod_diff.png')
 
+    # --- Raw spectra (not ratios), normalized as k*P(k) --------------------
+    for space in ['real', 'zspace']:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
+        for iell, ell in enumerate(ELLS):
+            ax = axes[iell]
+            for cfg in CONFIGS + [TRUTH]:
+                color = COLORS.get(cfg, 'k')
+                stack = []
+                for d in data:
+                    _, Pc = rebinned(d, space, cfg)
+                    stack.append(Pc[:, iell])
+                stack = np.array(stack)
+                mean = np.nanmean(stack, 0)
+                ax.semilogx(kc, kc * mean, color=color, label=LABELS[cfg])
+            ax.axhline(0, color='k', lw=0.5)
+            ax.set_xlabel(r'$k$ [$h$/Mpc]')
+            ax.set_title(rf'$P_{ell}$')
+        axes[0].set_ylabel(r'$k\,P_\ell(k)$ [$(\mathrm{Mpc}/h)^2$]')
+        axes[0].legend(fontsize=8)
+        fig.suptitle(
+            f'Raw power spectra (mean over {len(data)} boxes) — {space}')
+        fig.tight_layout()
+        fig.savefig(f'{args.figdir}/pk_backend_raw_{space}.png', dpi=150)
+        print(f'saved {args.figdir}/pk_backend_raw_{space}.png')
+
     # --- Timings ----------------------------------------------------------
     print('\nTimings (best-of-3, mean ± std over lhids, seconds):')
     rows = []
