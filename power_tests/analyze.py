@@ -22,6 +22,7 @@ def rebin_fixed(k, Pk, Nmodes):
             out[i] = np.average(Pk[m], weights=Nmodes[m], axis=0)
     return kc, out
 
+
 TRUTH = 'pypower_n512_i2'
 TRUTH_CHECK = 'pylians_n512'
 CONFIGS = ['pylians_n128', 'pypower_n128_i0', 'pypower_n128_i2',
@@ -139,30 +140,63 @@ def main():
     fig.savefig(f'{args.figdir}/pk_backend_prod_diff.png', dpi=150)
     print(f'saved {args.figdir}/pk_backend_prod_diff.png')
 
-    # --- Raw spectra (not ratios), normalized as k*P(k) --------------------
+    # --- Raw spectra (not ratios), single sim ------------------------------
+    d0 = data[0]
+    lhid0 = int(d0['lhid'])
     for space in ['real', 'zspace']:
         fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
         for iell, ell in enumerate(ELLS):
             ax = axes[iell]
             for cfg in CONFIGS + [TRUTH]:
                 color = COLORS.get(cfg, 'k')
-                stack = []
-                for d in data:
-                    _, Pc = rebinned(d, space, cfg)
-                    stack.append(Pc[:, iell])
-                stack = np.array(stack)
-                mean = np.nanmean(stack, 0)
-                ax.semilogx(kc, kc * mean, color=color, label=LABELS[cfg])
-            ax.axhline(0, color='k', lw=0.5)
+                kc, Pc = rebinned(d0, space, cfg)
+                if ell == 0:
+                    ax.loglog(kc, Pc[:, iell], color=color, label=LABELS[cfg])
+                else:
+                    ax.semilogx(kc, Pc[:, iell], color=color, label=LABELS[cfg])
+                    ax.axhline(0, color='k', lw=0.5)
             ax.set_xlabel(r'$k$ [$h$/Mpc]')
             ax.set_title(rf'$P_{ell}$')
-        axes[0].set_ylabel(r'$k\,P_\ell(k)$ [$(\mathrm{Mpc}/h)^2$]')
+        axes[0].set_ylabel(r'$P_\ell(k)$ [$(\mathrm{Mpc}/h)^3$]')
         axes[0].legend(fontsize=8)
-        fig.suptitle(
-            f'Raw power spectra (mean over {len(data)} boxes) — {space}')
+        fig.suptitle(f'Raw power spectra — {space}, lhid {lhid0}')
         fig.tight_layout()
         fig.savefig(f'{args.figdir}/pk_backend_raw_{space}.png', dpi=150)
         print(f'saved {args.figdir}/pk_backend_raw_{space}.png')
+
+    # --- z-space monopole: raw P(k) on top, ratio to truth on bottom ------
+    space, iell = 'zspace', 0
+    fig, (ax_top, ax_bot) = plt.subplots(
+        2, 1, figsize=(7, 6.5), sharex=True,
+        gridspec_kw={'height_ratios': [2, 1]})
+    d0 = data[0]
+    lhid0 = int(d0['lhid'])
+    kt = None
+    for cfg in CONFIGS + [TRUTH]:
+        color = COLORS.get(cfg, 'k')
+        _, P0 = rebinned(d0, space, cfg)
+        ratios = []
+        for d in data:
+            kt, Pt = rebinned(d, space, TRUTH)
+            kc, Pc = rebinned(d, space, cfg)
+            ratios.append(Pc[:, iell] / Pt[:, iell])
+        ratios = np.array(ratios)
+        ax_top.loglog(kc, P0[:, iell], color=color, label=LABELS[cfg])
+        mean, std = np.nanmean(ratios, 0), np.nanstd(ratios, 0)
+        ax_bot.plot(kt, mean, color=color)
+        ax_bot.fill_between(kt, mean - std, mean + std,
+                            color=color, alpha=0.2, lw=0)
+    ax_top.set_ylabel(r'$P_0(k)$ [$(\mathrm{Mpc}/h)^3$]')
+    ax_top.set_title(f'z-space monopole — lhid {lhid0}')
+    ax_top.legend(fontsize=8)
+    ax_bot.axhline(1, color='k', lw=0.5)
+    ax_bot.axhspan(0.999, 1.001, color='gray', alpha=0.15)
+    ax_bot.set_ylim(0.995, 1.005)
+    ax_bot.set_xlabel(r'$k$ [$h$/Mpc]')
+    ax_bot.set_ylabel(r'$P_0 / P_0^{\rm truth}$')
+    fig.tight_layout()
+    fig.savefig(f'{args.figdir}/pk_backend_zspace_p0.png', dpi=150)
+    print(f'saved {args.figdir}/pk_backend_zspace_p0.png')
 
     # --- Timings ----------------------------------------------------------
     print('\nTimings (best-of-3, mean ± std over lhids, seconds):')
