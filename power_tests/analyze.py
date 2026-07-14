@@ -8,7 +8,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-K_EDGES = np.arange(0.01, 0.401, 0.01)  # fixed production-style grid
+K_EDGES = np.arange(0.01, 0.601, 0.01)  # fixed production-style grid
 
 
 def rebin_fixed(k, Pk, Nmodes):

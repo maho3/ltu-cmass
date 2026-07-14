@@ -37,15 +37,22 @@ between training and inference).
 ## Accuracy / anti-aliasing
 
 Ratio to truth, z-space, mean over 11 boxes
-(`figures/pk_backend_ratio_{real,zspace}.png`):
+(`figures/pk_backend_ratio_{real,zspace}.png`). Binning was extended from the
+original kmax=0.4 to kmax=0.6 to see how far past the N=128 production
+Nyquist (k_Nyq = πN/L ≈ 0.402 for N=128, L=1000) the N=256/N=512 configs
+hold up:
 
-| Config | P0 @ k=0.3 | P0 @ k=0.4 | P2 @ k=0.3 | P2 @ k=0.4 |
-|---|---|---|---|---|
-| pylians N=128 (production) | +0.8% | **+19.0%** | +0.5% | **+27.5%** |
-| pypower N=128, no interlacing | −0.4% | −1.2% | −1.3% | −5.3% |
-| pypower N=128, interlacing=2 | +0.00% | +0.5% | +0.00% | +0.1% |
-| pylians N=256 (high_res) | +0.01% | +0.02% | −0.05% | −0.5% |
-| pypower N=256, interlacing=2 | 0.00% | 0.00% | 0.00% | 0.00% |
+| Config | P0 @ 0.3 | P0 @ 0.4 | P0 @ 0.5 | P0 @ 0.6 | P2 @ 0.3 | P2 @ 0.4 | P2 @ 0.5 | P2 @ 0.6 |
+|---|---|---|---|---|---|---|---|---|
+| pylians N=128 (production) | +0.8% | **+19.0%** | — | — | +1.0% | +27.5% | — | — |
+| pypower N=128, no interlacing | −0.4% | −1.2% | — | — | −1.3% | −5.3% | — | — |
+| pypower N=128, interlacing=2 | +0.00% | +0.5% | — | — | +0.00% | +0.1% | — | — |
+| pylians N=256 (high_res) | +0.01% | +0.02% | +0.2% | **+0.7%** | −0.05% | −0.5% | +0.1% | **−2.9%** |
+| pypower N=256, interlacing=2 | 0.00% | 0.00% | 0.00% | +0.01% | 0.00% | 0.00% | −0.01% | −0.2% |
+
+(`—` = no data: k=0.5 and 0.6 lie beyond the N=128 mesh's Nyquist, so those
+bins have zero modes and are NaN in the rebinned output, not silently
+truncated.)
 
 - The pylians N=128 aliasing turns on at k ≳ 0.25 (≳1% by k≈0.3) and blows up
   approaching k_Nyq=0.4. This is inherited by every summary computed through
@@ -53,11 +60,18 @@ Ratio to truth, z-space, mean over 11 boxes
 - Interlacing, not the code, is the differentiator: pypower *without*
   interlacing is also biased (a few % low; its aliasing residual has opposite
   sign because compensated TSC over-corrects the raw aliased power).
-- With interlacing=2, N=128 is already converged: the last (edge-truncated)
-  bin at k≈0.40 is the only one off, at +0.5% (P0). N=256+interlacing is
-  exact to <0.01% everywhere.
+- With interlacing=2, N=128 is already converged over its accessible range:
+  the last (edge-truncated) bin at k≈0.40 is the only one off, at +0.5% (P0).
+- At the extended range, N=256 without interlacing (pylians) starts drifting
+  again as k approaches its own Nyquist (0.804): P0 is still sub-percent at
+  k=0.6, but P2 is off by −2.9% (z-space) — the same aliasing mechanism as the
+  N=128 case, just pushed out by a factor of 2 in k. pypower N=256+interlacing
+  stays <0.2% out to k=0.6 for both P0 and P2, i.e. interlacing continues to
+  do the work, not the extra resolution.
 - Real-space results are identical in character (P0: +10% pylians bias at
-  k=0.4; P2/P4 ratios are noise-dominated since those multipoles ≈ 0).
+  k=0.4; P2/P4 ratios are noise-dominated since those multipoles ≈ 0, so their
+  percent deviations swing more — e.g. pypower N=256 i2 shows +9.8% on real
+  P2 at k=0.6, which is noise on a near-zero signal, not a real bias).
 
 ## What changes in the SBI data vector
 
@@ -65,9 +79,13 @@ Ratio to truth, z-space, mean over 11 boxes
 leaves the data vector unchanged (<0.1% of P0) for k < 0.25, then removes the
 aliasing excess: −1.5% at k≈0.3, −16% at k≈0.4 (P0, both spaces; P2 −4% of P0
 at k=0.4 in z-space). Experiments with kmax ≤ 0.2 are unaffected; kmax ≥ 0.3
-experiments will see systematically different spectra. **Training and
-inference must use the same backend** — a model trained on pylians summaries
-cannot be applied to pypower summaries at kmax ≳ 0.25. Since the aliasing is
+experiments will see systematically different spectra. Note `infer/default.yaml`
+sweeps `kmax` up to 0.5 — any such experiment run at N=128 is *already* past
+that mesh's Nyquist (0.402), regardless of backend, so kmax ∈ {0.4, 0.5}
+configs need N=256 (with interlacing) to be measuring real power rather than
+aliased/absent modes. **Training and inference must use the same backend** —
+a model trained on pylians summaries cannot be applied to pypower summaries
+at kmax ≳ 0.25. Since the aliasing is
 present identically in both simulation and (simulated) observation, the
 current pylians-based inferences are internally consistent, not wrong — the
 gain from switching is accuracy of the physical spectra and robustness when
@@ -116,7 +134,10 @@ Adopt **pypower, TSC, interlacing=2, N=128 per Gpc/h** for periodic-box
 multipoles in `summ.py`, drop `high_res` for P(k), and regenerate summaries
 for any suite used with kmax > 0.2 before retraining. Keep pylians for
 painting-only uses (`MA` fields feeding polybin) since PolyBin handles its own
-pixel window.
+pixel window. For any experiment with kmax > 0.4 (i.e. past the N=128
+Nyquist), this recommendation does not apply as-is — bump to **N=256 with
+interlacing=2**, which stays <0.2% accurate out to k=0.6 (extended-range test
+above), instead of trying to push N=128 further.
 
 ## Reproducing
 

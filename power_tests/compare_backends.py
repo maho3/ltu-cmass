@@ -21,7 +21,7 @@ L = 1000.0
 Z = 0.5
 A = '0.666667'
 DATADIR = '/work/hdd/bdne/maho3/cmass-ili/quijote/nbody/L1000-N128'
-KEDGES = np.arange(0, 0.41, 2 * np.pi / L)
+KEDGES = np.arange(0, 0.61, 2 * np.pi / L)
 NREP = 3
 
 CONFIGS = [
