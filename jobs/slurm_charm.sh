@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=abacuscharm  # Job name
-#SBATCH --array=0-4,10-14         # Job array range for lhid
+#SBATCH --array=0-19         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
 #SBATCH --time=2:00:00         # Time limit
@@ -24,12 +24,12 @@ echo "lhid=$lhid"
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-nbody=abacuslike
-sim=fastpm_charm6
+nbody=quijotelike
+sim=fastpm_charm7
 multisnapshot=False
-extras="nbody.matchIC=0 nbody.zf=0.500015" #  meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
-L=2000
-N=256
+extras="nbody.matchIC=0 nbody.zf=0.5  meta.cosmofile=./params/stupid_fastpm_4k_params.txt" # "meta.cosmofile=./params/mtng_cosmologies.txt" # meta.cosmofile=./params/abacus_cosmologies.txt" # nbody.zf=0.500015"
+L=1000
+N=128
 # keys_to_check=(0.586220 0.606330 0.626440 0.646550 0.666660 0.686770 0.706880 0.726990 0.747100 0.767210)
 keys_to_check=(0.666667)
 
