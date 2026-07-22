@@ -588,6 +588,10 @@ def summarize_lightcone_pypower(
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 @clean_up(hydra)
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'sim', 'bias', 'survey',
+                                      'diag', 'noise', 'multisnapshot'])
+
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
 

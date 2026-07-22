@@ -233,6 +233,10 @@ def process_single_snapshot(cfg, workdir, a, delete_files=True):
         outfile.create_dataset('fvel', data=fvel)
     os.replace(outpath + '.tmp', outpath)
 
+    # Remove raw particle files when they've been converted
+    if delete_files:
+        shutil.rmtree(snapdir, ignore_errors=True)
+
 
 def _snapdir(workdir, cfg, a):
     return join(workdir, f'fastpm_B{cfg.nbody.B}_{a:.4f}')
