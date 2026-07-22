@@ -3,6 +3,7 @@
 #SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=8            # Number of tasks
+#SBATCH --mem=16GB            # Memory per node
 #SBATCH --time=02:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
@@ -25,7 +26,7 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=quijotelike
-sim=fastpm_charm6_comp
+sim=fastpm_charm7
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
