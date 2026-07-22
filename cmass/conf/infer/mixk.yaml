@@ -1,0 +1,34 @@
+defaults:
+  - simple
+  - _self_
+
+# Example of summary-dependent kmax cuts.
+#
+# Each entry of `kmax` is either:
+#   - a float, applied to every summary (legacy behaviour), or
+#   - a mapping, resolved per summary in order of decreasing specificity:
+#       exact name (zPk4) -> family (zPk, zQk, zEqBk) -> family without the
+#       triangle tag (zEqQk -> zQk) -> 'default'.
+#     A summary with no matching key and no 'default' raises.
+#
+# `kmin` remains a scalar, applied to all summaries.
+#
+# Output directories:
+#   - float kmax  ->  kmin-0.0_kmax-0.4
+#   - mapping     ->  kmin-0.0_kmax-def=0.2__zPk=0.6__zPk4=0.3
+#
+# In the mapping form: 'default' is shortened to 'def', '=' separates key from
+# value, and '__' separates rules.  Keys are ordered least-specific first
+# (def, then family keys by length, then exact summary names), so the name
+# reads as a left-to-right fallback chain.
+
+experiments:
+  - summary: [zPk0, zPk2, zPk4, zQk0]
+    kmin: [0.]
+    kmax:
+      - 0.4                    # uniform cut, as before
+      - {zPk: 0.6, zQk: 0.2}   # P(k) to 0.6, Q(k) only to 0.2
+  - summary: [zPk0, zPk2, zPk4, zBk0]
+    kmin: [0.]
+    kmax:
+      - {zPk: 0.6, zPk4: 0.3, default: 0.2}

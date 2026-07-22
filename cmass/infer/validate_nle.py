@@ -22,7 +22,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from .train_nle import load_nle
-from .tools import split_experiments
+from .tools import split_experiments, iter_kcuts, kcut_dirname
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -130,64 +130,60 @@ def plot_emulations(model, x_test, theta_test, out_path, device='cpu',
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
-    kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
+    for kmin, kmax in iter_kcuts(exp):
+        log.info(
+            f'Running NLE validation for {name} '
+            f'with {kmin} <= k <= {kmax}')
+        exp_path = join(model_path, kcut_dirname(kmin, kmax))
 
-    for kmin in kmin_list:
-        for kmax in kmax_list:
-            log.info(
-                f'Running NLE validation for {name} '
-                f'with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+        # ── resolve test data path (OOD or in-distribution) ──────
+        if cfg.infer.testing.suite is None:
+            log.info(f'Loading test data from {exp_path}')
+            test_path = exp_path
+            out_path = exp_path
+        else:
+            test_path = join(
+                cfg.meta.wdir,
+                cfg.infer.testing.suite, cfg.infer.testing.sim,
+                'models', cfg.infer.tracer, name,
+                kcut_dirname(kmin, kmax))
+            log.info(f'Loading OOD test data from {test_path}')
+            out_path = join(
+                exp_path, 'testing',
+                f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
+            os.makedirs(out_path, exist_ok=True)
 
-            # ── resolve test data path (OOD or in-distribution) ──────
-            if cfg.infer.testing.suite is None:
-                log.info(f'Loading test data from {exp_path}')
-                test_path = exp_path
-                out_path = exp_path
-            else:
-                test_path = join(
-                    cfg.meta.wdir,
-                    cfg.infer.testing.suite, cfg.infer.testing.sim,
-                    'models', cfg.infer.tracer, name,
-                    f'kmin-{kmin}_kmax-{kmax}')
-                log.info(f'Loading OOD test data from {test_path}')
-                out_path = join(
-                    exp_path, 'testing',
-                    f'{cfg.infer.testing.suite}_{cfg.infer.testing.sim}')
-                os.makedirs(out_path, exist_ok=True)
+        try:
+            x_test = np.load(join(test_path, 'x_test.npy'))
+            theta_test = np.load(join(test_path, 'theta_test.npy'))
+        except FileNotFoundError:
+            log.error(
+                f'Missing test data in {test_path}. '
+                'Run cmass.infer.preprocess first.')
+            continue
 
-            try:
-                x_test = np.load(join(test_path, 'x_test.npy'))
-                theta_test = np.load(join(test_path, 'theta_test.npy'))
-            except FileNotFoundError:
-                log.error(
-                    f'Missing test data in {test_path}. '
-                    'Run cmass.infer.preprocess first.')
-                continue
+        log.info(f'Testing on {len(x_test)} examples')
 
-            log.info(f'Testing on {len(x_test)} examples')
+        # ── load trained NLE ─────────────────────────────────────
+        nle_path = join(exp_path, 'nle.pt')
+        if not os.path.exists(nle_path):
+            log.error(f'No NLE checkpoint at {nle_path}. '
+                      'Run cmass.infer.train_nle first.')
+            continue
 
-            # ── load trained NLE ─────────────────────────────────────
-            nle_path = join(exp_path, 'nle.pt')
-            if not os.path.exists(nle_path):
-                log.error(f'No NLE checkpoint at {nle_path}. '
-                          'Run cmass.infer.train_nle first.')
-                continue
+        model = load_nle(nle_path, device=cfg.infer.device)
+        log.info(f'Loaded NLE from {nle_path}')
 
-            model = load_nle(nle_path, device=cfg.infer.device)
-            log.info(f'Loaded NLE from {nle_path}')
+        segments = _load_segments(exp_path)
+        if segments is not None:
+            log.info(f'Colouring by segments: {[s[0] for s in segments]}')
 
-            segments = _load_segments(exp_path)
-            if segments is not None:
-                log.info(f'Colouring by segments: {[s[0] for s in segments]}')
-
-            # ── plot emulations ──────────────────────────────────────
-            plot_emulations(
-                model, x_test, theta_test,
-                join(out_path, 'nle_emulations.png'),
-                device=cfg.infer.device,
-                segments=segments)
+        # ── plot emulations ──────────────────────────────────────
+        plot_emulations(
+            model, x_test, theta_test,
+            join(out_path, 'nle_emulations.png'),
+            device=cfg.infer.device,
+            segments=segments)
 
 
 @timing_decorator
