@@ -24,7 +24,8 @@ import yaml
 import time
 import optuna
 
-from .tools import select_top_trials, split_experiments, prepare_loader
+from .tools import (select_top_trials, split_experiments, prepare_loader,
+                    iter_kcuts, kcut_dirname, study_name_from_path)
 from .hyperparameters import sample_hyperparameters_randomly
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -418,57 +419,54 @@ def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
 
-    kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
     validation_smoothing_method = cfg.infer.get(
         'validation_smoothing_method', 'none')
     ema_decay = cfg.infer.get('ema_decay', 0.9)
 
-    for kmin in kmin_list:
-        for kmax in kmax_list:
-            logging.info(
-                f'Running training for {name} with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+    for kmin, kmax in iter_kcuts(exp):
+        logging.info(
+            f'Running training for {name} with {kmin} <= k <= {kmax}')
+        exp_path = join(model_path, kcut_dirname(kmin, kmax))
 
-            # load training/test data
-            (x_train, theta_train, ids_train,
-             x_val, theta_val, ids_val,
-             x_test, theta_test, ids_test,
-             hodprior, noiseprior,
-             startidx) = load_preprocessed_data(exp_path)
+        # load training/test data
+        (x_train, theta_train, ids_train,
+         x_val, theta_val, ids_val,
+         x_test, theta_test, ids_test,
+         hodprior, noiseprior,
+         startidx) = load_preprocessed_data(exp_path)
 
-            logging.info(
-                f'Split: {len(x_train)} training, {len(x_val)} validation, '
-                f'{len(x_test)} testing')
+        logging.info(
+            f'Split: {len(x_train)} training, {len(x_val)} validation, '
+            f'{len(x_test)} testing')
 
-            out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
-            logging.info(f'Saving models to {out_dir}')
+        out_dir = join(exp_path, 'nets', f'net-{cfg.infer.net_index}')
+        logging.info(f'Saving models to {out_dir}')
 
-            # run training
-            start = time.time()
-            posterior, histories = run_training(
-                x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                cfg=cfg, mcfg=cfg.net,
-                hodprior=hodprior, noiseprior=noiseprior,
-                start_idx=startidx,
-                validation_smoothing_method=validation_smoothing_method,
-                ema_decay=ema_decay,
-            )
-            end = time.time()
+        # run training
+        start = time.time()
+        posterior, histories = run_training(
+            x_train, theta_train, x_val, theta_val, out_dir=out_dir,
+            cfg=cfg, mcfg=cfg.net,
+            hodprior=hodprior, noiseprior=noiseprior,
+            start_idx=startidx,
+            validation_smoothing_method=validation_smoothing_method,
+            ema_decay=ema_decay,
+        )
+        end = time.time()
 
-            # Save the timing and metadata
-            with open(join(out_dir, 'timing.txt'), 'w') as f:
-                f.write(f'{end - start:.3f}')
-            with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
+        # Save the timing and metadata
+        with open(join(out_dir, 'timing.txt'), 'w') as f:
+            f.write(f'{end - start:.3f}')
+        with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+            yaml.dump(OmegaConf.to_container(cfg.net, resolve=True), f)
 
-            # plot training history
-            plot_training_history(histories, out_dir)
+        # plot training history
+        plot_training_history(histories, out_dir)
 
-            # evaluate the posterior and save to file
-            log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
-            with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-                f.write(f'{log_prob_test}\n')
+        # evaluate the posterior and save to file
+        log_prob_test = evaluate_posterior(posterior, x_test, theta_test)
+        with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+            f.write(f'{log_prob_test}\n')
 
 
 def select_nets_retrain(exp_path, Nnets):
@@ -480,10 +478,10 @@ def select_nets_retrain(exp_path, Nnets):
     optunafile_cv = join(exp_path, 'optuna_study.db')
     storage_cv = f"sqlite:///{optunafile_cv}"
 
-    # hack not to pass the summary/summaries argument again, already in exp_path
+    # the summary combination is already encoded in exp_path
     study_cv = optuna.load_study(
         storage=storage_cv,
-        study_name=exp_path.split("/kmin")[0].split("/")[-1])
+        study_name=study_name_from_path(exp_path))
 
     # Load top Nnets architectures by test log prob
     top_trials = select_top_trials(study_cv, Nnets)
@@ -505,9 +503,6 @@ def run_retraining(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
 
-    kmin_list = exp.kmin if 'kmin' in exp else [0.]
-    kmax_list = exp.kmax if 'kmax' in exp else [0.4]
-
     Nnets = cfg.infer.Nnets
     if cfg.infer.precompress:
         train_fn = run_training_with_precompression
@@ -522,78 +517,77 @@ def run_retraining(exp, cfg, model_path):
         'validation_smoothing_method', 'none').lower()
     ema_decay = cfg.infer.get('ema_decay', 0.9)
 
-    for kmin in kmin_list:
-        for kmax in kmax_list:
-            logging.info(
-                f'Running training for {name} with {kmin} <= k <= {kmax}')
-            exp_path = join(model_path, f'kmin-{kmin}_kmax-{kmax}')
+    for kmin, kmax in iter_kcuts(exp):
+        logging.info(
+            f'Running training for {name} with {kmin} <= k <= {kmax}')
+        exp_path = join(model_path, kcut_dirname(kmin, kmax))
 
-            # Only select a subset of networks within the hyperparameter study
-            trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
+        # Only select a subset of networks within the hyperparameter study
+        trial_numbers, net_configs = select_nets_retrain(exp_path, Nnets)
 
-            # If net_index is not None, select the net_index-th model, otherwise train all sequentially
-            if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
-                net_index = cfg.infer.net_index
-                if net_index < len(trial_numbers):
-                    logging.info(
-                        f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
-                    trial_numbers = [trial_numbers[net_index]]
-                    net_configs = [net_configs[net_index]]
-                else:
-                    logging.warning(
-                        f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
-                    return
-
-            for trial_number, config in zip(trial_numbers, net_configs):
-
-                out_dir = join(exp_path, "nets", f"net-{trial_number}")
-                os.makedirs(out_dir, exist_ok=True)
-
-                # if net is run and saved already, skip
-                if os.path.exists(join(out_dir, 'posterior.pkl')):
-                    logging.info(
-                        f"Net-{trial_number} already trained. Skipping.")
-                    continue
-
-                # load training/test data: we retrain on the original split
-                # from cmass.infer.preprocess
-                (x_train, theta_train, ids_train,
-                 x_val, theta_val, ids_val,
-                 x_test, theta_test, ids_test,
-                 hodprior, noiseprior,
-                 startidx) = load_preprocessed_data(exp_path)
-
+        # If net_index is not None, select the net_index-th model, otherwise train all sequentially
+        if hasattr(cfg.infer, 'net_index') and cfg.infer.net_index is not None:
+            net_index = cfg.infer.net_index
+            if net_index < len(trial_numbers):
                 logging.info(
-                    f'Split: {len(x_train)} training, {len(x_val)} validation, '
-                    f'{len(x_test)} testing')
+                    f"Selecting net index {net_index} from top {len(trial_numbers)} models.")
+                trial_numbers = [trial_numbers[net_index]]
+                net_configs = [net_configs[net_index]]
+            else:
+                logging.warning(
+                    f"net_index {net_index} is out of bounds for top {len(trial_numbers)} models. Exiting.")
+                return
 
-                mcfg = OmegaConf.create(config)
+        for trial_number, config in zip(trial_numbers, net_configs):
 
-                start = time.time()
-                posterior, histories = train_fn(
-                    x_train, theta_train, x_val, theta_val, out_dir=out_dir,
-                    cfg=cfg, mcfg=mcfg,
-                    hodprior=hodprior, noiseprior=noiseprior,
-                    start_idx=startidx,
-                    validation_smoothing_method=validation_smoothing_method,
-                    ema_decay=ema_decay
-                )
-                end = time.time()
+            out_dir = join(exp_path, "nets", f"net-{trial_number}")
+            os.makedirs(out_dir, exist_ok=True)
 
-                # Save the timing and metadata
-                with open(join(out_dir, 'timing.txt'), 'w') as f:
-                    f.write(f'{end - start:.3f}')
-                with open(join(out_dir, 'model_config.yaml'), 'w') as f:
-                    yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+            # if net is run and saved already, skip
+            if os.path.exists(join(out_dir, 'posterior.pkl')):
+                logging.info(
+                    f"Net-{trial_number} already trained. Skipping.")
+                continue
 
-                # plot training history
-                plot_training_history(histories, out_dir)
+            # load training/test data: we retrain on the original split
+            # from cmass.infer.preprocess
+            (x_train, theta_train, ids_train,
+             x_val, theta_val, ids_val,
+             x_test, theta_test, ids_test,
+             hodprior, noiseprior,
+             startidx) = load_preprocessed_data(exp_path)
 
-                # evaluate the posterior and save to file
-                log_prob_test = evaluate_posterior(
-                    posterior, x_test, theta_test)
-                with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
-                    f.write(f'{log_prob_test}\n')
+            logging.info(
+                f'Split: {len(x_train)} training, {len(x_val)} validation, '
+                f'{len(x_test)} testing')
+
+            mcfg = OmegaConf.create(config)
+
+            start = time.time()
+            posterior, histories = train_fn(
+                x_train, theta_train, x_val, theta_val, out_dir=out_dir,
+                cfg=cfg, mcfg=mcfg,
+                hodprior=hodprior, noiseprior=noiseprior,
+                start_idx=startidx,
+                validation_smoothing_method=validation_smoothing_method,
+                ema_decay=ema_decay
+            )
+            end = time.time()
+
+            # Save the timing and metadata
+            with open(join(out_dir, 'timing.txt'), 'w') as f:
+                f.write(f'{end - start:.3f}')
+            with open(join(out_dir, 'model_config.yaml'), 'w') as f:
+                yaml.dump(OmegaConf.to_container(mcfg, resolve=True), f)
+
+            # plot training history
+            plot_training_history(histories, out_dir)
+
+            # evaluate the posterior and save to file
+            log_prob_test = evaluate_posterior(
+                posterior, x_test, theta_test)
+            with open(join(out_dir, 'log_prob_test.txt'), 'w') as f:
+                f.write(f'{log_prob_test}\n')
 
 
 @timing_decorator
