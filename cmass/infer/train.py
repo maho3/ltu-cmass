@@ -208,8 +208,10 @@ def run_training(
         extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
-    kwargs = {k: v for k, v in mcfg.items() if k in [
-        'model', 'hidden_features', 'num_transforms', 'num_components']}
+    allowed_keys = ['model', 'hidden_features', 'num_transforms', 'num_components']
+    if mcfg.model == 'moment':
+        allowed_keys += ['hidden_depth', 'activation']
+    kwargs = {k: v for k, v in mcfg.items() if k in allowed_keys}
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments

@@ -25,19 +25,19 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm6_comp
-infer=simple  # simple  # lightcone
+sim=fastpm_charm6_momenthod
+infer=moment_test  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun net=moment_test" # 
 device="cpu"
 
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
+# export TQDM_DISABLE=0
+# extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=True infer.include_hod=True"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 # suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_hodz_gridnoise"

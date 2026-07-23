@@ -1,0 +1,81 @@
+# Quick single-model moment-network test on fastpm_charm6_momenthod.
+# Mirrors infer/simple.yaml's experiment/kmax grid, which matches what's
+# already preprocessed on disk for this suite.
+
+save_dir: null
+
+# --- GLOBAL CONFIGURATION ---
+exp_index: null
+net_index: 0
+device: cpu
+
+# --- EXPERIMENT CONFIGURATION ---
+Nmax: -1
+correct_shot: true
+tracer: galaxy
+
+experiments:
+  - summary: [zPk0]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4, 0.5, 0.6]
+  - summary: [zPk0, zPk2, zPk4]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4, 0.5, 0.6]
+  - summary: [zPk0, zPk2, zPk4, zBk0]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4]
+  - summary: [zPk0, zPk2, zPk4, zEqBk0]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4]
+
+# --- TRAINING CONFIGURATION ---
+Nnets: 10
+retrain: False
+verbose: False
+
+val_frac: 0.1
+test_frac: 0.1
+seed: 0
+
+include_hod: True
+include_noise: True
+subselect_cosmo: null
+
+prior: quijote
+backend: lampe
+engine: NPE
+embedding_net: fcn
+
+batch_size: null
+learning_rate: null
+stop_after_epochs: 50
+weight_decay: 0
+lr_decay_factor: 0.5
+lr_patience: 10
+early_stopping: True
+noise_percent: 0.0
+lr_scheduler: 'ReduceLROnPlateau'
+max_epochs: 1000
+dropout: 0.0
+linear_dim: null
+
+validation_smoothing_method: none
+ema_decay: 0.9
+
+cross_val: False
+n_splits: 4
+cv_val_frac: 0.1
+
+precompress: False
+pca_features: null
+test_noised_summs: false
+loglinear_start_idx: null
+
+n_trials: 25
+n_startup_trials: 50
+
+clean_models: False
+
+testing:
+  suite: null
+  sim: null

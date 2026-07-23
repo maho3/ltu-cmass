@@ -98,46 +98,80 @@ def plot_optuna_diagnostics(study, exp_path):
 # For cross-validation cases or not, assuming we have been using optuna
 
 
+def _select_nets_from_dir(exp_path, Nnets):
+    """Fallback net selection when no completed Optuna study exists (e.g. the
+    experiment was trained via train.py's non-retrain path, which doesn't use
+    Optuna at all). Ranks nets/net-* dirs by their saved log_prob_test.txt.
+    """
+    net_dir = join(exp_path, 'nets')
+    net_names = [n for n in os.listdir(net_dir)
+                if n.startswith('net-')] if os.path.isdir(net_dir) else []
+
+    numbers, values = [], []
+    for n in net_names:
+        num = n.split('net-')[-1]
+        logprob_file = join(net_dir, n, 'log_prob_test.txt')
+        with open(logprob_file) as f:
+            value = float(f.read().strip())
+        numbers.append(num)
+        values.append(value)
+
+    order = sorted(range(len(numbers)), key=lambda i: values[i], reverse=True)
+    order = order[:Nnets]
+    return [numbers[i] for i in order], [values[i] for i in order]
+
+
 def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     """
-    Load an ensemble of posteriors from an optuna study.
+    Load an ensemble of posteriors, preferring the top Nnets architectures
+    from an Optuna study (cross-validated hyperparameter search). If no
+    Optuna study with completed trials exists, falls back to loading
+    whatever nets are present in nets/, ranked by their held-out log prob.
     """
-    # Load the optuna study
     optunafile_cv = join(exp_path, 'optuna_study.db')
-    storage_cv = f"sqlite:///{optunafile_cv}"
+    net_numbers = net_values = None
+    if os.path.exists(optunafile_cv):
+        study_cv = optuna.load_study(
+            storage=f"sqlite:///{optunafile_cv}",
+            study_name=study_name_from_path(exp_path))
+        try:
+            top_trials = select_top_trials(study_cv, Nnets)
+        except ValueError:
+            logging.info(
+                'Optuna study exists but has no completed trials; '
+                'falling back to loading nets directly from nets/.')
+        else:
+            net_numbers = [t.number for t in top_trials]
+            net_values = [t.value for t in top_trials]
+            if plot:
+                plot_optuna_diagnostics(study_cv, exp_path)
 
-    # the summary combination is already encoded in exp_path
-    study_cv = optuna.load_study(
-        storage=storage_cv,
-        study_name=study_name_from_path(exp_path))
+    if net_numbers is None:
+        logging.info(
+            f'No Optuna study found at {optunafile_cv}; loading nets '
+            f'directly from {join(exp_path, "nets")}.')
+        net_numbers, net_values = _select_nets_from_dir(exp_path, Nnets)
 
-    # Load top Nnets architectures by test log prob
-    top_trials = select_top_trials(study_cv, Nnets)
-
-    logging.info(f'Selected {len(top_trials)} nets.')
-
-    if plot:
-        plot_optuna_diagnostics(study_cv, exp_path)
+    logging.info(f'Selected {len(net_numbers)} nets.')
 
     ensemble_list = []
-    valid_trials = []
-    for t in top_trials:
-        model_path = join(exp_path, 'nets',
-                          f'net-{t.number}', 'posterior.pkl')
+    valid_numbers, valid_values = [], []
+    for num, val in zip(net_numbers, net_values):
+        model_path = join(exp_path, 'nets', f'net-{num}', 'posterior.pkl')
         if not os.path.exists(model_path):
             logging.warning(f"Model path not found, skipping: {model_path}")
             continue
         pi = load_posterior(model_path, 'cpu')
         ensemble_list.append(pi.posteriors[0])
-        valid_trials.append(t)
-    top_trials = valid_trials
+        valid_numbers.append(num)
+        valid_values.append(val)
 
-    if not top_trials:
+    if not ensemble_list:
         raise RuntimeError("No valid models found to form an ensemble.")
 
     if clean:   # Remove net directories that are not in top_nets
         all_net_dirs = os.listdir(join(exp_path, "nets"))
-        top_net_numbers = {str(t.number) for t in top_trials}
+        top_net_numbers = {str(num) for num in valid_numbers}
         for n in all_net_dirs:
             # check if the folder name is net-{number}
             if n.startswith('net-'):
@@ -146,15 +180,13 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
                     shutil.rmtree(join(exp_path, 'nets', n))
 
     if weighted:
-        ensemble_logprobs = [t.value for t in top_trials]
-        weights = scipy.special.softmax(ensemble_logprobs)
-        weights = torch.Tensor(weights)
+        weights = torch.Tensor(scipy.special.softmax(valid_values))
     else:
-        weights = torch.ones(len(top_trials)) / len(top_trials)
+        weights = torch.ones(len(ensemble_list)) / len(ensemble_list)
 
     ensemble = LampeEnsemble(
         posteriors=ensemble_list,
-        weights=weights  # equally weighted
+        weights=weights
     )
     return ensemble
 

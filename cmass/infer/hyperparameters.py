@@ -143,6 +143,19 @@ def sample_hyperparameters_randomly(
     mcfg['dropout'] = _get_or_sample_random(
         hp.dropout, 'uniform')
 
+    # model-specific parameters (currently only 'moment' needs extras)
+    if mcfg['model'] == 'moment':
+        if 'hidden_depth' in hp:
+            if embedding_net in ('mhe', 'mhf'):
+                raise NotImplementedError(
+                    "model 'moment' hidden_depth would collide with "
+                    f"embedding_net '{embedding_net}''s own hidden_depth key.")
+            mcfg['hidden_depth'] = _get_or_sample_random(
+                hp.hidden_depth, 'randint')
+        if 'activation' in hp:
+            mcfg['activation'] = _get_or_sample_random(
+                hp.activation, 'choice')
+
     # sample embedding-specific parameters
     hp_emb = hyperprior[embedding_net]
     if embedding_net == 'fcn':
