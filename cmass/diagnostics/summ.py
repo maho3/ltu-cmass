@@ -525,7 +525,7 @@ def summarize_lightcone_pypower(
                         f'hod{0:05}_aug{0:05}.h5')
 
     # Limit the number of processes to avoid overloading the system
-    n_processes = min(threads, 8)  # Limit to 8 processes
+    n_processes = min(threads, 32)  # Limit to 8 processes
 
     codedir = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
@@ -533,12 +533,10 @@ def summarize_lightcone_pypower(
     # --- 2. Construct the Command ---
     command_string = f"""
     cd {codedir}
-    module purge
-    module restore cmass
-    source /apps/anvil/external/apps/conda/2024.02/bin/activate
-    conda activate pmesh
+    source ~/.bashrc
+    conda activate cmass
     which python
-    mpirun -n {n_processes} python -m cmass.diagnostics.pypower \
+    srun -n {n_processes} python -m cmass.diagnostics.pypower \
         --data-file {data_file} \
         --randoms-file {randoms_file} \
         --output-file {outpath} \
@@ -566,7 +564,7 @@ def summarize_lightcone_pypower(
             f'MPI job completed successfully. Output saved to {outpath}')
     except FileNotFoundError:
         logging.error(
-            "mpirun command not found. Please check your MPI installation.")
+            "srun command not found. Please check your MPI installation.")
         return False
     except subprocess.CalledProcessError as e:
         logging.error(

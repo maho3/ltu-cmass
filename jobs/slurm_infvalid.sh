@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-15  # Array range 0-15, 0-31
+#SBATCH --array=0-20  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=4            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -40,7 +40,7 @@ suffix="$suffix infer.device=$device $extras"
 suffix="$suffix infer.include_noise=True infer.include_hod=True"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
-# suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_hodz_gridnoise"
+# suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_mixk_gridnoise"
 # suffix="$suffix infer.testing.suite=abacus1gpch infer.testing.sim=custom_hodz_gridnoise"
 
 echo "Running inference pipeline with $suffix"
