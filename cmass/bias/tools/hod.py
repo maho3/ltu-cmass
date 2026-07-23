@@ -298,7 +298,7 @@ def build_halo_catalog(
         conc = mass_to_concentration(mass, redshift, cosmo, mdef)
 
     hz = halo_redshift if halo_redshift is not None else redshift
-    if isinstance(redshift, float):
+    if np.isscalar(hz):
         hz = np.array([hz]*len(pos))
 
     # Specify arguments
