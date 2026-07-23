@@ -25,6 +25,7 @@ from .tools import (
 )
 from .calculations import (
     MA, MAz, calcPk, rebin_pk, calcBk_bfast, calcBk_polybin,
+    calcPk_pypower, calcPk_pypower_field, get_redshift_space_pos,
     get_box_catalogue, get_box_catalogue_rsd  # not used
 )
 from .geometry import SURVEY_GEOMETRIES
@@ -39,6 +40,43 @@ def run_pylians(
     k, Pk, Nmodes = calcPk(field, box_size, axis=axis,
                            MAS=MAS, threads=num_threads)
     k, Pk = rebin_pk(k, Pk, Nmodes)
+    out = {
+        pfx+'Pk_k3D': k,
+        pfx+'Pk': Pk,
+    }
+    return out
+
+
+def run_pypower_box(
+    pos, box_size, N, axis, num_threads, use_rsd, MAS='TSC'
+):
+    """Periodic-box P(k) via pypower+interlacing=2. Replaces `run_pylians`
+    for volumes we paint ourselves (halos/galaxies) -- see
+    power_tests/REPORT.md for the accuracy/speed comparison motivating this.
+    `calcPk_pypower` already bins directly onto the fixed output grid, so
+    unlike `run_pylians` there's no separate `rebin_pk` step here.
+    """
+    os.environ.setdefault('OMP_NUM_THREADS', str(num_threads))
+    pfx = 'z' if use_rsd else ''
+    k, Pk, _ = calcPk_pypower(
+        pos, box_size, N, axis=axis, resampler=MAS, interlacing=2)
+    out = {
+        pfx+'Pk_k3D': k,
+        pfx+'Pk': Pk,
+    }
+    return out
+
+
+def run_pypower_field(
+    field, box_size, axis, num_threads, use_rsd, MAS='CIC'
+):
+    """Periodic-box P(k) via pypower for a pre-painted field (e.g. the nbody
+    density field). No interlacing possible -- see `calcPk_pypower_field`.
+    Bins directly onto the fixed output grid (no separate `rebin_pk` step).
+    """
+    os.environ.setdefault('OMP_NUM_THREADS', str(num_threads))
+    pfx = 'z' if use_rsd else ''
+    k, Pk, _ = calcPk_pypower_field(field, box_size, axis=axis, MAS=MAS)
     out = {
         pfx+'Pk_k3D': k,
         pfx+'Pk': Pk,
@@ -131,7 +169,7 @@ def summarize_rho(
         # Compute P(k)
         out_data = {}
         if 'Pk' in summaries:
-            out = run_pylians(
+            out = run_pypower_field(
                 rho, L, axis=2, MAS='CIC',
                 num_threads=threads, use_rsd=False
             )
@@ -255,18 +293,17 @@ def summarize_tracer(
             N, MAS = get_mesh_resolution(L, high_res, use_ngp)
 
             # real space
-            field = MA(pos, L, N, MAS=MAS).astype(np.float32)
-            out = run_pylians(
-                field, L, axis=2, MAS=MAS,
+            out = run_pypower_box(
+                pos, L, N, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=False
             )
             out_data.update(out)
 
             # redshift space
-            field = MAz(pos, vel, L, N, cosmo, z, MAS=MAS,
-                        axis=2).astype(np.float32)
-            out = run_pylians(
-                field, L, axis=2, MAS=MAS,
+            zpos = get_redshift_space_pos(
+                pos.copy(), vel.copy(), L, cosmo, z, axis=2)
+            out = run_pypower_box(
+                zpos, L, N, axis=2, MAS=MAS,
                 num_threads=threads, use_rsd=True
             )
             out_data.update(out)
@@ -548,6 +585,10 @@ def summarize_lightcone_pypower(
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 @clean_up(hydra)
 def main(cfg: DictConfig) -> None:
+    # Filtering for necessary configs
+    cfg = OmegaConf.masked_copy(cfg, ['meta', 'nbody', 'sim', 'bias', 'survey',
+                                      'diag', 'noise', 'multisnapshot'])
+
     cfg = parse_nbody_config(cfg)
     cfg = parse_hod(cfg)
 

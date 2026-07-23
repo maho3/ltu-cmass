@@ -9,13 +9,16 @@ matchIC: 0        # whether to match ICs to file (0 no, 1 yes, 2 quijote)
 supersampling: 3  # particles resolution relative to meshgrid
 save_particles: false  # whether to save particle data
 save_transfer: false    # whether to save z=99 ICs (for CHARM bias model)
+postprocess: true  # whether to run postprocessing
+stream_postprocess: false  # move+convert snapshots during run (needs meta.localdir)
+harvest: false    # leave snapshots in scratch for an external harvester job
 
 zi: 10            # initial redshift (for grav solver)
 zf: 0.3           # final redshift
 
 # snapshot scale factors to save (e.g. evenly spaced in a)
 # asave: []
-asave: [0.58622, 0.60633, 0.62644, 0.64655, 0.66666, 0.68677, 0.70688, 0.72699, 0.74710, 0.76721]
+asave: [0.58622, 0.60633, 0.62644, 0.64655, 0.66666, 0.68677, 0.70688] # , 0.72699] # , 0.74710, 0.76721]
 
 
 # borglpt, borgpm and pinocchio-only

@@ -22,12 +22,24 @@ from .hod_models import (
     Zheng07, Leauthaud11, Zu_mandelbaum15,
     Zheng07zdep, Zheng07zinterp
 )
+from .priors import COMPOSITE_HOD_PRIORS
 
 
 def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=None, custom_prior=None):
     if model is None:
         return Zheng07()  # for backwards compatibility
     elif model == "zheng07":
+        if custom_prior and custom_prior in COMPOSITE_HOD_PRIORS:
+            p = COMPOSITE_HOD_PRIORS[custom_prior]
+            # Override only logMmin; all other params stay uniform
+            location = [p['mean'], None, None, None, None, None, None, None, 0, 0]
+            sigma    = [p['stdev'], None, None, None, None, None, None, None, 0.2, 0.2]
+            distribution = [
+                "norm", "uniform", "uniform", "uniform", "uniform",
+                "uniform", "uniform", "uniform", "truncnorm", "truncnorm",
+            ]
+            return Zheng07(assem_bias=assem_bias, vel_assem_bias=vel_assem_bias,
+                           location=location, sigma=sigma, distribution=distribution)
         return Zheng07(assem_bias=assem_bias,
                        vel_assem_bias=vel_assem_bias)
     elif model == 'zheng07zdep':

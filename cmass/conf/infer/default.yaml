@@ -13,6 +13,9 @@ correct_shot: true  # whether to correct for shot noise when normalizing
 
 tracer: halo      # tracer to use for inference
 
+# Each kmax entry is a float (applied to all summaries) or a mapping keyed by
+# summary family (zPk, zQk, ...), exact name (zPk4), or 'default'.
+# See infer/mixk.yaml. kmin is always a scalar.
 experiments:
   - summary: [Pk0]   # monopole
     kmin: [0., 0.02]

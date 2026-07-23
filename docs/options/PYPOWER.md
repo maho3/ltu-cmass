@@ -4,6 +4,34 @@ Installing PYPOWER
 Installing `pypower` is tricky because it relies on `pmesh`, which in turn relies on MPI. 
 
 The environments I've gotten it to work in are:
+- Delta @ NCSA (`cmass` conda env, used for `cmass.diagnostics.summ` box/periodic-volume P(k))
+
+The manylinux `mpi4py` wheel does not find `libmpi` against Delta's Cray
+MPICH stack, so `mpi4py`, `pfft-python`, and `pmesh` all need to be built
+from source against the loaded `cray-mpich` module. On a Delta CPU node:
+```bash
+module load PrgEnv-gnu cray-mpich   # or whatever MPI module your job loads
+source ~/.bashrc && conda activate cmass
+
+# mpi4py: force a source build so it links against cray-mpich, not a bundled MPI
+MPICC=$(which mpicc) pip install --no-cache-dir --no-binary mpi4py mpi4py
+
+# pfft-python and pmesh: install from git (PyPI wheels lag/aren't MPI-portable)
+pip install --no-cache-dir git+https://github.com/rainwoodman/pfft-python.git
+pip install --no-cache-dir git+https://github.com/rainwoodman/pmesh.git
+
+# pypower itself
+pip install --no-cache-dir git+https://github.com/cosmodesi/pypower.git
+```
+Verify with:
+```bash
+python -c "import mpi4py, pfft, pmesh, pypower; print('ok')"
+```
+This same recipe (source builds against the cluster's MPI module) will be
+needed on Anvil/Bridges2 once periodic-box `summ.py` diagnostics are run
+there too — see `power_tests/REPORT.md` for the accuracy/speed motivation
+for adopting pypower over pylians at box P(k).
+
 - Anvil @ RCAC
 ```bash
 x-mho1@login03.anvil:[ltu-cmass-run] $ module list
