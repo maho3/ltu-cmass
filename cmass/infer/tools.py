@@ -60,10 +60,13 @@ def kcut_dirname(kmin, kmax):
     """Directory name encoding a k-cut.
 
     Scalar kmax reproduces the legacy name verbatim (kmin-0.0_kmax-0.4).
-    Mapping kmax is encoded as kmin-0.0_kmax-zPk-0.6.zQk-0.2.
+    Mapping kmax is encoded as
+    kmin-0.0_kmax-def=0.2__zPk=0.6__zPk4=0.3 ('default' short as 'def').
     """
     if _is_mapping(kmax):
-        kmax = '.'.join(f'{k}-{kmax[k]}' for k in sorted(kmax))
+        kmax = '__'.join(
+            f'{"def" if k == "default" else k}={kmax[k]}'
+            for k in sorted(kmax))
     return f'kmin-{kmin}_kmax-{kmax}'
 
 
@@ -126,12 +129,13 @@ def select_top_trials(study: optuna.study.Study, n_nets: int) -> List[optuna.tri
     """
     trials = study.get_trials(
         deepcopy=False, states=[optuna.trial.TrialState.COMPLETE])
-    
+
     if len(trials) == 0:
         raise ValueError('No completed trials found in the study.')
-    
+
     trials = sorted(trials, key=lambda t: t.value, reverse=True)
     return trials[:n_nets]
+
 
 def log2_avg(A, s=0):
     A = np.asarray(A)

@@ -14,7 +14,8 @@ defaults:
 # `kmin` remains a scalar, applied to all summaries.
 #
 # Output directories: a float kmax gives the usual kmin-0.0_kmax-0.4; a mapping
-# gives kmin-0.0_kmax-<key>-<val>.<key>-<val>... with keys sorted.
+# gives kmin-0.0_kmax-<key>=<val>__<key>=<val>... with keys sorted ('default'
+# shortened to 'def'), e.g. kmin-0.0_kmax-def=0.2__zPk=0.6__zPk4=0.3.
 
 experiments:
   - summary: [zPk0, zPk2, zPk4, zQk0]
