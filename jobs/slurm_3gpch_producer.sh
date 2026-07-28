@@ -36,6 +36,23 @@ if [ -f "$outdir/$lhid/nbody.h5" ]; then
     exit 0
 fi
 
+# Quota guard: a producer writes ~322GB of raw snapshots. If the shared
+# /work/hdd/bdne allocation is already near full, starting would risk the
+# hard limit (21.48T) and deadlock the harvesters (which can't free space
+# without first writing a temp file). Refuse to start; the lhid simply stays
+# missing and is picked up by the next producer resubmission. Threshold is
+# below the soft limit (19.53T) so that up to %throttle producers can each
+# add their footprint and still stay under the hard limit.
+QUOTA_MAX_T=19.0
+usage=$(quota 2>/dev/null | awk -F'|' '/work\/hdd\/bdne/ {gsub(/ /,"",$3); print $3}')
+usage=${usage%\*}
+if [ "${usage: -1}" = "T" ] && \
+   awk "BEGIN{exit !(${usage%?} >= $QUOTA_MAX_T)}"; then
+    echo "QUOTA GUARD: /work/hdd/bdne at ${usage} >= ${QUOTA_MAX_T}T; " \
+         "refusing to produce lhid=$lhid (will rerun once harvest frees space)"
+    exit 1
+fi
+
 extras="nbody.matchIC=0 meta.scratchdir=$scratchbase"
 extras="$extras nbody.postprocess=False nbody.harvest=True"
 

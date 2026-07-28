@@ -123,6 +123,25 @@ def concat(st):
     logging.info(f'HARVESTED lhid={st.lhid} -> {st.outdir}/nbody.h5')
 
 
+def producers_active(jobname):
+    """True if any producer job is still queued or running.
+
+    Conservative on failure: if squeue errors or times out we report True, so
+    the harvester keeps polling rather than exiting and leaving later
+    producers with no consumer (which repeatedly filled the disk quota).
+    """
+    try:
+        r = subprocess.run(
+            ['squeue', '-h', '-u', os.environ.get('USER', ''),
+             '-n', jobname, '-o', '%T'],
+            capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            return True
+        return bool(r.stdout.strip())
+    except Exception:
+        return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--scratchbase', required=True)
@@ -158,18 +177,43 @@ def main():
         pending = [s for s in states.values()
                    if not s.concat_done and not s.producer_failed()]
         if not pending:
-            logging.info('all lhids harvested')
+            # Nothing to do *right now* is not the same as being finished:
+            # producers still in the queue will create more work, and exiting
+            # here leaves them with no consumer until the quota fills. Only
+            # stop once no producer remains.
+            if producers_active(args.producer_name):
+                logging.info('nothing pending, but producers still queued; '
+                             'waiting')
+                time.sleep(args.poll_sec)
+                continue
+            logging.info('all lhids harvested and no producers queued')
             break
 
         worked = False
         for st in pending:
-            for a in st.convertible():
-                # one snapshot at a time, directly on shared scratch
-                process_single_snapshot(st.cfg, st.work, a, delete_files=True)
-                logging.info(f'converted lhid={st.lhid} a={a:.4f}')
-                worked = True
-            if st.ready_to_concat():
-                concat(st)
+            # Isolate each lhid: a corrupt snapshot (e.g. a missing bigfile
+            # Position/Velocity block from a half-written producer) raises here.
+            # Without this guard the exception kills the whole shard process,
+            # abandoning every other lhid it owns and stranding their scratch —
+            # which then never drains. Mark the bad lhid failed so it is skipped
+            # (and rerun by the producer resubmission) and keep going.
+            try:
+                for a in st.convertible():
+                    # one snapshot at a time, directly on shared scratch
+                    process_single_snapshot(st.cfg, st.work, a,
+                                             delete_files=True)
+                    logging.info(f'converted lhid={st.lhid} a={a:.4f}')
+                    worked = True
+                if st.ready_to_concat():
+                    concat(st)
+                    worked = True
+            except Exception as e:
+                logging.error(f'lhid={st.lhid} conversion failed ({e}); '
+                              'marking failed and skipping')
+                try:
+                    open(join(st.work, '.fastpm_failed'), 'a').close()
+                except OSError:
+                    pass
                 worked = True
 
         failed = [s.lhid for s in states.values() if s.producer_failed()]
