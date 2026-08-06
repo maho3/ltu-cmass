@@ -1,0 +1,21 @@
+fun:
+  hidden_depth: 2       # funnel depth: interpolated hidden layers from input down to out_features
+  out_features: 16      # funnel output width (the moment trunk's input dimension)
+  linear_dim: null
+  bypass: False
+shared:
+  model: 'moment'
+  hidden_features: 16  # shallow, fixed-width moment trunk (after the funnel embedding)
+  moment_hidden_depth: 2
+  activation: 'gelu'  # matches the reference script
+  num_transforms: 0  # unused by 'moment', ignored with a warning
+  log2_batch_size: 9  # batch_size=512, matches the reference script
+  learning_rate: 1.e-3  # matches the reference script's LR_START
+  weight_decay: 0.01  # AdamW's own default, which the reference script leaves unset
+  lr_patience: 10  # unused while lr_scheduler=CosineAnnealingLR
+  lr_decay_factor: 0.5  # unused while lr_scheduler=CosineAnnealingLR
+  early_stopping: False  # matches the reference script: always run the full schedule
+  noise_percent: 0.01  # matches the reference script's NOISE_STD
+  lr_scheduler: 'CosineAnnealingLR'  # matches the reference script's cosine decay (eta_min=0 here vs. its LR_END=1e-6 -- close enough)
+  max_epochs: 200  # matches the reference script's N_EPOCHS
+  dropout: 0.0

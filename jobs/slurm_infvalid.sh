@@ -9,7 +9,7 @@
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=7
+# SLURM_ARRAY_TASK_ID=0
 
 # module restore cmass
 source ~/.bashrc
@@ -24,11 +24,11 @@ sleep $exp_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 
-nbody=quijotelike
-sim=fastpm_charm7
-infer=mixk  # simple  # lightcone
+nbody=abacuslike
+sim=fastpm_charm6_comphod
+infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True" # 
 device="cpu"
 
 export TQDM_DISABLE=0
@@ -37,7 +37,7 @@ extras="$extras hydra/job_logging=disabled"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=True infer.include_hod=True"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 # suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_mixk_gridnoise"
