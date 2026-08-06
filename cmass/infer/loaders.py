@@ -307,20 +307,26 @@ def _construct_hod_prior(configfile):
         vel_assem_bias=hodcfg.vel_assem_bias if hasattr(
             hodcfg, "vel_assem_bias") else False,
         zpivot=hodcfg.zpivot if hasattr(
-            hodcfg, "zpivot") else None
+            hodcfg, "zpivot") else None,
+        custom_prior=hodcfg.custom_prior if hasattr(
+            hodcfg, "custom_prior") else None
     )
-    names, lower, upper, sigma, distribution = (
+    names, lower, upper, sigma, distribution, loc = (
         hodmodel.parameters, hodmodel.lower_bound,
-        hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution
+        hodmodel.upper_bound, hodmodel.sigma, hodmodel.distribution,
+        hodmodel.loc
     )
     # correct for unknowns
     distribution = ['uniform'] * \
         len(names) if distribution is None else distribution
     sigma = [0.] * len(names) if sigma is None else sigma
+    loc = [0.] * len(names) if loc is None else loc
     hodprior = np.array(
-        list(zip(names, distribution, lower, upper, sigma)),
+        list(zip(names, distribution, lower, upper, sigma, loc)),
         dtype=object
     )
+    # theta's HOD columns are saved in alphabetical order by name
+    hodprior = hodprior[np.argsort(hodprior[:, 0])]
     return hodprior
 
 
