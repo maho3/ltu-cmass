@@ -9,7 +9,7 @@
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=7
+# SLURM_ARRAY_TASK_ID=0
 
 # module restore cmass
 source ~/.bashrc
@@ -25,14 +25,14 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm6_momenthod
-infer=moment_test  # simple  # lightcone
+sim=fastpm_charm6_comphod
+infer=simple  # simple  # lightcone
 tracer=galaxy
-extras="nbody.zf=0.5 infer.embedding_net=fun net=moment_test" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True" # 
 device="cpu"
 
-# export TQDM_DISABLE=0
-# extras="$extras hydra/job_logging=disabled"
+export TQDM_DISABLE=0
+extras="$extras hydra/job_logging=disabled"
 
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"

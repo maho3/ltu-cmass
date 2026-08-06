@@ -105,7 +105,7 @@ def _select_nets_from_dir(exp_path, Nnets):
     """
     net_dir = join(exp_path, 'nets')
     net_names = [n for n in os.listdir(net_dir)
-                if n.startswith('net-')] if os.path.isdir(net_dir) else []
+                 if n.startswith('net-')] if os.path.isdir(net_dir) else []
 
     numbers, values = [], []
     for n in net_names:

@@ -44,7 +44,7 @@ subselect_cosmo: null
 prior: quijote
 backend: lampe
 engine: NPE
-embedding_net: fcn
+embedding_net: fun
 
 batch_size: null
 learning_rate: null
