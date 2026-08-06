@@ -44,7 +44,8 @@ def sample_hyperparameters_optuna(
 
     # sample shared parameters
     hp = hyperprior.shared
-    mcfg['model'] = _get_or_sample_optuna(trial, "model", hp.model, 'categorical')
+    mcfg['model'] = _get_or_sample_optuna(
+        trial, "model", hp.model, 'categorical')
     mcfg['hidden_features'] = _get_or_sample_optuna(
         trial, "hidden_features", hp.hidden_features, 'int', log=True)
     mcfg['num_transforms'] = _get_or_sample_optuna(
@@ -143,15 +144,11 @@ def sample_hyperparameters_randomly(
     mcfg['dropout'] = _get_or_sample_random(
         hp.dropout, 'uniform')
 
-    # model-specific parameters (currently only 'moment' needs extras)
+    # model-specific parameters (currently only 'moment' needs extras).
     if mcfg['model'] == 'moment':
-        if 'hidden_depth' in hp:
-            if embedding_net in ('mhe', 'mhf'):
-                raise NotImplementedError(
-                    "model 'moment' hidden_depth would collide with "
-                    f"embedding_net '{embedding_net}''s own hidden_depth key.")
-            mcfg['hidden_depth'] = _get_or_sample_random(
-                hp.hidden_depth, 'randint')
+        if 'moment_hidden_depth' in hp:
+            mcfg['moment_hidden_depth'] = _get_or_sample_random(
+                hp.moment_hidden_depth, 'randint')
         if 'activation' in hp:
             mcfg['activation'] = _get_or_sample_random(
                 hp.activation, 'choice')
@@ -180,8 +177,10 @@ def sample_hyperparameters_randomly(
             hp_emb.hidden_depth, 'randint')
         mcfg['out_features'] = int(
             _get_or_sample_random(hp_emb.out_features, 'loguniform'))
-        linear_dim_value = _get_or_sample_random(hp_emb.linear_dim, 'loguniform')
-        mcfg['linear_dim'] = int(linear_dim_value) if linear_dim_value is not None else None
+        linear_dim_value = _get_or_sample_random(
+            hp_emb.linear_dim, 'loguniform')
+        mcfg['linear_dim'] = int(
+            linear_dim_value) if linear_dim_value is not None else None
         mcfg['bypass'] = _get_or_sample_random(hp_emb.bypass, 'choice')
     else:
         raise ValueError(f"Unknown embedding net: {embedding_net}")

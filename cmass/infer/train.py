@@ -58,19 +58,29 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
         ])
         if subselect_cosmo is not None:
             prior_lims = prior_lims[subselect_cosmo]
+        n_cosmo = prior_lims.shape[0]
 
         if ((hodprior is not None) or (noiseprior is not None)) and (theta.shape[-1] == 5):
             raise ValueError(
                 'HOD or noise priors provided, but theta has only 5 parameters.'
                 ' include_hod or include_noise might not be set correctly.')
+
+        hod_norm_mask = None
         if hodprior is not None:
-            # TODO: support non-uniform HOD priors
+            # 'uniform'/'truncnorm' HOD priors are approximated as a uniform
+            # box over their (lower, upper) bounds -- the specific shape
+            # (truncnorm) isn't modeled beyond its support. 'norm' entries
+            # (e.g. a composite logMmin prior) get a genuine Gaussian below,
+            # since a Gaussian has no natural box.
             types = np.char.lower(hodprior[:, 1].astype(str))
-            if not np.all((types == 'uniform') | (types == 'truncnorm')):
+            if not np.all((types == 'uniform') | (types == 'truncnorm') |
+                          (types == 'norm')):
                 raise NotImplementedError(
                     "We don't know how to handle non-uniform HOD priors yet.")
             hod_lims = hodprior[:, 2:4].astype(float)
+            hod_norm_mask = (types == 'norm')
             prior_lims = np.vstack([prior_lims, hod_lims])
+
         if noiseprior is not None:
             if noiseprior.dist == 'Fixed':
                 low, high = -np.inf, np.inf
@@ -87,10 +97,31 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
             noise_lims = np.array([[low, high]]*2)
             prior_lims = np.vstack([prior_lims, noise_lims])
 
-        prior = ili.utils.Uniform(
-            low=prior_lims[:, 0],
-            high=prior_lims[:, 1],
-            device=device)
+        if hod_norm_mask is None or not np.any(hod_norm_mask):
+            # fast path: every dimension is a plain box
+            prior = ili.utils.Uniform(
+                low=prior_lims[:, 0],
+                high=prior_lims[:, 1],
+                device=device)
+        else:
+            # mixed prior: cosmo/noise/box-HOD dims stay Uniform, but 'norm'
+            # HOD dims (e.g. a composite logMmin prior) get a genuine
+            # Normal, since a hard box has no principled bounds for one.
+            components = [
+                torch.distributions.Uniform(
+                    torch.tensor(float(lo), dtype=torch.float32, device=device),
+                    torch.tensor(float(hi), dtype=torch.float32, device=device))
+                for lo, hi in prior_lims
+            ]
+            for i, is_norm in enumerate(hod_norm_mask):
+                if not is_norm:
+                    continue
+                loc = float(hodprior[i, 5])
+                scale = float(hodprior[i, 4])
+                components[n_cosmo + i] = torch.distributions.Normal(
+                    torch.tensor(loc, dtype=torch.float32, device=device),
+                    torch.tensor(scale, dtype=torch.float32, device=device))
+            prior = ili.utils.CustomJointIndependent(components)
     else:
         raise NotImplementedError
 
@@ -208,10 +239,17 @@ def run_training(
         extra_kwargs = {'engine': cfg.infer.engine}
     else:
         raise NotImplementedError
-    allowed_keys = ['model', 'hidden_features', 'num_transforms', 'num_components']
-    if mcfg.model == 'moment':
-        allowed_keys += ['hidden_depth', 'activation']
+    allowed_keys = ['model', 'hidden_features',
+                    'num_transforms', 'num_components']
     kwargs = {k: v for k, v in mcfg.items() if k in allowed_keys}
+    if mcfg.model == 'moment':
+        # moment_hidden_depth avoids colliding with mhe/fun/mhf embeddings'
+        # own 'hidden_depth' key in mcfg; map it back to the 'hidden_depth'
+        # kwarg load_nde_lampe actually expects for the moment model itself.
+        if 'moment_hidden_depth' in mcfg:
+            kwargs['hidden_depth'] = mcfg.moment_hidden_depth
+        if 'activation' in mcfg:
+            kwargs['activation'] = mcfg.activation
     nets = [net_loader(**kwargs, **extra_kwargs, embedding_net=embedding)]
 
     # define training arguments
