@@ -55,15 +55,20 @@ def split_galsnap_galidx(gid):
 
 
 def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
-                     noise_uniform, use_randoms=False):
+                     noise_uniform, use_randoms=False, randoms_nbar=3.0e-3):
     # Load snapshots
     for snap_idx, a in enumerate(snap_times):
         logging.info(f'Loading snapshot at a={a:.6f}...')
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 10*3e-4  # 10x number density of CMASS
-            Nrandoms = int(nbar_randoms * BoxSize**3)
+            # Uniform cube, later downsampled to the target n(z) if fix_nz.
+            # randoms_nbar must exceed the peak target density in every
+            # z-bin or the downsampling cannot saturate; see the
+            # survey.randoms_nbar comment in conf/survey/default.yaml.
+            Nrandoms = int(randoms_nbar * BoxSize**3)
+            logging.info(f'Drawing {Nrandoms} uniform randoms '
+                         f'(nbar={randoms_nbar:.3e} (h/Mpc)^3)')
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
 
@@ -89,16 +94,64 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
     return ra, dec, z, galsnap, galidx
 
 
+def _nz_cap(geometry):
+    """Cap name in the n(z) target filename, or None if we have no target."""
+    return {'ngc': 'North', 'sgc': 'South', 'mtng': 'MTNG'}.get(geometry)
+
+
+def prepare_nz_target(nz_dir, out_dir, geometry, zmin, zmax, factor):
+    """Write the n(z) target the C++ lightcone will actually read.
+
+    Two things are handled here.
+
+    1. `factor` scales the observed counts. fix_nz alone downsamples to
+       exactly the observed n(z); randoms want that same *shape* at higher
+       density, so factor=10 gives 10x the observed n(z). It may be a scalar
+       or a per-bin vector -- mtng needs the latter, because its angular cut
+       is applied *after* the C++ downsampling (see main), so the target has
+       to be pre-inflated by 1/survival to land on the requested factor.
+
+    2. `Lightcone` picks its target file purely from `is_north`
+       (lightcone.cpp: North if is_north else South) -- there is no MTNG
+       branch, so an mtng run would otherwise silently downsample to the
+       South n(z). We therefore write the counts we actually want under
+       *both* the cap's own name and the name the C++ will read.
+
+    Returns the directory to pass as `boss_dir` (and to check_saturation).
+    """
+    cap = _nz_cap(geometry)
+    if cap is None:
+        raise ValueError(f'No n(z) target available for geometry {geometry}')
+
+    src = join(nz_dir,
+               f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
+    counts = np.loadtxt(src, usecols=(0,))
+    factor = np.asarray(factor, dtype=float)
+    if factor.ndim and len(factor) != len(counts):
+        raise ValueError(
+            f'nz_factor has {len(factor)} entries but the {cap} target has '
+            f'{len(counts)} bins')
+    scaled = np.rint(counts * factor).astype(int)
+
+    os.makedirs(out_dir, exist_ok=True)
+    # 'North' if is_north else 'South' -- must match hodlightcone's is_north
+    read_as = 'North' if geometry == 'ngc' else 'South'
+    for name in {cap, read_as}:
+        dst = join(out_dir,
+                   f'nz_DR12v5_CMASS_{name}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
+        np.savetxt(dst, scaled, fmt='%d')
+    fstr = (f'x{float(factor):g}' if not factor.ndim
+            else f'x[{factor.min():.2f}-{factor.max():.2f}] per-bin')
+    logging.info(
+        f'Wrote n(z) target for {geometry} ({fstr}, {scaled.sum()} '
+        f'objects over {len(scaled)} bins) to {out_dir}')
+    return out_dir
+
+
 def check_saturation(z, nz_dir, zmin, zmax, geometry):
-    if geometry == 'ngc':
-        cap = 'North'
-    elif geometry == 'sgc':
-        cap = 'South'
-    elif geometry == 'mtng':
-        cap = 'MTNG'
-    else:
+    cap = _nz_cap(geometry)
+    if cap is None:
         return False  # SIMBIG hasn't been calculated yet
-        raise ValueError(geometry)
 
     filepath = join(
         nz_dir, f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
@@ -202,11 +255,28 @@ def main(cfg: DictConfig) -> None:
         maskobs = None
         zmin, zmax = 0.0, 1.1  # midpoint is the same
 
+    # If fix_nz, resolve the n(z) target. nz_factor>1 scales the observed
+    # counts (randoms want the observed shape at higher density), and
+    # prepare_nz_target also works around the C++ only reading North/South.
+    nz_factor = getattr(cfg.survey, 'nz_factor', 1)
+    if cfg.survey.fix_nz:
+        nz_factor = OmegaConf.to_object(nz_factor) \
+            if OmegaConf.is_config(nz_factor) else nz_factor
+        tag = (f'x{float(nz_factor):g}' if np.isscalar(nz_factor)
+               else f'perbin{np.mean(nz_factor):.2f}')
+        target_dir = prepare_nz_target(
+            nz_dir,
+            join(cfg.meta.wdir, 'scratch', 'nz_targets',
+                 f'{geometry}_{tag}'),
+            geometry, zmin, zmax, nz_factor)
+    else:
+        target_dir = nz_dir  # only used by check_saturation
+
     # Setup lightcone
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
     lightcone = lc.Lightcone(
-        boss_dir=nz_dir if cfg.survey.fix_nz else None,
+        boss_dir=target_dir if cfg.survey.fix_nz else None,
         mask=maskobs,
         BoxSize=cfg.nbody.L,
         Omega_m=cfg.nbody.cosmo[0],
@@ -234,7 +304,8 @@ def main(cfg: DictConfig) -> None:
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times,
         cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_uniform,
-        use_randoms=cfg.survey.randoms)
+        use_randoms=cfg.survey.randoms,
+        randoms_nbar=float(getattr(cfg.survey, 'randoms_nbar', 3.0e-3)))
 
     # If SIMBIG, apply selection
     if geometry == 'simbig' and not cfg.survey.nomask:
@@ -253,7 +324,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.survey.nomask:
         saturated = False
     else:
-        saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+        saturated = check_saturation(z, target_dir, zmin, zmax, geometry)
 
     # Save
     if geometry == 'ngc':

@@ -25,10 +25,12 @@ from .tools import (
 )
 from .calculations import (
     MA, MAz, calcPk, rebin_pk, calcBk_bfast, calcBk_polybin,
+    calcBk_polybin_survey,
     calcPk_pypower, calcPk_pypower_field, get_redshift_space_pos,
     get_box_catalogue, get_box_catalogue_rsd  # not used
 )
 from .geometry import SURVEY_GEOMETRIES
+from .pypower import build_survey_fkp_mesh, get_randoms_file
 from ..survey.tools import sky_to_xyz
 
 
@@ -110,6 +112,30 @@ def run_bispectrum(
         pfx+'Qk': Qk,
         pfx+'bPk_k3D': k123,
         pfx+'bPk': Pk
+    }
+    return out
+
+
+def run_bispectrum_survey(
+    field, mask, box_size, boxcenter, num_threads,
+    cache_dir=None, cache_tag=None
+):
+    """FKP bispectrum of a survey lightcone via PolyBin3D.
+
+    Survey analogue of `run_bispectrum`. There is no real/redshift-space
+    split here -- a lightcone is already in redshift space -- so the keys
+    carry no 'z' prefix, matching `summarize_lightcone_pylians`.
+    """
+    k123, Bk, Qk, k, Pk = calcBk_polybin_survey(
+        field, mask, box_size, boxcenter,
+        threads=num_threads, cache_dir=cache_dir, cache_tag=cache_tag
+    )
+    out = {
+        'Bk_k123': k123,
+        'Bk': Bk,
+        'Qk': Qk,
+        'bPk_k3D': k,
+        'bPk': Pk
     }
     return out
 
@@ -509,17 +535,7 @@ def summarize_lightcone_pypower(
         return True
 
     # get randoms file
-    if cap in ['simbig', 'sgc', 'mtng']:
-        randoms_path = get_source_path(
-            cfg.meta.wdir, 'abacus', 'randoms', 2000, 256, 0)
-    elif cap == 'ngc':
-        randoms_path = get_source_path(
-            cfg.meta.wdir, 'quijote3gpch', 'randoms', 3000, 384, 0)
-    else:
-        raise ValueError(f'Unknown cap: {cap}.')
-
-    randoms_file = join(randoms_path, f'{cap}_lightcone',
-                        f'hod{0:05}_aug{0:05}.h5')
+    randoms_file = get_randoms_file(cfg.meta.wdir, cap)
 
     # Limit the number of processes to avoid overloading the system
     n_processes = min(threads, 32)  # Limit to 8 processes
@@ -576,6 +592,113 @@ def summarize_lightcone_pypower(
 
     with h5py.File(outpath, 'a') as f:
         save_configuration_h5(f, cfg, save_HOD=True, save_noise=True)
+    return True
+
+
+def _check_polybin_alignment(boxsize, boxcenter, nmesh, mask, mean_dist):
+    """Verify the field was shifted into PolyBin's real-space layout.
+
+    PolyBin indexes real-space maps FFT-style (index 0 sits at `boxcenter`),
+    whereas pypower paints corner-first, so inputs must be ifftshift-ed.
+    Getting this wrong leaves the local-sightline Y_lm misaligned with the
+    data and silently corrupts the l>0 multipoles, so we check it: the
+    mask-weighted mean |r| on PolyBin's grid must reproduce the FKP-weighted
+    mean comoving distance of the randoms (`mean_dist`), which is the same
+    first moment computed from the catalog.
+    """
+    r_arrs = [np.fft.fftshift(np.arange(-nmesh//2, nmesh//2))
+              * boxsize/nmesh + boxcenter[i] for i in range(3)]
+    r_grids = np.meshgrid(*r_arrs, indexing='ij')
+    modr = np.sqrt(sum(r**2 for r in r_grids))
+    grid_dist = np.sum(mask * modr) / np.sum(mask)
+
+    cellsize = boxsize / nmesh
+    logging.info(f'Alignment check: mask-weighted <|r|> = {grid_dist:.2f}, '
+                 f'randoms <|r|> = {mean_dist:.2f} Mpc/h '
+                 f'(cell = {cellsize:.2f})')
+    if np.abs(grid_dist - mean_dist) > cellsize:
+        raise ValueError(
+            'PolyBin grid is misaligned with the painted field: '
+            f'<|r|> = {grid_dist:.2f} vs {mean_dist:.2f} Mpc/h')
+
+
+def summarize_lightcone_polybin(
+    source_path,
+    cap='ngc', use_ngp=False,
+    threads=16, from_scratch=True,
+    hod_seed=None, aug_seed=None,
+    summaries=['Bk'],
+    cfg=None
+):
+    """FKP bispectrum of a lightcone, appended to the pypower P(k) output.
+
+    Runs in-process: PolyBin3D is threaded but not MPI-parallel, unlike the
+    P(k) step which is launched under srun.
+    """
+    # get source file
+    postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}.h5'
+    data_file = join(source_path, postfix)
+    if not os.path.isfile(data_file):
+        logging.error(f'File not found: {data_file}')
+        return False
+
+    # check if diagnostics already computed
+    os.makedirs(join(source_path, 'diag', f'{cap}_lightcone'), exist_ok=True)
+    if getattr(cfg.diag, 'noise_seed', None) is not None:
+        # for saving things with a specific noise, for sensitivity tests
+        postfix = f'{cap}_lightcone/hod{hod_seed:05}_aug{aug_seed:05}_noise{cfg.diag.noise_seed:06}.h5'
+    outpath = join(source_path, 'diag', postfix)
+    summaries = check_existing(outpath, summaries, from_scratch, rsd=False)
+    if 'Bk' not in summaries:
+        logging.info('Bk diagnostics already saved. Skipping...')
+        return True
+
+    randoms_file = get_randoms_file(cfg.meta.wdir, cap)
+
+    # Load
+    logging.info(f'Computing lightcone Bk to save to: {outpath}')
+    with h5py.File(data_file, 'r') as f:
+        data_rdz = np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+    with h5py.File(randoms_file, 'r') as f:
+        randoms_rdz = np.stack([f['ra'][:], f['dec'][:], f['z'][:]], axis=1)
+
+    # Paint the FKP field and the n(x)w(x) mask on a common mesh. Bk uses the
+    # standard-resolution mesh (high_res takes too much memory), which also
+    # puts k_Nyquist just above K_MAX_BK.
+    cellsize = 1000. / 128
+    fkp, mask, boxsize, boxcenter, nmesh, mean_dist = build_survey_fkp_mesh(
+        data_rdz, randoms_rdz, cap,
+        resampler='ngp' if use_ngp else 'tsc', cellsize=cellsize)
+
+    # Shift into PolyBin's FFT-ordered real-space layout, then verify it
+    fkp, mask = np.fft.ifftshift(fkp), np.fft.ifftshift(mask)
+    _check_polybin_alignment(boxsize, boxcenter, nmesh, mask, mean_dist)
+
+    cache_dir = join(cfg.meta.wdir, 'scratch', 'cache')
+    out_data = run_bispectrum_survey(
+        fkp, mask, boxsize, boxcenter, num_threads=threads,
+        cache_dir=cache_dir,
+        cache_tag=f'polybin_survey_{cap}_N{nmesh}_lmax2'
+    )
+    del fkp, mask
+
+    # Save metadata. The P(k) step writes identical values for these, but
+    # repeat them so the file is loadable (infer.loaders.load_lc_Bk needs
+    # nbar and n(z)) even if only the Bk step has run. 'high_res' is
+    # deliberately omitted -- it describes the P(k) mesh, not this one.
+    out_attrs = {}
+    Ngalaxies = data_rdz.shape[0]
+    out_attrs['Ngalaxies'] = Ngalaxies
+    out_attrs['boxsize'] = boxsize
+    out_attrs['nbar'] = Ngalaxies / boxsize**3
+    out_attrs['log10nbar'] = np.log10(Ngalaxies) - 3 * np.log10(boxsize)
+
+    zbins = np.linspace(0.4, 0.7, 101)  # spacing in dz = 0.003
+    out_data['nz'], out_data['nz_bins'] = \
+        np.histogram(data_rdz[:, -1], bins=zbins)
+
+    save_group(outpath, out_data, out_attrs, None,
+               cfg, save_HOD=True, save_noise=True)
     return True
 
 
@@ -708,19 +831,17 @@ def main(cfg: DictConfig) -> None:
                     summaries=['Pk'],
                     cfg=cfg
                 )
-                # # Bk is still done with old code (TODO: update)
-                # done &= summarize_lightcone_pylians(
-                #     source_path,
-                #     # Diagnostics for lightcone stats use fiducial cosmology
-                #     cosmo=Planck18,
-                #     cap=cap,
-                #     high_res=cfg.diag.high_res,
-                #     use_ngp=cfg.diag.use_ngp,
-                #     threads=threads, from_scratch=from_scratch,
-                #     hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
-                #     summaries=['Bk'],
-                #     config=cfg
-                # )
+                if 'Bk' in summaries:
+                    # Must follow the P(k) step, which creates the file
+                    done &= summarize_lightcone_polybin(
+                        source_path,
+                        cap=cap,
+                        use_ngp=cfg.diag.use_ngp,
+                        threads=threads, from_scratch=from_scratch,
+                        hod_seed=hod_seed, aug_seed=cfg.survey.aug_seed,
+                        summaries=['Bk'],
+                        cfg=cfg
+                    )
             else:
                 raise ValueError(
                     f'Unknown survey backend: {cfg.diag.survey_backend}')
