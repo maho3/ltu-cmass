@@ -2,7 +2,9 @@
 
 import os
 import copy
+import logging
 import numpy as np
+from os.path import join
 import Pk_library as PKL
 import MAS_library as MASL
 import redshift_space_library as RSL
@@ -171,14 +173,23 @@ def calcQk_polybin(k, Pk, k123, Bk):
     return Qk
 
 
+def _fixed_bk_kedges():
+    """The fixed (K_MIN, DK_BK, K_MAX_BK) triangle-side binning.
+
+    Shared by the periodic-box and survey bispectrum estimators so the
+    triangle set (and hence the data vector) is identical for both.
+    """
+    n_bins = (K_MAX_BK - K_MIN) // DK_BK
+    return np.append(K_MIN + DK_BK*np.arange(n_bins+1),
+                     K_MAX_BK)  # last bin shorter
+
+
 @timing_decorator
 def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     assert axis == 2  # polybin measures along the z axis
 
     n_mesh = delta.shape[0]
-    n_bins = (K_MAX_BK - K_MIN) // DK_BK
-    k_bins = np.append(K_MIN + DK_BK*np.arange(n_bins+1),
-                       K_MAX_BK)  # last bin shorter
+    k_bins = _fixed_bk_kedges()
 
     # set stuff up
     base = pb.PolyBin3D(
@@ -209,6 +220,153 @@ def calcBk_polybin(delta, L, axis=0, MAS='CIC', threads=16):
     # compute
     pk_corr = pspec.Pk_ideal(delta, discreteness_correction=True)
     bk_corr = bspec.Bk_ideal(delta, discreteness_correction=True)
+
+    # set up outputs
+    k = pspec.get_ks()
+    k123 = bspec.get_ks()
+    pk = np.array([pk_corr[f'p{ell}'] for ell in [0, 2]])
+    bk = np.array([bk_corr[f'b{ell}'] for ell in [0, 2]])
+    qk = calcQk_polybin(k, pk, k123, bk)
+
+    return k123, bk, qk, k, pk
+
+
+def _polybin_survey_cache(cache_dir, tag, base, pspec, bspec):
+    """Load (or compute and store) the data-independent ideal Fisher matrices.
+
+    `compute_fisher_ideal` and the l>0 symmetry factors depend only on the
+    grid and the binning, not on the field, so for a survey geometry they are
+    the same for every lhid. They are also by far the most expensive part of
+    the estimator at survey resolution, so we cache them on disk.
+    """
+    fname = None if cache_dir is None else join(cache_dir, f'{tag}.npz')
+
+    if fname is not None and os.path.isfile(fname):
+        logging.info(f'Loading cached PolyBin Fisher matrices from {fname}')
+        with np.load(fname) as f:
+            bspec.sym_factor = f['sym_factor']
+            bspec.fish_ideal = f['bfish']
+            pspec.fish_ideal = f['pfish']
+    else:
+        logging.info('Computing PolyBin ideal Fisher matrices (uncached)')
+        bspec.compute_fisher_ideal(discreteness_correction=True)
+        pspec.compute_fisher_ideal(discreteness_correction=True)
+        if fname is not None:
+            os.makedirs(cache_dir, exist_ok=True)
+            np.savez(fname, sym_factor=bspec.sym_factor,
+                     bfish=bspec.fish_ideal, pfish=pspec.fish_ideal)
+
+    # Set the attributes Bk_ideal/Pk_ideal check for. We do this by hand
+    # rather than passing fish_ideal=..., because those methods read
+    # self.discreteness_correction, which is only set by compute_fisher_ideal.
+    for spec in (pspec, bspec):
+        spec.inv_fish_ideal = np.linalg.inv(spec.fish_ideal)
+        spec.discreteness_correction = True
+
+
+@timing_decorator
+def calcBk_polybin_survey(field, mask, L, boxcenter, threads=16,
+                          cache_dir=None, cache_tag=None):
+    """FKP bispectrum + power spectrum multipoles of a survey lightcone.
+
+    `field` is the FKP difference field n_d(x)w(x) - alpha*n_r(x)w(x) and
+    `mask` is alpha*n_r(x)w(x), both painted on the same survey-box mesh and
+    already deconvolved of the assignment window.
+
+    How the normalization is computed
+    ---------------------------------
+    PolyBin's `*_ideal` estimators divide each copy of the field by
+    <mask^2>^(1/2) (P) or <mask^3>^(1/3) (B), where <.> is the plain mean
+    over *all* grid cells -- `sq_mask_mean` in pspec.py, `cube_mask_mean` in
+    bspec.py. Combined with their `volume/gridsize.prod()**2` prefactor that
+    is the FKP normalization; see the `Pk_ideal`/`Bk_ideal` docstrings ("for
+    suitably normalized input, the FKP power spectrum"). Numerator and
+    normalization are homogeneous of the same degree in the field, so the
+    overall units of `field`/`mask` cancel -- only their ratio matters, and
+    painting in pypower's "weight units" is fine.
+
+    In pypower's units the implied normalization is
+
+        I22_polybin = <mask^2> * gridsize.prod()**2 / boxsize**3
+
+    directly comparable to `MeshFFTPower(...).poles.wnorm`.
+
+    Line-of-sight is radial (`sightline='local'`), the lightcone analogue of
+    pypower's `los='endpoint'`. As in the box estimator, no shot noise is
+    subtracted.
+
+    Normalization caveat: pypower computes `wnorm` differently. Its
+    `fft_power.normalization()` sums the data x randoms *cross* product,
+    (1/dV) sum_cells n_d * (alpha n_r), on a separate mesh (cellsize=10
+    Mpc/h, CIC, no interlacing). Cross and auto agree only if the randoms
+    trace the data's selection function.
+
+    Historically they did not: the shared survey randoms were generated by
+    `survey.randoms=true`, which pushes a *uniform random cube* through the
+    lightcone (hodlightcone.stitch_lightcone), so they carried only the
+    angular mask and the z-range cut and were uniform in comoving volume --
+    dN/dz tracking dV/dz to ~3%. Randoms built with `survey.fix_nz=true`
+    (plus `survey.nz_factor`) instead follow the observed CMASS n(z) and
+    largely remove this term.
+
+    Measured consequence with the legacy uniform randoms (ngc real_data,
+    nmesh=240): polybin/pypower = 0.7792, flat in k to 4 decimals and
+    identical for P_0 and P_2. The normalization is a scalar, so it can only
+    ever be an amplitude convention, never a k- or multipole-dependent
+    distortion. Decomposition, from
+    scripts/check_lightcone_bk_maskshot.py: the randoms' own Poisson
+    variance in <mask^2> contributes just 1.7% (~8% of the gap); the rest is
+    the n(z) mismatch (a radial catalog-only estimate of the cross/auto
+    ratio gives 0.758).
+
+    Note this factor is *not* identical across lhids: it depends on each
+    mock's n(z) through alpha and the FKP weights. It also grows as the mesh
+    gets finer, so do not compare absolute amplitudes across different
+    nmesh. See the module docstring of check_lightcone_bk_maskshot.py.
+
+    Both arrays must already be in PolyBin's real-space layout, i.e.
+    `np.fft.ifftshift`-ed out of pypower's corner-first ordering; see
+    `summarize_lightcone_polybin`.
+
+    Returns (k123, bk, qk, k, pk), matching `calcBk_polybin`.
+    """
+    field = np.ascontiguousarray(field, dtype=np.float64)
+    mask = np.ascontiguousarray(mask, dtype=np.float64)
+    assert field.shape == mask.shape
+
+    n_mesh = np.asarray(field.shape, dtype=int)
+    k_bins = _fixed_bk_kedges()
+
+    base = pb.PolyBin3D(
+        sightline='local',  # radial LOS, as for pypower's 'endpoint'
+        gridsize=list(n_mesh),
+        boxsize=[float(L)]*3,
+        boxcenter=list(np.asarray(boxcenter, dtype=float)),
+        pixel_window='none',  # pypower already compensated the mesh
+        backend='fftw',
+        nthreads=threads
+    )
+    pspec = pb.PSpec(
+        base,
+        k_bins,  # k-bin edges
+        lmax=2,  # Legendre multipoles
+        mask=mask,  # n(x)w(x), sets the FKP normalization
+        applySinv=None,  # filter to apply to data
+    )
+    bspec = pb.BSpec(
+        base,
+        k_bins,  # k-bin edges
+        lmax=2,  # Legendre multipoles
+        mask=mask,  # n(x)w(x), sets the FKP normalization
+        applySinv=None,  # filter to apply to data
+        k_bins_squeeze=None,
+        include_partial_triangles=False,
+    )
+    _polybin_survey_cache(cache_dir, cache_tag, base, pspec, bspec)
+
+    # compute
+    pk_corr = pspec.Pk_ideal(field, discreteness_correction=True)
+    bk_corr = bspec.Bk_ideal(field, discreteness_correction=True)
 
     # set up outputs
     k = pspec.get_ks()
