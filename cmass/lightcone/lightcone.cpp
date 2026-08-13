@@ -6,6 +6,7 @@
 #include <climits>
 
 #include <vector>
+#include <string>
 #include <functional>
 #include <map>
 #include <utility>
@@ -200,6 +201,13 @@ struct Lightcone
     const unsigned augment;
     const unsigned long seed;
     const bool is_north;
+    const bool skip_fibcoll;
+    // name of the n(z) target cap (e.g. "North", "South", "MTNG").
+    // empty -> fall back to is_north
+    const std::string nz_cap;
+    // multiplies the target n(z) bins. empty -> 1, size 1 -> scalar,
+    // otherwise one entry per bin
+    const std::vector<double> nz_factor;
     const std::vector<double> snap_times;
     size_t Nsnaps;
     std::vector<double> snap_redshifts, snap_chis, redshift_bounds, chi_bounds;
@@ -229,9 +237,14 @@ struct Lightcone
                double BoxSize_=3e3, int remap_case_=0,
                bool verbose_=false, unsigned augment_=0,
                double sigmaradial_=0.0, double sigmatransverse_=0.0,
-               unsigned long seed_=137UL, bool is_north_=true) :
+               unsigned long seed_=137UL, bool is_north_=true,
+               bool skip_fibcoll_=false,
+               const std::string &nz_cap_=std::string(),
+               const std::vector<double> &nz_factor_=std::vector<double>()) :
         mask{mask_},
         is_north{is_north_},
+        skip_fibcoll{skip_fibcoll_},
+        nz_cap{nz_cap_}, nz_factor{nz_factor_},
         // hod_fct{hod_fct_},
         Omega_m{Omega_m_}, zmin{zmin_}, zmax{zmax_}, zmid{zmid_},
         snap_times{snap_times_}, Nsnaps{snap_times_.size()},
@@ -340,21 +353,27 @@ struct Lightcone
         if (snap_indices_done.size() != Nsnaps)
             throw std::runtime_error("not all snapshots have been added");
 
-        if (do_downsample)
+        // randoms should not be thinned by fiber collisions -- they trace the
+        // selection function, not the instrument
+        if (!skip_fibcoll)
         {
-            // get an idea of the fiber collision rate in our sample,
-            // so the subsequent downsampling is to the correct level.
-            // This is justified as all this stuff is not super expensive.
-            double fibcoll_rate = fibcoll</*only_measure=*/true>();
+            if (do_downsample)
+            {
+                // get an idea of the fiber collision rate in our sample,
+                // so the subsequent downsampling is to the correct level.
+                // This is justified as all this stuff is not super expensive.
+                double fibcoll_rate = fibcoll</*only_measure=*/true>();
 
-            // first downsampling before fiber collisions are applied
-            if (verbose) std::printf("downsample\n");
-            downsample(fibcoll_rate+Numbers::fibcoll_rate_correction);
+                // first downsampling before fiber collisions are applied
+                if (verbose) std::printf("downsample\n");
+                downsample(fibcoll_rate+Numbers::fibcoll_rate_correction);
+            }
+
+            // apply fiber collisions
+            if (verbose) std::printf("fibcoll\n");
+            fibcoll</*only_measure=*/false>();
         }
-
-        // apply fiber collisions
-        if (verbose) std::printf("fibcoll\n");
-        fibcoll</*only_measure=*/false>(); 
+        else if (verbose) std::printf("skipping fibcoll\n");
 
         // now downsample to our final density
         if (do_downsample)
@@ -411,14 +430,19 @@ PYBIND11_MODULE(lc, m)
                        bool, unsigned,
                        double, double,
                        unsigned long,
-                       bool>(),
+                       bool, bool,
+                       const std::string &,
+                       const std::vector<double> &>(),
             "mask"_a, "Omega_m"_a, "zmin"_a, "zmax"_a, "zmid"_a, "snap_times"_a,
             pyb::kw_only(),
             "boss_dir"_a=nullptr,
             "BoxSize"_a=3e3, "remap_case"_a=0,
             "verbose"_a=false, "augment"_a=0,
             "sigmaradial"_a=0.0, "sigmatransverse"_a=0.0,
-            "seed"_a=137UL, "is_north"_a=true
+            "seed"_a=137UL, "is_north"_a=true,
+            "skip_fibcoll"_a=false,
+            "nz_cap"_a=std::string(),
+            "nz_factor"_a=std::vector<double>()
         )
         .def("set_hod", &Lightcone::set_hod, "hod_fct"_a)
         .def("add_snap", &Lightcone::add_snap, "snap_idx"_a, "xhlo"_a, "vhlo"_a)
@@ -434,16 +458,27 @@ void Lightcone::read_boss_nz (void)
     // text file, each line number of objects in a redshift bin
     // we assume bins are equally spaced in redshift between zmin and zmax,
     // number of bins is inferred from the file
-    if (is_north)
-        std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_North_zmin%.4f_zmax%.4f.dat",
-                      boss_dir, zmin, zmax);
-    else
-        std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_South_zmin%.4f_zmax%.4f.dat",
-                      boss_dir, zmin, zmax);
+    const std::string cap = nz_cap.empty() ? (is_north ? "North" : "South")
+                                           : nz_cap;
+    std::snprintf(fname, 512, "%s/nz_DR12v5_CMASS_%s_zmin%.4f_zmax%.4f.dat",
+                  boss_dir, cap.c_str(), zmin, zmax);
     auto fp = std::fopen(fname, "r");
+    if (!fp)
+        throw std::runtime_error(std::string("could not open n(z) target ")+fname);
     char line[64];
     while (std::fgets(line, 64, fp))
         nz.push_back(std::atof(line));
+    std::fclose(fp);
+
+    if (nz.empty())
+        throw std::runtime_error(std::string("empty n(z) target ")+fname);
+
+    // scale the target, either by a scalar or per-bin
+    if (nz_factor.size() > 1 && nz_factor.size() != nz.size())
+        throw std::runtime_error("nz_factor length does not match number of n(z) bins");
+    if (!nz_factor.empty())
+        for (size_t ii=0; ii<nz.size(); ++ii)
+            nz[ii] *= (nz_factor.size()==1) ? nz_factor[0] : nz_factor[ii];
 
     boss_z_hist = gsl_histogram_alloc(nz.size());
     gsl_histogram_set_ranges_uniform(boss_z_hist, zmin, zmax);
