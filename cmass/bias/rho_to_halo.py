@@ -230,19 +230,47 @@ def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
     return hposs, hmasss, hvels, meta
 
 
+# Process-wide cache so the CHARM checkpoint is only built/loaded once, even
+# though apply_charm_new() is called once per snapshot in cfg.nbody.asave
+# (e.g. 7x for mtnglike) within the same `rho_to_halo` process.
+_CHARM_MODEL_CACHE = {}
+
+
+def _get_charm_model(charm_yaml_path, ckpt_path, device):
+    key = (charm_yaml_path, ckpt_path, str(device))
+    if key not in _CHARM_MODEL_CACHE:
+        from charm.config_loader import load_config
+        from charm.run_charm_joint_v2vel_ddp import build_model
+        from charm.inferers.run_inference_v2 import load_checkpoint
+        import torch
+
+        cfg_charm = load_config(charm_yaml_path)
+        logging.info(f'Loading CHARM gobig model on {device}...')
+        if device.type == 'cuda':
+            # Every chunk feeds the encoder the same fixed tensor shape, so
+            # let cudnn pick (and cache) the fastest conv algorithm for it.
+            torch.backends.cudnn.benchmark = True
+        model = build_model(cfg_charm).to(device)
+        load_checkpoint(model, ckpt_path, device)
+        model.eval()
+        _CHARM_MODEL_CACHE[key] = (model, cfg_charm)
+    return _CHARM_MODEL_CACHE[key]
+
+
 def apply_charm_new(rho, fvel, L, cosmo):
     """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
 
     import torch
-    from charm.config_loader import load_config
-    from charm.run_charm_joint_v2vel_ddp import build_model
     from charm.inferers.run_inference_v2 import (
-        load_checkpoint, build_cond_tensors,
+        build_cond_tensors,
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
 
     charm_yaml_path = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
-    cfg_charm = load_config(charm_yaml_path)
+    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model, cfg_charm = _get_charm_model(charm_yaml_path, ckpt_path, device)
 
     sc = cfg_charm['sim_settings']
     Nmax = int(sc['Nmax'])
@@ -259,14 +287,6 @@ def apply_charm_new(rho, fvel, L, cosmo):
 
     Npix = nb * nax        # pre-trained per-chunk resolution (128)
     Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
-
-    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logging.info(f'Loading CHARM gobig model on {device}...')
-    model = build_model(cfg_charm).to(device)
-    load_checkpoint(model, ckpt_path, device)
-    model.eval()
 
     N = rho.shape[0]  # input resolution
     assert N % Npix == 0, 'Input must be divisible by Npix'  # TODO: generalize

@@ -11,7 +11,7 @@
 
 # Called by watch_and_submit.sh with --export=lhid=<N>
 # e.g. sbatch --export=lhid=42 slurm_charm_single.sh
-lhid=2000
+lhid=3000
 echo "lhid=$lhid"
 
 source ~/.bashrc
@@ -19,8 +19,8 @@ conda activate cmass
 
 cd /u/maho3/git/ltu-cmass
 
-nbody=quijote3gpch
-sim=fastpm_charm6
+nbody=mtnglike
+sim=fastpm
 multisnapshot=True
 extras="nbody.matchIC=0" #  hydra/job_logging=disabled"
 L=3000
@@ -36,6 +36,11 @@ fi
 
 if [ ! -d "$outdir/$lhid" ]; then
     echo "Directory $outdir/$lhid does not exist (nbody.h5 not staged yet?). Exiting."
+    exit 1
+fi
+
+if [ ! -f "$outdir/$lhid/nbody.h5" ]; then
+    echo "Input $outdir/$lhid/nbody.h5 does not exist. Exiting."
     exit 1
 fi
 
