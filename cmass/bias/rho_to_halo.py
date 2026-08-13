@@ -230,8 +230,17 @@ def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
     return hposs, hmasss, hvels, meta
 
 
-def apply_charm_new(rho, fvel, L, cosmo):
-    """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
+CHARM_YAML = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
+CHARM_CKPT = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
+
+
+def apply_charm_new(rho, fvel, L, cosmo, charm_yaml=None, charm_ckpt=None):
+    """Apply CHARM (gobig branch), accounting for the pre-trained resolution.
+
+    `charm_yaml`/`charm_ckpt` default to the current model (charm7). Override
+    them via bias.halo.charm_yaml / bias.halo.charm_ckpt to reproduce an older
+    suite -- e.g. charm6 used charm_joint_best_val_ft15.pth with the same yaml.
+    """
 
     import torch
     from charm.config_loader import load_config
@@ -241,7 +250,7 @@ def apply_charm_new(rho, fvel, L, cosmo):
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
 
-    charm_yaml_path = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
+    charm_yaml_path = charm_yaml or CHARM_YAML
     cfg_charm = load_config(charm_yaml_path)
 
     sc = cfg_charm['sim_settings']
@@ -260,10 +269,11 @@ def apply_charm_new(rho, fvel, L, cosmo):
     Npix = nb * nax        # pre-trained per-chunk resolution (128)
     Lcharm = 1000.0          # CHARM trained box size [Mpc/h]
 
-    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
+    ckpt_path = charm_ckpt or CHARM_CKPT
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logging.info(f'Loading CHARM gobig model on {device}...')
+    logging.info(f'Loading CHARM gobig model on {device} '
+                 f'from {ckpt_path}...')
     model = build_model(cfg_charm).to(device)
     load_checkpoint(model, ckpt_path, device)
     model.eval()
@@ -424,7 +434,9 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         hpos, hmass, hvel, meta = apply_charm_new(
             rho,
             fvel*a,  # physical velocities in km/s
-            cfg.nbody.L, cfg.nbody.cosmo
+            cfg.nbody.L, cfg.nbody.cosmo,
+            charm_yaml=cfg.bias.halo.get('charm_yaml', None),
+            charm_ckpt=cfg.bias.halo.get('charm_ckpt', None),
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')
