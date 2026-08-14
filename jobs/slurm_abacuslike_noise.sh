@@ -27,14 +27,14 @@ Nhod=1
 Nnoise=49
 
 nbody=abacus
-sim=custom_comp_gridnoise
+sim=nbody_comp_gridnoise
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 
 multisnapshot=False
 diag_from_scratch=True
 rm_galaxies=True
-extras="bias=zheng_composite nbody.zf=0.5 meta.cosmofile=./params/abacus_custom_cosmologies.txt bias.hod.use_conc=False" # "noise.params.radial=0 noise.params.transverse=0
+extras="bias=zheng_composite nbody.zf=0.5 meta.cosmofile=./params/abacus_custom_cosmologies.txt" # "noise.params.radial=0 noise.params.transverse=0
 L=2000
 N=256
 
