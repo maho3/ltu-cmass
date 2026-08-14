@@ -1,4 +1,5 @@
 
+import os
 import h5py
 import argparse
 import numpy as np
@@ -71,6 +72,108 @@ def _get_box_geometry(cap):
     boxcenter = geom['boxcenter']
     rotation = geom['rotation']
     return boxsize, boxcenter, rotation, fsky
+
+
+def get_randoms_file(wdir, cap):
+    """Path to the shared randoms lightcone for a given survey cap."""
+    from ..utils import get_source_path
+    if cap in ['simbig', 'sgc', 'mtng']:
+        randoms_path = get_source_path(wdir, 'abacus', 'randoms', 2000, 256, 0)
+    elif cap == 'ngc':
+        randoms_path = get_source_path(
+            wdir, 'quijote3gpch', 'randoms', 3000, 384, 0)
+    else:
+        raise ValueError(f'Unknown cap: {cap}.')
+    return os.path.join(
+        randoms_path, f'{cap}_lightcone', f'hod{0:05}_aug{0:05}.h5')
+
+
+def get_survey_nmesh(boxsize, cellsize):
+    """Number of cells per side for a survey box, rounded to an even number.
+
+    PolyBin3D's real-to-complex FFTs require an even last dimension, and we
+    keep the grid cubic, so all three sides are rounded together.
+    """
+    nmesh = int(round(boxsize / cellsize))
+    return nmesh + (nmesh % 2)
+
+
+def build_survey_fkp_mesh(data_rdz, randoms_rdz, cap, resampler='tsc',
+                          interlacing=2, cellsize=1000. / 128, P0=1e4,
+                          mpicomm=None):
+    """Paint the FKP difference field and the n(x)w(x) 'mask' onto one mesh.
+
+    Serial counterpart of the painting done inside `main` below -- same
+    geometry, FKP weights and resampler, but on a single rank so the result
+    can be handed to a non-MPI estimator (PolyBin3D). Returns
+
+        (fkp_field, mask_field, boxsize, boxcenter, nmesh, mean_dist)
+
+    where `fkp_field` is n_d w - alpha n_r w and `mask_field` is alpha n_r w,
+    both in pypower's corner-first array layout and in weight units (the
+    common normalization cancels in the FKP estimator), and `mean_dist` is
+    the FKP-weighted mean comoving distance of the randoms (used downstream
+    to check the field is aligned with the estimator's coordinate grid).
+    """
+    if mpicomm is None:
+        mpicomm = MPI.COMM_SELF
+
+    boxsize, boxcenter, rotation, fsky = _get_box_geometry(cap)
+
+    data_pos, randoms_pos = preprocess_lightcone_catalogs(
+        data_rdz, randoms_rdz)
+
+    data_weights, nofz = compute_fkp_weights(
+        data_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=P0)
+    randoms_weights, _ = compute_fkp_weights(
+        randoms_rdz[:, 2], fsky=fsky, cosmology=cosmo, P0=P0, nofz=nofz)
+
+    # FKP-weighted mean distance of the randoms, i.e. the first moment of the
+    # mask field. Computed before the rotation, which preserves |r| anyway.
+    mean_dist = np.average(
+        np.linalg.norm(randoms_pos, axis=1), weights=randoms_weights)
+
+    # Rotate positions so they lie optimally along cardinal axes
+    data_pos = rotation @ data_pos.T
+    randoms_pos = rotation @ randoms_pos.T
+
+    outside_box = np.sum(
+        np.any(np.abs(data_pos.T - boxcenter) > boxsize / 2, axis=1))
+    if outside_box > 0:
+        raise ValueError(
+            f'{outside_box} data positions are outside the {cap} box.')
+
+    nmesh = get_survey_nmesh(boxsize, cellsize)
+
+    mesh = CatalogMesh(
+        data_positions=data_pos,
+        data_weights=data_weights,
+        randoms_positions=randoms_pos,
+        randoms_weights=randoms_weights,
+        boxsize=boxsize,
+        boxcenter=boxcenter,
+        nmesh=nmesh,
+        mpicomm=mpicomm,
+        mpiroot=None,
+        resampler=resampler,
+        interlacing=interlacing,
+        position_type='xyz'
+    )
+
+    # The data field is compensated here rather than deconvolved in PolyBin,
+    # so the window treatment matches the P(k) path exactly (incl. interlacing).
+    fkp = np.ascontiguousarray(
+        mesh.to_mesh(field='fkp', compensate=True).value, dtype=np.float64)
+
+    # The mask is deliberately *not* compensated: it stands for the physical
+    # n(x)w(x) and is only ever used as a real-space moment (<mask^2>,
+    # <mask^3>). Deconvolving it would ring at the sharp survey boundary and
+    # push cells negative, which those odd moments are sensitive to.
+    mask = np.ascontiguousarray(
+        mesh.to_mesh(field='data-normalized_randoms', compensate=False).value,
+        dtype=np.float64)
+
+    return fkp, mask, boxsize, boxcenter, nmesh, mean_dist
 
 
 def main():
@@ -207,9 +310,8 @@ def main():
         'Pk': Pk,
     }
 
-    # # --- Step 3: Calculate the Bispectrum ---
-    # field = mesh.to_mesh(field='fkp', dtype=np.float32, compensate=True)
-    # TODO: Update this section to calculate the bispectrum (solve jax versioning)
+    # The bispectrum is computed separately, in serial, by
+    # summ.summarize_lightcone_polybin -- PolyBin3D is threaded, not MPI.
 
     # Save metadata
     out_attrs = {}

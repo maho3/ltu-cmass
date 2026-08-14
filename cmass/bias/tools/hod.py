@@ -32,14 +32,19 @@ def lookup_hod_model(model=None, assem_bias=False, vel_assem_bias=False, zpivot=
         if custom_prior and custom_prior in COMPOSITE_HOD_PRIORS:
             p = COMPOSITE_HOD_PRIORS[custom_prior]
             # Override only logMmin; all other params stay uniform
-            location = [p['mean'], None, None, None, None, None, None, None, 0, 0]
-            sigma    = [p['stdev'], None, None, None, None, None, None, None, 0.2, 0.2]
+            location = [p['mean'], None, None,
+                        None, None, None, None, None, 0, 0]
+            sigma = [p['stdev'], None, None, None,
+                     None, None, None, None, 0.2, 0.2]
             distribution = [
                 "norm", "uniform", "uniform", "uniform", "uniform",
                 "uniform", "uniform", "uniform", "truncnorm", "truncnorm",
             ]
+            lower_bound = [-np.inf, 0.1, 13.0, 13.0, 0.0, 0.0, 0.2, 0.2, -1, -1]
+            upper_bound = [np.inf, 0.6, 15.0, 15.0, 1.5, 0.7, 2.0, 2.0, 1, 1]
             return Zheng07(assem_bias=assem_bias, vel_assem_bias=vel_assem_bias,
-                           location=location, sigma=sigma, distribution=distribution)
+                           location=location, sigma=sigma, distribution=distribution,
+                           lower_bound=lower_bound, upper_bound=upper_bound)
         return Zheng07(assem_bias=assem_bias,
                        vel_assem_bias=vel_assem_bias)
     elif model == 'zheng07zdep':
@@ -298,7 +303,7 @@ def build_halo_catalog(
         conc = mass_to_concentration(mass, redshift, cosmo, mdef)
 
     hz = halo_redshift if halo_redshift is not None else redshift
-    if isinstance(redshift, float):
+    if np.isscalar(hz):
         hz = np.array([hz]*len(pos))
 
     # Specify arguments

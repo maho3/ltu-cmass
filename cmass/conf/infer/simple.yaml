@@ -80,3 +80,11 @@ clean_models: True  # whether to delete poorly fit model files after validation
 testing:
   suite: null
   sim: null
+
+# ~~ RESIMULATION ARGS (cmass.infer.resim) ~~
+resim:
+  n_resim: 100      # number of importance-sampled data vectors to select
+  n_post: 10000     # number of direct posterior samples (for diagnostics)
+  seed: 0           # seed for the weighted selection
+  batch_size: 2048  # batch size for log_prob evaluation
+  pool: [train, val, test]  # splits to draw resimulations from
