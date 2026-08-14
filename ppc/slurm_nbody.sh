@@ -12,14 +12,14 @@
 
 # Stage A of the PPC campaign: FastPM only.
 #   Stage B  = CHARM (cmass.bias.rho_to_halo), run by hand on a GPU machine.
-#   Stage C  = jobs/slurm_ppc_hod.sh (apply_hod + diagnostics).
+#   Stage C  = ppc/slurm_hod.sh (apply_hod + diagnostics).
 #
 # The forward chain replicates jobs/slurm_abacuslike_bias.sh, which produced the
 # training suite: nbody=abacuslike, bias=zheng_composite, multisnapshot=False,
 # nbody.zf=0.500015 (a=0.666660, the analysis snapshot).
 #
 # Cosmology per draw comes from params/ppc_<tag>_cosmo.txt, written by
-# scripts/ppc_draw.py, indexed by nbody.lhid. matchIC=0 so each draw gets its
+# ppc/draw.py, indexed by nbody.lhid. matchIC=0 so each draw gets its
 # own IC phase (gen_white_noise is seeded by lhid).
 #
 # Storage strategy copied from jobs/slurm_fastpm_2000.sh: the transient FastPM

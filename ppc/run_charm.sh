@@ -2,10 +2,10 @@
 # Stage B of the PPC campaign: CHARM (cmass.bias.rho_to_halo).
 #
 # NOT a SLURM script -- run this by hand on a GPU machine, after
-# jobs/slurm_ppc_nbody.sh has produced nbody.h5 for every draw.
+# ppc/slurm_nbody.sh has produced nbody.h5 for every draw.
 #
-#   usage:  bash jobs/run_ppc_charm.sh [first_draw] [last_draw]
-#   e.g.    bash jobs/run_ppc_charm.sh 0 99
+#   usage:  bash ppc/run_charm.sh [first_draw] [last_draw]
+#   e.g.    bash ppc/run_charm.sh 0 99
 #
 # CHARM VERSION: the training suite (abacuslike/fastpm_charm6) was built with
 # charm6 = charm_joint_best_val_ft15.pth (ltu-cmass commit 23ff0a8, 2026-06-10).
