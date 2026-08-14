@@ -13,6 +13,12 @@ is the correct correction when the dataset's parameters were drawn from the
 prior. Note that LampeEnsemble.log_prob is a weighted *sum* of member log
 probabilities rather than a true log mixture; we use it anyway for consistency
 with cmass.infer.validate.
+
+Selection is the top-n_resim pool points by weight. Downstream statistics
+(data-space coverage, ESS) carry w_i through rather than treating selection
+as unweighted, so deterministic top-k is more sample-efficient than a
+stochastic resample: every selected point is genuinely high-density, and none
+are dropped or duplicated by chance.
 """
 
 import os
@@ -35,7 +41,6 @@ SPLITS = ('train', 'val', 'test')
 _RESIM_DEFAULTS = dict(
     n_resim=100,        # number of resimulations to select
     n_post=10000,       # number of direct posterior samples (for diagnostics)
-    seed=0,             # seed for the Gumbel top-k selection
     batch_size=2048,    # batch size for log_prob evaluation
     pool=list(SPLITS),  # which splits to draw resimulations from
 )
@@ -80,15 +85,22 @@ def load_labels(exp_path):
     return labels, startidx
 
 
-def param_names(cfg, exp_path):
+def param_names(exp_path):
+    """Parameter names for theta's columns as they actually were at training
+    time. Read from exp_path's own saved config.yaml rather than the current
+    run's cfg -- infer.include_hod/include_noise/subselect_cosmo are commonly
+    overridden per-run (e.g. infer.include_hod=False is standard for most
+    jobs), which would silently desync from a model trained with different
+    flags and misalign every downstream name with the wrong theta column."""
+    saved = OmegaConf.load(join(exp_path, 'config.yaml')).infer
     names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
-    if cfg.infer.subselect_cosmo is not None:
-        names = [names[i] for i in cfg.infer.subselect_cosmo]
+    if saved.subselect_cosmo is not None:
+        names = [names[i] for i in saved.subselect_cosmo]
     filepath = join(exp_path, 'hodprior.csv')
-    if cfg.infer.include_hod and os.path.exists(filepath):
+    if saved.include_hod and os.path.exists(filepath):
         hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
         names += hodprior[:, 0].astype('str').tolist()
-    if cfg.infer.include_noise:
+    if saved.include_noise:
         names += ['noise_radial', 'noise_transverse']
     return names
 
@@ -139,12 +151,12 @@ def normalize_weights(logw):
     return w / w.sum()
 
 
-def gumbel_topk(logw, k, seed):
-    """Weighted sampling without replacement (Gumbel top-k trick)."""
-    rng = np.random.default_rng(seed)
-    g = rng.gumbel(size=len(logw))
-    keys = logw - logw.max() + g
-    return np.argsort(keys)[::-1][:k]
+def top_k_by_weight(logw, k):
+    """Indices of the k largest importance weights. Deterministic: every
+    selected point is genuinely among the highest-density resimulation
+    candidates, and downstream statistics reweight by w_resim rather than
+    treating selection as an unweighted draw."""
+    return np.argsort(logw)[::-1][:k]
 
 
 def weighted_quantile(x, w, q):
@@ -242,12 +254,19 @@ def _short(name, maxlen=22):
     return out
 
 
-def plot_corner(theta_post, theta_resim, theta_obs, names, out_dir):
+def plot_corner(theta_post, theta_resim, w_resim, theta_obs, names, out_dir):
     """Check that resims tile the posterior, not just its mode, over every
-    inferred parameter (cosmology + HOD + noise)."""
+    inferred parameter (cosmology + HOD + noise). Resim points are a
+    deterministic top-weight selection rather than a posterior-representative
+    resample, so both the histograms and the marker sizes are weighted by
+    w_resim -- otherwise the plot would misleadingly read as an unweighted
+    posterior sample."""
     ndim = theta_post.shape[1]
     panel = 2.1 if ndim <= 6 else max(1.0, 12.6 / ndim)
     fs = 8 if ndim <= 6 else 6
+    # scale marker area by weight, normalized to a fixed max area
+    smax = 40 if ndim <= 6 else 18
+    sizes = smax * w_resim / w_resim.max()
     fig, axs = plt.subplots(ndim, ndim, figsize=(panel*ndim, panel*ndim),
                             squeeze=False)
     for i in range(ndim):
@@ -261,16 +280,16 @@ def plot_corner(theta_post, theta_resim, theta_obs, names, out_dir):
                 bins = np.histogram_bin_edges(theta_post[:, i], bins=30)
                 ax.hist(theta_post[:, i], bins=bins, density=True,
                         histtype='step', color='k')
-                ax.hist(theta_resim[:, i], bins=bins, density=True,
-                        histtype='stepfilled', alpha=0.5, color='C0')
+                ax.hist(theta_resim[:, i], bins=bins, weights=w_resim,
+                        density=True, histtype='stepfilled', alpha=0.5,
+                        color='C0')
                 ax.axvline(theta_obs[i], color='C3', lw=1.5)
                 ax.set_yticks([])
             else:
                 ax.scatter(theta_post[:, j], theta_post[:, i], s=1,
                            alpha=0.1, color='0.5', rasterized=True)
                 ax.scatter(theta_resim[:, j], theta_resim[:, i],
-                           s=12 if ndim <= 6 else 5,
-                           color='C0', edgecolor='none')
+                           s=sizes, color='C0', alpha=0.7, edgecolor='none')
                 ax.scatter(theta_obs[j], theta_obs[i], marker='*',
                            s=120 if ndim <= 6 else 50,
                            color='C3', zorder=5)
@@ -285,8 +304,8 @@ def plot_corner(theta_post, theta_resim, theta_obs, names, out_dir):
                 ax.set_yticklabels([])
             if ndim > 6:
                 ax.locator_params(nbins=3)
-    fig.suptitle('Resimulations (blue) vs. direct posterior (grey); '
-                 'truth in red')
+    fig.suptitle('Resimulations (blue, sized by weight) vs. direct '
+                 'posterior (grey); truth in red')
     fig.tight_layout()
     fig.savefig(join(out_dir, 'plot_resim_corner.png'), dpi=150,
                 bbox_inches='tight')
@@ -306,7 +325,7 @@ def run_resim(exp_path, cfg, rcfg, test_path=None, out_dir=None):
     # load the candidate pool -- always the training suite
     x, theta, ids, tags = load_pool(exp_path, list(rcfg.pool))
     labels, startidx = load_labels(exp_path)
-    names = param_names(cfg, exp_path)
+    names = param_names(exp_path)
     logging.info(f'Pool: {len(x)} data vectors, {theta.shape[1]} parameters')
 
     # load the trained ensemble
@@ -368,7 +387,7 @@ def run_resim(exp_path, cfg, rcfg, test_path=None, out_dir=None):
     if n_resim < int(rcfg.n_resim):
         logging.warning(f'Only {n_resim} candidates with nonzero weight; '
                         f'requested {rcfg.n_resim}.')
-    sel = gumbel_topk(logw, n_resim, int(rcfg.seed))
+    sel = top_k_by_weight(logw, n_resim)
 
     x_pool, theta_pool = x[keep], theta[keep]
     ids_pool, tags_pool = ids[keep], tags[keep]
@@ -403,7 +422,7 @@ def run_resim(exp_path, cfg, rcfg, test_path=None, out_dir=None):
     # plots
     plot_dataspace(x_obs, x_resim, w_resim, x_pool, labels, startidx, out_dir)
     plot_logprob(logq_post, logq_resim, ess, ess_frac, w.max(), out_dir)
-    plot_corner(theta_post, theta_resim, theta_obs, names, out_dir)
+    plot_corner(theta_post, theta_resim, w_resim, theta_obs, names, out_dir)
 
 
 def run_experiment(exp, cfg, model_path):
