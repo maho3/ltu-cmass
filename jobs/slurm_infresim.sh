@@ -23,7 +23,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm6_comp
+sim=fastpm_charm6_comphod
 infer=simple  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True"
@@ -36,7 +36,7 @@ suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
 suffix="$suffix infer.include_noise=True infer.include_hod=False"
-suffix="$suffix infer.resim.n_resim=100 infer.resim.n_post=10000 infer.resim.seed=0"
+suffix="$suffix infer.resim.n_resim=100 infer.resim.n_post=10000"
 # suffix="$suffix infer.resim.pool=[train,val,test]"
 
 echo "Running posterior resimulation with $suffix"
