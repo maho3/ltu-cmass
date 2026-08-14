@@ -26,7 +26,9 @@ NOTE:
     - This only works for snapshot mode, wherein lightcone evolution is
     mimicked by stitching snapshots together. For the non-snapshot mode
     alternative, use 'ngc_selection.py'.
-    - The fiber collisions are applied in-sync with resampling.
+    - The fiber collisions are applied in-sync with resampling. They are
+    skipped entirely when survey.randoms=True, since randoms should trace
+    the selection function rather than the instrument.
 """
 
 import os
@@ -55,15 +57,20 @@ def split_galsnap_galidx(gid):
 
 
 def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
-                     noise_uniform, use_randoms=False):
+                     noise_uniform, use_randoms=False, randoms_nbar=3.0e-3):
     # Load snapshots
     for snap_idx, a in enumerate(snap_times):
         logging.info(f'Loading snapshot at a={a:.6f}...')
         if not use_randoms:
             hpos, hvel, _, _ = load_snapshot(source_path, a)
         else:
-            nbar_randoms = 10*3e-4  # 10x number density of CMASS
-            Nrandoms = int(nbar_randoms * BoxSize**3)
+            # Uniform cube, later downsampled to the target n(z) if fix_nz.
+            # randoms_nbar must exceed the peak target density in every
+            # z-bin or the downsampling cannot saturate; see the
+            # survey.randoms_nbar comment in conf/survey/default.yaml.
+            Nrandoms = int(randoms_nbar * BoxSize**3)
+            logging.info(f'Drawing {Nrandoms} uniform randoms '
+                         f'(nbar={randoms_nbar:.3e} (h/Mpc)^3)')
             hpos = np.random.rand(Nrandoms, 3) * BoxSize
             hvel = np.zeros_like(hpos)
 
@@ -89,20 +96,41 @@ def stitch_lightcone(lightcone, source_path, snap_times, BoxSize, Ngrid,
     return ra, dec, z, galsnap, galidx
 
 
-def check_saturation(z, nz_dir, zmin, zmax, geometry):
-    if geometry == 'ngc':
-        cap = 'North'
-    elif geometry == 'sgc':
-        cap = 'South'
-    elif geometry == 'mtng':
-        cap = 'MTNG'
-    else:
-        return False  # SIMBIG hasn't been calculated yet
-        raise ValueError(geometry)
+def _nz_cap(geometry):
+    """Cap name in the n(z) target filename, or None if we have no target."""
+    return {'ngc': 'North', 'sgc': 'South', 'mtng': 'MTNG'}.get(geometry)
 
-    filepath = join(
-        nz_dir, f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
-    nzobs = np.loadtxt(filepath, usecols=(0,))
+
+def load_nz_target(nz_dir, geometry, zmin, zmax, factor=1):
+    """Load the n(z) target counts the C++ lightcone downsamples to.
+
+    `factor` scales the observed counts. fix_nz alone downsamples to exactly
+    the observed n(z); randoms want that same *shape* at higher density, so
+    factor=10 gives 10x the observed n(z). It may be a scalar or a per-bin
+    vector -- mtng needs the latter, because its angular cut is applied
+    *after* the C++ downsampling (see main), so the target has to be
+    pre-inflated by 1/survival to land on the requested factor.
+    """
+    cap = _nz_cap(geometry)
+    if cap is None:
+        raise ValueError(f'No n(z) target available for geometry {geometry}')
+
+    src = join(nz_dir,
+               f'nz_DR12v5_CMASS_{cap}_zmin{zmin:.4f}_zmax{zmax:.4f}.dat')
+    counts = np.loadtxt(src, usecols=(0,))
+    factor = np.asarray(factor, dtype=float)
+    if factor.ndim and len(factor) != len(counts):
+        raise ValueError(
+            f'nz_factor has {len(factor)} entries but the {cap} target has '
+            f'{len(counts)} bins')
+    return counts * factor
+
+
+def check_saturation(z, nz_dir, zmin, zmax, geometry, factor=1):
+    if _nz_cap(geometry) is None:
+        return False  # SIMBIG hasn't been calculated yet
+
+    nzobs = load_nz_target(nz_dir, geometry, zmin, zmax, factor)
     zbins = np.linspace(zmin, zmax, len(nzobs)+1)
 
     # Check if n(z) is saturated (within 1-sigma of observed n(z))
@@ -202,6 +230,20 @@ def main(cfg: DictConfig) -> None:
         maskobs = None
         zmin, zmax = 0.0, 1.1  # midpoint is the same
 
+    # If fix_nz, resolve the n(z) target. The C++ reads it from nz_dir, keyed
+    # by cap name, and scales each bin by nz_factor (scalar or per-bin).
+    # nz_factor>1 gives the observed shape at higher density, for randoms.
+    nz_factor = getattr(cfg.survey, 'nz_factor', 1)
+    if OmegaConf.is_config(nz_factor):
+        nz_factor = OmegaConf.to_object(nz_factor)
+    nz_factor = np.atleast_1d(np.asarray(nz_factor, dtype=float)).tolist()
+    if cfg.survey.fix_nz:
+        # fails loudly here if the geometry has no target / wrong bin count
+        target = load_nz_target(nz_dir, geometry, zmin, zmax,
+                                np.squeeze(nz_factor))
+        logging.info(f'n(z) target for {geometry}: {target.sum():.0f} objects '
+                     f'over {len(target)} bins')
+
     # Setup lightcone
     snap_times = sorted(cfg.nbody.asave)[::-1]  # decreasing order
     snap_times = [a for a in snap_times if (zmin < (1/a - 1) < zmax)]
@@ -220,7 +262,12 @@ def main(cfg: DictConfig) -> None:
         sigmaradial=cfg.noise.radial,
         sigmatransverse=cfg.noise.transverse,
         seed=42,
-        is_north=geometry == 'ngc'
+        is_north=geometry == 'ngc',
+        # randoms trace the selection function, so they must not be thinned
+        # by fiber collisions (also by far the most expensive step)
+        skip_fibcoll=bool(cfg.survey.randoms),
+        nz_cap=_nz_cap(geometry) or '',
+        nz_factor=nz_factor
     )
 
     # Setup HOD model function
@@ -234,7 +281,8 @@ def main(cfg: DictConfig) -> None:
     ra, dec, z, galsnap, galidx = stitch_lightcone(
         lightcone, source_path, snap_times,
         cfg.nbody.L, cfg.nbody.N, cfg.bias.hod.noise_uniform,
-        use_randoms=cfg.survey.randoms)
+        use_randoms=cfg.survey.randoms,
+        randoms_nbar=float(getattr(cfg.survey, 'randoms_nbar', 3.0e-3)))
 
     # If SIMBIG, apply selection
     if geometry == 'simbig' and not cfg.survey.nomask:
@@ -253,7 +301,9 @@ def main(cfg: DictConfig) -> None:
     if cfg.survey.nomask:
         saturated = False
     else:
-        saturated = check_saturation(z, nz_dir, zmin, zmax, geometry)
+        saturated = check_saturation(
+            z, nz_dir, zmin, zmax, geometry,
+            np.squeeze(nz_factor) if cfg.survey.fix_nz else 1)
 
     # Save
     if geometry == 'ngc':
