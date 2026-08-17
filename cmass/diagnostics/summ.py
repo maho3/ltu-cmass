@@ -546,8 +546,10 @@ def summarize_lightcone_pypower(
     # --- 2. Construct the Command ---
     command_string = f"""
     cd {codedir}
-    source ~/.bashrc
-    conda activate cmass
+    module purge
+    module restore cmass
+    source /apps/anvil/external/apps/conda/2024.02/bin/activate
+    conda activate pmesh
     which python
     srun -n {n_processes} python -m cmass.diagnostics.pypower \
         --data-file {data_file} \
