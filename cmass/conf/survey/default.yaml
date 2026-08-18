@@ -13,8 +13,19 @@ z_range: [0.4, 0.7]
 boss_dir: "${meta.wdir}/obs/"  # path to observational masks
 fix_nz: False
 
+# Multiplier on the observed n(z) target used by fix_nz. 1 reproduces the
+# observed number counts; >1 is for randoms, which want the same n(z) shape
+# at higher density. May be a scalar or a list with one entry per z-bin of
+# the target file. Ignored unless fix_nz is True.
+nz_factor: 1
+
 # For randoms creation only (will not load any correct data!)
 randoms: False
+
+# Comoving number density of the uniform cube fed to the randoms lightcone,
+# in (h/Mpc)^3, before any n(z) downsampling. Must be high enough that every
+# z-bin can saturate nz_factor x the observed n(z).
+randoms_nbar: 3.0e-3
 
 # For turning off all masking (only for testing footprint coverage!)
 nomask: False

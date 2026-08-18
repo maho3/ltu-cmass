@@ -305,11 +305,9 @@ def calcBk_polybin_survey(field, mask, L, boxcenter, threads=16,
     `survey.randoms=true`, which pushes a *uniform random cube* through the
     lightcone (hodlightcone.stitch_lightcone), so they carried only the
     angular mask and the z-range cut and were uniform in comoving volume --
-    dN/dz tracking dV/dz to ~3%. Randoms built with `survey.fix_nz=true`
-    (plus `survey.nz_factor`) instead follow the observed CMASS n(z) and
-    largely remove this term.
+    dN/dz tracking dV/dz to ~3%.
 
-    Measured consequence with the legacy uniform randoms (ngc real_data,
+    Measured consequence with those legacy uniform randoms (ngc real_data,
     nmesh=240): polybin/pypower = 0.7792, flat in k to 4 decimals and
     identical for P_0 and P_2. The normalization is a scalar, so it can only
     ever be an amplitude convention, never a k- or multipole-dependent
@@ -319,10 +317,33 @@ def calcBk_polybin_survey(field, mask, L, boxcenter, threads=16,
     the n(z) mismatch (a radial catalog-only estimate of the cross/auto
     ratio gives 0.758).
 
+    The randoms have since been rebuilt with `survey.fix_nz=true` plus
+    `survey.nz_factor=10`, so they follow the observed CMASS n(z) at 10x
+    density, and this term is now small. Re-measured on the same catalog by
+    scripts/check_lightcone_norm_ratio.py:
+
+        nmesh   new randoms   uniform-in-dV control
+        120     1.0332        0.8339
+        240     0.9895        0.7378
+
+    i.e. a 26% mismatch at nmesh=240 becomes 1.0%. The control is built by
+    subsampling the current randoms back to a dV/dz shape, which leaves only
+    1.54M of them against the real randoms' 5.79M; the extra Poisson variance
+    in <mask^2> biases it low, which is why it reads 0.7378 rather than the
+    0.7792 measured on the actual legacy randoms. Read the improvement as
+    0.78 -> 0.99.
+
+    The residual ~1% is the C++ downsampler enforcing n(z) only in the 10
+    coarse dz=0.03 bins of the target file; within a bin the randoms still
+    carry the dV/dz shape. Finer target bins would reduce it further.
+
     Note this factor is *not* identical across lhids: it depends on each
-    mock's n(z) through alpha and the FKP weights. It also grows as the mesh
-    gets finer, so do not compare absolute amplitudes across different
-    nmesh. See the module docstring of check_lightcone_bk_maskshot.py.
+    mock's n(z) through alpha and the FKP weights. It also moves further from
+    1 as the mesh gets finer, so do not compare absolute amplitudes across
+    different nmesh -- note that all of that mesh dependence is in polybin's
+    <mask^2>, since pypower's wnorm is computed on its own fixed 10 Mpc/h
+    mesh and is identical at both resolutions above. See the module docstring
+    of check_lightcone_bk_maskshot.py.
 
     Both arrays must already be in PolyBin's real-space layout, i.e.
     `np.fft.ifftshift`-ed out of pypower's corner-first ordering; see

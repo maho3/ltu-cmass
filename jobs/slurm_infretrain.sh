@@ -25,8 +25,8 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm6_comphod
-infer=simple  # simple  # lightcone
+sim=fastpm_charm7
+infer=mixk  # simple  # lightcone
 
 tracer=${tracer:-galaxy}
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
