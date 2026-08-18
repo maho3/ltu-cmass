@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 Nhod=5
 
 nbody=abacuslike
-sim=fastpm_charm6_comp
+sim=fastpm_charm7
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-15  # Array range 0-15, 0-31
+#SBATCH --array=0-19  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=4:00:00         # Time limit
@@ -25,8 +25,8 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm6_comp
-infer=simple  # simple  # lightcone
+sim=fastpm_charm7
+infer=mixk  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True" # 
 device="cpu"
@@ -37,7 +37,7 @@ extras="$extras hydra/job_logging=disabled"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=True infer.include_hod=True"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 # suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_mixk_gridnoise"
