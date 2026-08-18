@@ -2,6 +2,7 @@
 #SBATCH --job-name=abacus_noise   # Job name
 # # SBATCH --array=0-99         # Job array range for lhid
 #SBATCH --array=0-120
+# # SBATCH --array=0,1,2,3,4,5,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=04:00:00         # Time limit
