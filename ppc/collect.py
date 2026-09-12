@@ -39,7 +39,6 @@ No Mahalanobis distances, no p-values -- bands only.
 
 import argparse
 import os
-import re
 import shutil
 from os.path import join, exists
 import numpy as np
@@ -55,12 +54,12 @@ from cmass.infer.loaders import (      # noqa: E402
 from cmass.infer.resim import (        # noqa: E402
     load_pool, plot_logprob, plot_corner, batched_log_prob)
 from cmass.infer.tools import resolve_kmax   # noqa: E402
+from ppc.layout import (                   # noqa: E402
+    ExpPath, WDIR, N_COSMO, N_NOISE, fmt_kmax, sim_subdir)
 
-WDIR = '/work/hdd/bdne/maho3/cmass-ili'
 PPC = join(WDIR, 'ppc/abacuslike_fastpm_charm6_comphod',
            'zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/obs01880')
 AF = 0.666660000066666           # analysis snapshot (a), key '0.666660'
-N_COSMO, N_NOISE = 5, 2
 TAGS = ('Eq', 'Sq', 'Ss', 'Is', '')
 
 # Entity -> colour, fixed. Observed is ink, the PPC ensemble is one hue, the
@@ -121,51 +120,6 @@ def actual_nnets(exp_path, nnets):
         return None
     return sum(exists(join(exp_path, 'nets', f'net-{t.number}',
                            'posterior.pkl')) for t in top)
-
-
-def kcut_from_path(exp_path):
-    """Inverse of cmass.infer.tools.kcut_dirname.
-
-    kmax is a scalar for a plain cut, or a per-summary mapping for a mixed one
-    (kmax-Bk=0.2__Pk=0.4). resolve_kmax consumes either.
-    """
-    m = re.match(r'kmin-([\d.]+)_kmax-(.+)$', os.path.basename(exp_path))
-    if not m:
-        raise ValueError(f'Cannot parse k-cut from {exp_path}')
-    kmin, kmax = float(m.group(1)), m.group(2)
-    if '=' not in kmax:
-        return kmin, float(kmax)
-    out = {}
-    for part in kmax.split('__'):
-        key, val = part.split('=')
-        out['default' if key == 'def' else key] = float(val)
-    return kmin, out
-
-
-def fmt_kmax(kmax):
-    if not isinstance(kmax, dict):
-        return str(kmax)
-    return ', '.join(f'{k}<{v}' for k, v in sorted(kmax.items()))
-
-
-def tracer_from_path(exp_path):
-    """.../models/<tracer>/<summaries>/<kcut>"""
-    return exp_path.rstrip('/').split(os.sep)[-3]
-
-
-def diag_subdir(tracer):
-    """Where cmass.diagnostics.summ writes this tracer's diagnostics."""
-    return tracer if is_lightcone(tracer) else 'galaxies'
-
-
-def is_lightcone(tracer):
-    return tracer.endswith('_lightcone')
-
-
-def diag_filename(tracer, hod_seed, aug_seed):
-    if is_lightcone(tracer):
-        return f'hod{hod_seed:05d}_aug{aug_seed:05d}.h5'
-    return f'hod{hod_seed:05d}.h5'
 
 
 def split_tag(summ):
@@ -355,22 +309,23 @@ def main():
     names = [str(s) for s in draws['param_names']]
     inf_labels = [str(s) for s in draws['labels']]
     startidx_ref = list(draws['startidx'])
-    exp_path = str(draws['exp_path'])
-    obs_exp_path = str(draws['test_path']) if 'test_path' in draws else ''
+    exp = ExpPath(str(draws['exp_path']))
+    obs_exp = (ExpPath(str(draws['test_path']))
+               if str(draws['test_path'] if 'test_path' in draws else '')
+               else exp)
     x_obs = draws['x_obs']
     theta_obs = np.asarray(draws['theta_obs'])
     id_obs = str(draws['id_obs'])
     nnets_req = int(draws['nnets']) if 'nnets' in draws else None
 
-    cfg = OmegaConf.load(join(exp_path, 'config.yaml'))
-    if cfg.infer.pca_features or exists(join(exp_path, 'pca.pkl')):
+    cfg = OmegaConf.load(join(exp, 'config.yaml'))
+    if cfg.infer.pca_features or exists(join(exp, 'pca.pkl')):
         raise SystemExit('Experiment uses PCA; must apply it, never refit.')
-    kmin, kmax = kcut_from_path(exp_path)
-    tracer = tracer_from_path(exp_path)
-    lc = is_lightcone(tracer)
-    sim_sub = args.sim_sub or join('fastpm', f'L{cfg.nbody.L}-N{cfg.nbody.N}')
-    print(f'exp_path   = {exp_path}')
-    print(f'tracer     = {tracer}' + ('  (lightcone)' if lc else ''))
+    kmin, kmax = exp.kmin, exp.kmax
+    sim_sub = args.sim_sub or sim_subdir(cfg)
+    print(f'exp_path   = {exp}')
+    print(f'tracer     = {exp.tracer}'
+          + ('  (lightcone)' if exp.is_lightcone else ''))
     print(f'k-cut      = {kmin} <= k <= {fmt_kmax(kmax)}')
     print(f'inference  = {inf_labels}, startidx {startidx_ref}')
     print(f'correct_shot={cfg.infer.correct_shot}, '
@@ -379,18 +334,18 @@ def main():
     # --- the observed sim's own diagnostics (for held-out summaries) --------
     obs_dir = args.obs_dir
     if obs_dir is None:
-        obs_cfg = (OmegaConf.load(join(obs_exp_path, 'config.yaml'))
-                   if obs_exp_path else cfg)
-        suite_root = (obs_exp_path or exp_path).split(
-            os.sep + 'models' + os.sep)[0]
-        obs_dir = join(suite_root,
+        # An OOD observation lives in the testing suite, whose box need not
+        # match the training suite's, so use that experiment's own config.
+        obs_cfg = (cfg if obs_exp is exp else
+                   OmegaConf.load(join(obs_exp, 'config.yaml')))
+        obs_dir = join(obs_exp.suite_root,
                        f'L{obs_cfg.nbody.L}-N{obs_cfg.nbody.N}', id_obs)
-    if obs_exp_path:
-        print(f'x_obs is  = out-of-distribution, from {obs_exp_path}')
-    obs_diag = find_obs_diag(join(obs_dir, 'diag', diag_subdir(tracer)),
+    if obs_exp is not exp:
+        print(f'x_obs is   = out-of-distribution, from {obs_exp}')
+    obs_diag = find_obs_diag(join(obs_dir, obs_exp.diag_dir),
                              theta_obs, names, args.atol)
     print(f'x_obs from = {obs_diag}')
-    obs_data = load_summ(obs_diag, lightcone=lc)
+    obs_data = load_summ(obs_diag, lightcone=exp.is_lightcone)
 
     # --- which blocks to plot ----------------------------------------------
     if args.summaries:
@@ -399,7 +354,7 @@ def main():
         # every redshift-space summary present, plus the equilateral/squeezed
         # slices of the bispectrum monopole. A lightcone is already in redshift
         # space, so its keys carry no 'z' and every key qualifies.
-        pre = '' if lc else 'z'
+        pre = '' if exp.is_lightcone else 'z'
         avail = sorted(k for k in obs_data if k.startswith(pre))
         plot_labels = (
             inf_labels
@@ -415,12 +370,12 @@ def main():
     kept, status = [], {}
     for i, theta in enumerate(theta_draws):
         simdir = join(out, sim_sub, str(i))
-        diagfile = join(simdir, 'diag', diag_subdir(tracer),
-                        diag_filename(tracer, args.hod_seed, args.aug_seed))
+        diagfile = join(simdir,
+                        exp.diag_file(args.hod_seed, args.aug_seed))
         if not exists(diagfile):
             status[i] = 'missing_diag'
             continue
-        s = load_summ(diagfile, lightcone=lc)
+        s = load_summ(diagfile, lightcone=exp.is_lightcone)
         if any(b not in s for b in needed_bases):
             status[i] = 'incomplete_summ'
             continue
@@ -445,7 +400,7 @@ def main():
     draw_data = {b: [s[b] for s in draw_summs] for b in needed_bases}
 
     # the training pool, for the grey context band on inference blocks
-    POOL, _, _, _ = load_pool(exp_path, ('train', 'val', 'test'))
+    POOL, _, _, _ = load_pool(exp, ('train', 'val', 'test'))
 
     # --- preprocess every plotted block ------------------------------------
     blocks, xs_inf = [], []
@@ -505,19 +460,16 @@ def main():
         return
 
     # --- bands --------------------------------------------------------------
-    parts = exp_path.rstrip('/').split(os.sep)
-    suite, sim = parts[-6], parts[-5]
-    n_nets = actual_nnets(exp_path, nnets_req or cfg.infer.Nnets)
+    n_nets = actual_nnets(exp, nnets_req or cfg.infer.Nnets)
     nets = f'{n_nets}-net ' if n_nets else ''
     if n_nets and nnets_req and n_nets != nnets_req:
         print(f'NOTE: ensemble is {n_nets} nets, not the {nnets_req} '
               f'requested (missing posterior.pkl for some top trials)')
-    obs_from = ''
-    if obs_exp_path:
-        op = obs_exp_path.rstrip('/').split(os.sep)
-        obs_from = f' from {op[-6]}/{op[-5]} (out-of-distribution)'
+    obs_from = ('' if obs_exp is exp else
+                f' from {obs_exp.suite}/{obs_exp.sim} (out-of-distribution)')
     title = (
-        f'Posterior predictive check  |  {suite}/{sim}, tracer={tracer}\n'
+        f'Posterior predictive check  |  {exp.suite}/{exp.sim}, '
+        f'tracer={exp.tracer}\n'
         f'conditioned on {"+".join(inf_labels)} at {kmin} $\\leq k \\leq$ '
         f'{fmt_kmax(kmax)}  |  {nets}{cfg.infer.backend}/{cfg.infer.engine} '
         f'ensemble, '
@@ -542,7 +494,7 @@ def main():
     import torch
     from cmass.infer.validate import load_ensemble
     w = np.full(n_ok, 1. / n_ok)
-    ensemble = load_ensemble(exp_path, cfg.infer.Nnets, plot=False,
+    ensemble = load_ensemble(exp, cfg.infer.Nnets, plot=False,
                              clean=False).to(args.device)
     with torch.no_grad():
         theta_post = ensemble.sample(

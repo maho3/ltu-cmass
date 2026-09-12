@@ -41,24 +41,12 @@ from omegaconf import OmegaConf
 from cmass.infer.resim import load_pool, load_labels, load_test_split, \
     param_names, select_test_point, empirical_quantiles
 from cmass.infer.validate import load_ensemble
+from ppc.layout import (
+    ExpPath, WDIR, N_COSMO, N_NOISE, COSMO_NAMES, NOISE_NAMES, sim_subdir)
 
-WDIR = '/work/hdd/bdne/maho3/cmass-ili'
 EXP_PATH = join(
     WDIR, 'abacuslike/fastpm_charm6_comphod/models/galaxy',
     'zPk0+zPk2+zPk4/kmin-0.0_kmax-0.4')
-
-# theta layout: 5 cosmology, then HOD (alphabetical, from hodprior.csv),
-# then noise_radial, noise_transverse.
-N_COSMO = 5
-N_NOISE = 2
-COSMO_NAMES = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
-NOISE_NAMES = ['noise_radial', 'noise_transverse']
-
-# The stage-C job scripts run with bias.hod.seed=1 (and survey.aug_seed=1 for
-# lightcones), so each draw's diagnostics land in hod00001[_aug00001].h5. Keep
-# in step with collect.py's --hod_seed / --aug_seed.
-HOD_SEED = 1
-AUG_SEED = 1
 
 # Flags that decide how a summary vector is built. x_obs is preprocessed by the
 # testing suite's own run, so these must agree or it does not mean what the
@@ -100,28 +88,6 @@ def build_argparser():
     return p
 
 
-def default_outroot(wdir, exp_path, tag, testing=None):
-    # .../<suite>/<sim>/models/<tracer>/<summaries>/<kcut>
-    parts = exp_path.rstrip('/').split(os.sep)
-    kcut, summ = parts[-1], parts[-2]
-    sim, suite = parts[-5], parts[-6]
-    root = join(wdir, 'ppc', f'{suite}_{sim}', f'{summ}_{kcut}')
-    if testing is not None:
-        root = join(root, 'testing', f'{testing[0]}_{testing[1]}')
-    return join(root, tag)
-
-
-def testing_exp_path(wdir, exp_path, suite, sim):
-    """The same experiment -- tracer, summaries, k-cut -- under another suite.
-
-    Derived from exp_path rather than rebuilt from a config, so the OOD
-    experiment cannot silently resolve to a different k-cut or summary set than
-    the model was trained on.
-    """
-    tail = exp_path.rstrip('/').split(os.sep)[-4:]  # models/tracer/summ/kcut
-    return join(wdir, suite, sim, *tail)
-
-
 def check_theta_layout(names):
     """Refuse experiments whose theta is not [5 cosmo][HOD...][2 noise].
 
@@ -159,14 +125,6 @@ def check_preprocessing(cfg, test_path):
             'suite, so its x_obs is not what the posterior reads:\n' +
             '\n'.join(f'  infer.{k}: training={a!r}, testing={b!r}'
                       for k, a, b in bad))
-
-
-def diag_relpath(tracer):
-    """Per-draw diagnostics file, as cmass.diagnostics.summ names it."""
-    if tracer.endswith('_lightcone'):
-        return join('diag', tracer,
-                    f'hod{HOD_SEED:05d}_aug{AUG_SEED:05d}.h5')
-    return join('diag', 'galaxies', f'hod{HOD_SEED:05d}.h5')
 
 
 def select_by_lhid(theta_src, ids_src, theta_pool, lhid, mask=None):
@@ -244,21 +202,20 @@ def main():
     args = build_argparser().parse_args()
     if (args.testing_suite is None) != (args.testing_sim is None):
         raise SystemExit('--testing_suite and --testing_sim go together.')
-    testing = (None if args.testing_suite is None
-               else (args.testing_suite, args.testing_sim))
-    test_path = (None if testing is None else
-                 testing_exp_path(args.wdir, args.exp_path, *testing))
+    exp = ExpPath(args.exp_path)
+    testing = (None if args.testing_suite is None else
+               exp.swap_suite(args.wdir, args.testing_suite, args.testing_sim))
 
-    cfg = OmegaConf.load(join(args.exp_path, 'config.yaml'))
+    cfg = OmegaConf.load(join(exp, 'config.yaml'))
     nnets = args.nnets if args.nnets is not None else cfg.infer.Nnets
     if cfg.infer.pca_features:
         raise RuntimeError(
             'Experiment uses PCA; ppc_collect must load pca.pkl. Aborting.')
 
     # --- the observed point -------------------------------------------------
-    x, theta, ids, tags = load_pool(args.exp_path, ('train', 'val', 'test'))
-    labels, startidx = load_labels(args.exp_path)
-    names = param_names(args.exp_path)
+    x, theta, ids, tags = load_pool(exp, ('train', 'val', 'test'))
+    labels, startidx = load_labels(exp)
+    names = param_names(exp)
     assert len(names) == theta.shape[1], (names, theta.shape)
     check_theta_layout(names)
 
@@ -271,11 +228,11 @@ def main():
         x_obs, theta_obs, id_obs, split_obs = (
             x[iobs], theta[iobs], ids[iobs], tags[iobs])
     else:
-        check_preprocessing(cfg, test_path)
-        x_t, theta_t, ids_t = load_test_split(test_path)
+        check_preprocessing(cfg, testing)
+        x_t, theta_t, ids_t = load_test_split(testing)
         if x_t.shape[1] != x.shape[1] or theta_t.shape[1] != theta.shape[1]:
             raise SystemExit(
-                f'Testing suite at {test_path} has incompatible shapes '
+                f'Testing suite at {testing} has incompatible shapes '
                 f'(x: {x_t.shape[1]} vs {x.shape[1]}, theta: '
                 f'{theta_t.shape[1]} vs {theta.shape[1]}). It must be '
                 'preprocessed with the same summaries and k-cut.')
@@ -297,15 +254,14 @@ def main():
     # The tag derives from the observed lhid unless overridden, so naming a
     # different point cannot silently overwrite another campaign's cosmofile.
     tag = args.tag or f'obs{int(id_obs):05d}'
-    out = args.outroot or default_outroot(
-        args.wdir, args.exp_path, tag, testing)
+    out = args.outroot or exp.campaign_dir(args.wdir, tag, testing)
     os.makedirs(join(out, 'overrides'), exist_ok=True)
 
     q_obs = empirical_quantiles(theta, theta_obs[None])[0]
     print(f'Pool: {x.shape[0]} vectors, {theta.shape[1]} params, '
           f'x is {x.shape[1]}-dim')
     if testing is not None:
-        print(f'x_obs drawn out-of-distribution from {test_path}')
+        print(f'x_obs drawn out-of-distribution from {testing}')
     print(f'x_obs: index {iobs}, lhid {id_obs}, split {split_obs}'
           + (' (requested)' if args.obs_lhid is not None else ''))
     print(f'tag:   {tag}')
@@ -313,7 +269,7 @@ def main():
         print(f'  {n_:46s} {v_:12.6g}  (q={q_:.2f})')
 
     # --- draw ---------------------------------------------------------------
-    ensemble = load_ensemble(args.exp_path, nnets, plot=False,
+    ensemble = load_ensemble(exp, nnets, plot=False,
                              clean=False).to(args.device)
     npz_path = join(out, 'posterior_draws.npz')
     n_total = args.start + args.ndraw
@@ -358,8 +314,8 @@ def main():
         theta_draws=theta_draws, x_obs=x_obs, theta_obs=theta_obs,
         id_obs=id_obs, index_obs=iobs, split_obs=split_obs,
         seed=args.seed, seed_blocks=np.array(seed_blocks),
-        n_rejected=n_rejected, exp_path=args.exp_path,
-        test_path=test_path or '',
+        n_rejected=n_rejected, exp_path=str(exp),
+        test_path=str(testing or ''),
         testing_suite=args.testing_suite or '',
         testing_sim=args.testing_sim or '',
         param_names=np.array(names), labels=np.array(labels),
@@ -374,14 +330,12 @@ def main():
     with open(join(out, 'manifest.tsv'), 'w') as f:
         f.write('\t'.join(['draw_id', 'status', 'wall_s'] + names +
                           ['sim_dir', 'diag_file']) + '\n')
-        tracer = args.exp_path.rstrip('/').split(os.sep)[-3]
-        subdir = join('fastpm', f'L{cfg.nbody.L}-N{cfg.nbody.N}')
         for i in range(n_total):
-            simdir = join(out, subdir, str(i))
+            simdir = join(out, sim_subdir(cfg), str(i))
             f.write('\t'.join(
                 [str(i), 'pending', ''] +
                 [f'{v:.10g}' for v in theta_draws[i]] +
-                [simdir, join(simdir, diag_relpath(tracer))]
+                [simdir, join(simdir, exp.diag_file())]
             ) + '\n')
 
     print(f'Wrote {npz_path}, manifest.tsv, and {n_total - args.start} '
