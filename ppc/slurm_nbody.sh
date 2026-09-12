@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ppc_nbody    # Job name
-#SBATCH --array=0-99%50         # One task per posterior draw (array idx == draw id == lhid)
+#SBATCH --array=0-19%20         # One task per posterior draw (array idx == draw id == lhid)
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=128            # Number of tasks
 #SBATCH --mem=240G              # Amount of memory
@@ -17,6 +17,11 @@
 # The forward chain replicates jobs/slurm_abacuslike_bias.sh, which produced the
 # training suite: nbody=abacuslike, bias=zheng_composite, multisnapshot=False,
 # nbody.zf=0.500015 (a=0.666660, the analysis snapshot).
+#
+# Caveat: the training suite's density came from a multisnapshot FastPM run to
+# z=0.3 (32 steps to a=0.769) whose a=0.66666 snapshot was the analysis one.
+# Here a single-snapshot run stops at a=0.666660, so the step spacing differs
+# slightly. Inherited from the validated charm6 campaign; small, but real.
 #
 # Cosmology per draw comes from params/ppc_<tag>_cosmo.txt, written by
 # ppc/draw.py, indexed by nbody.lhid. matchIC=0 so each draw gets its
@@ -38,8 +43,8 @@ lhid=$SLURM_ARRAY_TASK_ID
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs01880
-ppcdir=ppc/abacuslike_fastpm_charm6_comphod/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
+tag=obs00038
+ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/$tag
 
 nbody=abacuslike
 sim=fastpm

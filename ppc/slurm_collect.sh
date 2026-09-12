@@ -24,5 +24,7 @@ export OMP_NUM_THREADS=16
 export MKL_NUM_THREADS=16
 export TQDM_DISABLE=0
 
-PYTHONPATH=. python -u ppc/collect.py --n_post 5000 --device cpu
+ppcdir=/work/hdd/bdne/maho3/cmass-ili/ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/obs00038
+
+PYTHONPATH=. python -u ppc/collect.py --ppc_dir "$ppcdir" --n_post 5000 --device cpu
 echo "ppc_collect status=$?"

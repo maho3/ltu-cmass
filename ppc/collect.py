@@ -494,7 +494,7 @@ def main():
     import torch
     from cmass.infer.validate import load_ensemble
     w = np.full(n_ok, 1. / n_ok)
-    ensemble = load_ensemble(exp, cfg.infer.Nnets, plot=False,
+    ensemble = load_ensemble(str(exp), cfg.infer.Nnets, plot=False,
                              clean=False).to(args.device)
     with torch.no_grad():
         theta_post = ensemble.sample(

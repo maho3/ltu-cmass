@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ppc_hod      # Job name
-#SBATCH --array=0-99%50         # One task per posterior draw (array idx == draw id == lhid)
+#SBATCH --array=0-19%20         # One task per posterior draw (array idx == draw id == lhid)
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16             # Number of tasks
 #SBATCH --mem=64G               # Amount of memory
@@ -38,8 +38,8 @@ lhid=$SLURM_ARRAY_TASK_ID
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs01880
-ppcdir=ppc/abacuslike_fastpm_charm6_comphod/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
+tag=obs00038
+ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/$tag
 ppcbase=/work/hdd/bdne/maho3/cmass-ili/$ppcdir
 
 nbody=abacuslike

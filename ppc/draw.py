@@ -269,7 +269,8 @@ def main():
         print(f'  {n_:46s} {v_:12.6g}  (q={q_:.2f})')
 
     # --- draw ---------------------------------------------------------------
-    ensemble = load_ensemble(exp, nnets, plot=False,
+    # str(): load_ensemble -> study_name_from_path does string ops on the path.
+    ensemble = load_ensemble(str(exp), nnets, plot=False,
                              clean=False).to(args.device)
     npz_path = join(out, 'posterior_draws.npz')
     n_total = args.start + args.ndraw

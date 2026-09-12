@@ -5,13 +5,12 @@
 # ppc/slurm_nbody.sh has produced nbody.h5 for every draw.
 #
 #   usage:  bash ppc/run_charm.sh [first_draw] [last_draw]
-#   e.g.    bash ppc/run_charm.sh 0 99
+#   e.g.    bash ppc/run_charm.sh 0 19
 #
-# CHARM VERSION: the training suite (abacuslike/fastpm_charm6) was built with
-# charm6 = charm_joint_best_val_ft15.pth (ltu-cmass commit 23ff0a8, 2026-06-10).
-# HEAD defaults to charm_joint_v19.pth (charm7), which is a DIFFERENT halo bias
-# model -- using it would make the PPC test a forward model the posterior was
-# never trained on. CHARM_CKPT below pins the right one.
+# CHARM VERSION: the training suite (abacuslike/fastpm_charm7_cosmoHOD) was
+# built with charm7 = charm_joint_v19.pth, which is also HEAD's default in
+# cmass/bias/rho_to_halo.py. CHARM_CKPT pins it anyway, so the campaign keeps
+# testing the forward model the posterior was trained on if that default moves.
 #
 # rho_to_halo reads nbody.h5 and writes halos.h5 into the SAME directory, so
 # nothing needs symlinking.
@@ -19,18 +18,18 @@
 set -u
 
 first=${1:-0}
-last=${2:-99}
+last=${2:-19}
 
 # --- adjust these three for the machine you are running on -------------------
 WDIR=/work/hdd/bdne/maho3/cmass-ili
-CHARM_CKPT=$WDIR/scratch/charm_joint_best_val_ft15.pth
+CHARM_CKPT=$WDIR/scratch/charm_joint_v19.pth
 CHARM_YAML=/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml
 # -----------------------------------------------------------------------------
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs01880
-ppcdir=ppc/abacuslike_fastpm_charm6_comphod/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
+tag=obs00038
+ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/$tag
 L=2000
 N=256
 
