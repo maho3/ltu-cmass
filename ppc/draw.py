@@ -12,6 +12,13 @@ everything the SLURM stages need to simulate those draws:
 Draws are joint: one theta per simulation, straight from ensemble.sample().
 Nothing here is expensive; it runs on the login node.
 
+Out-of-distribution: --testing_suite/--testing_sim draw x_obs from another
+suite's test split instead of the training suite's, mirroring infer.testing in
+cmass.infer.validate and cmass.infer.resim. The posterior, the forward chain and
+the quantile reference pool all stay the training suite's; only the observation
+moves. Outputs land under a testing/<suite>_<sim>/ segment so an OOD campaign
+cannot collide with the in-distribution one.
+
 Appending (campaign step 5): pass --start N to extend an existing campaign.
 The full stream of start+ndraw draws is regenerated from the same seed and the
 first N are checked against the existing npz, so earlier draws are never
@@ -25,8 +32,8 @@ import numpy as np
 import torch
 from omegaconf import OmegaConf
 
-from cmass.infer.resim import load_pool, load_labels, param_names, \
-    select_test_point, empirical_quantiles
+from cmass.infer.resim import load_pool, load_labels, load_test_split, \
+    param_names, select_test_point, empirical_quantiles
 from cmass.infer.validate import load_ensemble
 
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
@@ -58,15 +65,34 @@ def build_argparser():
     p.add_argument('--tag', default='obs01880')
     p.add_argument('--outroot', default=None,
                    help='default: <wdir>/ppc/<suitetag>/<exptag>/<tag>')
+    p.add_argument('--testing_suite', default=None,
+                   help='draw x_obs from this suite instead of the training '
+                        'one (cf. infer.testing.suite)')
+    p.add_argument('--testing_sim', default=None,
+                   help='sim of --testing_suite (cf. infer.testing.sim)')
     return p
 
 
-def default_outroot(wdir, exp_path, tag):
+def default_outroot(wdir, exp_path, tag, testing=None):
     # .../<suite>/<sim>/models/<tracer>/<summaries>/<kcut>
     parts = exp_path.rstrip('/').split(os.sep)
     kcut, summ = parts[-1], parts[-2]
     sim, suite = parts[-5], parts[-6]
-    return join(wdir, 'ppc', f'{suite}_{sim}', f'{summ}_{kcut}', tag)
+    root = join(wdir, 'ppc', f'{suite}_{sim}', f'{summ}_{kcut}')
+    if testing is not None:
+        root = join(root, 'testing', f'{testing[0]}_{testing[1]}')
+    return join(root, tag)
+
+
+def testing_exp_path(wdir, exp_path, suite, sim):
+    """The same experiment -- tracer, summaries, k-cut -- under another suite.
+
+    Derived from exp_path rather than rebuilt from a config, so the OOD
+    experiment cannot silently resolve to a different k-cut or summary set than
+    the model was trained on.
+    """
+    tail = exp_path.rstrip('/').split(os.sep)[-4:]  # models/tracer/summ/kcut
+    return join(wdir, suite, sim, *tail)
 
 
 def draw_theta(ensemble, x_obs, n, seed, device):
@@ -117,7 +143,15 @@ def override_string(names, theta):
 
 def main():
     args = build_argparser().parse_args()
-    out = args.outroot or default_outroot(args.wdir, args.exp_path, args.tag)
+    if (args.testing_suite is None) != (args.testing_sim is None):
+        raise SystemExit('--testing_suite and --testing_sim go together.')
+    testing = (None if args.testing_suite is None
+               else (args.testing_suite, args.testing_sim))
+    test_path = (None if testing is None else
+                 testing_exp_path(args.wdir, args.exp_path, *testing))
+
+    out = args.outroot or default_outroot(
+        args.wdir, args.exp_path, args.tag, testing)
     os.makedirs(join(out, 'overrides'), exist_ok=True)
 
     cfg = OmegaConf.load(join(args.exp_path, 'config.yaml'))
@@ -132,16 +166,35 @@ def main():
     names = param_names(args.exp_path)
     assert len(names) == theta.shape[1], (names, theta.shape)
 
-    iobs = select_test_point(theta, tags, theta)
-    x_obs, theta_obs, id_obs = x[iobs], theta[iobs], ids[iobs]
+    if testing is None:
+        iobs = select_test_point(theta, tags, theta)
+        x_obs, theta_obs, id_obs, split_obs = (
+            x[iobs], theta[iobs], ids[iobs], tags[iobs])
+    else:
+        x_t, theta_t, ids_t = load_test_split(test_path)
+        if x_t.shape[1] != x.shape[1] or theta_t.shape[1] != theta.shape[1]:
+            raise SystemExit(
+                f'Testing suite at {test_path} has incompatible shapes '
+                f'(x: {x_t.shape[1]} vs {x.shape[1]}, theta: '
+                f'{theta_t.shape[1]} vs {theta.shape[1]}). It must be '
+                'preprocessed with the same summaries and k-cut.')
+        # Quantiles stay referenced to the training pool, as in resim.py: the
+        # question is which OOD point is most central to what the model saw.
+        iobs = select_test_point(theta_t, None, theta)
+        x_obs, theta_obs, id_obs, split_obs = (
+            x_t[iobs], theta_t[iobs], ids_t[iobs], 'test')
+
     if args.expect_lhid >= 0 and int(id_obs) != args.expect_lhid:
         raise SystemExit(
             f'select_test_point returned lhid {id_obs}, expected '
-            f'{args.expect_lhid}. Stopping (see TODO.md Phase 0.1).')
+            f'{args.expect_lhid}. Stopping (see TODO.md Phase 0.1). '
+            'Pass --expect_lhid -1 to accept whichever point it picks.')
     q_obs = empirical_quantiles(theta, theta_obs[None])[0]
     print(f'Pool: {x.shape[0]} vectors, {theta.shape[1]} params, '
           f'x is {x.shape[1]}-dim')
-    print(f'x_obs: index {iobs}, lhid {id_obs}, split {tags[iobs]}')
+    if testing is not None:
+        print(f'x_obs drawn out-of-distribution from {test_path}')
+    print(f'x_obs: index {iobs}, lhid {id_obs}, split {split_obs}')
     for n_, v_, q_ in zip(names, theta_obs, q_obs):
         print(f'  {n_:46s} {v_:12.6g}  (q={q_:.2f})')
 
@@ -189,9 +242,12 @@ def main():
     np.savez(
         npz_path,
         theta_draws=theta_draws, x_obs=x_obs, theta_obs=theta_obs,
-        id_obs=id_obs, index_obs=iobs, split_obs=tags[iobs],
+        id_obs=id_obs, index_obs=iobs, split_obs=split_obs,
         seed=args.seed, seed_blocks=np.array(seed_blocks),
         n_rejected=n_rejected, exp_path=args.exp_path,
+        test_path=test_path or '',
+        testing_suite=args.testing_suite or '',
+        testing_sim=args.testing_sim or '',
         param_names=np.array(names), labels=np.array(labels),
         startidx=np.array(startidx), nnets=nnets,
     )

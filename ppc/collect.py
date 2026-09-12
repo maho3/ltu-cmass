@@ -23,7 +23,9 @@ ones. Panel titles mark which is which.
 For summaries outside the inference set there is no x_obs in the trained
 experiment, so the observed vector is recomputed from the observed lhid's own
 diagnostics file -- located by matching its recorded HOD parameters to
-theta_obs, not by hardcoding a filename.
+theta_obs, not by hardcoding a filename. For an out-of-distribution campaign
+(ppc/draw.py --testing_suite) that sim lives in the testing suite, whose box
+need not match the training suite's, so its own config.yaml sets the L-N dir.
 
 k-grid caveat: the training summaries predate ltu-cmass ba2334f (2026-07-14,
 pylians -> pypower for periodic-box P(k)), so training P(k) sits on a uniform
@@ -307,6 +309,7 @@ def main():
     inf_labels = [str(s) for s in draws['labels']]
     startidx_ref = list(draws['startidx'])
     exp_path = str(draws['exp_path'])
+    obs_exp_path = str(draws['test_path']) if 'test_path' in draws else ''
     x_obs = draws['x_obs']
     theta_obs = np.asarray(draws['theta_obs'])
     id_obs = str(draws['id_obs'])
@@ -325,8 +328,14 @@ def main():
     # --- the observed sim's own diagnostics (for held-out summaries) --------
     obs_dir = args.obs_dir
     if obs_dir is None:
-        suite_root = exp_path.split(os.sep + 'models' + os.sep)[0]
-        obs_dir = join(suite_root, f'L{cfg.nbody.L}-N{cfg.nbody.N}', id_obs)
+        obs_cfg = (OmegaConf.load(join(obs_exp_path, 'config.yaml'))
+                   if obs_exp_path else cfg)
+        suite_root = (obs_exp_path or exp_path).split(
+            os.sep + 'models' + os.sep)[0]
+        obs_dir = join(suite_root,
+                       f'L{obs_cfg.nbody.L}-N{obs_cfg.nbody.N}', id_obs)
+    if obs_exp_path:
+        print(f'x_obs is  = out-of-distribution, from {obs_exp_path}')
     obs_diag = find_obs_diag(obs_dir, theta_obs, names, args.atol)
     print(f'x_obs from = {obs_diag}')
     obs_data = load_summ(obs_diag)
@@ -448,12 +457,17 @@ def main():
     if n_nets and nnets_req and n_nets != nnets_req:
         print(f'NOTE: ensemble is {n_nets} nets, not the {nnets_req} '
               f'requested (missing posterior.pkl for some top trials)')
+    obs_from = ''
+    if obs_exp_path:
+        op = obs_exp_path.rstrip('/').split(os.sep)
+        obs_from = f' from {op[-6]}/{op[-5]} (out-of-distribution)'
     title = (
         f'Posterior predictive check  |  {suite}/{sim}, tracer={tracer}\n'
         f'conditioned on {"+".join(inf_labels)} at {kmin} $\\leq k \\leq$ '
         f'{kmax}  |  {nets}{cfg.infer.backend}/{cfg.infer.engine} ensemble, '
         f'correct_shot={cfg.infer.correct_shot}\n'
-        f'$x_{{\\rm obs}}$ = lhid {id_obs} ({os.path.basename(obs_diag)}), '
+        f'$x_{{\\rm obs}}$ = lhid {id_obs}{obs_from} '
+        f'({os.path.basename(obs_diag)}), '
         f'{n_ok} joint draws from $q(\\theta|x_{{\\rm obs}})$')
     plotdir = join(out, 'plots')
     os.makedirs(plotdir, exist_ok=True)

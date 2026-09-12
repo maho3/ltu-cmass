@@ -56,9 +56,49 @@ A mismatch here does not error. It produces a PPC that tests a different forward
 model than the posterior was trained on, and a failed check then tells you about
 the config difference rather than the model.
 
+## Out-of-distribution test points
+
+By default `x_obs` is the training suite's own most-central test point, so the
+check is self-consistent: the observation comes from the same forward model
+being tested. To instead condition on an observation the model never saw, pass
+the testing suite the same way `infer.testing` does in `cmass/infer/validate.py`
+and `cmass/infer/resim.py`:
+
+```bash
+PYTHONPATH=. python ppc/draw.py --ndraw 10 \
+    --testing_suite abacus --testing_sim nbody_comp_gridnoise \
+    --expect_lhid -1 --tag obs_abacus
+```
+
+Only the observation moves. The posterior, the forward chain that simulates the
+draws, and the pool the centrality quantiles are measured against all stay the
+training suite's, matching `resim.py`. The testing experiment is resolved by
+swapping suite/sim into `--exp_path`, so its tracer, summaries and k-cut cannot
+silently differ; it must already be preprocessed at that same k-cut, and `draw.py`
+aborts if the x or theta widths disagree.
+
+This asks a different question than the self-consistent run: whether the forward
+model, driven by the parameters the posterior believes explain an observation
+from elsewhere, reproduces that observation. Disagreement is a real finding, not
+a bug — which is why it is worth running the self-consistent check first, so a
+failure here is attributable to the model rather than to the plumbing.
+
+Three practical notes:
+
+- `--expect_lhid` defaults to the self-consistent campaign's point and will
+  abort. Run once with `-1`, then pin the lhid it reports.
+- Give the run its own `--tag`. The tag names `params/ppc_<tag>_cosmo.txt`, which
+  is overwritten in place.
+- Outputs gain a `testing/<suite>_<sim>/` segment (below), so `ppcdir` in the
+  three job scripts and `--ppc_dir` for `collect.py` both change. `draw.py`
+  prints the exact path to paste in; `slurm_collect.sh` relies on `collect.py`'s
+  built-in default and needs `--ppc_dir` added for an OOD campaign.
+
 ## Outputs
 
-Under `<wdir>/ppc/<suite>_<sim>/<summaries>_<kcut>/<tag>/`:
+Under `<wdir>/ppc/<suite>_<sim>/<summaries>_<kcut>/<tag>/`, or
+`<wdir>/ppc/<suite>_<sim>/<summaries>_<kcut>/testing/<tsuite>_<tsim>/<tag>/` for
+an out-of-distribution run:
 
 | | |
 |---|---|
