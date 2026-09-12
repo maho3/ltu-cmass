@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=validate  # Job name
-#SBATCH --array=0-19  # Array range 0-15, 0-31
+#SBATCH --array=0-20  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
 #SBATCH --time=12:00:00         # Time limit
@@ -24,8 +24,8 @@ sleep $exp_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 
-nbody=abacuslike
-sim=fastpm_charm7
+nbody=quijotelike
+sim=fastpm_charm7_cosmoHOD
 infer=mixk  # simple  # lightcone
 tracer=galaxy
 extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True" # 
@@ -41,7 +41,7 @@ suffix="$suffix infer.include_noise=True infer.include_hod=True"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 # suffix="$suffix infer.testing.suite=quijote infer.testing.sim=nbody_mixk_gridnoise"
-suffix="$suffix infer.testing.suite=abacus infer.testing.sim=nbody_comp_gridnoise"
+# suffix="$suffix infer.testing.suite=abacus infer.testing.sim=nbody_comp_gridnoise"
 
 echo "Running inference pipeline with $suffix"
 

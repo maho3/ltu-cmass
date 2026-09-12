@@ -13,13 +13,13 @@ tracer: halo # Type of tracer to use for inference (e.g., halo, galaxy, ngc_ligh
 
 experiments:
   # List of experiments, each defining a set of summary statistics and k-ranges.
-  - summary: [Pk0]  # z-space monopole
+  - summary: [Pk0]  #  monopole
     kmin: [0.]
     kmax: [0.2, 0.4, 0.6]
-  - summary: [Pk0, Pk2, Pk4]  # z-space monopole, quadrupole, hexadecapole,
+  - summary: [Pk0, Pk2, Pk4]  #  monopole, quadrupole, hexadecapole,
     kmin: [0.]
     kmax: [0.2, 0.4, 0.6]
-  - summary: [Pk0, Pk2, Pk4, zEqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+  - summary: [Pk0, Pk2, Pk4, EqBk0]   #  monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax:
       - {Pk: 0.2, Bk: 0.2}
@@ -27,7 +27,7 @@ experiments:
       - {Pk: 0.4, Bk: 0.4}
       - {Pk: 0.6, Bk: 0.2}
       - {Pk: 0.4, Bk: 0.4}
-  - summary: [Pk0, Pk2, Pk4, zSqBk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+  - summary: [Pk0, Pk2, Pk4, SqBk0]   #  monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax:
       - {Pk: 0.2, Bk: 0.2}
@@ -35,7 +35,7 @@ experiments:
       - {Pk: 0.4, Bk: 0.4}
       - {Pk: 0.6, Bk: 0.2}
       - {Pk: 0.4, Bk: 0.4}
-  - summary: [Pk0, Pk2, Pk4, Bk0]   # z-space monopole, quadrupole, hexadecapole, bispectrum
+  - summary: [Pk0, Pk2, Pk4, Bk0]   #  monopole, quadrupole, hexadecapole, bispectrum
     kmin: [0.]
     kmax:
       - {Pk: 0.2, Bk: 0.2}
