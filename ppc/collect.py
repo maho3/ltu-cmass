@@ -50,7 +50,7 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt   # noqa: E402
 
 from cmass.infer.loaders import (      # noqa: E402
-    preprocess_Pk, preprocess_Bk, load_Pk, load_Bk,
+    preprocess_Pk, preprocess_Bk, load_Pk, load_Bk, load_lc_Pk, load_lc_Bk,
     _is_in_kminmax, _get_Bk_mask)
 from cmass.infer.resim import (        # noqa: E402
     load_pool, plot_logprob, plot_corner, batched_log_prob)
@@ -72,9 +72,13 @@ C_OBS, C_PPC, C_POOL = 'k', 'C0', '0.85'
 def build_argparser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--ppc_dir', default=PPC)
-    p.add_argument('--sim_sub', default='fastpm/L2000-N256')
+    p.add_argument('--sim_sub', default=None,
+                   help='per-draw sim subdir (default: fastpm/L<L>-N<N> from '
+                        'the experiment config)')
     p.add_argument('--hod_seed', type=int, default=1,
-                   help='which diag/galaxies/hodNNNNN.h5 to read per draw')
+                   help='which hodNNNNN[_augNNNNN].h5 to read per draw')
+    p.add_argument('--aug_seed', type=int, default=1,
+                   help='lightcone augmentation seed of the file to read')
     p.add_argument('--atol', type=float, default=1e-5,
                    help='tolerance when checking recorded vs drawn params')
     p.add_argument('--summaries', default=None,
@@ -120,10 +124,48 @@ def actual_nnets(exp_path, nnets):
 
 
 def kcut_from_path(exp_path):
-    m = re.match(r'kmin-([\d.]+)_kmax-([\d.]+)', os.path.basename(exp_path))
+    """Inverse of cmass.infer.tools.kcut_dirname.
+
+    kmax is a scalar for a plain cut, or a per-summary mapping for a mixed one
+    (kmax-Bk=0.2__Pk=0.4). resolve_kmax consumes either.
+    """
+    m = re.match(r'kmin-([\d.]+)_kmax-(.+)$', os.path.basename(exp_path))
     if not m:
         raise ValueError(f'Cannot parse k-cut from {exp_path}')
-    return float(m.group(1)), float(m.group(2))
+    kmin, kmax = float(m.group(1)), m.group(2)
+    if '=' not in kmax:
+        return kmin, float(kmax)
+    out = {}
+    for part in kmax.split('__'):
+        key, val = part.split('=')
+        out['default' if key == 'def' else key] = float(val)
+    return kmin, out
+
+
+def fmt_kmax(kmax):
+    if not isinstance(kmax, dict):
+        return str(kmax)
+    return ', '.join(f'{k}<{v}' for k, v in sorted(kmax.items()))
+
+
+def tracer_from_path(exp_path):
+    """.../models/<tracer>/<summaries>/<kcut>"""
+    return exp_path.rstrip('/').split(os.sep)[-3]
+
+
+def diag_subdir(tracer):
+    """Where cmass.diagnostics.summ writes this tracer's diagnostics."""
+    return tracer if is_lightcone(tracer) else 'galaxies'
+
+
+def is_lightcone(tracer):
+    return tracer.endswith('_lightcone')
+
+
+def diag_filename(tracer, hod_seed, aug_seed):
+    if is_lightcone(tracer):
+        return f'hod{hod_seed:05d}_aug{aug_seed:05d}.h5'
+    return f'hod{hod_seed:05d}.h5'
 
 
 def split_tag(summ):
@@ -134,10 +176,16 @@ def split_tag(summ):
     return summ, ''
 
 
-def load_summ(diagfile):
+def load_summ(diagfile, lightcone=False):
+    """A lightcone h5 is flat at the root and already in redshift space, so it
+    needs its own loaders and its keys carry no 'z' prefix."""
     s = {}
-    s.update(load_Pk(diagfile, AF))
-    s.update(load_Bk(diagfile, AF))
+    if lightcone:
+        s.update(load_lc_Pk(diagfile))
+        s.update(load_lc_Bk(diagfile))
+    else:
+        s.update(load_Pk(diagfile, AF))
+        s.update(load_Bk(diagfile, AF))
     return s
 
 
@@ -192,11 +240,10 @@ def ylabel_for(summ):
     return rf'${stat}_{ell}/{stat}_0$'
 
 
-def find_obs_diag(obs_dir, theta_obs, names, atol):
+def find_obs_diag(diagdir, theta_obs, names, atol):
     """The observed lhid has several HOD realizations; pick the one whose
     recorded HOD parameters are theta_obs. Identifying it by content rather
     than filename keeps this correct if the pool ordering ever changes."""
-    diagdir = join(obs_dir, 'diag', 'galaxies')
     want = theta_obs[N_COSMO:-N_NOISE]
     hodnames = list(names[N_COSMO:-N_NOISE])
     for fn in sorted(os.listdir(diagdir)):
@@ -319,8 +366,12 @@ def main():
     if cfg.infer.pca_features or exists(join(exp_path, 'pca.pkl')):
         raise SystemExit('Experiment uses PCA; must apply it, never refit.')
     kmin, kmax = kcut_from_path(exp_path)
+    tracer = tracer_from_path(exp_path)
+    lc = is_lightcone(tracer)
+    sim_sub = args.sim_sub or join('fastpm', f'L{cfg.nbody.L}-N{cfg.nbody.N}')
     print(f'exp_path   = {exp_path}')
-    print(f'k-cut      = {kmin} <= k <= {kmax}')
+    print(f'tracer     = {tracer}' + ('  (lightcone)' if lc else ''))
+    print(f'k-cut      = {kmin} <= k <= {fmt_kmax(kmax)}')
     print(f'inference  = {inf_labels}, startidx {startidx_ref}')
     print(f'correct_shot={cfg.infer.correct_shot}, '
           f'loglinear_start_idx={cfg.infer.loglinear_start_idx}')
@@ -336,21 +387,25 @@ def main():
                        f'L{obs_cfg.nbody.L}-N{obs_cfg.nbody.N}', id_obs)
     if obs_exp_path:
         print(f'x_obs is  = out-of-distribution, from {obs_exp_path}')
-    obs_diag = find_obs_diag(obs_dir, theta_obs, names, args.atol)
+    obs_diag = find_obs_diag(join(obs_dir, 'diag', diag_subdir(tracer)),
+                             theta_obs, names, args.atol)
     print(f'x_obs from = {obs_diag}')
-    obs_data = load_summ(obs_diag)
+    obs_data = load_summ(obs_diag, lightcone=lc)
 
     # --- which blocks to plot ----------------------------------------------
     if args.summaries:
         plot_labels = [s.strip() for s in args.summaries.split(',')]
     else:
-        # every z-space summary present, plus the equilateral/squeezed slices
-        # of the bispectrum monopole
-        avail = sorted(k for k in obs_data if k.startswith('z'))
+        # every redshift-space summary present, plus the equilateral/squeezed
+        # slices of the bispectrum monopole. A lightcone is already in redshift
+        # space, so its keys carry no 'z' and every key qualifies.
+        pre = '' if lc else 'z'
+        avail = sorted(k for k in obs_data if k.startswith(pre))
         plot_labels = (
             inf_labels
             + [s for s in avail if s not in inf_labels]
-            + [f'z{t}Bk0' for t in ('Eq', 'Sq') if 'zBk0' in avail])
+            + [f'{pre}{t}Bk0' for t in ('Eq', 'Sq')
+               if f'{pre}Bk0' in avail])
     print(f'plotting   = {plot_labels}')
 
     # --- gather per-draw summaries -----------------------------------------
@@ -359,13 +414,13 @@ def main():
     needed_bases |= {split_tag(lab)[0][:-1] + '0' for lab in plot_labels}
     kept, status = [], {}
     for i, theta in enumerate(theta_draws):
-        simdir = join(out, args.sim_sub, str(i))
-        diagfile = join(simdir, 'diag', 'galaxies',
-                        f'hod{args.hod_seed:05d}.h5')
+        simdir = join(out, sim_sub, str(i))
+        diagfile = join(simdir, 'diag', diag_subdir(tracer),
+                        diag_filename(tracer, args.hod_seed, args.aug_seed))
         if not exists(diagfile):
             status[i] = 'missing_diag'
             continue
-        s = load_summ(diagfile)
+        s = load_summ(diagfile, lightcone=lc)
         if any(b not in s for b in needed_bases):
             status[i] = 'incomplete_summ'
             continue
@@ -451,7 +506,7 @@ def main():
 
     # --- bands --------------------------------------------------------------
     parts = exp_path.rstrip('/').split(os.sep)
-    suite, sim, tracer = parts[-6], parts[-5], parts[-3]
+    suite, sim = parts[-6], parts[-5]
     n_nets = actual_nnets(exp_path, nnets_req or cfg.infer.Nnets)
     nets = f'{n_nets}-net ' if n_nets else ''
     if n_nets and nnets_req and n_nets != nnets_req:
@@ -464,7 +519,8 @@ def main():
     title = (
         f'Posterior predictive check  |  {suite}/{sim}, tracer={tracer}\n'
         f'conditioned on {"+".join(inf_labels)} at {kmin} $\\leq k \\leq$ '
-        f'{kmax}  |  {nets}{cfg.infer.backend}/{cfg.infer.engine} ensemble, '
+        f'{fmt_kmax(kmax)}  |  {nets}{cfg.infer.backend}/{cfg.infer.engine} '
+        f'ensemble, '
         f'correct_shot={cfg.infer.correct_shot}\n'
         f'$x_{{\\rm obs}}$ = lhid {id_obs}{obs_from} '
         f'({os.path.basename(obs_diag)}), '

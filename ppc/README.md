@@ -141,6 +141,50 @@ Which Abacus lhids are LCDM with `Mnu = 0` is recorded in
 columns; `ltu-gobig-notes/scripts/ood_abacus_inference.py` reads the same table
 to classify test points.
 
+## Lightcone campaigns
+
+Survey-geometry tracers (`mtng_lightcone`, `ngc_lightcone`, `sgc_lightcone`,
+`simbig_lightcone`) run the same four stages against a different chain:
+
+```bash
+PYTHONPATH=. python ppc/draw.py --exp_path <.../models/mtng_lightcone/...> --ndraw 10
+sbatch ppc/slurm_nbody_lc.sh    # A: FastPM, multisnapshot
+bash   ppc/run_charm_lc.sh 0 99 # B: CHARM over every snapshot
+sbatch ppc/slurm_lightcone.sh   # C: hodlightcone + summaries
+sbatch ppc/slurm_collect.sh     # D: add --ppc_dir
+```
+
+`draw.py` and `collect.py` need no flags for this — both read the tracer out of
+`--exp_path` and switch on it. `collect.py` picks the lightcone loaders, reads
+`diag/<tracer>/hod00001_aug00001.h5`, and drops the `z` prefix when discovering
+held-out summaries, since a lightcone is already in redshift space.
+
+Three things differ from the snapshot chain and are worth understanding before
+adapting the scripts:
+
+- **`hodlightcone` replaces `apply_hod`.** It reads `halos.h5` and applies the
+  HOD while stitching the lightcone, so there is no separate `galaxies/` stage.
+  It still routes through `parse_hod`/`parse_noise`, so the per-draw overrides
+  inject exactly as they do in the snapshot campaign.
+- **`multisnapshot=True` is required.** The lightcone is stitched out of
+  `nbody.asave`, so a single snapshot gives it nothing to interpolate over.
+  Stage A costs proportionally more wall time and scratch than
+  `slurm_nbody.sh`, and stage B runs CHARM once per snapshot.
+- **`aug_seed`** is a degree of freedom the snapshot chain does not have. It is
+  pinned to 1 alongside `bias.hod.seed=1`, matching the training suite's
+  `aug_seed == hod_seed` pairing.
+
+To run a different geometry, change `cap` at the top of `slurm_lightcone.sh` —
+the diag flag, `survey.geometry` and `bias.hod.custom_prior` all follow it. The
+experiment's tracer has to match (`<cap>_lightcone`).
+
+The stage scripts reproduce `jobs/slurm_fastpm_3gpch.sh`, `jobs/slurm_charm.sh`
+and the mtng block of `jobs/slurm_mtng_bias.sh` on the `rundelta` branch. As
+with any campaign, check that they still match the run that produced your
+training summaries — in particular `bias=` (the mtnglike suite moved from
+`zheng07` to `zheng07zinterp`, which changes the HOD parameter set from 10 to
+16) and `diag.summaries`.
+
 ## Outputs
 
 Under `<wdir>/ppc/<suite>_<sim>/<summaries>_<kcut>/<tag>/`, or

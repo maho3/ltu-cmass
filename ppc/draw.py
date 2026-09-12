@@ -54,9 +54,11 @@ N_NOISE = 2
 COSMO_NAMES = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
 NOISE_NAMES = ['noise_radial', 'noise_transverse']
 
-# slurm_hod.sh runs with bias.hod.seed=1, so the diagnostics of each draw land
-# in hod00001.h5. Keep in step with collect.py's --hod_seed.
+# The stage-C job scripts run with bias.hod.seed=1 (and survey.aug_seed=1 for
+# lightcones), so each draw's diagnostics land in hod00001[_aug00001].h5. Keep
+# in step with collect.py's --hod_seed / --aug_seed.
 HOD_SEED = 1
+AUG_SEED = 1
 
 # Flags that decide how a summary vector is built. x_obs is preprocessed by the
 # testing suite's own run, so these must agree or it does not mean what the
@@ -157,6 +159,14 @@ def check_preprocessing(cfg, test_path):
             'suite, so its x_obs is not what the posterior reads:\n' +
             '\n'.join(f'  infer.{k}: training={a!r}, testing={b!r}'
                       for k, a, b in bad))
+
+
+def diag_relpath(tracer):
+    """Per-draw diagnostics file, as cmass.diagnostics.summ names it."""
+    if tracer.endswith('_lightcone'):
+        return join('diag', tracer,
+                    f'hod{HOD_SEED:05d}_aug{AUG_SEED:05d}.h5')
+    return join('diag', 'galaxies', f'hod{HOD_SEED:05d}.h5')
 
 
 def select_by_lhid(theta_src, ids_src, theta_pool, lhid, mask=None):
@@ -364,13 +374,14 @@ def main():
     with open(join(out, 'manifest.tsv'), 'w') as f:
         f.write('\t'.join(['draw_id', 'status', 'wall_s'] + names +
                           ['sim_dir', 'diag_file']) + '\n')
+        tracer = args.exp_path.rstrip('/').split(os.sep)[-3]
+        subdir = join('fastpm', f'L{cfg.nbody.L}-N{cfg.nbody.N}')
         for i in range(n_total):
-            simdir = join(out, 'fastpm', 'L2000-N256', str(i))
+            simdir = join(out, subdir, str(i))
             f.write('\t'.join(
                 [str(i), 'pending', ''] +
                 [f'{v:.10g}' for v in theta_draws[i]] +
-                [simdir, join(simdir, 'diag', 'galaxies',
-                              f'hod{HOD_SEED:05d}.h5')]
+                [simdir, join(simdir, diag_relpath(tracer))]
             ) + '\n')
 
     print(f'Wrote {npz_path}, manifest.tsv, and {n_total - args.start} '
