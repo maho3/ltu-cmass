@@ -83,16 +83,49 @@ from elsewhere, reproduces that observation. Disagreement is a real finding, not
 a bug — which is why it is worth running the self-consistent check first, so a
 failure here is attributable to the model rather than to the plumbing.
 
-Three practical notes:
+Two practical notes:
 
 - `--expect_lhid` defaults to the self-consistent campaign's point and will
-  abort. Run once with `-1`, then pin the lhid it reports.
-- Give the run its own `--tag`. The tag names `params/ppc_<tag>_cosmo.txt`, which
-  is overwritten in place.
+  abort. Run once with `-1`, then pin the lhid it reports — or name the point
+  with `--obs_lhid`, which makes the guard moot.
 - Outputs gain a `testing/<suite>_<sim>/` segment (below), so `ppcdir` in the
   three job scripts and `--ppc_dir` for `collect.py` both change. `draw.py`
   prints the exact path to paste in; `slurm_collect.sh` relies on `collect.py`'s
   built-in default and needs `--ppc_dir` added for an OOD campaign.
+
+### Choosing the observed point
+
+By default the observed point is whichever test-split row sits closest to the
+median of the training pool, in per-parameter quantile distance. That is the
+right question only when every candidate is a cosmology the forward chain can
+reproduce.
+
+It is the wrong question on suites whose test set mixes cosmology types. Abacus
+holds LCDM with `Mnu = 0`, LCDM with `Mnu > 0`, and non-LCDM models in one set,
+while the forward chain here carries only the five LCDM parameters — so
+resimulating a massive-neutrino or non-LCDM point silently drops what made it
+that point, and the check then measures the missing physics rather than the
+model. `--obs_lhid` names the point instead:
+
+```bash
+PYTHONPATH=. python ppc/draw.py --ndraw 10 \
+    --testing_suite abacus1gpch --testing_sim custom_hodz_gridnoise \
+    --obs_lhid 7
+```
+
+An lhid usually has several HOD and noise realizations. Among the rows carrying
+the one named, the same centrality criterion picks which to use, so `--obs_lhid`
+narrows the candidates without changing how the choice is made among them. In
+the self-consistent case the point must still come from the test split; naming
+one the posterior trained on is refused.
+
+`--tag` defaults to `obs<lhid>`, so it tracks the point automatically and a
+second campaign cannot overwrite the first's `params/ppc_<tag>_cosmo.txt`.
+
+Which Abacus lhids are LCDM with `Mnu = 0` is recorded in
+`<wdir>/scratch/abacus_custom_table.csv`, in its `LCDM` and `Massive Neutrinos`
+columns; `ltu-gobig-notes/scripts/ood_abacus_inference.py` reads the same table
+to classify test points.
 
 ## Outputs
 

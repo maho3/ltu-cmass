@@ -19,6 +19,12 @@ the quantile reference pool all stay the training suite's; only the observation
 moves. Outputs land under a testing/<suite>_<sim>/ segment so an OOD campaign
 cannot collide with the in-distribution one.
 
+--obs_lhid names the observed point outright instead of taking the most central
+one. Suites like abacus mix LCDM, massive-neutrino and non-LCDM cosmologies in
+one test set, and the forward chain reproduces only the five LCDM parameters, so
+centrality is the wrong criterion there -- the point has to be one the chain can
+actually resimulate.
+
 Appending (campaign step 5): pass --start N to extend an existing campaign.
 The full stream of start+ndraw draws is regenerated from the same seed and the
 first N are checked against the existing npz, so earlier draws are never
@@ -61,8 +67,16 @@ def build_argparser():
                    help='ensemble size (default: infer.Nnets from exp config)')
     p.add_argument('--device', default='cpu')
     p.add_argument('--expect_lhid', type=int, default=1880,
-                   help='abort if select_test_point disagrees; -1 to disable')
-    p.add_argument('--tag', default='obs01880')
+                   help='abort if select_test_point disagrees; -1 to disable. '
+                        'Ignored when --obs_lhid names the point outright')
+    p.add_argument('--obs_lhid', type=int, default=None,
+                   help='condition on this lhid instead of the most central '
+                        'test point. For suites whose cosmologies are not all '
+                        'LCDM (abacus), pick one the forward chain can '
+                        'actually reproduce')
+    p.add_argument('--tag', default=None,
+                   help='names the output dir and params/ppc_<tag>_cosmo.txt '
+                        '(default: obs<lhid>)')
     p.add_argument('--outroot', default=None,
                    help='default: <wdir>/ppc/<suitetag>/<exptag>/<tag>')
     p.add_argument('--testing_suite', default=None,
@@ -93,6 +107,31 @@ def testing_exp_path(wdir, exp_path, suite, sim):
     """
     tail = exp_path.rstrip('/').split(os.sep)[-4:]  # models/tracer/summ/kcut
     return join(wdir, suite, sim, *tail)
+
+
+def select_by_lhid(theta_src, ids_src, theta_pool, lhid, mask=None):
+    """The most central row carrying this lhid.
+
+    One lhid usually has several HOD/noise realizations. Among those, this
+    keeps the same quantile-centrality criterion select_test_point uses, so
+    naming an lhid narrows which rows are eligible without changing how the
+    choice is made among them.
+    """
+    present = np.asarray(ids_src).astype(int) == lhid
+    ok = present if mask is None else (present & mask)
+    sel = np.flatnonzero(ok)
+    if len(sel) == 0:
+        if present.any():
+            raise SystemExit(
+                f'lhid {lhid} is in this experiment but not in its test '
+                'split. A PPC must not condition on a point the posterior '
+                'was trained on.')
+        raise SystemExit(
+            f'lhid {lhid} is not in this experiment. It holds '
+            f'{len(np.unique(np.asarray(ids_src).astype(int)))} distinct '
+            'lhids.')
+    q = empirical_quantiles(theta_pool, theta_src[sel])
+    return int(sel[np.argmin(np.linalg.norm(q - 0.5, axis=-1))])
 
 
 def draw_theta(ensemble, x_obs, n, seed, device):
@@ -150,10 +189,6 @@ def main():
     test_path = (None if testing is None else
                  testing_exp_path(args.wdir, args.exp_path, *testing))
 
-    out = args.outroot or default_outroot(
-        args.wdir, args.exp_path, args.tag, testing)
-    os.makedirs(join(out, 'overrides'), exist_ok=True)
-
     cfg = OmegaConf.load(join(args.exp_path, 'config.yaml'))
     nnets = args.nnets if args.nnets is not None else cfg.infer.Nnets
     if cfg.infer.pca_features:
@@ -167,7 +202,11 @@ def main():
     assert len(names) == theta.shape[1], (names, theta.shape)
 
     if testing is None:
-        iobs = select_test_point(theta, tags, theta)
+        if args.obs_lhid is None:
+            iobs = select_test_point(theta, tags, theta)
+        else:
+            iobs = select_by_lhid(theta, ids, theta, args.obs_lhid,
+                                  mask=(tags == 'test'))
         x_obs, theta_obs, id_obs, split_obs = (
             x[iobs], theta[iobs], ids[iobs], tags[iobs])
     else:
@@ -180,21 +219,34 @@ def main():
                 'preprocessed with the same summaries and k-cut.')
         # Quantiles stay referenced to the training pool, as in resim.py: the
         # question is which OOD point is most central to what the model saw.
-        iobs = select_test_point(theta_t, None, theta)
+        if args.obs_lhid is None:
+            iobs = select_test_point(theta_t, None, theta)
+        else:
+            iobs = select_by_lhid(theta_t, ids_t, theta, args.obs_lhid)
         x_obs, theta_obs, id_obs, split_obs = (
             x_t[iobs], theta_t[iobs], ids_t[iobs], 'test')
 
-    if args.expect_lhid >= 0 and int(id_obs) != args.expect_lhid:
+    if (args.obs_lhid is None and args.expect_lhid >= 0
+            and int(id_obs) != args.expect_lhid):
         raise SystemExit(
             f'select_test_point returned lhid {id_obs}, expected '
             f'{args.expect_lhid}. Stopping (see TODO.md Phase 0.1). '
             'Pass --expect_lhid -1 to accept whichever point it picks.')
+    # The tag derives from the observed lhid unless overridden, so naming a
+    # different point cannot silently overwrite another campaign's cosmofile.
+    tag = args.tag or f'obs{int(id_obs):05d}'
+    out = args.outroot or default_outroot(
+        args.wdir, args.exp_path, tag, testing)
+    os.makedirs(join(out, 'overrides'), exist_ok=True)
+
     q_obs = empirical_quantiles(theta, theta_obs[None])[0]
     print(f'Pool: {x.shape[0]} vectors, {theta.shape[1]} params, '
           f'x is {x.shape[1]}-dim')
     if testing is not None:
         print(f'x_obs drawn out-of-distribution from {test_path}')
-    print(f'x_obs: index {iobs}, lhid {id_obs}, split {split_obs}')
+    print(f'x_obs: index {iobs}, lhid {id_obs}, split {split_obs}'
+          + (' (requested)' if args.obs_lhid is not None else ''))
+    print(f'tag:   {tag}')
     for n_, v_, q_ in zip(names, theta_obs, q_obs):
         print(f'  {n_:46s} {v_:12.6g}  (q={q_:.2f})')
 
@@ -234,7 +286,7 @@ def main():
           f'prior support), seed={block_seed}; {len(theta_draws)} total')
 
     # --- cosmofile (round-trip so theta_ppc matches what the sims read) -----
-    cosmofile = join('params', f'ppc_{args.tag}_cosmo.txt')
+    cosmofile = join('params', f'ppc_{tag}_cosmo.txt')
     write_cosmofile(cosmofile, theta_draws[:, :N_COSMO], args.start)
     theta_draws[:, :N_COSMO] = np.loadtxt(cosmofile, ndmin=2)
     print(f'Wrote {cosmofile} ({n_total} rows)')
