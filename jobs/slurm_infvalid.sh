@@ -3,13 +3,13 @@
 #SBATCH --array=0-19  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
-#SBATCH --time=4:00:00         # Time limit
+#SBATCH --time=12:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-# SLURM_ARRAY_TASK_ID=0
+# SLURM_ARRAY_TASK_ID=1
 
 # module restore cmass
 source ~/.bashrc

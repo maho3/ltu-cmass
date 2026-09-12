@@ -25,7 +25,7 @@ cd /u/maho3/git/ltu-cmass
 
 
 nbody=abacuslike
-sim=fastpm_charm7
+sim=fastpm_charm7_cosmo
 infer=mixk  # simple  # lightcone
 
 tracer=${tracer:-galaxy}
@@ -38,7 +38,7 @@ extras="$extras hydra/job_logging=disabled"
 suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_index=$net_index"
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
-suffix="$suffix infer.include_noise=True infer.include_hod=True"
+suffix="$suffix infer.include_noise=True infer.include_hod=False"
 # suffix="$suffix infer.subselect_cosmo=[0,4]"
 # suffix="$suffix infer.loglinear_start_idx=30"
 # suffix="$suffix infer.verbose=true"

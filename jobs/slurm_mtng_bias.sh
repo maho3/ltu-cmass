@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=mtnglike_bias   # Job name
-#SBATCH --array=0-49         # Job array range for lhid
+#SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=32            # Number of tasks
 #SBATCH --mem=64GB            # Memory per node
-#SBATCH --time=02:00:00         # Time limit
+#SBATCH --time=24:00:00         # Time limit
 #SBATCH --partition=cpu  # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
@@ -25,17 +25,17 @@ export LD_LIBRARY_PATH=/u/maho3/anaconda3/envs/cmass/lib:$GSL_ROOT_DIR/lib:$LD_L
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-Nhod=1
+Nhod=5
 
 nbody=mtnglike
 sim=fastpm_charm7
 noise_uniform_invoxel=False  # whether to uniformly distribute galaxies in each voxel (for CHARM only)
 noise=reciprocal
-use_custom_prior=False
+use_custom_prior=True
 
 multisnapshot=True
 diag_from_scratch=False
-rm_galaxies=False
+rm_galaxies=True
 extras="bias=zhenginterp_biased diag.high_res=True" # meta.cosmofile=./params/big_sobol_params.txt" # "nbody.zf=0.500015"
 L=3000
 N=384
@@ -46,8 +46,13 @@ echo "outdir=$outdir"
 export TQDM_DISABLE=0
 extras="$extras hydra/job_logging=disabled"
 
-for offset in $(seq 3000 50 3499); do
+for offset in $(seq 0 200 3999); do
     lhid=$(($SLURM_ARRAY_TASK_ID+offset))
+
+    if [ ! -d "$outdir/$lhid" ]; then
+        echo "Directory $outdir/$lhid does not exist. Skipping lhid=$lhid"
+        continue
+    fi
 
     postfix="nbody=$nbody sim=$sim nbody.lhid=$lhid"
     postfix="$postfix multisnapshot=$multisnapshot diag.from_scratch=$diag_from_scratch"
@@ -73,6 +78,16 @@ for offset in $(seq 3000 50 3499); do
             sgc_prior=""
             mtng_prior=""
             ngc_prior=""
+        fi
+
+        # galaxies
+        diag_file=$outdir/$lhid/diag/galaxies/hod$hod_str.h5
+        if [ -f "$diag_file" ]; then
+            echo "Diag file $diag_file exists."
+        else
+            echo "Diag file $diag_file does not exist."
+            python -m cmass.bias.apply_hod $postfix bias.hod.seed=$hod_seed bias=zheng_composite nbody.zf=0.500015 multisnapshot=False
+            python -m cmass.diagnostics.summ $postfix diag.galaxy=True bias.hod.seed=$hod_seed bias=zheng_composite nbody.zf=0.500015 multisnapshot=False
         fi
 
         # # simbig_lightcone
