@@ -235,6 +235,9 @@ def apply_charm_old(rho, fvel, charm_cfg, L, cosmo):
 # (e.g. 7x for mtnglike) within the same `rho_to_halo` process.
 _CHARM_MODEL_CACHE = {}
 
+CHARM_YAML = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
+CHARM_CKPT = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
+
 
 def _get_charm_model(charm_yaml_path, ckpt_path, device):
     key = (charm_yaml_path, ckpt_path, str(device))
@@ -257,8 +260,12 @@ def _get_charm_model(charm_yaml_path, ckpt_path, device):
     return _CHARM_MODEL_CACHE[key]
 
 
-def apply_charm_new(rho, fvel, L, cosmo):
-    """Apply CHARM (gobig branch), accounting for the pre-trained resolution."""
+def apply_charm_new(rho, fvel, L, cosmo, charm_yaml=None, charm_ckpt=None):
+    """Apply CHARM (gobig branch), accounting for the pre-trained resolution.
+
+    `charm_yaml`/`charm_ckpt` default to the current model. Override them via
+    bias.halo.charm_yaml / bias.halo.charm_ckpt to reproduce an older suite.
+    """
 
     import torch
     from charm.inferers.run_inference_v2 import (
@@ -266,8 +273,8 @@ def apply_charm_new(rho, fvel, L, cosmo):
         build_dm_velocity_interpolators, reconstruct_catalog,
     )
 
-    charm_yaml_path = '/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml'
-    ckpt_path = '/work/hdd/bdne/maho3/cmass-ili/scratch/charm_joint_v19.pth'
+    charm_yaml_path = charm_yaml or CHARM_YAML
+    ckpt_path = charm_ckpt or CHARM_CKPT
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     model, cfg_charm = _get_charm_model(charm_yaml_path, ckpt_path, device)
@@ -444,7 +451,9 @@ def run_snapshot(rho, fvel, a, cfg, ppos=None, pvel=None):
         hpos, hmass, hvel, meta = apply_charm_new(
             rho,
             fvel*a,  # physical velocities in km/s
-            cfg.nbody.L, cfg.nbody.cosmo
+            cfg.nbody.L, cfg.nbody.cosmo,
+            charm_yaml=cfg.bias.halo.get('charm_yaml', None),
+            charm_ckpt=cfg.bias.halo.get('charm_ckpt', None),
         )
     elif cfg.bias.halo.model == "LIMD":
         logging.info('Using LIMD model...')
