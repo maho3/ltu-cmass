@@ -10,7 +10,7 @@
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
-SLURM_ARRAY_TASK_ID=10
+# SLURM_ARRAY_TASK_ID=10
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 # baseoffset=0
 
