@@ -407,6 +407,9 @@ def _load_single_simulation_summaries(sourcepath, tracer, a=None,
 
         # load cosmo/hod parameters
         params = get_cosmo(sourcepath)
+        if params is None:
+            logging.error(f'Skipping {diagfile}: could not load cosmology from {sourcepath}')
+            continue
         if subselect_cosmo is not None:
             params = params[subselect_cosmo]
         if (tracer != 'halo') & (include_hod):  # add HOD params
