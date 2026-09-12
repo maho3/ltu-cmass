@@ -63,7 +63,8 @@ def run_validation(posterior, x, theta, out_dir, names=None):
         labels=names,
         plot_list=["coverage", "histogram", "predictions", "tarp", "logprob"],
         out_dir=out_dir,
-        save_samples=True
+        save_samples=True,
+        sample_params={'max_oversample': 10},
     )
     metric(posterior, x, theta.to('cpu'))
 
