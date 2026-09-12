@@ -56,6 +56,14 @@ A mismatch here does not error. It produces a PPC that tests a different forward
 model than the posterior was trained on, and a failed check then tells you about
 the config difference rather than the model.
 
+The model must have been trained with `include_hod=True` and
+`include_noise=True`, and without `subselect_cosmo`: the campaign injects theta
+as `[5 cosmo][HOD][2 noise]` and slices by that layout. `draw.py` refuses
+anything else up front. A cosmology-only model would otherwise emit an empty
+`bias.hod.theta`, which `parse_hod` ignores — leaving the HOD sampled from its
+prior rather than the posterior, and `collect.py` would only catch it at stage D
+once every draw had already been simulated.
+
 ## Out-of-distribution test points
 
 By default `x_obs` is the training suite's own most-central test point, so the
@@ -76,6 +84,12 @@ training suite's, matching `resim.py`. The testing experiment is resolved by
 swapping suite/sim into `--exp_path`, so its tracer, summaries and k-cut cannot
 silently differ; it must already be preprocessed at that same k-cut, and `draw.py`
 aborts if the x or theta widths disagree.
+
+`x_obs` comes from the testing suite's own preprocessing run, so `draw.py` also
+checks that `correct_shot`, `loglinear_start_idx` and `pca_features` match the
+training experiment. A difference there would feed the posterior a vector built
+to a different recipe than it was trained to read, and nothing downstream would
+notice.
 
 This asks a different question than the self-consistent run: whether the forward
 model, driven by the parameters the posterior believes explain an observation

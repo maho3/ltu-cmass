@@ -51,6 +51,17 @@ EXP_PATH = join(
 # then noise_radial, noise_transverse.
 N_COSMO = 5
 N_NOISE = 2
+COSMO_NAMES = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+NOISE_NAMES = ['noise_radial', 'noise_transverse']
+
+# slurm_hod.sh runs with bias.hod.seed=1, so the diagnostics of each draw land
+# in hod00001.h5. Keep in step with collect.py's --hod_seed.
+HOD_SEED = 1
+
+# Flags that decide how a summary vector is built. x_obs is preprocessed by the
+# testing suite's own run, so these must agree or it does not mean what the
+# posterior was trained to read.
+PREPROC_KEYS = ('correct_shot', 'loglinear_start_idx', 'pca_features')
 
 
 def build_argparser():
@@ -107,6 +118,45 @@ def testing_exp_path(wdir, exp_path, suite, sim):
     """
     tail = exp_path.rstrip('/').split(os.sep)[-4:]  # models/tracer/summ/kcut
     return join(wdir, suite, sim, *tail)
+
+
+def check_theta_layout(names):
+    """Refuse experiments whose theta is not [5 cosmo][HOD...][2 noise].
+
+    override_string slices by that layout and nothing downstream re-checks it.
+    A cosmology-only experiment emits `bias.hod.theta={}`, which parse_hod
+    silently ignores -- the HOD stays prior-sampled -- and collect.py only
+    notices at stage D, once every draw has already been simulated.
+    """
+    if names[:N_COSMO] != COSMO_NAMES:
+        raise SystemExit(
+            f'theta must begin with {COSMO_NAMES}, got {names[:N_COSMO]}. '
+            'infer.subselect_cosmo is not supported.')
+    if names[-N_NOISE:] != NOISE_NAMES:
+        raise SystemExit(
+            f'theta must end with {NOISE_NAMES}, got {names[-N_NOISE:]}. '
+            'This model was trained with infer.include_noise=False, so the '
+            'last two HOD parameters would be injected as noise.')
+    if len(names) <= N_COSMO + N_NOISE:
+        raise SystemExit(
+            'This is a cosmology-only experiment (infer.include_hod=False). '
+            'The campaign injects HOD parameters per draw, so there is '
+            'nothing to inject and the HOD would be drawn from its prior '
+            'instead of the posterior. Use a model trained with '
+            'include_hod=True.')
+
+
+def check_preprocessing(cfg, test_path):
+    """The testing suite must build x the way the training suite did."""
+    tcfg = OmegaConf.load(join(test_path, 'config.yaml')).infer
+    bad = [(k, cfg.infer.get(k), tcfg.get(k)) for k in PREPROC_KEYS
+           if cfg.infer.get(k) != tcfg.get(k)]
+    if bad:
+        raise SystemExit(
+            f'{test_path} was preprocessed differently than the training '
+            'suite, so its x_obs is not what the posterior reads:\n' +
+            '\n'.join(f'  infer.{k}: training={a!r}, testing={b!r}'
+                      for k, a, b in bad))
 
 
 def select_by_lhid(theta_src, ids_src, theta_pool, lhid, mask=None):
@@ -200,6 +250,7 @@ def main():
     labels, startidx = load_labels(args.exp_path)
     names = param_names(args.exp_path)
     assert len(names) == theta.shape[1], (names, theta.shape)
+    check_theta_layout(names)
 
     if testing is None:
         if args.obs_lhid is None:
@@ -210,6 +261,7 @@ def main():
         x_obs, theta_obs, id_obs, split_obs = (
             x[iobs], theta[iobs], ids[iobs], tags[iobs])
     else:
+        check_preprocessing(cfg, test_path)
         x_t, theta_t, ids_t = load_test_split(test_path)
         if x_t.shape[1] != x.shape[1] or theta_t.shape[1] != theta.shape[1]:
             raise SystemExit(
@@ -317,7 +369,8 @@ def main():
             f.write('\t'.join(
                 [str(i), 'pending', ''] +
                 [f'{v:.10g}' for v in theta_draws[i]] +
-                [simdir, join(simdir, 'diag', 'galaxies', 'hod00000.h5')]
+                [simdir, join(simdir, 'diag', 'galaxies',
+                              f'hod{HOD_SEED:05d}.h5')]
             ) + '\n')
 
     print(f'Wrote {npz_path}, manifest.tsv, and {n_total - args.start} '
