@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ppc_nbody    # Job name
-#SBATCH --array=0-19%20         # One task per posterior draw (array idx == draw id == lhid)
+#SBATCH --array=20-99%50        # One task per posterior draw (array idx == draw id == lhid)
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=128            # Number of tasks
 #SBATCH --mem=240G              # Amount of memory

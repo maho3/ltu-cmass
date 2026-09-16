@@ -5,7 +5,7 @@
 # ppc/slurm_nbody.sh has produced nbody.h5 for every draw.
 #
 #   usage:  bash ppc/run_charm.sh [first_draw] [last_draw]
-#   e.g.    bash ppc/run_charm.sh 0 19
+#   e.g.    bash ppc/run_charm.sh 0 99
 #
 # CHARM VERSION: the training suite (abacuslike/fastpm_charm7_cosmoHOD) was
 # built with charm7 = charm_joint_v19.pth, which is also HEAD's default in
@@ -18,7 +18,7 @@
 set -u
 
 first=${1:-0}
-last=${2:-19}
+last=${2:-99}
 
 # --- adjust these three for the machine you are running on -------------------
 WDIR=/work/hdd/bdne/maho3/cmass-ili

@@ -9,7 +9,7 @@
 #SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%j.out  # Output file
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%j.out   # Error file
 
-# Stage B of the PPC campaign: CHARM over all 20 posterior draws.
+# Stage B of the PPC campaign: CHARM over posterior draws 20-99.
 # Thin wrapper -- ppc/run_charm.sh holds the pinned checkpoint (charm7,
 # charm_joint_v19.pth) and hydra overrides. Environment setup copied from
 # jobs/slurm_charm.sh, which run_charm.sh does not do itself.
@@ -22,4 +22,4 @@ conda activate cmass
 export TQDM_DISABLE=0
 
 cd /u/maho3/git/ltu-cmass
-bash ppc/run_charm.sh 0 19
+bash ppc/run_charm.sh 20 99
