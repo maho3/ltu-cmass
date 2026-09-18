@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=validate  # Job name
+#SBATCH --job-name=valmtnglight  # Job name
 #SBATCH --array=0-20  # Array range 0-15, 0-31
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=16            # Number of tasks
@@ -24,10 +24,10 @@ sleep $exp_index  # to stagger the start of each job
 cd /u/maho3/git/ltu-cmass
 
 
-nbody=quijotelike
-sim=fastpm_charm7_cosmoHOD
-infer=mixk  # simple  # lightcone
-tracer=galaxy
+nbody=mtnglike
+sim=fastpm_charm7
+infer=mixk_survey  # simple  # lightcone
+tracer=mtng_lightcone
 extras="nbody.zf=0.5 infer.embedding_net=fun" #  infer.verbose=True" # 
 device="cpu"
 
