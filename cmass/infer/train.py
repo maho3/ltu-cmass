@@ -516,7 +516,10 @@ def select_nets_retrain(exp_path, Nnets):
     '''
     # Load the optuna study
     optunafile_cv = join(exp_path, 'optuna_study.db')
-    storage_cv = f"sqlite:///{optunafile_cv}"
+    storage_cv = optuna.storages.RDBStorage(
+        url=f"sqlite:///{optunafile_cv}",
+        engine_kwargs={"connect_args": {"timeout": 60}},
+    )
 
     # the summary combination is already encoded in exp_path
     study_cv = optuna.load_study(

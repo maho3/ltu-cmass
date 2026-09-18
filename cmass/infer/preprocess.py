@@ -32,7 +32,7 @@ from ..nbody.tools import parse_nbody_config
 from .tools import split_experiments, iter_kcuts, kcut_dirname, resolve_kmax
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
-    _construct_hod_prior, _construct_noise_prior,
+    _construct_hod_prior_from_summaries, _construct_noise_prior,
     _load_single_simulation_summaries, _get_log10nbar, _get_log10nz)
 
 
@@ -107,8 +107,8 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
     hodprior, noiseprior = None, None
     if simpaths:
         if (tracer != 'halo') and include_hod:
-            example_config_file = join(suitepath, simpaths[0], 'config.yaml')
-            hodprior = _construct_hod_prior(example_config_file)
+            hodprior = _construct_hod_prior_from_summaries(
+                join(suitepath, simpaths[0]), tracer)
         if include_noise:
             noiseprior = _construct_noise_prior(
                 join(suitepath, simpaths[0]), tracer)

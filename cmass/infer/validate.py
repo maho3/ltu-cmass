@@ -192,6 +192,47 @@ def load_ensemble(exp_path, Nnets, weighted=True, plot=True, clean=False):
     return ensemble
 
 
+def _prior_dim(prior):
+    return prior.sample((1,)).shape[-1]
+
+
+def fix_ensemble_prior(ensemble, exp_path, theta, cfg):
+    """
+    Replace the pickled prior if its dimension disagrees with theta (e.g.
+    models trained with a hodprior.csv from the wrong HOD model). The prior
+    only enters sampling (support rejection / fill-in), not the trained flow,
+    so it is rebuilt from exp_path/{hodprior.csv,noiseprior.yaml} as in train.
+    """
+    from .train import prepare_prior
+
+    theta_dim = theta.shape[-1]
+    if _prior_dim(ensemble.prior) == theta_dim:
+        return ensemble
+
+    filepath = join(exp_path, 'hodprior.csv')
+    hodprior = (np.genfromtxt(filepath, delimiter=',', dtype=object)
+                if cfg.infer.include_hod and os.path.exists(filepath) else None)
+    filepath = join(exp_path, 'noiseprior.yaml')
+    noiseprior = (OmegaConf.load(filepath)
+                  if cfg.infer.include_noise and os.path.exists(filepath) else None)
+    prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
+                          theta=theta, hodprior=hodprior,
+                          noiseprior=noiseprior,
+                          subselect_cosmo=cfg.infer.subselect_cosmo)
+    if _prior_dim(prior) != theta_dim:
+        raise ValueError(
+            f'Pickled prior has dim {_prior_dim(ensemble.prior)} and the '
+            f'prior rebuilt from {exp_path} has dim {_prior_dim(prior)}, '
+            f'but theta has dim {theta_dim}. Fix hodprior.csv.')
+    logging.warning(
+        f'Pickled prior dim {_prior_dim(ensemble.prior)} != theta dim '
+        f'{theta_dim}; using prior rebuilt from {exp_path}.')
+    ensemble.prior = prior
+    for p in ensemble.posteriors:
+        p.prior = prior
+    return ensemble
+
+
 def run_experiment(exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
     name = '+'.join(exp.summary)
@@ -246,6 +287,8 @@ def run_experiment(exp, cfg, model_path):
         posterior_ensemble = load_ensemble(
             exp_path, cfg.infer.Nnets,
             clean=cfg.infer.clean_models)
+        posterior_ensemble = fix_ensemble_prior(
+            posterior_ensemble, exp_path, theta_test, cfg)
 
         # run validation
         x_test = torch.Tensor(x_test).to(cfg.infer.device)

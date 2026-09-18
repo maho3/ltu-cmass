@@ -4,7 +4,7 @@ from os.path import join
 import h5py
 import numpy as np
 import logging
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from cmass.bias.tools.hod import lookup_hod_model
 from .tools import log2_avg
 
@@ -304,7 +304,8 @@ def preprocess_Bk(data, kmin, kmax, norm=None,
 
 
 def _construct_hod_prior(configfile):
-    cfg = OmegaConf.load(configfile)
+    cfg = configfile if isinstance(configfile, DictConfig) \
+        else OmegaConf.load(configfile)
     hodcfg = cfg.bias.hod
     hodmodel = lookup_hod_model(
         model=hodcfg.model if hasattr(hodcfg, "model") else None,
@@ -327,6 +328,9 @@ def _construct_hod_prior(configfile):
         len(names) if distribution is None else distribution
     sigma = [0.] * len(names) if sigma is None else sigma
     loc = [0.] * len(names) if loc is None else loc
+    # unbounded (e.g. 'norm') entries: None -> -inf/inf so the csv parses
+    lower = [-np.inf if lo is None else lo for lo in lower]
+    upper = [np.inf if hi is None else hi for hi in upper]
     hodprior = np.array(
         list(zip(names, distribution, lower, upper, sigma, loc)),
         dtype=object
@@ -334,6 +338,31 @@ def _construct_hod_prior(configfile):
     # theta's HOD columns are saved in alphabetical order by name
     hodprior = hodprior[np.argsort(hodprior[:, 0])]
     return hodprior
+
+
+def _construct_hod_prior_from_summaries(sourcepath, tracer):
+    """
+    Build the HOD prior from the config embedded in the tracer's own diag
+    files. The sim-level config.yaml is shared across tracers (e.g. box HOD
+    and lightcone HOD runs overwrite each other's bias section), so it can
+    describe the wrong HOD model. Falls back to config.yaml if no diag file
+    carries a config.
+    """
+    diagpath = join(sourcepath, 'diag')
+    if tracer == 'galaxy':
+        diagpath = join(diagpath, 'galaxies')
+    elif 'lightcone' in tracer:
+        diagpath = join(diagpath, f'{tracer}')
+    if os.path.isdir(diagpath):
+        for f in sorted(os.listdir(diagpath)):
+            if not os.path.isfile(join(diagpath, f)):
+                continue
+            with h5py.File(join(diagpath, f), 'r') as h:
+                if 'config' in h.attrs:
+                    cfg = OmegaConf.create(h.attrs['config'])
+                    if 'bias' in cfg:
+                        return _construct_hod_prior(cfg)
+    return _construct_hod_prior(join(sourcepath, 'config.yaml'))
 
 
 def _construct_noise_prior(sourcepath, tracer):
