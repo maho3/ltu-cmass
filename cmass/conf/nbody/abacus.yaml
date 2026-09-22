@@ -19,7 +19,7 @@ asave: []
 
 # ~~~ BELOW ARE NOT RELEVANT FOR ABACUS SIMS  ~~~
 # borglpt, borgpm and pinocchio-only
-transfer: 'CLASS' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
+transfer: 'CAMB' # transfer function (EH, CLASS, CAMB or SYREN. Only EH or CLASS for borg)
 
 # borglpt-only
 order: 2          # order of the LPT expansion

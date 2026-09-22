@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=quijotemore  # Job name
+#SBATCH --job-name=pinn  # Job name
 #SBATCH --array=0-199         # Job array range for lhid
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=32            # Number of tasks
+#SBATCH --ntasks=24            # Number of tasks
 #SBATCH --time=12:00:00         # Time limit
 #SBATCH --partition=shared # Partition name
 #SBATCH --account=phy240043   # Account name
@@ -11,28 +11,23 @@
 
 # SLURM_ARRAY_TASK_ID=0
 echo "SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
-baseoffset=2000
+baseoffset=0
 
-module restore cmass
+module restore cmasspinn
 conda activate cmassrun
 lhid=$((SLURM_ARRAY_TASK_ID + baseoffset))
 
 # Command to run for each lhid
 cd /home/x-mho1/git/ltu-cmass-run
 
-nbody=quijotelike
-sim=fastpm
-extras="nbody.matchIC=0 nbody.suite=quijotelike" #  meta.cosmofile=./params/abacus_cosmologies.txt"
+nbody=pinocchio_quijote
+sim=pinocchio
+extras="nbody.matchIC=0"
 L=1000
-N=128
+N=512
 
-outdir=/anvil/scratch/x-mho1/cmass-ili/quijotelike/$sim/L$L-N$N
+outdir=/anvil/scratch/x-mho1/cmass-ili/for_sammy/$sim/L$L-N$N
 echo "outdir=$outdir"
-
-
-export TQDM_DISABLE=0
-extras="$extras hydra/job_logging=disabled"
-
 
 for offset in $(seq 0 200 1800); do
     loff=$((lhid + offset))
@@ -44,7 +39,6 @@ for offset in $(seq 0 200 1800); do
         echo "File $file exists."
     else
         echo "File $file does not exist."
-        python -m cmass.nbody.fastpm $postfix
-        # python -m cmass.nbody.postprocess_fastpm $postfix
+        python -m cmass.nbody.pinocchio $postfix
     fi
 done
