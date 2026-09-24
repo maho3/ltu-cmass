@@ -137,3 +137,14 @@ informative; panel titles mark which is which.
 
 No Mahalanobis distance or p-value is computed. `x_ppc` / `theta_ppc` are
 row-aligned and `x_obs` is in the npz, so a distance statistic is trivial to add.
+
+## Reparameterized models (`*_reparam`)
+
+Experiments trained with `infer.reparam_degeneracy=True` sample
+`(degen_r, degen_phi)` in place of `eta_vb_centrals` / `noise_radial`. `draw.py`
+inverts them to the physical values for the sims (bounds from the non-reparam
+sibling suite's `hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
+draws that map outside the physical prior box, and stores both
+`theta_draws` (reparam) and `theta_phys` in the npz. `collect.py` verifies sims
+against `theta_phys`. The stage scripts take `TAG` from the environment
+(`TAG=obs01880 sbatch ppc/slurm_nbody.sh`).

@@ -106,7 +106,8 @@ elif [ "$target" = "mtng" ]; then
         printf -v aug_str "%05d" $aug_seed
         printf -v noise_str "%06d" $noise_seed
         file=$src/diag/mtng_lightcone/hod00000_aug${aug_str}_noise${noise_str}.h5
-        if h5ls "$file" 2>/dev/null | grep -q '^Bk[[:space:]]'; then
+        keys=$(h5ls "$file" 2>/dev/null)
+        if grep -q '^Bk[[:space:]]' <<< "$keys" && grep -q '^Pk[[:space:]]' <<< "$keys"; then
             echo "skipping $file"
             continue
         fi

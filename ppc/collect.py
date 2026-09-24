@@ -34,7 +34,15 @@ bins in k <= 0.4. Bk is unaffected. Per instruction this is left as-is and
 everything is plotted against the PPC (pypower) k, with residuals taken
 element-wise -- matching how x_ppc and x_obs are used downstream.
 
-No Mahalanobis distances, no p-values -- bands only.
+OOD p-value (plots/ppc_pvalue.png, ppc_pvalues.tsv): tests H0 "x_obs is a
+draw from the posterior predictive the PPC ensemble samples". Per block, and
+for the concatenated inference / held-out vectors, features are standardized
+by the PPC draws, projected on their top-k PCs (N ~ 100 draws cannot support a
+full covariance), and scored by Mahalanobis d^2. p is the leave-one-out rank
+of d^2_obs among the draws (floored at 1/(N+1)); a Hotelling-F p extrapolates
+past that floor under a Gaussian assumption. A separate LOO p scores the
+deviation orthogonal to the top-k PCs. --pvalue_only rebuilds this figure from
+an existing x_ppc_all.npz without touching the per-draw sims.
 """
 
 import argparse
@@ -57,7 +65,7 @@ from cmass.infer.tools import resolve_kmax   # noqa: E402
 from ppc.layout import (                   # noqa: E402
     ExpPath, WDIR, N_COSMO, N_NOISE, fmt_kmax, sim_subdir)
 
-PPC = join(WDIR, 'ppc/abacuslike_fastpm_charm6_comphod',
+PPC = join(WDIR, 'ppc/abacuslike_fastpm_charm7_cosmoHOD_reparam',
            'zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/obs01880')
 AF = 0.666660000066666           # analysis snapshot (a), key '0.666660'
 TAGS = ('Eq', 'Sq', 'Ss', 'Is', '')
@@ -96,6 +104,11 @@ def build_argparser():
     p.add_argument('--batch_size', type=int, default=2048)
     p.add_argument('--device', default='cpu')
     p.add_argument('--no_theta_plots', action='store_true')
+    p.add_argument('--n_pca', type=int, default=10,
+                   help='PCs kept for the OOD Mahalanobis p-value')
+    p.add_argument('--no_pvalue', action='store_true')
+    p.add_argument('--pvalue_only', action='store_true',
+                   help='only remake the p-value figure from x_ppc_all.npz')
     return p
 
 
@@ -300,13 +313,276 @@ def plot_bands(blocks, title, out_path, ncols=4):
     plt.close(fig)
 
 
+def _pca_d2(Xfit, Y, kmax):
+    """Mahalanobis d^2 of rows Y in the top-1..kmax PCs of standardized Xfit.
+
+    Returns d2 and out-of-subspace residual |b|^2 - |proj|^2, each (nY, kmax)
+    with column j for k = j+1, plus the PC projections and variances. One SVD
+    serves every k.
+    """
+    mu, sd = Xfit.mean(0), Xfit.std(0, ddof=1)
+    sd = np.where(sd > 0, sd, 1.)
+    A, B = (Xfit - mu) / sd, (Y - mu) / sd
+    _, S, Vt = np.linalg.svd(A, full_matrices=False)
+    kmax = min(kmax, len(S))
+    P = B @ Vt[:kmax].T
+    var = S[:kmax]**2 / (len(A) - 1)
+    d2 = np.cumsum(P**2 / var, axis=-1)
+    resid = (B**2).sum(-1)[:, None] - np.cumsum(P**2, axis=-1)
+    return d2, resid, P, var
+
+
+def ppc_pvalues(X, obs, kmax):
+    """p-values of obs against the PPC draws X (N, D), for k = 1..kmax.
+
+    Every draw is scored against a PCA/covariance fit to the other N-1, so it
+    is exchangeable with obs under H0 and the rank p is exact up to the 1/(N+1)
+    floor. p_F is Hotelling's T^2 = d^2 N/(N+1) ~ k(N-1)/(N-k) F(k, N-k), the
+    finite-N replacement for chi^2_k.
+    """
+    from scipy import stats
+    N, D = X.shape
+    kmax = min(kmax, D, N - 2)
+    d2_obs, r_obs, _, _ = _pca_d2(X, obs[None], kmax)
+    loo = [_pca_d2(np.delete(X, i, 0), X[i:i + 1], kmax)[:2]
+           for i in range(N)]
+    d2_loo = np.concatenate([d for d, _ in loo])
+    r_loo = np.concatenate([r for _, r in loo])
+    ks = np.arange(1, kmax + 1)
+    p_emp = (1 + (d2_loo >= d2_obs).sum(0)) / (N + 1)
+    p_res = (1 + (r_loo >= r_obs).sum(0)) / (N + 1)
+    p_res = np.where(ks < D, p_res, np.nan)      # no residual when k = D
+    fstat = d2_obs[0] * N / (N + 1) * (N - ks) / (ks * (N - 1))
+    p_F = stats.f.sf(fstat, ks, N - ks)
+    return dict(ks=ks, N=N, D=D, d2_obs=d2_obs[0], d2_loo=d2_loo,
+                p_emp=p_emp, p_F=p_F, p_res=p_res)
+
+
+def pvalue_groups(blocks):
+    """Each block, plus the concatenated inference and held-out vectors, in
+    display order: inference first, each section closed by its aggregate."""
+    groups = []
+    for used, agg in ((True, 'inference (all)'), (False, 'held out (all)')):
+        sel = [b for b in blocks if b['used'] == used]
+        groups += [(b['name'], used, b['x_ppc'], b['obs']) for b in sel]
+        if len(sel) > 1:
+            groups.append((agg, used,
+                           np.concatenate([b['x_ppc'] for b in sel], 1),
+                           np.concatenate([b['obs'] for b in sel])))
+    return groups
+
+
+def _hist_panel(ax, r, k, name):
+    """LOO d^2 of the draws vs d^2_obs, with the Hotelling reference."""
+    from scipy import stats
+    j = min(k, len(r['ks'])) - 1
+    k, N = r['ks'][j], r['N']
+    d2l, d2o = r['d2_loo'][:, j], r['d2_obs'][j]
+    hi = max(1.5 * np.percentile(d2l, 97.5), 1.1 * d2o)
+    bins = np.linspace(0, hi, 30)
+    nover = int((d2l > hi).sum())
+    ax.hist(np.minimum(d2l, hi * 0.999), bins=bins, density=True,
+            color=C_PPC, alpha=0.45,
+            label=f'PPC draws, leave-one-out (N={N})'
+                  + (f', {nover} piled in last bin' if nover else ''))
+    c = (N + 1) / N * k * (N - 1) / (N - k)      # d^2 = c * F
+    t = np.linspace(1e-3, hi, 400)
+    ax.plot(t, stats.f.pdf(t / c, k, N - k) / c, color=C_PPC, lw=2,
+            label=f'Hotelling $T^2$ reference, k={k}')
+    ax.axvline(d2o, color=C_OBS, lw=2, label=r'$x_{\rm obs}$')
+    ax.set_title(f'{name}: $d^2$ in top-{k} PCs  (D={r["D"]})\n'
+                 f'$p_{{\\rm LOO}}$={r["p_emp"][j]:.3f},  '
+                 f'$p_F$={r["p_F"][j]:.1e}', fontsize=10)
+    ax.set_xlabel(r'Mahalanobis $d^2$', fontsize=9)
+    ax.set_ylabel('density', fontsize=9)
+    ax.legend(fontsize=7.5, framealpha=0.9)
+
+
+def _dot_panel(ax, res, names, key_style, floor, title):
+    y = np.arange(len(names))
+    for key, lab, kw in key_style:
+        ax.plot(-np.log10(res[key]), y, ls='none', ms=8, label=lab, **kw)
+    ax.axvline(-np.log10(0.05), color='0.3', ls='--', lw=1,
+               label='p = 0.05')
+    ax.axvline(-np.log10(floor), color='0.3', ls=':', lw=1,
+               label='LOO floor 1/(N+1)')
+    ax.set_xlabel(r'$-\log_{10}\,p$   (right = more OOD)', fontsize=9)
+    ax.set_title(title, fontsize=10)
+    ax.legend(fontsize=7.5, framealpha=0.9, loc='upper center',
+              bbox_to_anchor=(0.5, -0.1), ncol=2)
+
+
+def plot_pvalue(blocks, k, title, out_path, tsv_path, kscan=30):
+    """One figure: what is tested (a), the test on the two aggregate vectors
+    (b, c), and every block's p at k (d), across k (e), and off-subspace (f).
+    """
+    from matplotlib.patches import Ellipse
+    from scipy import stats
+    groups = pvalue_groups(blocks)
+    N = len(groups[0][2])
+    kmax = max(k, min(kscan, N // 3))
+    res = [ppc_pvalues(X, o, kmax) for _, _, X, o in groups]
+    names = [g[0] for g in groups]
+    used = [g[1] for g in groups]
+    at_k = lambda key: np.array(  # noqa: E731
+        [r[key][min(k, len(r['ks'])) - 1] for r in res])
+    tab = {key: at_k(key) for key in ('d2_obs', 'p_emp', 'p_F', 'p_res')}
+    kk = np.array([min(k, len(r['ks'])) for r in res])
+
+    with open(tsv_path, 'w') as f:
+        f.write('group\tused\tD\tk\td2_obs\tp_loo\tp_F\tp_resid\n')
+        for i, n in enumerate(names):
+            f.write(f'{n}\t{int(used[i])}\t{res[i]["D"]}\t{kk[i]}\t'
+                    f'{tab["d2_obs"][i]:.4g}\t{tab["p_emp"][i]:.4g}\t'
+                    f'{tab["p_F"][i]:.4g}\t{tab["p_res"][i]:.4g}\n')
+
+    fig = plt.figure(figsize=(19, 13))
+    gs = fig.add_gridspec(2, 3, height_ratios=[1, 1.15], hspace=0.3,
+                          wspace=0.32)
+    axa, axb, axc = (fig.add_subplot(gs[0, i]) for i in range(3))
+    axd = fig.add_subplot(gs[1, 0])
+    axe = fig.add_subplot(gs[1, 1], sharey=axd)
+    axf = fig.add_subplot(gs[1, 2], sharey=axd)
+
+    # (a) the inference vector in its leading PC plane
+    ia = names.index('inference (all)') if 'inference (all)' in names else 0
+    Xa, oa = groups[ia][2], groups[ia][3]
+    _, _, Pd, var = _pca_d2(Xa, Xa, 2)
+    _, _, Po, _ = _pca_d2(Xa, oa[None], 2)
+    ax = axa
+    ax.scatter(Pd[:, 0], Pd[:, 1], s=18, color=C_PPC, alpha=0.6,
+               label='PPC draws')
+    for q, ls in ((0.68, '-'), (0.95, '--')):
+        r2 = stats.chi2.ppf(q, 2)
+        ax.add_patch(Ellipse((0, 0), 2 * np.sqrt(r2 * var[0]),
+                             2 * np.sqrt(r2 * var[1]), fill=False,
+                             color=C_PPC, ls=ls, lw=1.2,
+                             label=f'{int(q * 100)}% Gaussian contour'))
+    ax.plot(Po[0, 0], Po[0, 1], '*', color=C_OBS, ms=16,
+            label=r'$x_{\rm obs}$')
+    ax.set_xlabel('PC1 (standardized)', fontsize=9)
+    ax.set_ylabel('PC2 (standardized)', fontsize=9)
+    ax.set_title(f'(a) {names[ia]}: leading 2 of k={kk[ia]} PCs of the '
+                 'PPC draws\n$d^2$ sums (PC$_i$/$\\sigma_i$)$^2$ over all k',
+                 fontsize=10)
+    ax.legend(fontsize=7.5, framealpha=0.9)
+
+    # (b), (c) the test itself on the aggregate vectors
+    for ax, agg, lab in ((axb, 'inference (all)', '(b)'),
+                         (axc, 'held out (all)', '(c)')):
+        if agg in names:
+            _hist_panel(ax, res[names.index(agg)], k, f'{lab} {agg}')
+        else:
+            ax.axis('off')
+
+    # (d) every group at k
+    _dot_panel(axd, tab, names,
+               [('p_emp', 'leave-one-out rank', dict(marker='o', color=C_PPC)),
+                ('p_F', 'Hotelling F (Gaussian)',
+                 dict(marker='s', mfc='none', color=C_OBS))],
+               1 / (N + 1), f'(d) p-value per block, k={k} PCs')
+    y = np.arange(len(names))
+    axd.set_yticks(y)
+    axd.set_yticklabels([f'{n}  [{"inf" if u else "held"}]'
+                         for n, u in zip(names, used)], fontsize=8.5)
+    axd.invert_yaxis()
+
+    # (e) robustness to k
+    M = np.full((len(res), kmax), np.nan)
+    for i, r in enumerate(res):
+        M[i, :len(r['ks'])] = -np.log10(r['p_emp'])
+    im = axe.imshow(M, aspect='auto', cmap='Blues', vmin=0,
+                    vmax=np.log10(N + 1), interpolation='nearest',
+                    extent=[0.5, kmax + 0.5, len(res) - 0.5, -0.5])
+    axe.axvline(k, color=C_OBS, lw=1.5, ls='--')
+    axe.set_xlabel('k (PCs kept)', fontsize=9)
+    axe.set_title(f'(e) leave-one-out p vs k  (dashed: k={k} used; '
+                  'blank: k > D)',
+                  fontsize=10)
+    cb = fig.colorbar(im, ax=axe, pad=0.02)
+    cb.set_label(r'$-\log_{10}\,p_{\rm LOO}$', fontsize=9)
+    plt.setp(axe.get_yticklabels(), visible=False)
+
+    # (f) deviation the top-k PCs cannot see
+    _dot_panel(axf, tab, names,
+               [('p_res', 'leave-one-out rank of |residual|$^2$',
+                 dict(marker='D', color=C_PPC))],
+               1 / (N + 1),
+               f'(f) deviation orthogonal to the top-{k} PCs\n'
+               '(blank: k = D, nothing left over)')
+    plt.setp(axf.get_yticklabels(), visible=False)
+
+    nsep = sum(used) - 0.5
+    for ax in (axd, axe, axf):
+        ax.axhline(nsep, color='0.3', lw=1)
+        ax.tick_params(labelsize=8)
+    for ax in (axa, axb, axc, axd, axf):
+        ax.grid(alpha=0.25, lw=0.5)
+        ax.set_axisbelow(True)
+        for side in ('top', 'right'):
+            ax.spines[side].set_visible(False)
+
+    fig.suptitle(
+        title + '\n'
+        r'H$_0$: $x_{\rm obs}$ is a draw from the posterior predictive '
+        r'$p(x\,|\,x_{\rm obs})$ sampled by the PPC draws.  Statistic: '
+        r'Mahalanobis $d^2$ of standardized $x_{\rm obs}$ in the top-k PCs '
+        'of the draws.  Small p = out of distribution.\n'
+        'Inference blocks reuse $x_{\\rm obs}$ (fit and test), so their p is '
+        'conservative; held-out blocks are a clean test.',
+        fontsize=10.5)
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+
+def pvalue_title(exp, obs_exp, inf_labels, id_obs, n_ok):
+    obs_from = ('' if obs_exp is exp else
+                f' from {obs_exp.suite}/{obs_exp.sim} (out-of-distribution)')
+    return (f'PPC OOD test  |  {exp.suite}/{exp.sim}, tracer={exp.tracer}, '
+            f'conditioned on {"+".join(inf_labels)} at {exp.kmin} '
+            f'$\\leq k \\leq$ {fmt_kmax(exp.kmax)}\n'
+            f'$x_{{\\rm obs}}$ = lhid {id_obs}{obs_from}, '
+            f'{n_ok} PPC draws')
+
+
+def pvalue_from_saved(out, n_pca):
+    """Rebuild the blocks from x_ppc_all.npz, which already holds every
+    plotted block's draws and observed vector."""
+    draws = np.load(join(out, 'posterior_draws.npz'), allow_pickle=True)
+    inf_labels = [str(s) for s in draws['labels']]
+    exp = ExpPath(str(draws['exp_path']))
+    obs_exp = (ExpPath(str(draws['test_path']))
+               if str(draws['test_path'] if 'test_path' in draws else '')
+               else exp)
+    z = np.load(join(out, 'x_ppc_all.npz'))
+    names = [n for n in z.files if not n.endswith(('_obs', '_k'))]
+    blocks = [dict(name=n, x_ppc=z[n], obs=z[n + '_obs'],
+                   used=n in inf_labels) for n in names]
+    n_ok = len(blocks[0]['x_ppc'])
+    plotdir = join(out, 'plots')
+    os.makedirs(plotdir, exist_ok=True)
+    plot_pvalue(blocks, n_pca,
+                pvalue_title(exp, obs_exp, inf_labels, str(draws['id_obs']),
+                             n_ok),
+                join(plotdir, 'ppc_pvalue.png'), join(out, 'ppc_pvalues.tsv'))
+    print(f'Wrote {join(plotdir, "ppc_pvalue.png")}, ppc_pvalues.tsv')
+
+
 def main():
     args = build_argparser().parse_args()
     out = args.ppc_dir
+    if args.pvalue_only:
+        return pvalue_from_saved(out, args.n_pca)
 
-    draws = np.load(join(out, 'posterior_draws.npz'), allow_pickle=True)
+    draws =np.load(join(out, 'posterior_draws.npz'), allow_pickle=True)
     theta_draws = draws['theta_draws']
     names = [str(s) for s in draws['param_names']]
+    # sims and their recorded attrs use physical params; for a reparam model
+    # theta_draws/names are (degen_r, degen_phi) and *_phys hold the inverse
+    theta_phys = (draws['theta_phys'] if 'theta_phys' in draws
+                  else theta_draws)
+    names_phys = ([str(s) for s in draws['names_phys']]
+                  if 'names_phys' in draws else names)
     inf_labels = [str(s) for s in draws['labels']]
     startidx_ref = list(draws['startidx'])
     exp = ExpPath(str(draws['exp_path']))
@@ -315,6 +591,8 @@ def main():
                else exp)
     x_obs = draws['x_obs']
     theta_obs = np.asarray(draws['theta_obs'])
+    theta_obs_phys = (np.asarray(draws['theta_obs_phys'])
+                      if 'theta_obs_phys' in draws else theta_obs)
     id_obs = str(draws['id_obs'])
     nnets_req = int(draws['nnets']) if 'nnets' in draws else None
 
@@ -343,7 +621,7 @@ def main():
     if obs_exp is not exp:
         print(f'x_obs is   = out-of-distribution, from {obs_exp}')
     obs_diag = find_obs_diag(join(obs_dir, obs_exp.diag_dir),
-                             theta_obs, names, args.atol)
+                             theta_obs_phys, names_phys, args.atol)
     print(f'x_obs from = {obs_diag}')
     obs_data = load_summ(obs_diag, lightcone=exp.is_lightcone)
 
@@ -368,7 +646,7 @@ def main():
     needed_bases = {split_tag(lab)[0] for lab in plot_labels}
     needed_bases |= {split_tag(lab)[0][:-1] + '0' for lab in plot_labels}
     kept, status = [], {}
-    for i, theta in enumerate(theta_draws):
+    for i, theta in enumerate(theta_phys):
         simdir = join(out, sim_sub, str(i))
         diagfile = join(simdir,
                         exp.diag_file(args.hod_seed, args.aug_seed))
@@ -379,7 +657,7 @@ def main():
         if any(b not in s for b in needed_bases):
             status[i] = 'incomplete_summ'
             continue
-        problems = check_draw(diagfile, theta, names, args.atol)
+        problems = check_draw(diagfile, theta, names_phys, args.atol)
         if problems:
             status[i] = 'param_mismatch'
             print(f'  draw {i}: PARAM MISMATCH -- ' + '; '.join(problems))
@@ -481,6 +759,13 @@ def main():
     os.makedirs(plotdir, exist_ok=True)
     plot_bands(blocks, title, join(plotdir, 'ppc_bands.png'))
     print(f'Wrote {join(plotdir, "ppc_bands.png")}')
+
+    if not args.no_pvalue:
+        plot_pvalue(blocks, args.n_pca,
+                    pvalue_title(exp, obs_exp, inf_labels, id_obs, n_ok),
+                    join(plotdir, 'ppc_pvalue.png'),
+                    join(out, 'ppc_pvalues.tsv'))
+        print(f'Wrote {join(plotdir, "ppc_pvalue.png")}, ppc_pvalues.tsv')
 
     if args.no_theta_plots:
         return

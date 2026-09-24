@@ -25,7 +25,8 @@ import time
 import optuna
 
 from .tools import (select_top_trials, split_experiments, prepare_loader,
-                    iter_kcuts, kcut_dirname, study_name_from_path)
+                    iter_kcuts, kcut_dirname, study_name_from_path,
+                    DEGEN_PHI_PRIOR_BOUNDS)
 from .hyperparameters import sample_hyperparameters_randomly
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -40,7 +41,8 @@ from .architectures import CNN, MultiHeadEmbedding, FunnelNetwork, MultiHeadFunn
 import matplotlib.pyplot as plt
 
 
-def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None, subselect_cosmo=None):
+def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None,
+                  subselect_cosmo=None, reparam_degeneracy=False):
     # define a prior
     if prior_name.lower() == 'uniform':
         prior = ili.utils.Uniform(
@@ -95,6 +97,11 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                     f'Noise prior distribution {noiseprior.dist} not '
                     'implemented.')
             noise_lims = np.array([[low, high]]*2)
+            if reparam_degeneracy:
+                # noise_radial's slot now holds degen_phi -- assumed uniform
+                # for now (TODO: derive the actual induced prior instead of
+                # assuming uniform; see cmass.infer.tools.DEGEN_PHI_PRIOR_BOUNDS)
+                noise_lims[0] = DEGEN_PHI_PRIOR_BOUNDS
             prior_lims = np.vstack([prior_lims, noise_lims])
 
         if hod_norm_mask is None or not np.any(hod_norm_mask):
@@ -171,7 +178,8 @@ def run_training(
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
                           hodprior=hodprior, noiseprior=noiseprior,
-                          subselect_cosmo=cfg.infer.get('subselect_cosmo'))
+                          subselect_cosmo=cfg.infer.get('subselect_cosmo'),
+                          reparam_degeneracy=cfg.infer.get('reparam_degeneracy', False))
 
     # define an embedding network
     if mcfg.embedding_net == 'fcn':
@@ -319,7 +327,8 @@ def run_training_with_precompression(
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta_train,
                           hodprior=hodprior, noiseprior=noiseprior,
-                          subselect_cosmo=cfg.infer.get('subselect_cosmo'))
+                          subselect_cosmo=cfg.infer.get('subselect_cosmo'),
+                          reparam_degeneracy=cfg.infer.get('reparam_degeneracy', False))
 
     # define training arguments
     train_args = {

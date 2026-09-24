@@ -60,6 +60,15 @@ include_hod: True  # whether to infer HOD parameters
 include_noise: False  # whether to infer noise parameters
 subselect_cosmo: null # whether to subselect cosmologies by index
 
+# Reparameterize the eta_vb_centrals/noise_radial degeneracy (which roughly
+# follows A^2+B^2=const in prior-normalized units) into polar coords
+# (degen_r, degen_phi) parallel/perpendicular to the degeneracy. Requires
+# include_hod and include_noise both True. The (degen_r, degen_phi) prior
+# is assumed uniform (0, inf) x (0, 90) deg for now -- TODO: derive the
+# actual induced prior from the eta_vb_centrals/noise_radial priors instead
+# of assuming uniform.
+reparam_degeneracy: False
+
 prior: quijote  # prior to use for training (uniform, quijote)
 backend: lampe # backend to use for training (sbi/lampe/pydelfi)
 engine: NPE    # engine to use for training (NPE/NLE/NRE)

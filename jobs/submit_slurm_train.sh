@@ -2,7 +2,7 @@
 
 cd /u/maho3/git/ltu-cmass
 
-for case in mtng_lightcone; do  # simbig_lightcone sgc_lightcone mtng_lightcone ngc_lightcone galaxy
+for case in galaxy; do  # simbig_lightcone sgc_lightcone mtng_lightcone ngc_lightcone galaxy
     name="abagal"
     # submit_script="jobs/slurm_infoptuna.sh"
     submit_script="jobs/slurm_infretrain.sh"

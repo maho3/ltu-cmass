@@ -29,7 +29,9 @@ import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
-from .tools import split_experiments, iter_kcuts, kcut_dirname, resolve_kmax
+from .tools import (split_experiments, iter_kcuts, kcut_dirname, resolve_kmax,
+                    reparam_degeneracy_bounds, apply_degeneracy_reparam,
+                    DEGEN_NAME_A, DEGEN_NEW_NAME_R, DEGEN_R_PRIOR_BOUNDS)
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
     _construct_hod_prior_from_summaries, _construct_noise_prior,
@@ -40,12 +42,18 @@ def aggregate(summlist, paramlist, idlist):
     summaries = defaultdict(list)
     parameters = defaultdict(list)
     ids = defaultdict(list)
-    for summ, param, id in zip(summlist, paramlist, idlist):
+    # Global sample position of each entry, per key. Keys are ragged: a sample
+    # missing a summary (e.g. a partially-written diag file with Bk but no Pk)
+    # is absent from that key but still present in others, so positions are not
+    # interchangeable between keys.
+    positions = defaultdict(list)
+    for i, (summ, param, id) in enumerate(zip(summlist, paramlist, idlist)):
         for key in summ:
             summaries[key].append(summ[key])
             parameters[key].append(param)
             ids[key].append(id)
-    return summaries, parameters, ids
+            positions[key].append(i)
+    return summaries, parameters, ids, positions
 
 
 def _load_summaries_worker(lhid, suitepath, tracer, a,
@@ -114,12 +122,13 @@ def load_summaries(suitepath, tracer, Nmax, a=None,
                 join(suitepath, simpaths[0]), tracer)
 
     # Aggregate summaries into a single dictionary
-    summaries, parameters, ids = aggregate(summlist, paramlist, idlist)
+    summaries, parameters, ids, positions = aggregate(
+        summlist, paramlist, idlist)
     for key in summaries:
         logging.info(
             f'Successfully loaded {len(summaries[key])} {key} summaries')
 
-    return summaries, parameters, ids, hodprior, noiseprior
+    return summaries, parameters, ids, positions, hodprior, noiseprior
 
 
 def split_train_val_test(x, theta, ids, val_frac, test_frac, seed=None):
@@ -165,8 +174,32 @@ def setup_optuna(exp_path, name, n_startup_trials):
     return study
 
 
-def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
-                      exp, cfg, model_path):
+def _align_to_key(values, value_positions, target_positions,
+                  value_key, target_key):
+    """Reorder a per-sample aux array onto another key's sample ordering.
+
+    summaries[key] only holds the samples that actually carried `key`, so two
+    keys' lists are only positionally comparable when every sample carried
+    both. Gathering through the global sample positions makes the alignment
+    explicit and fails loudly when a sample is missing the aux value, rather
+    than silently pairing an aux value with the wrong row.
+    """
+    lookup = dict(zip(value_positions, values))
+    try:
+        return np.asarray([lookup[i] for i in target_positions])
+    except KeyError as e:
+        raise ValueError(
+            f"Cannot align '{value_key}' to '{target_key}': "
+            f"{len(set(target_positions) - set(value_positions))} of "
+            f"{len(target_positions)} '{target_key}' samples have no "
+            f"'{value_key}' entry (sample {e} missing). This usually means "
+            f"some summary files are incomplete -- check that every diag file "
+            f"contains all expected datasets."
+        ) from e
+
+
+def run_preprocessing(summaries, parameters, ids, positions,
+                      hodprior, noiseprior, exp, cfg, model_path):
     assert len(exp.summary) > 0, 'No summaries provided for inference'
 
     # check that there's data
@@ -203,6 +236,7 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
             skmax = resolve_kmax(kmax, summ)
 
             x, theta, id = summaries[base], parameters[base], ids[base]
+            base_key = base  # aux arrays below must align to this key
             # Preprocess the summaries
             if 'Pk' in summ:
                 norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
@@ -247,6 +281,34 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
                     x[:, start:end] = np.random.standard_normal(
                         size=(x.shape[0], end-start)
                     ).astype(x.dtype)
+
+        # reparameterize the eta_vb_centrals/noise_radial degeneracy into
+        # polar (degen_r, degen_phi) coords, in place of theta's columns for
+        # those two names
+        hodprior_save = hodprior
+        if cfg.infer.get('reparam_degeneracy', False):
+            if not (cfg.infer.include_hod and cfg.infer.include_noise):
+                raise ValueError(
+                    'infer.reparam_degeneracy requires infer.include_hod '
+                    'and infer.include_noise to both be True.')
+            theta_names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+            if cfg.infer.subselect_cosmo is not None:
+                theta_names = [theta_names[i]
+                              for i in cfg.infer.subselect_cosmo]
+            theta_names += hodprior[:, 0].astype(str).tolist()
+            theta_names += ['noise_radial', 'noise_transverse']
+            bounds_a, bounds_b = reparam_degeneracy_bounds(
+                hodprior, noiseprior)
+            theta, theta_names = apply_degeneracy_reparam(
+                theta, theta_names, bounds_a, bounds_b)
+
+            # rename the matching hodprior row for the saved hodprior.csv,
+            # with an assumed uniform prior on degen_r -- the actual induced
+            # prior isn't derived yet (TODO)
+            hodprior_save = hodprior.copy()
+            row = np.where(hodprior_save[:, 0].astype(str) == DEGEN_NAME_A)[0][0]
+            hodprior_save[row] = [DEGEN_NEW_NAME_R, 'uniform',
+                                  *DEGEN_R_PRIOR_BOUNDS, None, None]
 
         # split train/test
         ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
@@ -299,14 +361,19 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
         test_mask = np.isin(id_arr, ids_test)
 
         # number densities
-        nbar = np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1]
+        nbar = _align_to_key(
+            np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1],
+            positions["Pk0"], positions[base_key], "Pk0", base_key)
         np.save(join(exp_path, "nbar_train.npy"), nbar[train_mask])
         np.save(join(exp_path, "nbar_val.npy"), nbar[val_mask])
         np.save(join(exp_path, "nbar_test.npy"), nbar[test_mask])
 
         if "noiseid" in summaries:
             # noise indices
-            noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
+            noise = _align_to_key(
+                np.asarray(summaries["noiseid"]),
+                positions["noiseid"], positions[base_key],
+                "noiseid", base_key).reshape(-1, 1)
             np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
             np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
             np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
@@ -314,8 +381,8 @@ def run_preprocessing(summaries, parameters, ids, hodprior, noiseprior,
         with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
             f.write(','.join(labels) + '\n')
             f.write(','.join(map(str, startidx.tolist())) + '\n')
-        if hodprior is not None:
-            np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
+        if hodprior_save is not None:
+            np.savetxt(join(exp_path, 'hodprior.csv'), hodprior_save,
                        delimiter=',', fmt='%s')
         if noiseprior is not None:
             with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
@@ -365,14 +432,14 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Running {tracer} preprocessing...')
     if tracer in ['halo', 'galaxy']:
         logging.info(f"Training: scale factor a =  {cfg.nbody.af}")
-    summaries, parameters, ids, hodprior, noiseprior = load_summaries(
+    summaries, parameters, ids, positions, hodprior, noiseprior = load_summaries(
         suite_path, tracer, cfg.infer.Nmax, a=cfg.nbody.af,
         include_hod=cfg.infer.include_hod,
         include_noise=cfg.infer.include_noise,
         subselect_cosmo=cfg.infer.subselect_cosmo)
     for exp in cfg.infer.experiments:
         save_path = join(model_dir, tracer, '+'.join(exp.summary))
-        run_preprocessing(summaries, parameters, ids,
+        run_preprocessing(summaries, parameters, ids, positions,
                           hodprior, noiseprior, exp, cfg, save_path)
 
 

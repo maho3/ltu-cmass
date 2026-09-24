@@ -22,12 +22,12 @@ net_index=$SLURM_ARRAY_TASK_ID
 cd /u/maho3/git/ltu-cmass
 
 nbody=abacuslike
-sim=fastpm_charm7_cosmo
+sim=fastpm_charm7_cosmoHOD_reparam
 infer=mixk  # simple  # lightcone
 
 tracer=galaxy
 
-extras="nbody.zf=0.5 infer.Nmax=4000" #
+extras="nbody.zf=0.5 infer.Nmax=4000 infer.reparam_degeneracy=True" #
 # extras="$extras infer.pca_features=16" 
 device="cpu"
 
@@ -35,7 +35,7 @@ suffix="nbody=$nbody sim=$sim infer=$infer infer.exp_index=$exp_index infer.net_
 suffix="$suffix infer.tracer=$tracer"
 suffix="$suffix infer.device=$device $extras"
 # suffix="$suffix infer.val_frac=0 infer.test_frac=1"
-suffix="$suffix infer.include_noise=True infer.include_hod=False"
+suffix="$suffix infer.include_noise=True infer.include_hod=True"
 
 echo "Running inference pipeline with $suffix"
 python -m cmass.infer.preprocess $suffix

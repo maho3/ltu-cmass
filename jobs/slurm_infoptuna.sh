@@ -22,12 +22,12 @@ sleep $net_index  # to stagger the start of each job
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
-nbody=mtnglike
-sim=fastpm_charm7
-infer=mixk_survey  # simple  # lightcone
+nbody=abacuslike
+sim=fastpm_charm7_cosmoHOD_reparam
+infer=mixk  # simple  # lightcone # mixk_survey
 
 tracer=${tracer:-galaxy}
-extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2" # 
+extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2 infer.reparam_degeneracy=True" # 
 device="cpu"
 
 export TQDM_DISABLE=0

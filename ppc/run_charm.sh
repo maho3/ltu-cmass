@@ -7,7 +7,7 @@
 #   usage:  bash ppc/run_charm.sh [first_draw] [last_draw]
 #   e.g.    bash ppc/run_charm.sh 0 99
 #
-# CHARM VERSION: the training suite (abacuslike/fastpm_charm7_cosmoHOD) was
+# CHARM VERSION: the training suite (abacuslike/fastpm_charm7_cosmoHOD[_reparam]) was
 # built with charm7 = charm_joint_v19.pth, which is also HEAD's default in
 # cmass/bias/rho_to_halo.py. CHARM_CKPT pins it anyway, so the campaign keeps
 # testing the forward model the posterior was trained on if that default moves.
@@ -28,8 +28,8 @@ CHARM_YAML=/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs00038
-ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/$tag
+tag=${TAG:?set TAG (obs<lhid>, as printed by draw.py)}
+ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD_reparam/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
 L=2000
 N=256
 
