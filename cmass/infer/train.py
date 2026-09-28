@@ -25,8 +25,8 @@ import time
 import optuna
 
 from .tools import (select_top_trials, split_experiments, prepare_loader,
-                    iter_kcuts, kcut_dirname, study_name_from_path,
-                    DEGEN_PHI_PRIOR_BOUNDS, check_reparam_degeneracy)
+                    iter_kcuts, kcut_dirname, study_name_from_path)
+from .reparam import DEGENERACY, check_reparam_degeneracy
 from .hyperparameters import sample_hyperparameters_randomly
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -98,10 +98,8 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                     'implemented.')
             noise_lims = np.array([[low, high]]*2)
             if reparam_degeneracy:
-                # noise_radial's slot now holds degen_phi -- assumed uniform
-                # for now (TODO: derive the actual induced prior instead of
-                # assuming uniform; see cmass.infer.tools.DEGEN_PHI_PRIOR_BOUNDS)
-                noise_lims[0] = DEGEN_PHI_PRIOR_BOUNDS
+                # noise_radial's slot now holds degen_phi
+                noise_lims[0] = DEGENERACY.prior_bounds[DEGENERACY.phi]
             prior_lims = np.vstack([prior_lims, noise_lims])
 
         if hod_norm_mask is None or not np.any(hod_norm_mask):

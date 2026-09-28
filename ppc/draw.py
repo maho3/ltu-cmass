@@ -41,9 +41,10 @@ from omegaconf import OmegaConf
 from cmass.infer.resim import load_pool, load_labels, load_test_split, \
     param_names, select_test_point, empirical_quantiles
 from cmass.infer.validate import load_ensemble
+from cmass.infer.reparam import DEGENERACY
 from ppc.layout import (
     ExpPath, WDIR, N_COSMO, N_NOISE, COSMO_NAMES, NOISE_NAMES,
-    REPARAM_NOISE_NAMES, is_reparam, reparam_bounds, to_physical, sim_subdir)
+    REPARAM_NOISE_NAMES, is_reparam, reparam_bounds, sim_subdir)
 
 EXP_PATH = join(
     WDIR, 'abacuslike/fastpm_charm7_cosmoHOD_reparam/models/galaxy',
@@ -308,7 +309,7 @@ def main():
     # eta_vb_centrals/noise_radial, so also reject draws that map outside the
     # physical prior box (the (r, phi) prior box is larger than its image).
     bounds = reparam_bounds(exp) if reparam else None
-    accept = ((lambda t: to_physical(t, names, bounds)[2])
+    accept = ((lambda t: DEGENERACY.inverse(t, names, bounds)[2])
               if reparam else None)
     new_draws, n_rejected = draw_theta(
         ensemble, x_obs, args.ndraw, block_seed, args.device, accept)
@@ -324,9 +325,11 @@ def main():
     print(f'Wrote {cosmofile} ({n_total} rows)')
 
     if reparam:
-        theta_phys, names_phys, ok = to_physical(theta_draws, names, bounds)
+        theta_phys, names_phys, ok = DEGENERACY.inverse(
+            theta_draws, names, bounds)
         assert ok.all(), 'carried-over draw outside physical prior'
-        theta_obs_phys = to_physical(theta_obs[None], names, bounds)[0][0]
+        theta_obs_phys = DEGENERACY.inverse(
+            theta_obs[None], names, bounds)[0][0]
     else:
         theta_phys, names_phys, theta_obs_phys = theta_draws, names, theta_obs
 

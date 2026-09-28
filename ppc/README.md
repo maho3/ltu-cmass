@@ -232,4 +232,5 @@ inverts them to the physical values for the sims (bounds from the experiment's
 `hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
 draws that map outside the physical prior box, and stores both
 `theta_draws` (reparam) and `theta_phys` in the npz. `collect.py` verifies sims
-against `theta_phys`.
+against `theta_phys`. The stage scripts take `TAG` from the environment
+(`TAG=obs01880 sbatch ppc/slurm_nbody.sh`).

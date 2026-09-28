@@ -29,10 +29,8 @@ import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
-from .tools import (split_experiments, iter_kcuts, kcut_dirname, resolve_kmax,
-                    reparam_degeneracy_bounds, apply_degeneracy_reparam,
-                    DEGEN_NAME_A, DEGEN_NAME_B, DEGEN_NEW_NAME_R,
-                    DEGEN_R_PRIOR_BOUNDS, REPARAM_BOUNDS_FILE)
+from .tools import split_experiments, iter_kcuts, kcut_dirname, resolve_kmax
+from .reparam import DEGENERACY, degeneracy_bounds, save_bounds
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
     _construct_hod_prior_from_summaries, _construct_noise_prior,
@@ -322,20 +320,9 @@ def run_preprocessing(summaries, parameters, ids, positions,
                               for i in cfg.infer.subselect_cosmo]
             theta_names += hodprior[:, 0].astype(str).tolist()
             theta_names += ['noise_radial', 'noise_transverse']
-            bounds_a, bounds_b = reparam_degeneracy_bounds(
-                hodprior, noiseprior)
-            theta, theta_names = apply_degeneracy_reparam(
-                theta, theta_names, bounds_a, bounds_b)
-            reparam_bounds = {DEGEN_NAME_A: list(map(float, bounds_a)),
-                              DEGEN_NAME_B: list(map(float, bounds_b))}
-
-            # rename the matching hodprior row for the saved hodprior.csv,
-            # with an assumed uniform prior on degen_r -- the actual induced
-            # prior isn't derived yet (TODO)
-            hodprior_save = hodprior.copy()
-            row = np.where(hodprior_save[:, 0].astype(str) == DEGEN_NAME_A)[0][0]
-            hodprior_save[row] = [DEGEN_NEW_NAME_R, 'uniform',
-                                  *DEGEN_R_PRIOR_BOUNDS, None, None]
+            reparam_bounds = degeneracy_bounds(hodprior, noiseprior)
+            theta, _ = DEGENERACY.forward(theta, theta_names, reparam_bounds)
+            hodprior_save = DEGENERACY.rename_hodprior(hodprior)
 
         # split train/test
         ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
@@ -410,8 +397,7 @@ def run_preprocessing(summaries, parameters, ids, positions,
             with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
                 OmegaConf.save(noiseprior, f)
         if reparam_bounds is not None:
-            OmegaConf.save(OmegaConf.create(reparam_bounds),
-                           join(exp_path, REPARAM_BOUNDS_FILE))
+            save_bounds(exp_path, reparam_bounds)
         # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
         # initialize Optuna study (to avoid overwriting during parallelization)
