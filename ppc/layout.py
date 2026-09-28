@@ -10,6 +10,8 @@ this module exists to prevent.
 import os
 from os.path import join
 
+import numpy as np
+
 WDIR = '/work/hdd/bdne/maho3/cmass-ili'
 
 # theta layout: 5 cosmology, then HOD (alphabetical, from hodprior.csv), then
@@ -18,6 +20,7 @@ N_COSMO = 5
 N_NOISE = 2
 COSMO_NAMES = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
 NOISE_NAMES = ['noise_radial', 'noise_transverse']
+REPARAM_NOISE_NAMES = ['degen_phi', 'noise_transverse']
 
 # The stage-C job scripts run bias.hod.seed=1, and survey.aug_seed=1 for
 # lightcones, so every draw's diagnostics land in hod00001[_aug00001].h5.
@@ -117,3 +120,52 @@ class ExpPath:
         if testing is not None:
             root = join(root, 'testing', f'{testing.suite}_{testing.sim}')
         return join(root, tag)
+
+
+def is_reparam(names):
+    return names[-N_NOISE:] == REPARAM_NOISE_NAMES
+
+
+def reparam_bounds(exp):
+    """Prior bounds ((eta_vb_centrals), (noise_radial)) that normalized the
+    degeneracy reparam at preprocess time, from the experiment's
+    reparam_bounds.yaml. Experiments preprocessed before that file existed
+    fall back to the non-reparam sibling suite's hodprior.csv (<sim> minus
+    '_reparam'), since the experiment's own has eta_vb_centrals renamed."""
+    from omegaconf import OmegaConf
+    from cmass.infer.tools import (
+        REPARAM_BOUNDS_FILE, DEGEN_NAME_A, DEGEN_NAME_B)
+    path = join(exp.path, REPARAM_BOUNDS_FILE)
+    if os.path.exists(path):
+        b = OmegaConf.load(path)
+        return (tuple(map(float, b[DEGEN_NAME_A])),
+                tuple(map(float, b[DEGEN_NAME_B])))
+    if not exp.sim.endswith('_reparam'):
+        raise SystemExit(f'No {REPARAM_BOUNDS_FILE} in {exp.path}')
+    base = exp.sim[:-len('_reparam')]
+    sib = exp.path.replace(os.sep + exp.sim + os.sep,
+                           os.sep + base + os.sep)
+    hp = np.genfromtxt(join(sib, 'hodprior.csv'), delimiter=',', dtype=object)
+    row = np.flatnonzero(hp[:, 0].astype(str) == DEGEN_NAME_A)[0]
+    a = tuple(hp[row, 2:4].astype(float))
+    npr = OmegaConf.load(join(exp.path, 'noiseprior.yaml'))
+    return a, (float(npr.params.a), float(npr.params.b))
+
+
+def to_physical(theta, names, bounds):
+    """(degen_r, degen_phi) -> (eta_vb_centrals, noise_radial); inverse of
+    cmass.infer.tools.apply_degeneracy_reparam. Returns theta, names, and a
+    mask of rows whose normalized coords land inside the physical prior box
+    (the (r, phi) prior box is larger than the unit square's image, so the
+    posterior can leak out)."""
+    theta = np.array(theta, dtype=float)
+    (loA, hiA), (loB, hiB) = bounds
+    iA, iB = names.index('degen_r'), len(names) - N_NOISE
+    r, phi = theta[:, iA], np.radians(theta[:, iB])
+    An, Bn = r * np.cos(phi), r * np.sin(phi)
+    ok = (An >= 0) & (An <= 1) & (Bn >= 0) & (Bn <= 1)
+    theta[:, iA] = loA + (hiA - loA) * An
+    theta[:, iB] = loB + (hiB - loB) * Bn
+    new = list(names)
+    new[iA], new[iB] = 'eta_vb_centrals', 'noise_radial'
+    return theta, new, ok

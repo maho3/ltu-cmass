@@ -42,10 +42,11 @@ from cmass.infer.resim import load_pool, load_labels, load_test_split, \
     param_names, select_test_point, empirical_quantiles
 from cmass.infer.validate import load_ensemble
 from ppc.layout import (
-    ExpPath, WDIR, N_COSMO, N_NOISE, COSMO_NAMES, NOISE_NAMES, sim_subdir)
+    ExpPath, WDIR, N_COSMO, N_NOISE, COSMO_NAMES, NOISE_NAMES,
+    REPARAM_NOISE_NAMES, is_reparam, reparam_bounds, to_physical, sim_subdir)
 
 EXP_PATH = join(
-    WDIR, 'abacuslike/fastpm_charm6_comphod/models/galaxy',
+    WDIR, 'abacuslike/fastpm_charm7_cosmoHOD_reparam/models/galaxy',
     'zPk0+zPk2+zPk4/kmin-0.0_kmax-0.4')
 
 # Flags that decide how a summary vector is built. x_obs is preprocessed by the
@@ -100,7 +101,7 @@ def check_theta_layout(names):
         raise SystemExit(
             f'theta must begin with {COSMO_NAMES}, got {names[:N_COSMO]}. '
             'infer.subselect_cosmo is not supported.')
-    if names[-N_NOISE:] != NOISE_NAMES:
+    if names[-N_NOISE:] not in (NOISE_NAMES, REPARAM_NOISE_NAMES):
         raise SystemExit(
             f'theta must end with {NOISE_NAMES}, got {names[-N_NOISE:]}. '
             'This model was trained with infer.include_noise=False, so the '
@@ -152,7 +153,7 @@ def select_by_lhid(theta_src, ids_src, theta_pool, lhid, mask=None):
     return int(sel[np.argmin(np.linalg.norm(q - 0.5, axis=-1))])
 
 
-def draw_theta(ensemble, x_obs, n, seed, device):
+def draw_theta(ensemble, x_obs, n, seed, device, accept=None):
     """n joint draws from q(theta|x_obs), rejecting any outside prior support.
 
     Deterministic given seed: the accept/reject stream is fixed.
@@ -166,6 +167,8 @@ def draw_theta(ensemble, x_obs, n, seed, device):
             t = ensemble.sample((max(want, 64),), xt, show_progress_bars=False)
             lp = ensemble.prior.log_prob(t)
             good = torch.isfinite(lp)
+            if accept is not None:
+                good &= torch.as_tensor(accept(t.cpu().numpy()))
             n_rejected += int((~good).sum())
             kept.append(t[good].cpu().numpy()[:want])
     return np.concatenate(kept)[:n], n_rejected
@@ -218,6 +221,7 @@ def main():
     names = param_names(exp)
     assert len(names) == theta.shape[1], (names, theta.shape)
     check_theta_layout(names)
+    reparam = is_reparam(names)
 
     if testing is None:
         if args.obs_lhid is None:
@@ -262,6 +266,9 @@ def main():
           f'x is {x.shape[1]}-dim')
     if testing is not None:
         print(f'x_obs drawn out-of-distribution from {testing}')
+    if reparam:
+        print('reparam model: draws inverted to physical eta_vb_centrals/'
+              'noise_radial for the sims')
     print(f'x_obs: index {iobs}, lhid {id_obs}, split {split_obs}'
           + (' (requested)' if args.obs_lhid is not None else ''))
     print(f'tag:   {tag}')
@@ -297,8 +304,14 @@ def main():
         prev_seeds = []
 
     block_seed = args.seed + args.start
+    # Reparam models sample (degen_r, degen_phi); the sims need the physical
+    # eta_vb_centrals/noise_radial, so also reject draws that map outside the
+    # physical prior box (the (r, phi) prior box is larger than its image).
+    bounds = reparam_bounds(exp) if reparam else None
+    accept = ((lambda t: to_physical(t, names, bounds)[2])
+              if reparam else None)
     new_draws, n_rejected = draw_theta(
-        ensemble, x_obs, args.ndraw, block_seed, args.device)
+        ensemble, x_obs, args.ndraw, block_seed, args.device, accept)
     theta_draws = np.concatenate([prev, new_draws])
     seed_blocks = prev_seeds + [block_seed]
     print(f'\nDrew {args.ndraw} new theta ({n_rejected} rejected outside '
@@ -310,9 +323,17 @@ def main():
     theta_draws[:, :N_COSMO] = np.loadtxt(cosmofile, ndmin=2)
     print(f'Wrote {cosmofile} ({n_total} rows)')
 
+    if reparam:
+        theta_phys, names_phys, ok = to_physical(theta_draws, names, bounds)
+        assert ok.all(), 'carried-over draw outside physical prior'
+        theta_obs_phys = to_physical(theta_obs[None], names, bounds)[0][0]
+    else:
+        theta_phys, names_phys, theta_obs_phys = theta_draws, names, theta_obs
+
     np.savez(
         npz_path,
-        theta_draws=theta_draws, x_obs=x_obs, theta_obs=theta_obs,
+        theta_draws=theta_draws, theta_phys=theta_phys,
+        names_phys=np.array(names_phys), theta_obs_phys=theta_obs_phys, x_obs=x_obs, theta_obs=theta_obs,
         id_obs=id_obs, index_obs=iobs, split_obs=split_obs,
         seed=args.seed, seed_blocks=np.array(seed_blocks),
         n_rejected=n_rejected, exp_path=str(exp),
@@ -326,16 +347,16 @@ def main():
     # --- per-draw overrides + manifest --------------------------------------
     for i in range(args.start, n_total):
         with open(join(out, 'overrides', f'{i}.txt'), 'w') as f:
-            f.write(override_string(names, theta_draws[i]) + '\n')
+            f.write(override_string(names_phys, theta_phys[i]) + '\n')
 
     with open(join(out, 'manifest.tsv'), 'w') as f:
-        f.write('\t'.join(['draw_id', 'status', 'wall_s'] + names +
+        f.write('\t'.join(['draw_id', 'status', 'wall_s'] + names_phys +
                           ['sim_dir', 'diag_file']) + '\n')
         for i in range(n_total):
             simdir = join(out, sim_subdir(cfg), str(i))
             f.write('\t'.join(
                 [str(i), 'pending', ''] +
-                [f'{v:.10g}' for v in theta_draws[i]] +
+                [f'{v:.10g}' for v in theta_phys[i]] +
                 [simdir, join(simdir, exp.diag_file())]
             ) + '\n')
 

@@ -5,7 +5,7 @@ import io
 import os
 import pickle
 from torch.utils.data import TensorDataset, DataLoader
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import optuna
 from typing import List
 import numpy as np
@@ -17,6 +17,85 @@ _BK_TAGS = ('Eq', 'Sq', 'Ss', 'Is')
 
 # Summaries which carry no k-dependence, and so take no k-cut.
 _KLESS_SUMMARIES = ('nbar', 'nz')
+
+# Names involved in the eta_vb_centrals/noise_radial degeneracy reparam
+# (infer.reparam_degeneracy) -- see scripts/plot_degeneracy_reparam.py for
+# the diagnostic that motivated this. eta_vb_centrals lives in the HOD block
+# of theta, noise_radial in the noise block; reparam replaces them in place
+# with polar coords (degen_r, degen_phi) parallel/perpendicular to the
+# degeneracy, so the theta layout/length is unchanged.
+DEGEN_NAME_A = 'eta_vb_centrals'
+DEGEN_NAME_B = 'noise_radial'
+DEGEN_NEW_NAME_R = 'degen_r'
+DEGEN_NEW_NAME_PHI = 'degen_phi'
+
+# Placeholder priors for (degen_r, degen_phi), assumed uniform for now.
+# TODO: derive the actual induced prior from the eta_vb_centrals/noise_radial
+# priors instead of assuming uniform.
+# degen_phi = atan2(Bn, An) with An, Bn both >= 0, so [0, 90] deg is exact.
+# An, Bn lie in [0, 1], so degen_r <= sqrt(2). The (r, phi) box is a tight
+# bound on, but not equal to, the image of the unit square.
+DEGEN_R_PRIOR_BOUNDS = (0.0, float(np.sqrt(2)))
+DEGEN_PHI_PRIOR_BOUNDS = (0.0, 90.0)
+
+# Written by preprocess next to hodprior.csv: the physical
+# eta_vb_centrals/noise_radial bounds used to normalize the reparam, needed
+# to invert it (hodprior.csv has eta_vb_centrals renamed to degen_r).
+REPARAM_BOUNDS_FILE = 'reparam_bounds.yaml'
+
+
+def saved_reparam_degeneracy(exp_path):
+    """infer.reparam_degeneracy as exp_path was preprocessed, read from its
+    saved config.yaml rather than the current run's cfg."""
+    saved = OmegaConf.load(os.path.join(exp_path, 'config.yaml')).infer
+    return bool(saved.get('reparam_degeneracy', False))
+
+
+def check_reparam_degeneracy(exp_path, cfg):
+    """Fail if cfg's infer.reparam_degeneracy disagrees with exp_path's."""
+    saved = saved_reparam_degeneracy(exp_path)
+    if saved != bool(cfg.infer.get('reparam_degeneracy', False)):
+        raise ValueError(
+            f'{exp_path} was preprocessed with infer.reparam_degeneracy='
+            f'{saved}; set it to match.')
+
+
+def reparam_degeneracy_bounds(hodprior, noiseprior):
+    """Prior bounds used to normalize eta_vb_centrals/noise_radial before the
+    polar (r, phi) reparameterization -- the two live on very different
+    scales (noise_radial's range is ~6x wider), so A^2+B^2=const is only a
+    clean circle once each axis is scaled by its own prior range."""
+    hod_names = hodprior[:, 0].astype(str)
+    idx = np.where(hod_names == DEGEN_NAME_A)[0]
+    if len(idx) == 0:
+        raise ValueError(
+            f'{DEGEN_NAME_A} not found in hodprior; reparam_degeneracy '
+            'requires it to be part of the inferred HOD parameters.')
+    lo_a, hi_a = hodprior[idx[0], 2:4].astype(float)
+    lo_b, hi_b = float(noiseprior.params.a), float(noiseprior.params.b)
+    return (lo_a, hi_a), (lo_b, hi_b)
+
+
+def apply_degeneracy_reparam(theta, names, bounds_a, bounds_b):
+    """Replace the eta_vb_centrals and noise_radial columns of theta with a
+    polar (r, phi) reparameterization of their prior-range-normalized
+    values: r=sqrt(An^2+Bn^2) (perpendicular to the degeneracy, tightly
+    constrained by the data) and phi=atan2(Bn,An) in degrees (parallel to
+    the degeneracy, the direction the data leaves mostly unconstrained).
+    Column order/length is unchanged; only the two named columns are
+    overwritten, and their names are updated to match."""
+    theta = np.array(theta, dtype=float)
+    iA, iB = names.index(DEGEN_NAME_A), names.index(DEGEN_NAME_B)
+    loA, hiA = bounds_a
+    loB, hiB = bounds_b
+    An = (theta[:, iA] - loA) / (hiA - loA)
+    Bn = (theta[:, iB] - loB) / (hiB - loB)
+    theta[:, iA] = np.sqrt(An**2 + Bn**2)
+    theta[:, iB] = np.degrees(np.arctan2(Bn, An))
+    new_names = list(names)
+    new_names[iA] = DEGEN_NEW_NAME_R
+    new_names[iB] = DEGEN_NEW_NAME_PHI
+    return theta, new_names
 
 
 def _is_mapping(kmax):

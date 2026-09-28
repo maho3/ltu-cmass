@@ -120,11 +120,13 @@ Under `<wdir>/ppc/<suite>_<sim>/<summaries>_<kcut>/[testing/<tsuite>_<tsim>/]<ta
 |---|---|
 | `x_ppc.npy` | (Ndraw, Nfeat) inference blocks only, training x ordering |
 | `theta_ppc.npy` | (Ndraw, Nparam), row-aligned with `x_ppc` |
-| `x_ppc_all.npz` | every plotted block, its observed vector, its k axis |
+| `x_ppc_all.npz` | every plotted block, its observed vector, its k axis, and `<block>_k123` triangle sides for bispectra |
 | `posterior_draws.npz` | `x_obs`, `theta_obs`, `theta_draws`, `seed_blocks`, `param_names` |
 | `logq_ppc.npy` | log q(theta \| x_obs) per simulated draw |
 | `manifest.tsv` | per-draw status and all parameters |
 | `plots/ppc_{bands,corner,logprob}.png` | |
+| `plots/ppc_pcapvalue.png`, `ppc_pcapvalues.tsv` | OOD p-values in PCA space, see below |
+| `plots/ppc_kbinpvalue.png`, `ppc_kbinpvalues.tsv` | OOD p-values on k-bin subsets, see below |
 
 `collect.py` verifies every draw's recorded cosmology, HOD and noise parameters
 against the drawn values, drops mismatches from `x_ppc` and `theta_ppc`
@@ -135,5 +137,99 @@ Plots cover all available summaries, not just the conditioned ones. Held-out
 summaries carry no weight in the inference, so disagreement there is
 informative; panel titles mark which is which.
 
-No Mahalanobis distance or p-value is computed. `x_ppc` / `theta_ppc` are
-row-aligned and `x_obs` is in the npz, so a distance statistic is trivial to add.
+## Interpreting the p-values
+
+Both figures test one null hypothesis: **`x_obs` is a draw from the posterior
+predictive** that the resimulations sample. Small p means `x_obs` is out of
+distribution (OOD): no set of parameters the posterior believes can reproduce
+it. Every value is `-log10 p` on the plots, so up/right means more OOD.
+
+**How p is computed.** This is the matched leave-one-out test of
+`predictive_checks.ppc_mahalanobis` (it reproduces that package's `pca` mode to
+1e-8). In fold `j`, fit a mean and covariance to the other N−1 draws, then
+score both the held-out draw `j` and `x_obs` against that same fit with a
+Mahalanobis distance `T`. Then
+
+    p = (1 + #{j : T_j >= T_obs,j}) / (N + 1)
+
+Under H0, `x_obs` and draw `j` are interchangeable in every fold, so p is
+calibrated with no Gaussian assumption. Three consequences:
+
+- **p cannot go below 1/(N+1)** (≈ 0.01 for 100 draws). A test at the floor
+  says "more extreme than every draw", not how much more.
+- **`p_F`** (Hotelling F) extrapolates below the floor by assuming the draws
+  are Gaussian. Use it to rank how bad a failure is, never as the headline.
+  The draws are often heavier-tailed than Gaussian, so it can overstate
+  significance.
+- **`p_loo_std`** is the Monte Carlo noise from having only N draws. It is
+  ≈ 0.05 near p = 0.5, so differences smaller than that mean nothing.
+
+**Inference vs held-out blocks.** Blocks the posterior was conditioned on
+(`[inf]`) reuse `x_obs` for both fitting and testing, so their p is
+conservative (biased high) and a pass is weak evidence. Held-out blocks
+(`[held]`, e.g. the bispectrum when training on P(k)) are a clean test. A model
+that passes on its inference blocks but fails on held-out ones reproduces the
+statistics it was fitted to without capturing the physics behind them.
+
+### `ppc_pcapvalue.png`: PCA space
+
+With about 100 draws you cannot estimate a covariance over 100–500 features,
+so `T` is computed in the top `k` principal components of the draws
+(`--n_pca`, default 10).
+
+| panel | shows | read it as |
+|---|---|---|
+| (a) | draws and `x_obs` in the first two PCs of the inference vector | the star inside the cloud: typical along the directions the draws vary most |
+| (b), (c) | one point per fold, `T_j` against `T_obs,j`, for the inference and held-out vectors | p is the fraction of points on or above the diagonal. All points below it means OOD |
+| (d) | p per block: top-k PCA (circle), Hotelling (square), all-feature Ledoit–Wolf (triangle) | past the dashed line fails at 0.05; the dotted line is the floor |
+| (e) | p against k for every block | a row that flips colour with k is a fragile verdict. Report the k it holds at |
+| (f) | p for the deviation outside the top-k PCs | catches structure the draws never produce. It uses an unweighted norm of raw features, so high-variance features dominate |
+
+**The PCA and Ledoit–Wolf tests answer different questions.** The top PCs are
+mostly directions the parameters can move, so the PCA test asks whether any
+posterior draw lands near `x_obs`. Ledoit–Wolf keeps every direction,
+including low-variance combinations that no parameter setting produces. A block
+that passes PCA but fails Ledoit–Wolf is off in a direction the model cannot
+reach. The abacus OOD check's combined inference vector is the example:
+p = 0.67 with PCA, 0.0099 with Ledoit–Wolf.
+
+### `ppc_kbinpvalue.png`: k-bin subsets
+
+The same matched test with no PCA: the full Mahalanobis distance on the raw
+features inside a k-range. A subset is only tested if it has d ≤ N/2 features,
+so each fold's covariance stays well estimated. Subsets over the limit, or with
+no bins, are hatched and not tested. Heatmap cells print their d.
+
+| panel | shows | read it as |
+|---|---|---|
+| (a) | p in sliding k-windows (`--win_width` 0.06, `--win_step` 0.02) for each P(k) multipole and their combination, BAO range shaded | *which scales* are OOD |
+| (b) | p for all k ≤ kmax, P(k) averaged into `--kcoarse` 0.04 bins | *from which kmax* on the model stops fitting. Compare to the training kmax line |
+| (c) | per-bin `(x_obs − mean)/σ` of the draws | what drives (a) and (b), and the sign of the offset. Marginal only: a smooth 1σ offset across many bins can still fail the full test |
+| (d), (e) | (a) and (b) for every block, bispectra included. Triangles are placed by their largest side and are not averaged, so the cumulative scan stops once it passes N/2 triangles | where the held-out statistics break |
+| (f) | the matched folds behind the most OOD P(k) window | how far out that window is |
+
+**Do not over-read a single window.** Panel (a) makes about 17 overlapping
+tests per curve, so an isolated dip to p ≈ 0.04 is expected by chance even for
+an in-distribution point. Trust a run of adjacent low windows, or the
+cumulative curve (b).
+
+Bispectrum rows need `<block>_k123` in `x_ppc_all.npz`. Campaigns collected
+before it was stored show only P(k) and `zEqBk0`; re-run `collect.py
+--no_theta_plots` to add it (it rewrites the deliverables unchanged).
+
+### Rerunning
+
+`--pvalue_only` rebuilds both figures and tables from `x_ppc_all.npz` in under
+a minute, without the per-draw sims or the ensemble. `--no_pvalue` skips them
+in a full collect.
+
+## Reparameterized models (`*_reparam`)
+
+Experiments trained with `infer.reparam_degeneracy=True` sample
+`(degen_r, degen_phi)` in place of `eta_vb_centrals` / `noise_radial`. `draw.py`
+inverts them to the physical values for the sims (bounds from the experiment's
+`reparam_bounds.yaml`, or for older experiments the non-reparam sibling suite's
+`hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
+draws that map outside the physical prior box, and stores both
+`theta_draws` (reparam) and `theta_phys` in the npz. `collect.py` verifies sims
+against `theta_phys`.

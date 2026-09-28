@@ -101,7 +101,10 @@ def param_names(exp_path):
         hodprior = np.genfromtxt(filepath, delimiter=',', dtype=object)
         names += hodprior[:, 0].astype('str').tolist()
     if saved.include_noise:
-        names += ['noise_radial', 'noise_transverse']
+        if saved.get('reparam_degeneracy', False):
+            names += ['degen_phi', 'noise_transverse']
+        else:
+            names += ['noise_radial', 'noise_transverse']
     return names
 
 
