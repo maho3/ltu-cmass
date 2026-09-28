@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ppc_nbody    # Job name
-#SBATCH --array=20-99%50        # One task per posterior draw (array idx == draw id == lhid)
+#SBATCH --array=0-99%50         # One task per posterior draw (array idx == draw id == lhid)
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=128            # Number of tasks
 #SBATCH --mem=240G              # Amount of memory
@@ -43,8 +43,8 @@ lhid=$SLURM_ARRAY_TASK_ID
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs00038
-ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/testing/abacus_nbody_comp_gridnoise/$tag
+tag=${TAG:?set TAG (obs<lhid>, as printed by draw.py)}
+ppcdir=ppc/abacuslike_fastpm_charm7_cosmoHOD_reparam/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
 
 nbody=abacuslike
 sim=fastpm

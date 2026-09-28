@@ -323,6 +323,11 @@ set `bias.hod.noise_uniform=False` and do it yourself at the halo level.
 - Flag ambiguity rather than improvising; ask clarification questions up front
   on new visualization/analysis tasks (slice geometry, subsampling, etc.).
 - **Tests don't run locally.** Don't try `pytest`.
+- **Diagnostics / fast plots → `/tmp/`, not the repo.** If asked to make a
+  diagnostic or a quick/fast plot, write the script to `/tmp/` (not
+  `scripts/`, not `figures/`) — it's throwaway. Only write into the repo
+  (`scripts/`, editing existing scripts) if explicitly asked to *save* a
+  script or to *edit* an existing one.
 
 ## Frequent gotchas
 
