@@ -31,6 +31,7 @@ import torch
 from matplotlib import pyplot as plt
 
 from .tools import split_experiments, iter_kcuts, kcut_dirname
+from .reparam import DEGENERACY
 from .validate import load_ensemble
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
@@ -102,6 +103,8 @@ def param_names(exp_path):
         names += hodprior[:, 0].astype('str').tolist()
     if saved.include_noise:
         names += ['noise_radial', 'noise_transverse']
+    if saved.get('reparam_degeneracy', False):
+        names = DEGENERACY.rename(names)
     return names
 
 

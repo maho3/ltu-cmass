@@ -22,6 +22,7 @@ from matplotlib import pyplot as plt
 
 from .tools import (select_top_trials, split_experiments, load_posterior,
                     iter_kcuts, kcut_dirname, study_name_from_path)
+from .reparam import DEGENERACY, saved_reparam_degeneracy
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -186,7 +187,8 @@ def fix_ensemble_prior(ensemble, exp_path, theta, cfg):
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta, hodprior=hodprior,
                           noiseprior=noiseprior,
-                          subselect_cosmo=cfg.infer.subselect_cosmo)
+                          subselect_cosmo=cfg.infer.subselect_cosmo,
+                          reparam_degeneracy=saved_reparam_degeneracy(exp_path))
     if _prior_dim(prior) != theta_dim:
         raise ValueError(
             f'Pickled prior has dim {_prior_dim(ensemble.prior)} and the '
@@ -244,6 +246,8 @@ def run_experiment(exp, cfg, model_path):
                 names += hodprior[:, 0].astype('str').tolist()
             if cfg.infer.include_noise:
                 names += ['noise_radial', 'noise_transverse']
+            if saved_reparam_degeneracy(exp_path):
+                names = DEGENERACY.rename(names)
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}.'
