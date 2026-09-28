@@ -305,7 +305,7 @@ def main():
     block_seed = args.seed + args.start
     # Reparam models sample (degen_r, degen_phi); the sims need the physical
     # eta_vb_centrals/noise_radial, so also reject draws that map outside the
-    # physical prior box (degen_r's prior is a loose placeholder).
+    # physical prior box (the (r, phi) prior box is larger than its image).
     bounds = reparam_bounds(exp) if reparam else None
     accept = ((lambda t: to_physical(t, names, bounds)[2])
               if reparam else None)

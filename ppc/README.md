@@ -227,8 +227,9 @@ in a full collect.
 
 Experiments trained with `infer.reparam_degeneracy=True` sample
 `(degen_r, degen_phi)` in place of `eta_vb_centrals` / `noise_radial`. `draw.py`
-inverts them to the physical values for the sims (bounds from the non-reparam
-sibling suite's `hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
+inverts them to the physical values for the sims (bounds from the experiment's
+`reparam_bounds.yaml`, or for older experiments the non-reparam sibling suite's
+`hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
 draws that map outside the physical prior box, and stores both
 `theta_draws` (reparam) and `theta_phys` in the npz. `collect.py` verifies sims
 against `theta_phys`.
