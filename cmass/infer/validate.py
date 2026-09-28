@@ -21,7 +21,8 @@ import optuna.visualization.matplotlib as vis
 from matplotlib import pyplot as plt
 
 from .tools import (select_top_trials, split_experiments, load_posterior,
-                    iter_kcuts, kcut_dirname, study_name_from_path)
+                    iter_kcuts, kcut_dirname, study_name_from_path,
+                    saved_reparam_degeneracy)
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -187,7 +188,7 @@ def fix_ensemble_prior(ensemble, exp_path, theta, cfg):
                           theta=theta, hodprior=hodprior,
                           noiseprior=noiseprior,
                           subselect_cosmo=cfg.infer.subselect_cosmo,
-                          reparam_degeneracy=cfg.infer.get('reparam_degeneracy', False))
+                          reparam_degeneracy=saved_reparam_degeneracy(exp_path))
     if _prior_dim(prior) != theta_dim:
         raise ValueError(
             f'Pickled prior has dim {_prior_dim(ensemble.prior)} and the '
@@ -244,7 +245,7 @@ def run_experiment(exp, cfg, model_path):
                     filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
             if cfg.infer.include_noise:
-                if cfg.infer.get('reparam_degeneracy', False):
+                if saved_reparam_degeneracy(exp_path):
                     names += ['degen_phi', 'noise_transverse']
                 else:
                     names += ['noise_radial', 'noise_transverse']

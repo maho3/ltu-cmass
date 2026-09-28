@@ -5,7 +5,7 @@ import io
 import os
 import pickle
 from torch.utils.data import TensorDataset, DataLoader
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import optuna
 from typing import List
 import numpy as np
@@ -39,6 +39,22 @@ DEGEN_NEW_NAME_PHI = 'degen_phi'
 # resim.py's importance reweighting, which divides by the prior density).
 DEGEN_R_PRIOR_BOUNDS = (0.0, 10.0)
 DEGEN_PHI_PRIOR_BOUNDS = (0.0, 90.0)
+
+
+def saved_reparam_degeneracy(exp_path):
+    """infer.reparam_degeneracy as exp_path was preprocessed, read from its
+    saved config.yaml rather than the current run's cfg."""
+    saved = OmegaConf.load(os.path.join(exp_path, 'config.yaml')).infer
+    return bool(saved.get('reparam_degeneracy', False))
+
+
+def check_reparam_degeneracy(exp_path, cfg):
+    """Fail if cfg's infer.reparam_degeneracy disagrees with exp_path's."""
+    saved = saved_reparam_degeneracy(exp_path)
+    if saved != bool(cfg.infer.get('reparam_degeneracy', False)):
+        raise ValueError(
+            f'{exp_path} was preprocessed with infer.reparam_degeneracy='
+            f'{saved}; set it to match.')
 
 
 def reparam_degeneracy_bounds(hodprior, noiseprior):
