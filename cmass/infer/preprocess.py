@@ -172,28 +172,50 @@ def setup_optuna(exp_path, name, n_startup_trials):
     return study
 
 
-def _align_to_key(values, value_positions, target_positions,
-                  value_key, target_key):
-    """Reorder a per-sample aux array onto another key's sample ordering.
+def _required_keys(summaries, exp_summary):
+    """Every summaries key an experiment reads: each base summary, its
+    monopole normalization, Pk0 (nbar/nz aux) and noiseid if present."""
+    keys = {'Pk0'}
+    for summ in exp_summary:
+        if summ in ['nbar', 'nz']:
+            continue
+        base = summ
+        for tag in ["Eq", "Sq", "Ss", "Is", ""]:
+            if tag in summ:
+                base = base.replace(tag, "")
+                break
+        keys.add(base)
+        if '0' not in base:
+            keys.add(base[:-1] + '0')
+    if 'noiseid' in summaries:
+        keys.add('noiseid')
+    return sorted(keys)
 
-    summaries[key] only holds the samples that actually carried `key`, so two
-    keys' lists are only positionally comparable when every sample carried
-    both. Gathering through the global sample positions makes the alignment
-    explicit and fails loudly when a sample is missing the aux value, rather
-    than silently pairing an aux value with the wrong row.
+
+def _common_samples(summaries, parameters, ids, positions, keys):
+    """Restrict every key to the samples that carry all of `keys`, in one
+    shared order, so lists from different keys are positionally aligned.
+
+    summaries[key] only holds the samples that actually carried `key` (e.g. a
+    partially-written diag file with Bk but no Pk), so different keys' lists
+    are not interchangeable until restricted to their common samples.
     """
-    lookup = dict(zip(value_positions, values))
-    try:
-        return np.asarray([lookup[i] for i in target_positions])
-    except KeyError as e:
-        raise ValueError(
-            f"Cannot align '{value_key}' to '{target_key}': "
-            f"{len(set(target_positions) - set(value_positions))} of "
-            f"{len(target_positions)} '{target_key}' samples have no "
-            f"'{value_key}' entry (sample {e} missing). This usually means "
-            f"some summary files are incomplete -- check that every diag file "
-            f"contains all expected datasets."
-        ) from e
+    common = sorted(set.intersection(*(set(positions[k]) for k in keys)))
+    if len(common) == 0:
+        raise ValueError(f'No sample carries all of {keys}.')
+    out_s, out_p, out_i = {}, {}, {}
+    for k in keys:
+        idx = {pos: j for j, pos in enumerate(positions[k])}
+        sel = [idx[i] for i in common]
+        out_s[k] = [summaries[k][j] for j in sel]
+        out_p[k] = [parameters[k][j] for j in sel]
+        out_i[k] = [ids[k][j] for j in sel]
+    ndrop = {k: len(positions[k]) - len(common) for k in keys}
+    if any(ndrop.values()):
+        logging.warning(
+            f'Dropping samples missing any of {keys}: kept {len(common)}, '
+            f'dropped per key {ndrop}')
+    return out_s, out_p, out_i
 
 
 def run_preprocessing(summaries, parameters, ids, positions,
@@ -213,6 +235,9 @@ def run_preprocessing(summaries, parameters, ids, positions,
             return
 
     name = '+'.join(exp.summary)
+    summaries, parameters, ids = _common_samples(
+        summaries, parameters, ids, positions,
+        _required_keys(summaries, exp.summary))
 
     for kmin, kmax in iter_kcuts(exp):
         logging.info(
@@ -234,7 +259,6 @@ def run_preprocessing(summaries, parameters, ids, positions,
             skmax = resolve_kmax(kmax, summ)
 
             x, theta, id = summaries[base], parameters[base], ids[base]
-            base_key = base  # aux arrays below must align to this key
             # Preprocess the summaries
             if 'Pk' in summ:
                 norm_key = base[:-1] + '0'  # monopole (Pk0 or zPk0)
@@ -331,19 +355,14 @@ def run_preprocessing(summaries, parameters, ids, positions,
         test_mask = np.isin(id_arr, ids_test)
 
         # number densities
-        nbar = _align_to_key(
-            np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1],
-            positions["Pk0"], positions[base_key], "Pk0", base_key)
+        nbar = np.asarray(_get_log10nbar(summaries["Pk0"]))[:, -1]
         np.save(join(exp_path, "nbar_train.npy"), nbar[train_mask])
         np.save(join(exp_path, "nbar_val.npy"), nbar[val_mask])
         np.save(join(exp_path, "nbar_test.npy"), nbar[test_mask])
 
         if "noiseid" in summaries:
             # noise indices
-            noise = _align_to_key(
-                np.asarray(summaries["noiseid"]),
-                positions["noiseid"], positions[base_key],
-                "noiseid", base_key).reshape(-1, 1)
+            noise = np.asarray(summaries["noiseid"]).reshape(-1, 1)
             np.save(join(exp_path, "noiseid_train.npy"), noise[train_mask])
             np.save(join(exp_path, "noiseid_val.npy"), noise[val_mask])
             np.save(join(exp_path, "noiseid_test.npy"), noise[test_mask])
