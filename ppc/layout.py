@@ -128,17 +128,25 @@ def is_reparam(names):
 
 def reparam_bounds(exp):
     """Prior bounds ((eta_vb_centrals), (noise_radial)) that normalized the
-    degeneracy reparam at preprocess time. The reparam experiment's own
-    hodprior.csv has eta_vb_centrals renamed to degen_r, so its bounds are
-    read from the non-reparam sibling suite (<sim> minus '_reparam')."""
+    degeneracy reparam at preprocess time, from the experiment's
+    reparam_bounds.yaml. Experiments preprocessed before that file existed
+    fall back to the non-reparam sibling suite's hodprior.csv (<sim> minus
+    '_reparam'), since the experiment's own has eta_vb_centrals renamed."""
     from omegaconf import OmegaConf
+    from cmass.infer.tools import (
+        REPARAM_BOUNDS_FILE, DEGEN_NAME_A, DEGEN_NAME_B)
+    path = join(exp.path, REPARAM_BOUNDS_FILE)
+    if os.path.exists(path):
+        b = OmegaConf.load(path)
+        return (tuple(map(float, b[DEGEN_NAME_A])),
+                tuple(map(float, b[DEGEN_NAME_B])))
     if not exp.sim.endswith('_reparam'):
-        raise SystemExit(f'Cannot locate eta_vb_centrals bounds for {exp.sim}')
+        raise SystemExit(f'No {REPARAM_BOUNDS_FILE} in {exp.path}')
     base = exp.sim[:-len('_reparam')]
     sib = exp.path.replace(os.sep + exp.sim + os.sep,
                            os.sep + base + os.sep)
     hp = np.genfromtxt(join(sib, 'hodprior.csv'), delimiter=',', dtype=object)
-    row = np.flatnonzero(hp[:, 0].astype(str) == 'eta_vb_centrals')[0]
+    row = np.flatnonzero(hp[:, 0].astype(str) == DEGEN_NAME_A)[0]
     a = tuple(hp[row, 2:4].astype(float))
     npr = OmegaConf.load(join(exp.path, 'noiseprior.yaml'))
     return a, (float(npr.params.a), float(npr.params.b))
@@ -148,7 +156,8 @@ def to_physical(theta, names, bounds):
     """(degen_r, degen_phi) -> (eta_vb_centrals, noise_radial); inverse of
     cmass.infer.tools.apply_degeneracy_reparam. Returns theta, names, and a
     mask of rows whose normalized coords land inside the physical prior box
-    (degen_r's prior is a loose placeholder, so the posterior can leak out)."""
+    (the (r, phi) prior box is larger than the unit square's image, so the
+    posterior can leak out)."""
     theta = np.array(theta, dtype=float)
     (loA, hiA), (loB, hiB) = bounds
     iA, iB = names.index('degen_r'), len(names) - N_NOISE
