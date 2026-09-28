@@ -29,7 +29,9 @@ import joblib
 
 from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
-from .tools import split_experiments, iter_kcuts, kcut_dirname, resolve_kmax
+from .tools import (split_experiments, iter_kcuts, kcut_dirname, resolve_kmax,
+                    reparam_degeneracy_bounds, apply_degeneracy_reparam,
+                    DEGEN_NAME_A, DEGEN_NEW_NAME_R, DEGEN_R_PRIOR_BOUNDS)
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
     _construct_hod_prior_from_summaries, _construct_noise_prior,
@@ -304,6 +306,34 @@ def run_preprocessing(summaries, parameters, ids, positions,
                         size=(x.shape[0], end-start)
                     ).astype(x.dtype)
 
+        # reparameterize the eta_vb_centrals/noise_radial degeneracy into
+        # polar (degen_r, degen_phi) coords, in place of theta's columns for
+        # those two names
+        hodprior_save = hodprior
+        if cfg.infer.get('reparam_degeneracy', False):
+            if not (cfg.infer.include_hod and cfg.infer.include_noise):
+                raise ValueError(
+                    'infer.reparam_degeneracy requires infer.include_hod '
+                    'and infer.include_noise to both be True.')
+            theta_names = ['Omega_m', 'Omega_b', 'h', 'n_s', 'sigma_8']
+            if cfg.infer.subselect_cosmo is not None:
+                theta_names = [theta_names[i]
+                              for i in cfg.infer.subselect_cosmo]
+            theta_names += hodprior[:, 0].astype(str).tolist()
+            theta_names += ['noise_radial', 'noise_transverse']
+            bounds_a, bounds_b = reparam_degeneracy_bounds(
+                hodprior, noiseprior)
+            theta, theta_names = apply_degeneracy_reparam(
+                theta, theta_names, bounds_a, bounds_b)
+
+            # rename the matching hodprior row for the saved hodprior.csv,
+            # with an assumed uniform prior on degen_r -- the actual induced
+            # prior isn't derived yet (TODO)
+            hodprior_save = hodprior.copy()
+            row = np.where(hodprior_save[:, 0].astype(str) == DEGEN_NAME_A)[0][0]
+            hodprior_save[row] = [DEGEN_NEW_NAME_R, 'uniform',
+                                  *DEGEN_R_PRIOR_BOUNDS, None, None]
+
         # split train/test
         ((x_train, x_val, x_test), (theta_train, theta_val, theta_test),
          (ids_train, ids_val, ids_test)) = split_train_val_test(
@@ -370,8 +400,8 @@ def run_preprocessing(summaries, parameters, ids, positions,
         with open(join(exp_path, 'x_startidx.txt'), 'w') as f:
             f.write(','.join(labels) + '\n')
             f.write(','.join(map(str, startidx.tolist())) + '\n')
-        if hodprior is not None:
-            np.savetxt(join(exp_path, 'hodprior.csv'), hodprior,
+        if hodprior_save is not None:
+            np.savetxt(join(exp_path, 'hodprior.csv'), hodprior_save,
                        delimiter=',', fmt='%s')
         if noiseprior is not None:
             with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:

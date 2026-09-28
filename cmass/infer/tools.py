@@ -18,6 +18,66 @@ _BK_TAGS = ('Eq', 'Sq', 'Ss', 'Is')
 # Summaries which carry no k-dependence, and so take no k-cut.
 _KLESS_SUMMARIES = ('nbar', 'nz')
 
+# Names involved in the eta_vb_centrals/noise_radial degeneracy reparam
+# (infer.reparam_degeneracy) -- see scripts/plot_degeneracy_reparam.py for
+# the diagnostic that motivated this. eta_vb_centrals lives in the HOD block
+# of theta, noise_radial in the noise block; reparam replaces them in place
+# with polar coords (degen_r, degen_phi) parallel/perpendicular to the
+# degeneracy, so the theta layout/length is unchanged.
+DEGEN_NAME_A = 'eta_vb_centrals'
+DEGEN_NAME_B = 'noise_radial'
+DEGEN_NEW_NAME_R = 'degen_r'
+DEGEN_NEW_NAME_PHI = 'degen_phi'
+
+# Placeholder priors for (degen_r, degen_phi), assumed uniform for now.
+# TODO: derive the actual induced prior from the eta_vb_centrals/noise_radial
+# priors instead of assuming uniform.
+# degen_phi = atan2(Bn, An) with An, Bn both >= 0, so [0, 90] deg is exact.
+# degen_r's upper bound is a generous-but-finite placeholder, NOT a real
+# bound -- literal (0, inf) makes an improper prior with zero density
+# everywhere, which silently breaks any log_prob-based use (e.g.
+# resim.py's importance reweighting, which divides by the prior density).
+DEGEN_R_PRIOR_BOUNDS = (0.0, 10.0)
+DEGEN_PHI_PRIOR_BOUNDS = (0.0, 90.0)
+
+
+def reparam_degeneracy_bounds(hodprior, noiseprior):
+    """Prior bounds used to normalize eta_vb_centrals/noise_radial before the
+    polar (r, phi) reparameterization -- the two live on very different
+    scales (noise_radial's range is ~6x wider), so A^2+B^2=const is only a
+    clean circle once each axis is scaled by its own prior range."""
+    hod_names = hodprior[:, 0].astype(str)
+    idx = np.where(hod_names == DEGEN_NAME_A)[0]
+    if len(idx) == 0:
+        raise ValueError(
+            f'{DEGEN_NAME_A} not found in hodprior; reparam_degeneracy '
+            'requires it to be part of the inferred HOD parameters.')
+    lo_a, hi_a = hodprior[idx[0], 2:4].astype(float)
+    lo_b, hi_b = float(noiseprior.params.a), float(noiseprior.params.b)
+    return (lo_a, hi_a), (lo_b, hi_b)
+
+
+def apply_degeneracy_reparam(theta, names, bounds_a, bounds_b):
+    """Replace the eta_vb_centrals and noise_radial columns of theta with a
+    polar (r, phi) reparameterization of their prior-range-normalized
+    values: r=sqrt(An^2+Bn^2) (perpendicular to the degeneracy, tightly
+    constrained by the data) and phi=atan2(Bn,An) in degrees (parallel to
+    the degeneracy, the direction the data leaves mostly unconstrained).
+    Column order/length is unchanged; only the two named columns are
+    overwritten, and their names are updated to match."""
+    theta = np.array(theta, dtype=float)
+    iA, iB = names.index(DEGEN_NAME_A), names.index(DEGEN_NAME_B)
+    loA, hiA = bounds_a
+    loB, hiB = bounds_b
+    An = (theta[:, iA] - loA) / (hiA - loA)
+    Bn = (theta[:, iB] - loB) / (hiB - loB)
+    theta[:, iA] = np.sqrt(An**2 + Bn**2)
+    theta[:, iB] = np.degrees(np.arctan2(Bn, An))
+    new_names = list(names)
+    new_names[iA] = DEGEN_NEW_NAME_R
+    new_names[iB] = DEGEN_NEW_NAME_PHI
+    return theta, new_names
+
 
 def _is_mapping(kmax):
     return isinstance(kmax, (dict, DictConfig))

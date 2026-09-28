@@ -186,7 +186,8 @@ def fix_ensemble_prior(ensemble, exp_path, theta, cfg):
     prior = prepare_prior(cfg.infer.prior, device=cfg.infer.device,
                           theta=theta, hodprior=hodprior,
                           noiseprior=noiseprior,
-                          subselect_cosmo=cfg.infer.subselect_cosmo)
+                          subselect_cosmo=cfg.infer.subselect_cosmo,
+                          reparam_degeneracy=cfg.infer.get('reparam_degeneracy', False))
     if _prior_dim(prior) != theta_dim:
         raise ValueError(
             f'Pickled prior has dim {_prior_dim(ensemble.prior)} and the '
@@ -243,7 +244,10 @@ def run_experiment(exp, cfg, model_path):
                     filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
             if cfg.infer.include_noise:
-                names += ['noise_radial', 'noise_transverse']
+                if cfg.infer.get('reparam_degeneracy', False):
+                    names += ['degen_phi', 'noise_transverse']
+                else:
+                    names += ['noise_radial', 'noise_transverse']
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}.'
