@@ -33,12 +33,15 @@ DEGEN_NEW_NAME_PHI = 'degen_phi'
 # TODO: derive the actual induced prior from the eta_vb_centrals/noise_radial
 # priors instead of assuming uniform.
 # degen_phi = atan2(Bn, An) with An, Bn both >= 0, so [0, 90] deg is exact.
-# degen_r's upper bound is a generous-but-finite placeholder, NOT a real
-# bound -- literal (0, inf) makes an improper prior with zero density
-# everywhere, which silently breaks any log_prob-based use (e.g.
-# resim.py's importance reweighting, which divides by the prior density).
-DEGEN_R_PRIOR_BOUNDS = (0.0, 10.0)
+# An, Bn lie in [0, 1], so degen_r <= sqrt(2). The (r, phi) box is a tight
+# bound on, but not equal to, the image of the unit square.
+DEGEN_R_PRIOR_BOUNDS = (0.0, float(np.sqrt(2)))
 DEGEN_PHI_PRIOR_BOUNDS = (0.0, 90.0)
+
+# Written by preprocess next to hodprior.csv: the physical
+# eta_vb_centrals/noise_radial bounds used to normalize the reparam, needed
+# to invert it (hodprior.csv has eta_vb_centrals renamed to degen_r).
+REPARAM_BOUNDS_FILE = 'reparam_bounds.yaml'
 
 
 def saved_reparam_degeneracy(exp_path):

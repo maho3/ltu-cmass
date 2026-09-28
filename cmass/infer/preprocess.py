@@ -31,7 +31,8 @@ from ..utils import get_source_path, timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 from .tools import (split_experiments, iter_kcuts, kcut_dirname, resolve_kmax,
                     reparam_degeneracy_bounds, apply_degeneracy_reparam,
-                    DEGEN_NAME_A, DEGEN_NEW_NAME_R, DEGEN_R_PRIOR_BOUNDS)
+                    DEGEN_NAME_A, DEGEN_NAME_B, DEGEN_NEW_NAME_R,
+                    DEGEN_R_PRIOR_BOUNDS, REPARAM_BOUNDS_FILE)
 from .loaders import (
     preprocess_Pk, preprocess_Bk,
     _construct_hod_prior_from_summaries, _construct_noise_prior,
@@ -309,7 +310,7 @@ def run_preprocessing(summaries, parameters, ids, positions,
         # reparameterize the eta_vb_centrals/noise_radial degeneracy into
         # polar (degen_r, degen_phi) coords, in place of theta's columns for
         # those two names
-        hodprior_save = hodprior
+        hodprior_save, reparam_bounds = hodprior, None
         if cfg.infer.get('reparam_degeneracy', False):
             if not (cfg.infer.include_hod and cfg.infer.include_noise):
                 raise ValueError(
@@ -325,6 +326,8 @@ def run_preprocessing(summaries, parameters, ids, positions,
                 hodprior, noiseprior)
             theta, theta_names = apply_degeneracy_reparam(
                 theta, theta_names, bounds_a, bounds_b)
+            reparam_bounds = {DEGEN_NAME_A: list(map(float, bounds_a)),
+                              DEGEN_NAME_B: list(map(float, bounds_b))}
 
             # rename the matching hodprior row for the saved hodprior.csv,
             # with an assumed uniform prior on degen_r -- the actual induced
@@ -406,6 +409,9 @@ def run_preprocessing(summaries, parameters, ids, positions,
         if noiseprior is not None:
             with open(join(exp_path, 'noiseprior.yaml'), 'w') as f:
                 OmegaConf.save(noiseprior, f)
+        if reparam_bounds is not None:
+            OmegaConf.save(OmegaConf.create(reparam_bounds),
+                           join(exp_path, REPARAM_BOUNDS_FILE))
         # np.savetxt(join(exp_path, 'param_names.txt'), names, fmt='%s')
 
         # initialize Optuna study (to avoid overwriting during parallelization)

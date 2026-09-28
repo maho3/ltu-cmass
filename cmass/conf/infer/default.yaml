@@ -64,7 +64,7 @@ subselect_cosmo: null # whether to subselect cosmologies by index
 # follows A^2+B^2=const in prior-normalized units) into polar coords
 # (degen_r, degen_phi) parallel/perpendicular to the degeneracy. Requires
 # include_hod and include_noise both True. The (degen_r, degen_phi) prior
-# is assumed uniform (0, inf) x (0, 90) deg for now -- TODO: derive the
+# is assumed uniform (0, sqrt2) x (0, 90) deg for now -- TODO: derive the
 # actual induced prior from the eta_vb_centrals/noise_radial priors instead
 # of assuming uniform.
 reparam_degeneracy: False
