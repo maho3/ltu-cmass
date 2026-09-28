@@ -21,8 +21,8 @@ import optuna.visualization.matplotlib as vis
 from matplotlib import pyplot as plt
 
 from .tools import (select_top_trials, split_experiments, load_posterior,
-                    iter_kcuts, kcut_dirname, study_name_from_path,
-                    saved_reparam_degeneracy)
+                    iter_kcuts, kcut_dirname, study_name_from_path)
+from .reparam import DEGENERACY, saved_reparam_degeneracy
 from ..utils import timing_decorator, clean_up
 from ..nbody.tools import parse_nbody_config
 
@@ -245,10 +245,9 @@ def run_experiment(exp, cfg, model_path):
                     filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
             if cfg.infer.include_noise:
-                if saved_reparam_degeneracy(exp_path):
-                    names += ['degen_phi', 'noise_transverse']
-                else:
-                    names += ['noise_radial', 'noise_transverse']
+                names += ['noise_radial', 'noise_transverse']
+            if saved_reparam_degeneracy(exp_path):
+                names = DEGENERACY.rename(names)
         except FileNotFoundError:
             raise FileNotFoundError(
                 f'Could not find test data for {name} with kmax={kmax}.'
