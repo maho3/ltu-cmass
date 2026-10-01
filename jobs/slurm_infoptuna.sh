@@ -17,14 +17,14 @@ conda activate cmass
 # exp_index=0
 net_index=$SLURM_ARRAY_TASK_ID
 
-sleep $net_index  # to stagger the start of each job
+sleep $(( net_index * ${STAGGER:-1} ))  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
 
 nbody=abacuslike
 sim=fastpm_charm7_cosmoHOD_reparam
-infer=mixk  # simple  # lightcone # mixk_survey
+infer=${infer:-mixk}  # simple  # lightcone # mixk_survey # k03
 
 tracer=${tracer:-galaxy}
 extras="nbody.zf=0.5 infer.embedding_net=fun net=niall2 infer.reparam_degeneracy=True" # 

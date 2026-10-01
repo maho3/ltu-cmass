@@ -32,7 +32,12 @@ Every stage is idempotent and resume-safe: A and C skip draws that already have
 their output, B skips draws with no `nbody.h5` yet or an existing `halos.h5`, so
 B and C can be re-run as the stage before them drains.
 
-`draw.py` prints the campaign path for the `ppcdir` variable in the job scripts,
+`draw.py` prints the campaign path; the snapshot stage scripts take it as `PPC`
+from the environment (`PPC=ppc/.../obs00038 sbatch --array=0-49 ppc/slurm_nbody.sh`;
+`LAST=49` for `slurm_charm.sh`). `params/ppc_<tag>_cosmo.txt` is keyed by tag
+only, so campaigns on the same lhid need distinct `--tag`s; `draw.py` refuses to
+overwrite an existing one. `--obs_noiseid` pins the noise-grid row of an OOD
+observation,
 and `--start N` extends a campaign (earlier draws are carried over verbatim from
 the npz, never regenerated).
 
@@ -232,5 +237,4 @@ inverts them to the physical values for the sims (bounds from the experiment's
 `hodprior.csv` and the experiment's `noiseprior.yaml`), rejects
 draws that map outside the physical prior box, and stores both
 `theta_draws` (reparam) and `theta_phys` in the npz. `collect.py` verifies sims
-against `theta_phys`. The stage scripts take `TAG` from the environment
-(`TAG=obs01880 sbatch ppc/slurm_nbody.sh`).
+against `theta_phys`.

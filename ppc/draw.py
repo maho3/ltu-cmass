@@ -77,6 +77,13 @@ def build_argparser():
                         'test point. For suites whose cosmologies are not all '
                         'LCDM (abacus), pick one the forward chain can '
                         'actually reproduce')
+    p.add_argument('--obs_noiseid', type=int, default=None,
+                   help='with --testing_suite: restrict the observed row to '
+                        'this noise-grid index (noiseid_test.npy) of the '
+                        'testing suite')
+    p.add_argument('--overwrite', action='store_true',
+                   help='allow --start=0 to replace an existing '
+                        'params/ppc_<tag>_cosmo.txt')
     p.add_argument('--tag', default=None,
                    help='names the output dir and params/ppc_<tag>_cosmo.txt '
                         '(default: obs<lhid>)')
@@ -175,8 +182,16 @@ def draw_theta(ensemble, x_obs, n, seed, device, accept=None):
     return np.concatenate(kept)[:n], n_rejected
 
 
-def write_cosmofile(path, cosmo, start):
-    """Space-delimited, one row per draw id, matching latin_hypercube_params."""
+def write_cosmofile(path, cosmo, start, overwrite=False):
+    """Space-delimited, one row per draw id, matching latin_hypercube_params.
+
+    The file is keyed by tag alone, so two campaigns sharing a tag (e.g. the
+    same obs lhid under different experiments) would silently share it.
+    """
+    if start == 0 and exists(path) and not overwrite:
+        raise SystemExit(
+            f'{path} already exists, probably from another campaign with the '
+            'same tag. Pick a distinct --tag, or pass --overwrite.')
     if start > 0:
         if not exists(path):
             raise FileNotFoundError(
@@ -206,6 +221,8 @@ def main():
     args = build_argparser().parse_args()
     if (args.testing_suite is None) != (args.testing_sim is None):
         raise SystemExit('--testing_suite and --testing_sim go together.')
+    if args.obs_noiseid is not None and args.testing_suite is None:
+        raise SystemExit('--obs_noiseid is only supported with --testing_suite')
     exp = ExpPath(args.exp_path)
     testing = (None if args.testing_suite is None else
                exp.swap_suite(args.wdir, args.testing_suite, args.testing_sim))
@@ -234,6 +251,13 @@ def main():
             x[iobs], theta[iobs], ids[iobs], tags[iobs])
     else:
         check_preprocessing(cfg, testing)
+        if is_reparam(names) != bool(OmegaConf.load(
+                join(testing, 'config.yaml')).infer.get(
+                    'reparam_degeneracy', False)):
+            raise SystemExit(
+                f'{testing} and the experiment disagree on '
+                'infer.reparam_degeneracy, so theta_obs is in the wrong '
+                'coordinates.')
         x_t, theta_t, ids_t = load_test_split(testing)
         if x_t.shape[1] != x.shape[1] or theta_t.shape[1] != theta.shape[1]:
             raise SystemExit(
@@ -243,10 +267,20 @@ def main():
                 'preprocessed with the same summaries and k-cut.')
         # Quantiles stay referenced to the training pool, as in resim.py: the
         # question is which OOD point is most central to what the model saw.
+        mask = None
+        if args.obs_noiseid is not None:
+            noiseid_t = np.load(join(testing, 'noiseid_test.npy'))[:, 0]
+            assert len(noiseid_t) == len(ids_t), (len(noiseid_t), len(ids_t))
+            mask = noiseid_t == args.obs_noiseid
+            if not mask.any():
+                raise SystemExit(f'No test rows with noiseid {args.obs_noiseid}')
         if args.obs_lhid is None:
+            if mask is not None:
+                raise SystemExit('--obs_noiseid needs --obs_lhid')
             iobs = select_test_point(theta_t, None, theta)
         else:
-            iobs = select_by_lhid(theta_t, ids_t, theta, args.obs_lhid)
+            iobs = select_by_lhid(theta_t, ids_t, theta, args.obs_lhid,
+                                  mask=mask)
         x_obs, theta_obs, id_obs, split_obs = (
             x_t[iobs], theta_t[iobs], ids_t[iobs], 'test')
 
@@ -320,7 +354,8 @@ def main():
 
     # --- cosmofile (round-trip so theta_ppc matches what the sims read) -----
     cosmofile = join('params', f'ppc_{tag}_cosmo.txt')
-    write_cosmofile(cosmofile, theta_draws[:, :N_COSMO], args.start)
+    write_cosmofile(cosmofile, theta_draws[:, :N_COSMO], args.start,
+                    args.overwrite)
     theta_draws[:, :N_COSMO] = np.loadtxt(cosmofile, ndmin=2)
     print(f'Wrote {cosmofile} ({n_total} rows)')
 
