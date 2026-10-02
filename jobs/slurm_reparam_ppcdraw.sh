@@ -11,6 +11,8 @@
 
 # Stage 0 for the 2026-09-30 OOD PPCs: 50 draws per campaign at Abacus lhid 38,
 # noise (0, 0), against the reparam Abacus test preprocessing.
+#   sbatch jobs/slurm_reparam_ppcdraw.sh                 # the four 0.2/0.4 campaigns
+#   sbatch --export=ALL,set=k03 jobs/slurm_reparam_ppcdraw.sh   # the three kmax=0.3 ones
 
 source ~/.bashrc
 conda activate cmass
@@ -18,10 +20,17 @@ cd /u/maho3/git/ltu-cmass
 export OMP_NUM_THREADS=16
 
 M=/work/hdd/bdne/maho3/cmass-ili/abacuslike/fastpm_charm7_cosmoHOD_reparam/models/galaxy
-for c in "zPk0+zPk2+zPk4+zBk0/kmin-0.0_kmax-zBk=0.2__zPk=0.2 zPk024zBk0k02" \
-         "zPk0/kmin-0.0_kmax-0.2 zPk0k02" \
-         "zPk0+zPk2+zPk4/kmin-0.0_kmax-0.2 zPk024k02" \
-         "zPk0+zPk2+zPk4/kmin-0.0_kmax-0.4 zPk024k04"; do
+if [ "${set:-main}" = "k03" ]; then
+    cases=("zPk0+zPk2+zPk4+zBk0/kmin-0.0_kmax-zBk=0.3__zPk=0.3 zPk024zBk0k03"
+           "zPk0/kmin-0.0_kmax-0.3 zPk0k03"
+           "zPk0+zPk2+zPk4/kmin-0.0_kmax-0.3 zPk024k03")
+else
+    cases=("zPk0+zPk2+zPk4+zBk0/kmin-0.0_kmax-zBk=0.2__zPk=0.2 zPk024zBk0k02"
+           "zPk0/kmin-0.0_kmax-0.2 zPk0k02"
+           "zPk0+zPk2+zPk4/kmin-0.0_kmax-0.2 zPk024k02"
+           "zPk0+zPk2+zPk4/kmin-0.0_kmax-0.4 zPk024k04")
+fi
+for c in "${cases[@]}"; do
     read -r exp tag <<< "$c"
     echo "=== $exp ($tag)"
     PYTHONPATH=. python -u ppc/draw.py --exp_path "$M/$exp" --ndraw 50 \
