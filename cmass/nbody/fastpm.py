@@ -297,6 +297,10 @@ def _convert_snapshots(cfg, localwork, poll=10):
         process_single_snapshot(cfg, localwork, a, delete_files=True)
         logging.info(f"Converter: snapshot a={a:.4f} converted")
 
+    if delete_files:
+        infile.close()
+        shutil.rmtree(snapdir)
+
 
 @timing_decorator
 def process_outputs(cfg, workdir, outdir, delete_files=True,
