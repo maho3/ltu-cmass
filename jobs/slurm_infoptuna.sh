@@ -17,7 +17,7 @@ conda activate cmass
 # exp_index=0
 net_index=$SLURM_ARRAY_TASK_ID
 
-sleep $(( net_index * ${STAGGER:-1} ))  # to stagger the start of each job
+sleep $net_index  # to stagger the start of each job
 
 # Command to run for each lhid
 cd /u/maho3/git/ltu-cmass
