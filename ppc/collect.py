@@ -173,13 +173,29 @@ def load_summ(diagfile, lightcone=False):
     return s
 
 
+def block_kmax(summ, kmax, bk_kmax):
+    """kmax for one plotted block. A per-observable k-cut only names the
+    inference families, so a held-out block it does not cover (zQk0, zBk2
+    under {zPk, zBk}) takes the zBk cut if it is a bispectrum-like block, else
+    the zPk cut."""
+    base, _ = split_tag(summ)
+    is_bk = ('Bk' in base) or ('Qk' in base)
+    if is_bk and bk_kmax is not None:
+        return bk_kmax
+    try:
+        return resolve_kmax(kmax, summ)
+    except KeyError:
+        fam = ('zBk' if is_bk else 'zPk') if summ.startswith('z') else \
+              ('Bk' if is_bk else 'Pk')
+        return resolve_kmax(kmax, fam)
+
+
 def preprocess_block(summ, data, cfg, kmin, kmax, bk_kmax):
     """One summary block, preprocessed exactly as run_preprocessing does."""
     base, tag = split_tag(summ)
     norm_key = base[:-1] + '0'
     is_bk = ('Bk' in base) or ('Qk' in base)
-    skmax = (bk_kmax if (is_bk and bk_kmax is not None)
-             else resolve_kmax(kmax, summ))
+    skmax = block_kmax(summ, kmax, bk_kmax)
     norm = None if '0' in base else data[norm_key]
     if is_bk:
         x = preprocess_Bk(data[base], kmin=kmin, kmax=skmax, norm=norm,
@@ -201,8 +217,7 @@ def block_axis(summ, kdata, kmin, kmax, bk_kmax):
     """
     base, tag = split_tag(summ)
     is_bk = ('Bk' in base) or ('Qk' in base)
-    skmax = (bk_kmax if (is_bk and bk_kmax is not None)
-             else resolve_kmax(kmax, summ))
+    skmax = block_kmax(summ, kmax, bk_kmax)
     if not is_bk:
         k = np.asarray(kdata)
         return (k[_is_in_kminmax(k, kmin, skmax)], r'$k$ [$h$/Mpc]', skmax,
