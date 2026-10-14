@@ -29,8 +29,11 @@ CHARM_YAML=/u/maho3/git/CHARM/run_configs/TRAIN_CHARM_JOINT_v2vel_finetune2.yaml
 
 cd /u/maho3/git/ltu-cmass
 
-tag=obs01880
-ppcdir=ppc/abacuslike_fastpm_charm6_comphod/zPk0+zPk2+zPk4_kmin-0.0_kmax-0.4/$tag
+# PPC: campaign dir relative to the wdir, as printed by draw.py, e.g.
+#   ppc/<suite>_<sim>/<summaries>_<kcut>/[testing/<tsuite>_<tsim>/]<tag>
+ppcdir=${PPC:?set PPC (campaign path printed by draw.py)}
+ppcdir=${ppcdir%/}
+tag=$(basename "$ppcdir")
 L=2000
 N=256
 

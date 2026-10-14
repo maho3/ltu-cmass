@@ -24,5 +24,7 @@ export OMP_NUM_THREADS=16
 export MKL_NUM_THREADS=16
 export TQDM_DISABLE=0
 
-PYTHONPATH=. python -u ppc/collect.py --n_post 5000 --device cpu
+ppcdir=/work/hdd/bdne/maho3/cmass-ili/${PPC:?set PPC (campaign path printed by draw.py)}
+
+PYTHONPATH=. python -u ppc/collect.py --ppc_dir "$ppcdir" --n_post 5000 --device cpu
 echo "ppc_collect status=$?"
