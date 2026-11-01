@@ -198,6 +198,12 @@ def parse_noise(
         a = np.log(params['a'])
         b = np.log(params['b'])
         radial, transverse = np.exp(np.random.uniform(a, b, size=2))
+    elif dist == 'ReciprocalTransverse':  # fixed radial, Reciprocal transverse
+        a = np.log(params['a'])
+        b = np.log(params['b'])
+        # draw both so transverse matches 'Reciprocal' at the same seed
+        _, transverse = np.exp(np.random.uniform(a, b, size=2))
+        radial = params['radial']
     elif dist == 'Exponential':
         scale = params['scale']
         radial, transverse = np.random.exponential(scale, size=2)
