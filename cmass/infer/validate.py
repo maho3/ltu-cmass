@@ -245,7 +245,11 @@ def run_experiment(exp, cfg, model_path):
                     filepath, delimiter=',', dtype=object)
                 names += hodprior[:, 0].astype('str').tolist()
             if cfg.infer.include_noise:
-                names += ['noise_radial', 'noise_transverse']
+                filepath = join(exp_path, 'noiseprior.yaml')
+                if OmegaConf.load(filepath).dist == 'ReciprocalTransverse':
+                    names += ['noise_transverse']
+                else:
+                    names += ['noise_radial', 'noise_transverse']
             if saved_reparam_degeneracy(exp_path):
                 names = DEGENERACY.rename(names)
         except FileNotFoundError:

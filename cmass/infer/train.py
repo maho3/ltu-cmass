@@ -88,7 +88,7 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                 low, high = -np.inf, np.inf
             elif noiseprior.dist == 'Uniform':
                 low, high = noiseprior.params.a, noiseprior.params.b
-            elif noiseprior.dist == 'Reciprocal':
+            elif noiseprior.dist in ['Reciprocal', 'ReciprocalTransverse']:
                 low, high = noiseprior.params.a, noiseprior.params.b
             elif noiseprior.dist == 'Exponential':
                 low, high = 0, np.inf
@@ -97,6 +97,10 @@ def prepare_prior(prior_name, device, theta=None, hodprior=None, noiseprior=None
                     f'Noise prior distribution {noiseprior.dist} not '
                     'implemented.')
             noise_lims = np.array([[low, high]]*2)
+            if noiseprior.dist == 'ReciprocalTransverse':
+                assert not reparam_degeneracy, \
+                    'reparam_degeneracy needs a varied noise_radial'
+                noise_lims = noise_lims[1:]  # radial is fixed
             if reparam_degeneracy:
                 # noise_radial's slot now holds degen_phi
                 noise_lims[0] = DEGENERACY.prior_bounds[DEGENERACY.phi]

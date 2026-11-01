@@ -166,7 +166,9 @@ def setup_optuna(exp_path, name, n_startup_trials):
     study = optuna.create_study(
         sampler=sampler,
         direction="maximize",
-        storage='sqlite:///'+join(exp_path, 'optuna_study.db'),
+        storage=optuna.storages.RDBStorage(
+            'sqlite:///'+join(exp_path, 'optuna_study.db'),
+            engine_kwargs={'connect_args': {'timeout': 300}}),
         study_name=name,
         load_if_exists=True
     )
