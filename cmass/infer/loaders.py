@@ -36,6 +36,8 @@ def get_noise_params(diagfile):
             g = f[list(f.keys())[0]]
             noise_params = [g.attrs['noise_radial'],
                             g.attrs['noise_transverse']]
+        if f.attrs.get('noise_dist', None) == 'ReciprocalTransverse':
+            noise_params = noise_params[1:]  # radial is fixed
     return np.array(noise_params)
 
 

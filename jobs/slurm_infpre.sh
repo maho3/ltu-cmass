@@ -1,12 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=preprocess  # Job name
 #SBATCH --nodes=1               # Number of nodes
-#SBATCH --ntasks=4            # Number of tasks
+#SBATCH --ntasks=16            # Number of tasks
+#SBATCH --mem=128G              # Amount of memory
 #SBATCH --time=4:00:00         # Time limit
-#SBATCH --partition=shared  # Partition name
-#SBATCH --account=phy240043  # Account name
-#SBATCH --output=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out  # Output file for each array task
-#SBATCH --error=/anvil/scratch/x-mho1/jobout/%x_%A_%a.out   # Error file for each array task
+#SBATCH --partition=cpu  # Partition name
+#SBATCH --account=bdne-delta-cpu  # Account name
+#SBATCH --output=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out  # Output file for each array task
+#SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%A_%a.out   # Error file for each array task
 
 SLURM_ARRAY_TASK_ID=0
 # export TQDM_DISABLE=0
