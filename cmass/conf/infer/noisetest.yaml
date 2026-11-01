@@ -1,0 +1,20 @@
+defaults:
+  - mixk
+  - _self_
+
+# noise-marginalization inflation test (2026-10-14), cuts match cosmoHOD_reparam
+experiments:
+  - summary: [zPk0]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4, 0.6]
+  - summary: [zPk0, zPk2, zPk4]
+    kmin: [0.]
+    kmax: [0.2, 0.3, 0.4, 0.6]
+  - summary: [zPk0, zPk2, zPk4, zBk0]
+    kmin: [0.]
+    kmax:
+      - {zPk: 0.2, zBk: 0.2}
+      - {zPk: 0.4, zBk: 0.2}
+      - {zPk: 0.6, zBk: 0.2}
+      - {zPk: 0.3, zBk: 0.3}
+      - {zPk: 0.4, zBk: 0.4}
