@@ -2,7 +2,7 @@
 #SBATCH --job-name=du_bdne      # Job name
 #SBATCH --nodes=1               # Number of nodes
 #SBATCH --ntasks=1              # Number of tasks
-#SBATCH --cpus-per-task=64      # Parallel du workers
+#SBATCH --cpus-per-task=16      # Parallel du workers
 #SBATCH --time=12:00:00         # Time limit
 #SBATCH --partition=cpu         # Partition name
 #SBATCH --account=bdne-delta-cpu  # Account name
@@ -10,8 +10,8 @@
 #SBATCH --error=/work/hdd/bdne/maho3/jobout/%x_%j.out   # Error file
 
 ROOT=/work/hdd/bdne
-OUT=/work/hdd/bdne/maho3/du_bdne
-NPROC=64
+OUT=${OUT:-/work/hdd/bdne/maho3/du_bdne}
+NPROC=${SLURM_CPUS_PER_TASK:-16}
 
 mkdir -p "$OUT"
 
@@ -19,8 +19,10 @@ mkdir -p "$OUT"
 find "$ROOT" -mindepth 2 -maxdepth 2 -print0 2>/dev/null > "$OUT/worklist"
 echo "work units: $(tr -cd '\0' < "$OUT/worklist" | wc -c)"
 
-xargs -0 -n1 -P "$NPROC" du -s --block-size=1 -- < "$OUT/worklist" \
+# DU_TIMEOUT (e.g. 55m) caps the scan; roll-up below then covers completed units only
+timeout "${DU_TIMEOUT:-0}" xargs -0 -n1 -P "$NPROC" du -s --block-size=1 -- < "$OUT/worklist" \
     2> "$OUT/errors.log" > "$OUT/raw.tsv"
+echo "completed units: $(wc -l < "$OUT/raw.tsv")"
 
 # Roll up by user (2nd path component)
 awk -F'\t' -v root="$ROOT" '
