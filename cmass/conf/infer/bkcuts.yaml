@@ -1,0 +1,18 @@
+defaults:
+  - mixk
+  - _self_
+
+# Mixed P(k)/B(k) cuts for the 2026-11 Abacus PPC round. Trained without
+# Optuna: the study db is copied from the nearest existing cut (see
+# jobs/slurm_bkcuts_infpre.sh header).
+experiments:
+  - summary: [zPk0, zPk2, zPk4]
+    kmin: [0.]
+    kmax: [0.25]
+  - summary: [zPk0, zPk2, zPk4, zBk0]
+    kmin: [0.]
+    kmax:
+      - {zPk: 0.2, zBk: 0.08}
+      - {zPk: 0.25, zBk: 0.2}
+      - {zPk: 0.3, zBk: 0.1}
+      - {zPk: 0.3, zBk: 0.12}
